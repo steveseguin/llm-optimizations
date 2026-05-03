@@ -1,0 +1,14 @@
+--- /tmp/vllm-0.20.1-orig/vllm/platforms/xpu.py	2026-05-03 03:20:28.000000000 -0400
++++ /home/steve/.venvs/vllm-xpu-managed/lib/python3.12/site-packages/vllm/platforms/xpu.py	2026-05-03 14:10:20.994140036 -0400
+@@ -195,7 +195,10 @@
+                 "XPU Graph is disabled by environment variable, "
+                 "please set VLLM_XPU_ENABLE_XPU_GRAPH=1 to enable it."
+             )
+-        elif parallel_config.world_size_across_dp > 1:
++        elif (
++            parallel_config.world_size_across_dp > 1
++            and os.getenv("VLLM_XPU_FORCE_GRAPH_WITH_COMM", "0") != "1"
++        ):
+             compilation_config.cudagraph_mode = CUDAGraphMode.NONE
+             logger.warning(
+                 "XPU Graph doesn't support capture communication ops, "
