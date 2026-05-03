@@ -37,6 +37,14 @@ def post_payload(key: str, payload: dict) -> tuple[int, str, int | None]:
         return exc.code, text, retry_after_ms
 
 
+def print_success_response(text: str) -> None:
+    try:
+        parsed = json.loads(text)
+        print(json.dumps({"id": parsed.get("id"), "status": parsed.get("status")}))
+    except Exception:
+        print(text[:500])
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -71,11 +79,7 @@ def main() -> int:
         status, text, retry_after_ms = post_payload(key, item["payload"])
         print(f"{index}/{len(queue)} {label}: HTTP {status}")
         if 200 <= status < 300:
-            try:
-                parsed = json.loads(text)
-                print(json.dumps({"id": parsed.get("id"), "status": parsed.get("status")}))
-            except Exception:
-                print(text[:500])
+            print_success_response(text)
             continue
 
         print(text[:1000], file=sys.stderr)
@@ -88,6 +92,7 @@ def main() -> int:
             if not (200 <= status < 300):
                 print(text[:1000], file=sys.stderr)
                 return 1
+            print_success_response(text)
         else:
             return 1
     return 0
