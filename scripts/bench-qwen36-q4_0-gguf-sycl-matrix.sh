@@ -22,7 +22,7 @@ mkdir -p "$OUT_DIR"
   echo "model=$MODEL"
   echo "llama_bench=$LLAMA_BENCH"
   echo "ONEAPI_DEVICE_SELECTOR=$ONEAPI_DEVICE_SELECTOR"
-  "$LLAMA_BENCH" --version 2>&1 || true
+  git -C /home/steve/src/llama.cpp rev-parse --short HEAD 2>/dev/null | sed 's/^/llama_cpp_commit=/'
   sycl-ls 2>&1 || true
 } > "$META"
 
