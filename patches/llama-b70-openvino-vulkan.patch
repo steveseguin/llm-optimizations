@@ -1,0 +1,42 @@
+diff --git a/ggml/src/ggml-sycl/CMakeLists.txt b/ggml/src/ggml-sycl/CMakeLists.txt
+index 8e589fa..888d468 100644
+--- a/ggml/src/ggml-sycl/CMakeLists.txt
++++ b/ggml/src/ggml-sycl/CMakeLists.txt
+@@ -135,7 +135,7 @@ endif()
+ 
+ if (GGML_SYCL_TARGET STREQUAL "INTEL")
+     add_compile_definitions(GGML_SYCL_WARP_SIZE=16)
+-    target_link_options(ggml-sycl PRIVATE  -Xs   -ze-intel-greater-than-4GB-buffer-required)
++    target_link_options(ggml-sycl PRIVATE -Xs "-internal_options -ze-intel-greater-than-4GB-buffer-required")
+ 
+     # Link against Intel oneMKL
+     if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+diff --git a/ggml/src/ggml-vulkan/ggml-vulkan.cpp b/ggml/src/ggml-vulkan/ggml-vulkan.cpp
+index c2f1883..f3863c6 100644
+--- a/ggml/src/ggml-vulkan/ggml-vulkan.cpp
++++ b/ggml/src/ggml-vulkan/ggml-vulkan.cpp
+@@ -16379,6 +16379,8 @@ static uint32_t ggml_vk_intel_shader_core_count(const vk::PhysicalDevice& vkdev)
+     case 0xE20B:  // B580
+     case 0xE211:  // Pro B60
+         return 20;
++    case 0xE223:  // Pro B70
++        return 32;
+     default:
+         return 0;
+     }
+
+# Notes
+#
+# This is the clean, apply-ready subset from the local llama.cpp work. The broader local
+# diff also contains experimental OpenVINO scheduler/device-name/debug changes used to
+# analyze Qwen3.6 graph fragmentation on OpenVINO L0. That larger diff is intentionally
+# not treated as an apply-ready patch because the path still produces hundreds of graph
+# islands and is not performance-competitive yet.
+#
+# The OpenVINO exploration found these actionable issues:
+# - GPU.0/GPU.1 need exact GPU-device handling instead of assuming only "GPU".
+# - L0 builds do not satisfy the OpenCL remote-context path currently used by llama.cpp.
+# - Qwen3.6 recurrent blocks fragment badly around SSM_CONV, GATED_DELTA_NET, L2_NORM,
+#   ROPE/view inputs, and stateful KV/cache copy/update placement.
+# - Basic sigmoid/softplus OpenVINO unary support reduced split count, but GATED_DELTA_NET
+#   remains the dominant blocker.
