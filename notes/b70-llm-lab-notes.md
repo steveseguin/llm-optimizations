@@ -4,15 +4,24 @@ Date: 2026-05-03
 
 ## Current Best State
 
-Best single-B70 path:
+Important correction:
+
+- The over-40 tok/s vLLM result is an INT4 AutoRound result and is not counted as success against the original quality-preserving Q4_0 GGUF target.
+- The active Q4_0 plan is `plans/q4_0-gguf-b70-optimization-plan.md`.
+- New Q4_0 benchmark harnesses:
+  - `scripts/bench-qwen36-q4_0-gguf-vulkan-matrix.sh`
+  - `scripts/bench-qwen36-q4_0-gguf-sycl-matrix.sh`
+
+Best single-B70 speed path so far:
 
 - Engine: vLLM 0.20.1 XPU.
 - Model: `Lorbus/Qwen3.6-27B-int4-AutoRound`.
 - Patch: local XPU MTP fallback for Qwen3.6 Gated DeltaNet speculative metadata.
 - Shape `input=500`, `output=256`: `5.67 s`, about `45.2 output tok/s`, `133.44 total tok/s`.
 - Shape `input=500`, `output=512`: `12.40 s`, about `41.3 output tok/s`, `81.60 total tok/s`.
+- Treat this as a separate quantization tradeoff result, not as Q4_0 GGUF success.
 
-Best dual-B70 path:
+Best dual-B70 speed path so far:
 
 - Engine: vLLM 0.20.1 XPU, tensor parallel size 2, non-MTP.
 - Shape `input=500`, `output=256`: `5.22 s`, about `49.1 output tok/s`, `144.88 total tok/s`.
@@ -23,11 +32,12 @@ GGUF paths so far:
 
 - llama.cpp SYCL single-card Qwen3.6 27B Q4_0 GGUF: about `24.6 tok/s` decode.
 - llama.cpp Vulkan with B70 core-count patch on system Mesa: about `22 tok/s` decode.
+- Windows Q4_0 comparison target is `>=27 tok/s`, with external results up to about `28.8 tok/s`.
 - llama.cpp dual split is not viable locally yet.
 
 ## LocalMaxxing Submissions
 
-All submitted results returned `APPROVED`.
+All submitted vLLM INT4 results returned `APPROVED`.
 
 | Label | LocalMaxxing ID | GPUs | Input | Output | tok/s out | tok/s total |
 | --- | --- | ---: | ---: | ---: | ---: | ---: |
@@ -49,6 +59,13 @@ All submitted results returned `APPROVED`.
 - Level Zero loader/tools: installed and visible to OpenVINO/SYCL.
 - oneAPI compiler/MKL/DNNL 2026.0 installed.
 
+## Latest Stack Signals
+
+- Intel compute-runtime `26.14.37833.4` is still the latest GitHub release found on 2026-05-03 and is already installed.
+- Local llama.cpp is at `b9010`/`d05fe1d`; `origin/master` is one commit ahead at `db44417`.
+- Upstream llama.cpp still lacks the B70 Vulkan core-count entry for PCI ID `0xE223`, so the local patch remains required.
+- OpenVINO docs include an internal `GatedDeltaNet` op specification, but local OpenVINO 2026.1.2 source does not expose a matching implementation under `src/`; this is now an explicit R&D item.
+
 ## XCCL P2P Microbenchmark
 
 With `CCL_TOPO_P2P_ACCESS=1`:
@@ -62,23 +79,6 @@ With `CCL_TOPO_P2P_ACCESS=1`:
 
 With P2P disabled, large all-reduce falls to about 5 GB/s. Communication bandwidth is not the main TP2 blocker; vLLM's disabled XPU graph capture around communication is the larger issue.
 
-## vLLM Patch Notes
-
-`patches/vllm-xpu-mtp-fallback.patch` changes vLLM 0.20.1 so the XPU Gated DeltaNet path falls back to the generic `_forward_core` path when speculative sequence masks are present. This avoids the original XPU speculative assert and makes MTP usable on a single B70.
-
-`patches/vllm-xpu-force-graph-with-comm-experiment.patch` is a negative result. It adds a guarded environment override for XPU graph capture with TP communication, but forcing it hits a CUDA-specific communicator assertion in vLLM internals. The useful follow-up is not this flag; it is designing an XPU-safe graph/communication capture boundary or XPU communicator equivalent.
-
-## llama.cpp / OpenVINO Findings
-
-OpenVINO 2026.1 L0 source build worked after adding a missing `#include <cstdint>` in OpenVINO GPU plugin source for the L0 build path. Tiny OpenVINO GPU inference succeeded.
-
-The llama.cpp OpenVINO backend is not currently competitive for Qwen3.6 27B GGUF on B70. The main issue is graph fragmentation: Qwen3.6 recurrent/Gated DeltaNet blocks split into hundreds of CPU/GPU islands, and compile/load time dominates. Basic sigmoid and softplus OpenVINO unary support helped split count but did not address the core recurrent path.
-
-The clean llama.cpp patch currently worth carrying is in `patches/llama-b70-openvino-vulkan.patch`:
-
-- fixes the oneAPI 2026 SYCL linker flag spelling for the greater-than-4GB buffer option;
-- adds Intel PCI device `0xE223` as Arc Pro B70 with 32 shader cores to the Vulkan backend.
-
 ## Quality Notes
 
 The over-40 tok/s numbers are from the INT4 AutoRound model, not from the Q4_0 GGUF and not from fp8/fp16. That is a real quantization tradeoff. It should be benchmarked with quality evals before using it as a quality-equivalent replacement.
@@ -87,8 +87,8 @@ The MTP speedup should not intentionally change accepted-token semantics, but th
 
 ## Next Work
 
-- Run a quality sanity suite against INT4 AutoRound MTP versus non-MTP and GGUF Q4_0.
-- Implement or prototype an XPU-native speculative Gated DeltaNet kernel path to replace the generic fallback.
-- Investigate vLLM TP2 graph capture around XCCL communication instead of forcing CUDA graph assumptions.
-- Test Mesa main ANV for B70 Vulkan once the dependency/build path is practical.
-- Continue tracking Intel compute-runtime, IGC, OpenVINO, llama.cpp, and vLLM changes as B70 support matures.
+- Run the Q4_0 Vulkan and SYCL matrices and submit only comparable GGUF results to LocalMaxxing.
+- Rebuild llama.cpp from current upstream plus the B70 `0xE223` Vulkan patch.
+- Build/test Mesa main ANV locally and compare against system Mesa.
+- Reproduce the Windows SYCL Q4_0 command shape and instrument Q4_0 reorder.
+- Keep dual-GPU GGUF work paused until single-card Q4_0 is at least back in the Windows range.
