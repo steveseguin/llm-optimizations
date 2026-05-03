@@ -1,0 +1,101 @@
+--- /tmp/vllm-0.20.1-orig/vllm/model_executor/layers/mamba/gdn_linear_attn.py	2026-05-03 03:20:28.000000000 -0400
++++ /home/steve/.venvs/vllm-xpu-managed/lib/python3.12/site-packages/vllm/model_executor/layers/mamba/gdn_linear_attn.py	2026-05-03 13:49:53.831583702 -0400
+@@ -623,15 +623,51 @@
+             dtype=hidden_states.dtype,
+             device=hidden_states.device,
+         )
+-        z = torch.empty_like(core_attn_out)
++        forward_context = get_forward_context()
++        attn_metadata_raw = forward_context.attn_metadata
++        use_generic_spec_core = False
++        if isinstance(attn_metadata_raw, dict):
++            attn_metadata = attn_metadata_raw.get(self.prefix)
++            use_generic_spec_core = (
++                isinstance(attn_metadata, GDNAttentionMetadata)
++                and attn_metadata.spec_sequence_masks is not None
++            )
+ 
+-        torch.ops.vllm.gdn_attention_core_xpu(
+-            core_attn_out,
+-            z,
+-            projected_states_qkvz,
+-            projected_states_ba,
+-            self.prefix,
+-        )
++        if use_generic_spec_core:
++            if self.gqa_interleaved_layout:
++                query, key, value, z, b, a = self.fix_query_key_value_ordering(
++                    projected_states_qkvz, projected_states_ba
++                )
++                query, key, value = map(
++                    lambda x: rearrange(x, "l p d -> l (p d)"), (query, key, value)
++                )
++                mixed_qkv = torch.cat((query, key, value), dim=-1)
++            else:
++                qkv_size = (self.key_dim * 2 + self.value_dim) // self.tp_size
++                z_size = self.value_dim // self.tp_size
++                mixed_qkv, z = projected_states_qkvz.split(
++                    [qkv_size, z_size], dim=-1
++                )
++                z = z.reshape(z.size(0), -1, self.head_v_dim)
++                b, a = projected_states_ba.chunk(2, dim=-1)
++                b = b.contiguous()
++                a = a.contiguous()
++
++            self._forward_core(
++                mixed_qkv=mixed_qkv,
++                b=b,
++                a=a,
++                core_attn_out=core_attn_out,
++            )
++        else:
++            z = torch.empty_like(core_attn_out)
++            torch.ops.vllm.gdn_attention_core_xpu(
++                core_attn_out,
++                z,
++                projected_states_qkvz,
++                projected_states_ba,
++                self.prefix,
++            )
+ 
+         # ============================================================
+         # Part 3: Output Projection
+--- /tmp/vllm-0.20.1-orig/vllm/_xpu_ops.py	2026-05-03 03:20:26.000000000 -0400
++++ /home/steve/.venvs/vllm-xpu-managed/lib/python3.12/site-packages/vllm/_xpu_ops.py	2026-05-03 13:55:11.834373374 -0400
+@@ -114,8 +114,34 @@
+     attn_metadata = attn_metadata_raw[self.prefix]
+     assert isinstance(attn_metadata, GDNAttentionMetadata)
+ 
+-    # TODO: xpu does not support speculative decoding yet
+-    assert attn_metadata.spec_sequence_masks is None  # type: ignore[attr-defined]
++    if attn_metadata.spec_sequence_masks is not None:  # type: ignore[attr-defined]
++        if self.gqa_interleaved_layout:
++            query, key, value, computed_z, b, a = self.fix_query_key_value_ordering(
++                projected_states_qkvz, projected_states_ba
++            )
++            query = query.reshape(query.size(0), -1)
++            key = key.reshape(key.size(0), -1)
++            value = value.reshape(value.size(0), -1)
++            mixed_qkv = torch.cat((query, key, value), dim=-1)
++        else:
++            qkv_size = (self.key_dim * 2 + self.value_dim) // self.tp_size
++            z_size = self.value_dim // self.tp_size
++            mixed_qkv, computed_z = projected_states_qkvz.split(
++                [qkv_size, z_size], dim=-1
++            )
++            computed_z = computed_z.reshape(computed_z.size(0), -1, self.head_v_dim)
++            b, a = projected_states_ba.chunk(2, dim=-1)
++            b = b.contiguous()
++            a = a.contiguous()
++
++        z.copy_(computed_z)
++        self._forward_core(
++            mixed_qkv=mixed_qkv,
++            b=b,
++            a=a,
++            core_attn_out=core_attn_out,
++        )
++        return
+ 
+     conv_weights = self.conv1d.weight.view(
+         self.conv1d.weight.size(0), self.conv1d.weight.size(2)
