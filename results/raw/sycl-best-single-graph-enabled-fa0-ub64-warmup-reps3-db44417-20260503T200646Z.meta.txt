@@ -1,0 +1,16 @@
+date_utc=20260503T200646Z
+model=/home/steve/models/qwen3.6-27b-q4_0-gguf/Qwen3.6-27B-Q4_0.gguf
+llama_bench=/home/steve/src/llama.cpp-q4-b70/build-sycl-2026-bmg-g31/bin/llama-bench
+llama_cpp_dir=/home/steve/src/llama.cpp-q4-b70
+ONEAPI_DEVICE_SELECTOR=level_zero:0
+ZES_ENABLE_SYSMAN=1
+UR_L0_ENABLE_RELAXED_ALLOCATION_LIMITS=1
+GGML_SYCL_DISABLE_GRAPH=0
+llama_cpp_commit=db44417
+llama_cpp_diff_stat= ggml/src/ggml-vulkan/ggml-vulkan.cpp | 12 +++++++++++-
+llama_cpp_diff_stat= 1 file changed, 11 insertions(+), 1 deletion(-)
+INFO: Output filtered by ONEAPI_DEVICE_SELECTOR environment variable, which is set to level_zero:0.
+To see device ids, use the --ignore-device-selectors CLI option.
+
+[level_zero:gpu] Intel(R) oneAPI Unified Runtime over Level-Zero V2, Intel(R) Graphics [0xe223] 20.2.0 [1.15.37833+4]
+## fa=0 ub=64 GGML_SYCL_DISABLE_OPT=0 GGML_SYCL_DISABLE_DNN=1
