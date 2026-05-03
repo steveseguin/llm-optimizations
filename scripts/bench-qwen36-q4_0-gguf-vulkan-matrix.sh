@@ -14,7 +14,7 @@ mkdir -p "$OUT_DIR"
   echo "date_utc=$STAMP"
   echo "model=$MODEL"
   echo "llama_bench=$LLAMA_BENCH"
-  "$LLAMA_BENCH" --version 2>&1 || true
+  git -C /home/steve/src/llama.cpp rev-parse --short HEAD 2>/dev/null | sed 's/^/llama_cpp_commit=/'
   vulkaninfo --summary 2>&1 || true
 } > "$META"
 
