@@ -1,0 +1,245 @@
+[
+  {
+    "label": "vllm-int4-single-b70-mtp-500-256",
+    "payload": {
+      "hfId": "Lorbus/Qwen3.6-27B-int4-AutoRound",
+      "modelRevision": "main",
+      "hardware": {
+        "hwClass": "DISCRETE_GPU",
+        "gpuName": "Intel Arc Pro B70 32GB",
+        "gpuCount": 1,
+        "vramGb": 32,
+        "cpu": "AMD EPYC 9015",
+        "ramGb": 16,
+        "os": "Ubuntu 24.04 LTS, kernel 6.17.0-14-generic"
+      },
+      "engineName": "vllm",
+      "engineVersion": "0.20.1",
+      "quantization": "INT4 AutoRound W4A16",
+      "promptTokens": 500,
+      "outputTokens": 256,
+      "contextLength": 4096,
+      "batchSize": 1,
+      "tokSOut": 45.2,
+      "notes": "Qwen3.6 27B INT4 AutoRound on Intel Arc Pro B70. Local vLLM XPU patches route Qwen3.6 MTP speculative Gated DeltaNet through a generic fallback when speculative masks are present. One warmup, one measured latency bench. Latency 5.67s; MTP acceptance 86.0%.",
+      "engineFlags": {
+        "commandSnippet": "/home/steve/bench-qwen36-b70-single-mtp.sh",
+        "tensorParallel": 1,
+        "contextLength": 4096,
+        "attentionBackend": "flash_attn",
+        "flashAttn": true,
+        "chunkedPrefill": true,
+        "kvCacheSizeMb": 2048,
+        "concurrency": 1,
+        "specDecoding": true,
+        "specMethod": "mtp",
+        "specNumTokens": 1,
+        "mtpEnabled": true,
+        "mtpDraftLayers": 1,
+        "extraFlags": "VLLM_TARGET_DEVICE=xpu VLLM_XPU_ENABLE_XPU_GRAPH=1 ONEAPI_DEVICE_SELECTOR=level_zero:0 ZE_AFFINITY_MASK=0 --quantization inc --dtype half --language-model-only --max-num-batched-tokens 1024 --max-num-seqs 1"
+      },
+      "tokSTotal": 133.44
+    }
+  },
+  {
+    "label": "vllm-int4-single-b70-mtp-500-512",
+    "payload": {
+      "hfId": "Lorbus/Qwen3.6-27B-int4-AutoRound",
+      "modelRevision": "main",
+      "hardware": {
+        "hwClass": "DISCRETE_GPU",
+        "gpuName": "Intel Arc Pro B70 32GB",
+        "gpuCount": 1,
+        "vramGb": 32,
+        "cpu": "AMD EPYC 9015",
+        "ramGb": 16,
+        "os": "Ubuntu 24.04 LTS, kernel 6.17.0-14-generic"
+      },
+      "engineName": "vllm",
+      "engineVersion": "0.20.1",
+      "quantization": "INT4 AutoRound W4A16",
+      "promptTokens": 500,
+      "outputTokens": 512,
+      "contextLength": 4096,
+      "batchSize": 1,
+      "tokSOut": 41.3,
+      "notes": "Longer decode run for patched vLLM XPU MTP fallback on single Intel Arc Pro B70. One warmup, one measured latency bench. Latency 12.40s; measured MTP acceptance varied by generated content, with measured pass acceptance 65.4%.",
+      "engineFlags": {
+        "commandSnippet": "OUTPUT_LEN=512 /home/steve/bench-qwen36-b70-single-mtp.sh",
+        "tensorParallel": 1,
+        "contextLength": 4096,
+        "attentionBackend": "flash_attn",
+        "flashAttn": true,
+        "chunkedPrefill": true,
+        "kvCacheSizeMb": 2048,
+        "concurrency": 1,
+        "specDecoding": true,
+        "specMethod": "mtp",
+        "specNumTokens": 1,
+        "mtpEnabled": true,
+        "mtpDraftLayers": 1,
+        "extraFlags": "VLLM_TARGET_DEVICE=xpu VLLM_XPU_ENABLE_XPU_GRAPH=1 ONEAPI_DEVICE_SELECTOR=level_zero:0 ZE_AFFINITY_MASK=0 --quantization inc --dtype half --language-model-only --max-num-batched-tokens 1024 --max-num-seqs 1"
+      },
+      "tokSTotal": 81.6
+    }
+  },
+  {
+    "label": "vllm-int4-tp2-b70-nonmtp-500-256",
+    "payload": {
+      "hfId": "Lorbus/Qwen3.6-27B-int4-AutoRound",
+      "modelRevision": "main",
+      "hardware": {
+        "hwClass": "DISCRETE_GPU",
+        "gpuName": "Intel Arc Pro B70 32GB",
+        "gpuCount": 2,
+        "vramGb": 32,
+        "cpu": "AMD EPYC 9015",
+        "ramGb": 16,
+        "os": "Ubuntu 24.04 LTS, kernel 6.17.0-14-generic"
+      },
+      "engineName": "vllm",
+      "engineVersion": "0.20.1",
+      "quantization": "INT4 AutoRound W4A16",
+      "promptTokens": 500,
+      "outputTokens": 256,
+      "contextLength": 4096,
+      "batchSize": 1,
+      "tokSOut": 49.1,
+      "notes": "Best current dual-B70 result. vLLM TP2 non-MTP with XCCL P2P enabled. One warmup, one measured latency bench. Latency 5.22s. MTP was slower in TP2 because XPU graph capture is disabled for communication ops.",
+      "engineFlags": {
+        "commandSnippet": "/home/steve/bench-qwen36-b70-tp2.sh",
+        "tensorParallel": 2,
+        "contextLength": 4096,
+        "attentionBackend": "flash_attn",
+        "flashAttn": true,
+        "chunkedPrefill": true,
+        "kvCacheSizeMb": 2048,
+        "concurrency": 1,
+        "specDecoding": false,
+        "mtpEnabled": false,
+        "extraFlags": "ONEAPI_DEVICE_SELECTOR=level_zero:* CCL_ATL_TRANSPORT=ofi CCL_ZE_IPC_EXCHANGE=sockets CCL_TOPO_P2P_ACCESS=1 --quantization inc --dtype half --language-model-only --max-num-batched-tokens 1024 --max-num-seqs 1 --distributed-executor-backend mp --disable-custom-all-reduce"
+      },
+      "tokSTotal": 144.88
+    }
+  },
+  {
+    "label": "vllm-int4-tp2-b70-nonmtp-500-512",
+    "payload": {
+      "hfId": "Lorbus/Qwen3.6-27B-int4-AutoRound",
+      "modelRevision": "main",
+      "hardware": {
+        "hwClass": "DISCRETE_GPU",
+        "gpuName": "Intel Arc Pro B70 32GB",
+        "gpuCount": 2,
+        "vramGb": 32,
+        "cpu": "AMD EPYC 9015",
+        "ramGb": 16,
+        "os": "Ubuntu 24.04 LTS, kernel 6.17.0-14-generic"
+      },
+      "engineName": "vllm",
+      "engineVersion": "0.20.1",
+      "quantization": "INT4 AutoRound W4A16",
+      "promptTokens": 500,
+      "outputTokens": 512,
+      "contextLength": 4096,
+      "batchSize": 1,
+      "tokSOut": 48.3,
+      "notes": "Longer decode run for dual Intel Arc Pro B70 TP2 non-MTP. One warmup, one measured latency bench. Latency 10.59s. XCCL P2P enabled; large all-reduce microbench measured about 42 GB/s payload.",
+      "engineFlags": {
+        "commandSnippet": "OUTPUT_LEN=512 /home/steve/bench-qwen36-b70-tp2.sh",
+        "tensorParallel": 2,
+        "contextLength": 4096,
+        "attentionBackend": "flash_attn",
+        "flashAttn": true,
+        "chunkedPrefill": true,
+        "kvCacheSizeMb": 2048,
+        "concurrency": 1,
+        "specDecoding": false,
+        "mtpEnabled": false,
+        "extraFlags": "ONEAPI_DEVICE_SELECTOR=level_zero:* CCL_ATL_TRANSPORT=ofi CCL_ZE_IPC_EXCHANGE=sockets CCL_TOPO_P2P_ACCESS=1 --quantization inc --dtype half --language-model-only --max-num-batched-tokens 1024 --max-num-seqs 1 --distributed-executor-backend mp --disable-custom-all-reduce"
+      },
+      "tokSTotal": 95.56
+    }
+  },
+  {
+    "label": "vllm-int4-single-b70-nonmtp-500-256",
+    "payload": {
+      "hfId": "Lorbus/Qwen3.6-27B-int4-AutoRound",
+      "modelRevision": "main",
+      "hardware": {
+        "hwClass": "DISCRETE_GPU",
+        "gpuName": "Intel Arc Pro B70 32GB",
+        "gpuCount": 1,
+        "vramGb": 32,
+        "cpu": "AMD EPYC 9015",
+        "ramGb": 16,
+        "os": "Ubuntu 24.04 LTS, kernel 6.17.0-14-generic"
+      },
+      "engineName": "vllm",
+      "engineVersion": "0.20.1",
+      "quantization": "INT4 AutoRound W4A16",
+      "promptTokens": 500,
+      "outputTokens": 256,
+      "contextLength": 4096,
+      "batchSize": 1,
+      "tokSOut": 31.8,
+      "notes": "Single-B70 vLLM INT4 non-MTP baseline. One warmup, one measured latency bench. Latency 8.06s. XPU graph enabled.",
+      "engineFlags": {
+        "commandSnippet": "vllm bench latency --model /home/steve/models/hf/Lorbus-Qwen3.6-27B-int4-AutoRound --max-model-len 4096 --input-len 500 --output-len 256 --batch-size 1 --num-iters 1 --num-iters-warmup 1 --dtype half --quantization inc --language-model-only --kv-cache-memory-bytes 2G --max-num-batched-tokens 1024 --max-num-seqs 1 --distributed-executor-backend uni",
+        "tensorParallel": 1,
+        "contextLength": 4096,
+        "attentionBackend": "flash_attn",
+        "flashAttn": true,
+        "chunkedPrefill": true,
+        "kvCacheSizeMb": 2048,
+        "concurrency": 1,
+        "specDecoding": false,
+        "mtpEnabled": false,
+        "extraFlags": "VLLM_TARGET_DEVICE=xpu VLLM_XPU_ENABLE_XPU_GRAPH=1 ONEAPI_DEVICE_SELECTOR=level_zero:0 ZE_AFFINITY_MASK=0"
+      },
+      "tokSTotal": 93.8
+    }
+  },
+  {
+    "label": "vllm-int4-tp2-b70-mtp-500-256",
+    "payload": {
+      "hfId": "Lorbus/Qwen3.6-27B-int4-AutoRound",
+      "modelRevision": "main",
+      "hardware": {
+        "hwClass": "DISCRETE_GPU",
+        "gpuName": "Intel Arc Pro B70 32GB",
+        "gpuCount": 2,
+        "vramGb": 32,
+        "cpu": "AMD EPYC 9015",
+        "ramGb": 16,
+        "os": "Ubuntu 24.04 LTS, kernel 6.17.0-14-generic"
+      },
+      "engineName": "vllm",
+      "engineVersion": "0.20.1",
+      "quantization": "INT4 AutoRound W4A16",
+      "promptTokens": 500,
+      "outputTokens": 256,
+      "contextLength": 4096,
+      "batchSize": 1,
+      "tokSOut": 35.6,
+      "notes": "Dual-B70 TP2 plus patched MTP fallback. Included as negative result: slower than TP2 non-MTP and single-B70 MTP. Latency 7.20s. Warmup acceptance was 62.6%; vLLM disables XPU graph capture for TP2 communication ops.",
+      "engineFlags": {
+        "commandSnippet": "/home/steve/bench-qwen36-b70-tp2.sh --speculative-config '{\"method\":\"mtp\",\"num_speculative_tokens\":1}'",
+        "tensorParallel": 2,
+        "contextLength": 4096,
+        "attentionBackend": "flash_attn",
+        "flashAttn": true,
+        "chunkedPrefill": true,
+        "kvCacheSizeMb": 2048,
+        "concurrency": 1,
+        "specDecoding": true,
+        "specMethod": "mtp",
+        "specNumTokens": 1,
+        "mtpEnabled": true,
+        "mtpDraftLayers": 1,
+        "extraFlags": "ONEAPI_DEVICE_SELECTOR=level_zero:* CCL_ATL_TRANSPORT=ofi CCL_ZE_IPC_EXCHANGE=sockets CCL_TOPO_P2P_ACCESS=1 --quantization inc --dtype half --language-model-only --max-num-batched-tokens 1024 --max-num-seqs 1 --distributed-executor-backend mp --disable-custom-all-reduce"
+      },
+      "tokSTotal": 105.03
+    }
+  }
+]
