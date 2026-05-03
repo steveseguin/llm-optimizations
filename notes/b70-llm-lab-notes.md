@@ -35,6 +35,19 @@ GGUF paths so far:
 - Windows Q4_0 comparison target is `>=27 tok/s`, with external results up to about `28.8 tok/s`.
 - llama.cpp dual split is not viable locally yet.
 
+## Q4_0 GGUF Continuation
+
+- Decision: do not count the INT4 AutoRound result as meeting the Q4_0 GGUF target.
+- Active plan: `plans/q4_0-gguf-b70-optimization-plan.md`.
+- Added Q4_0 harnesses:
+  - `scripts/bench-qwen36-q4_0-gguf-vulkan-matrix.sh`
+  - `scripts/bench-qwen36-q4_0-gguf-sycl-matrix.sh`
+- Sanity run through the Vulkan harness:
+  - Local output: `/home/steve/bench-results/qwen36-q4_0-gguf/vulkan-20260503T191806Z.jsonl`
+  - Command shape: Vulkan0, Q4_0 GGUF, `-p 0 -n 512`, `-fa 0`, `-ub 64`, `--poll 50`, compute queue, `-ctk f16 -ctv f16`, one rep.
+  - Result: `22.19 tok/s`.
+  - Interpretation: still system-Mesa baseline behavior; no Linux Q4_0 improvement yet.
+
 ## LocalMaxxing Submissions
 
 All submitted vLLM INT4 results returned `APPROVED`.
