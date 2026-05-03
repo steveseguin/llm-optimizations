@@ -1,0 +1,162 @@
+diff --git a/ggml/include/ggml-sycl.h b/ggml/include/ggml-sycl.h
+index 5ce349a..6f5677d 100644
+--- a/ggml/include/ggml-sycl.h
++++ b/ggml/include/ggml-sycl.h
+@@ -25,7 +25,7 @@ GGML_BACKEND_API bool ggml_backend_is_sycl(ggml_backend_t backend);
+ GGML_BACKEND_API ggml_backend_buffer_type_t ggml_backend_sycl_buffer_type(int device);
+ 
+ // split tensor buffer that splits matrices by rows across multiple devices
+-GGML_BACKEND_API ggml_backend_buffer_type_t ggml_backend_sycl_split_buffer_type(const float * tensor_split);
++GGML_BACKEND_API ggml_backend_buffer_type_t ggml_backend_sycl_split_buffer_type(int main_device, const float * tensor_split);
+ 
+ // pinned host buffer for use with the CPU backend for faster copies between CPU and GPU
+ GGML_BACKEND_API ggml_backend_buffer_type_t ggml_backend_sycl_host_buffer_type(void);
+diff --git a/ggml/src/ggml-sycl/ggml-sycl.cpp b/ggml/src/ggml-sycl/ggml-sycl.cpp
+index f06147e..b17a37c 100644
+--- a/ggml/src/ggml-sycl/ggml-sycl.cpp
++++ b/ggml/src/ggml-sycl/ggml-sycl.cpp
+@@ -847,7 +847,9 @@ static size_t ggml_nbytes_split(const struct ggml_tensor * tensor, int nrows_spl
+ }
+ 
+ struct ggml_backend_sycl_split_buffer_type_context {
++    int main_device;
+     std::array<float, GGML_SYCL_MAX_DEVICES> tensor_split;
++    std::string name;
+ };
+ 
+ struct ggml_backend_sycl_split_buffer_context {
+@@ -893,7 +895,15 @@ ggml_backend_sycl_split_buffer_init_tensor(ggml_backend_buffer_t buffer,
+     ggml_tensor_extra_gpu * extra = new ggml_tensor_extra_gpu{};
+ 
+     ctx->tensor_extras.push_back(extra);
+-    ctx->streams.push_back(&(dpct::get_current_device().default_queue()));
++    if (ctx->streams.empty()) {
++        ctx->streams.reserve(ggml_sycl_info().device_count);
++        const int current_device = dpct::dev_mgr::instance().current_device_id();
++        for (int i = 0; i < ggml_sycl_info().device_count; ++i) {
++            ggml_sycl_set_device(i);
++            ctx->streams.push_back(&(dpct::get_current_device().default_queue()));
++        }
++        ggml_sycl_set_device(current_device);
++    }
+ 
+     for (int i = 0; i < ggml_sycl_info().device_count; ++i) {
+         int64_t row_low, row_high;
+@@ -1097,15 +1107,18 @@ static struct ggml_backend_buffer_i ggml_backend_sycl_split_buffer_interface = {
+ // sycl split buffer type
+ 
+ static const char * ggml_backend_sycl_split_buffer_type_get_name(ggml_backend_buffer_type_t buft) {
+-    return GGML_SYCL_NAME "_Split";
+-
+-    GGML_UNUSED(buft);
++    ggml_backend_sycl_split_buffer_type_context * ctx = (ggml_backend_sycl_split_buffer_type_context *) buft->context;
++    return ctx->name.c_str();
+ }
+ 
+ static bool ggml_backend_buffer_is_sycl_split(ggml_backend_buffer_t buffer) {
+    return buffer->buft->iface.get_name == ggml_backend_sycl_split_buffer_type_get_name;
+ }
+ 
++static bool ggml_backend_buft_is_sycl_split(ggml_backend_buffer_type_t buft) {
++   return buft->iface.get_name == ggml_backend_sycl_split_buffer_type_get_name;
++}
++
+ static ggml_backend_buffer_t ggml_backend_sycl_split_buffer_type_alloc_buffer(ggml_backend_buffer_type_t buft, size_t size) {
+     // since we don't know the exact split after rounding, we cannot allocate the device buffers at this point
+     // instead, we allocate them for each tensor separately in init_tensor
+@@ -1163,14 +1176,14 @@ static ggml_backend_buffer_type_i ggml_backend_sycl_split_buffer_type_interface
+     /* .is_host          = */ ggml_backend_sycl_split_buffer_type_is_host,
+ };
+ 
+-ggml_backend_buffer_type_t ggml_backend_sycl_split_buffer_type(const float * tensor_split) {
++ggml_backend_buffer_type_t ggml_backend_sycl_split_buffer_type(int main_device, const float * tensor_split) {
+     static std::mutex mutex;
+     std::lock_guard<std::mutex> lock(mutex);
+ 
+     GGML_SYCL_DEBUG("[SYCL] call ggml_backend_sycl_split_buffer_type\n");
+     ggml_check_sycl();
+     // FIXME: this is not thread safe
+-    static std::map<std::array<float, GGML_SYCL_MAX_DEVICES>, struct ggml_backend_buffer_type> buft_map;
++    static std::map<std::pair<int, std::array<float, GGML_SYCL_MAX_DEVICES>>, struct ggml_backend_buffer_type> buft_map;
+ 
+     std::array<float, GGML_SYCL_MAX_DEVICES> tensor_split_arr = {};
+ 
+@@ -1188,18 +1201,22 @@ ggml_backend_buffer_type_t ggml_backend_sycl_split_buffer_type(const float * ten
+         }
+     }
+ 
+-    auto it = buft_map.find(tensor_split_arr);
++    auto it = buft_map.find({main_device, tensor_split_arr});
+     if (it != buft_map.end()) {
+         return &it->second;
+     }
+ 
+     struct ggml_backend_buffer_type buft {
+         /* .iface   = */ ggml_backend_sycl_split_buffer_type_interface,
+-        /* .device  = */ ggml_backend_reg_dev_get(ggml_backend_sycl_reg(), 0),
+-        /* .context = */ new ggml_backend_sycl_split_buffer_type_context{tensor_split_arr},
++        /* .device  = */ ggml_backend_reg_dev_get(ggml_backend_sycl_reg(), main_device),
++        /* .context = */ new ggml_backend_sycl_split_buffer_type_context{
++            main_device,
++            tensor_split_arr,
++            GGML_SYCL_NAME + std::to_string(main_device) + "_Split",
++        },
+     };
+ 
+-    auto result = buft_map.emplace(tensor_split_arr, buft);
++    auto result = buft_map.emplace(std::make_pair(main_device, tensor_split_arr), buft);
+     return &result.first->second;
+ }
+ 
+@@ -3623,6 +3640,10 @@ static void opt_for_reorder(ggml_backend_sycl_context * ctx, const ggml_tensor *
+         return;
+     }
+ 
++    if (src0->buffer && ggml_backend_buffer_is_sycl_split(src0->buffer)) {
++        return;
++    }
++
+     ggml_tensor_extra_gpu * extra = static_cast<ggml_tensor_extra_gpu *>(src0->extra);
+     if (!extra || extra->optimized_feature.reorder) {
+         return;  // Skip permutations and already reordered tensors
+@@ -5114,6 +5135,10 @@ static bool ggml_backend_sycl_device_supports_op(ggml_backend_dev_t dev, const g
+ }
+ 
+ static bool ggml_backend_sycl_device_supports_buft(ggml_backend_dev_t dev, ggml_backend_buffer_type_t buft) {
++    if (ggml_backend_buft_is_sycl_split(buft)) {
++        return buft->device == dev;
++    }
++
+     if (buft->iface.get_name != ggml_backend_sycl_buffer_type_get_name) {
+         return false;
+     }
+diff --git a/ggml/src/ggml-vulkan/ggml-vulkan.cpp b/ggml/src/ggml-vulkan/ggml-vulkan.cpp
+index c2f1883..3f89754 100644
+--- a/ggml/src/ggml-vulkan/ggml-vulkan.cpp
++++ b/ggml/src/ggml-vulkan/ggml-vulkan.cpp
+@@ -6342,7 +6342,15 @@ static vk_pipeline ggml_vk_get_dequantize_mul_mat_vec(ggml_backend_vk_context *
+                 dmmv_wg = DMMV_WG_SIZE_LARGE;
+             }
+         } else {
+-            if (m <= 8192 && k >= 1024) {
++            uint32_t large_max_m = 8192;
++            if (ctx->device->vendor_id == VK_VENDOR_ID_INTEL && ctx->device->architecture == INTEL_XE2) {
++                static const uint32_t intel_xe2_large_max_m = []() {
++                    const char * env = getenv("GGML_VK_INTEL_XE2_DMMV_LARGE_MAX_M");
++                    return env ? (uint32_t) std::strtoul(env, nullptr, 10) : 8192u;
++                }();
++                large_max_m = intel_xe2_large_max_m;
++            }
++            if (m <= large_max_m && k >= 1024) {
+                 dmmv_wg = DMMV_WG_SIZE_LARGE;
+             }
+         }
+@@ -16379,6 +16387,8 @@ static uint32_t ggml_vk_intel_shader_core_count(const vk::PhysicalDevice& vkdev)
+     case 0xE20B:  // B580
+     case 0xE211:  // Pro B60
+         return 20;
++    case 0xE223:  // Pro B70
++        return 32;
+     default:
+         return 0;
+     }
