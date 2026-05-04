@@ -11,8 +11,38 @@ index 5ce349a..6f5677d 100644
  
  // pinned host buffer for use with the CPU backend for faster copies between CPU and GPU
  GGML_BACKEND_API ggml_backend_buffer_type_t ggml_backend_sycl_host_buffer_type(void);
+diff --git a/ggml/src/ggml-sycl/CMakeLists.txt b/ggml/src/ggml-sycl/CMakeLists.txt
+index 8e589fa..6aaced1 100644
+--- a/ggml/src/ggml-sycl/CMakeLists.txt
++++ b/ggml/src/ggml-sycl/CMakeLists.txt
+@@ -135,7 +135,9 @@ endif()
+ 
+ if (GGML_SYCL_TARGET STREQUAL "INTEL")
+     add_compile_definitions(GGML_SYCL_WARP_SIZE=16)
+-    target_link_options(ggml-sycl PRIVATE  -Xs   -ze-intel-greater-than-4GB-buffer-required)
++    if (NOT (GGML_SYCL_DEVICE_ARCH MATCHES "^intel_gpu_"))
++        target_link_options(ggml-sycl PRIVATE  -Xs   -ze-intel-greater-than-4GB-buffer-required)
++    endif()
+ 
+     # Link against Intel oneMKL
+     if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+@@ -160,7 +162,11 @@ if (GGML_SYCL_HOST_MEM_FALLBACK)
+ endif()
+ 
+ if (GGML_SYCL_DEVICE_ARCH)
+-    target_compile_options(ggml-sycl PRIVATE -Xsycl-target-backend --offload-arch=${GGML_SYCL_DEVICE_ARCH})
+-    target_link_options(ggml-sycl PRIVATE -Xsycl-target-backend --offload-arch=${GGML_SYCL_DEVICE_ARCH})
++    if (GGML_SYCL_TARGET STREQUAL "INTEL" AND GGML_SYCL_DEVICE_ARCH MATCHES "^intel_gpu_")
++        target_compile_options(ggml-sycl PRIVATE -fsycl-targets=${GGML_SYCL_DEVICE_ARCH})
++        target_link_options(ggml-sycl PRIVATE -fsycl-targets=${GGML_SYCL_DEVICE_ARCH})
++    else()
++        target_compile_options(ggml-sycl PRIVATE -Xsycl-target-backend --offload-arch=${GGML_SYCL_DEVICE_ARCH})
++        target_link_options(ggml-sycl PRIVATE -Xsycl-target-backend --offload-arch=${GGML_SYCL_DEVICE_ARCH})
++    endif()
+ endif()
+-
 diff --git a/ggml/src/ggml-sycl/ggml-sycl.cpp b/ggml/src/ggml-sycl/ggml-sycl.cpp
-index f06147e..b17a37c 100644
+index f06147e..794684e 100644
 --- a/ggml/src/ggml-sycl/ggml-sycl.cpp
 +++ b/ggml/src/ggml-sycl/ggml-sycl.cpp
 @@ -847,7 +847,9 @@ static size_t ggml_nbytes_split(const struct ggml_tensor * tensor, int nrows_spl
@@ -42,7 +72,7 @@ index f06147e..b17a37c 100644
  
      for (int i = 0; i < ggml_sycl_info().device_count; ++i) {
          int64_t row_low, row_high;
-@@ -1097,15 +1107,18 @@ static struct ggml_backend_buffer_i ggml_backend_sycl_split_buffer_interface = {
+@@ -1097,13 +1107,20 @@ static struct ggml_backend_buffer_i ggml_backend_sycl_split_buffer_interface = {
  // sycl split buffer type
  
  static const char * ggml_backend_sycl_split_buffer_type_get_name(ggml_backend_buffer_type_t buft) {
@@ -54,17 +84,20 @@ index f06147e..b17a37c 100644
  }
  
  static bool ggml_backend_buffer_is_sycl_split(ggml_backend_buffer_t buffer) {
-    return buffer->buft->iface.get_name == ggml_backend_sycl_split_buffer_type_get_name;
- }
- 
-+static bool ggml_backend_buft_is_sycl_split(ggml_backend_buffer_type_t buft) {
-+   return buft->iface.get_name == ggml_backend_sycl_split_buffer_type_get_name;
+-   return buffer->buft->iface.get_name == ggml_backend_sycl_split_buffer_type_get_name;
++    return buffer->buft->iface.get_name == ggml_backend_sycl_split_buffer_type_get_name;
 +}
 +
++static bool ggml_backend_buft_is_sycl_split(ggml_backend_buffer_type_t buft) {
++    return buft->iface.get_name == ggml_backend_sycl_split_buffer_type_get_name;
++}
++
++static bool ggml_tensor_is_sycl_split(const ggml_tensor * tensor) {
++    return tensor && tensor->buffer && ggml_backend_buffer_is_sycl_split(tensor->buffer);
+ }
+ 
  static ggml_backend_buffer_t ggml_backend_sycl_split_buffer_type_alloc_buffer(ggml_backend_buffer_type_t buft, size_t size) {
-     // since we don't know the exact split after rounding, we cannot allocate the device buffers at this point
-     // instead, we allocate them for each tensor separately in init_tensor
-@@ -1163,14 +1176,14 @@ static ggml_backend_buffer_type_i ggml_backend_sycl_split_buffer_type_interface
+@@ -1163,14 +1180,14 @@ static ggml_backend_buffer_type_i ggml_backend_sycl_split_buffer_type_interface
      /* .is_host          = */ ggml_backend_sycl_split_buffer_type_is_host,
  };
  
@@ -81,7 +114,7 @@ index f06147e..b17a37c 100644
  
      std::array<float, GGML_SYCL_MAX_DEVICES> tensor_split_arr = {};
  
-@@ -1188,18 +1201,22 @@ ggml_backend_buffer_type_t ggml_backend_sycl_split_buffer_type(const float * ten
+@@ -1188,18 +1205,22 @@ ggml_backend_buffer_type_t ggml_backend_sycl_split_buffer_type(const float * ten
          }
      }
  
@@ -108,7 +141,16 @@ index f06147e..b17a37c 100644
      return &result.first->second;
  }
  
-@@ -3623,6 +3640,10 @@ static void opt_for_reorder(ggml_backend_sycl_context * ctx, const ggml_tensor *
+@@ -2705,7 +2726,7 @@ static void ggml_sycl_op_mul_mat(ggml_backend_sycl_context & ctx, const ggml_ten
+         queue_ptr stream = ctx.stream(i, 0);
+ 
+         if (src0_is_contiguous) {
+-            dev[i].src0_dd = (char *) src0->data;
++            dev[i].src0_dd = split ? (char *) src0_extra->data_device[i] : (char *) src0->data;
+         } else {
+             dev[i].src0_dd = dev[i].src0_dd_alloc.alloc(ctx.pool(i), ggml_nbytes(src0));
+         }
+@@ -3623,6 +3644,10 @@ static void opt_for_reorder(ggml_backend_sycl_context * ctx, const ggml_tensor *
          return;
      }
  
@@ -119,7 +161,24 @@ index f06147e..b17a37c 100644
      ggml_tensor_extra_gpu * extra = static_cast<ggml_tensor_extra_gpu *>(src0->extra);
      if (!extra || extra->optimized_feature.reorder) {
          return;  // Skip permutations and already reordered tensors
-@@ -5114,6 +5135,10 @@ static bool ggml_backend_sycl_device_supports_op(ggml_backend_dev_t dev, const g
+@@ -5095,8 +5120,16 @@ static bool ggml_backend_sycl_device_supports_op(ggml_backend_dev_t dev, const g
+         case GGML_OP_RWKV_WKV7:
+         case GGML_OP_GATED_LINEAR_ATTN:
+         case GGML_OP_GATED_DELTA_NET:
++            for (int i = 0; i < 6; ++i) {
++                if (ggml_tensor_is_sycl_split(op->src[i])) {
++                    return false;
++                }
++            }
+             return true;
+         case GGML_OP_SSM_CONV:
++            if (ggml_tensor_is_sycl_split(op->src[0]) || ggml_tensor_is_sycl_split(op->src[1])) {
++                return false;
++            }
+             return op->type == GGML_TYPE_F32 &&
+                    op->src[0]->type == GGML_TYPE_F32 &&
+                    op->src[1]->type == GGML_TYPE_F32;
+@@ -5114,6 +5147,10 @@ static bool ggml_backend_sycl_device_supports_op(ggml_backend_dev_t dev, const g
  }
  
  static bool ggml_backend_sycl_device_supports_buft(ggml_backend_dev_t dev, ggml_backend_buffer_type_t buft) {
