@@ -45,6 +45,7 @@
     },
     "tp4_kv_fp8_512_256": {
       "log": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-vrfai-tp4-fa2-kvfp8-w1-i2-in512-out256-20260504T195521Z.log",
+      "localmaxxingId": "cmornlh8g000vkw04yb57ukvl",
       "avgLatencySec": 9.131148148495413,
       "tokSOut": 28.035904777449314,
       "tokSTotal": 84.10771433234794,
