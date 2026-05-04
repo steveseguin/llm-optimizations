@@ -1,0 +1,57 @@
+{
+  "date": "2026-05-04",
+  "model": {
+    "localPath": "/home/steve/models/qwen3.6-27b-q4_0-gguf/Qwen3.6-27B-Q4_0.gguf",
+    "family": "Qwen3.6 27B",
+    "quantization": "Q4_0 GGUF"
+  },
+  "hardware": {
+    "hwClass": "DISCRETE_GPU",
+    "gpuName": "Intel Arc Pro B70 32GB",
+    "gpuCount": 3,
+    "selector": "level_zero:2,1,3",
+    "vramGb": 32,
+    "os": "Ubuntu 24.04"
+  },
+  "engine": {
+    "name": "llama.cpp",
+    "backend": "sycl",
+    "build": "/home/steve/src/llama.cpp-q4-b70/build-sycl-2026-bmg-g31/bin/llama-bench"
+  },
+  "commonFlags": {
+    "nGpuLayers": 99,
+    "splitMode": "tensor",
+    "flashAttn": true,
+    "kvCacheDtype": "f16",
+    "threads": 8,
+    "promptTokens": 512,
+    "outputTokens": 128,
+    "batch": 128,
+    "ubatch": 32,
+    "env": {
+      "GGML_SYCL_DISABLE_DNN": 1,
+      "GGML_SYCL_ASYNC_CPY_TENSOR": 1,
+      "GGML_SYCL_Q8_CACHE": 1,
+      "GGML_SYCL_COMM_ALLREDUCE": 1,
+      "GGML_SYCL_COMM_SINGLE_KERNEL": 1
+    }
+  },
+  "runs": [
+    {
+      "name": "small_f32_off_control",
+      "env": {"GGML_SYCL_COMM_SMALL_F32": 0},
+      "tokSOut": 42.773387,
+      "json": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-smallf32-triple213-p512n128-small0-20260504T222348Z.jsonl",
+      "log": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-smallf32-triple213-p512n128-small0-20260504T222348Z.log"
+    },
+    {
+      "name": "small_f32_on_diagnostic",
+      "env": {"GGML_SYCL_COMM_SMALL_F32": 1},
+      "tokSOut": 34.98469,
+      "json": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-smallf32-triple213-p512n128-small1-20260504T222511Z.jsonl",
+      "log": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-smallf32-triple213-p512n128-small1-20260504T222511Z.log"
+    }
+  ],
+  "interpretation": "The single-workgroup 20 KB F32 reduction underutilizes the B70 and is not a speed path. Keep env-gated only as a negative diagnostic. Next small-allreduce variant should keep full-range parallelism and only test dependency barrier changes, or move to fused MMVQ/DMMV allreduce epilogue work.",
+  "localmaxxingSubmitted": false
+}
