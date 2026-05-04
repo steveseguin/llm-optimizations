@@ -130,6 +130,26 @@ LocalMaxxing ID: `cmoqqed6s0007jv049wnizwle`.
 - Best root order `3,0,1,2`: `31.311 tok/s` at 128 tokens.
 - All tested root orders stayed near `30.76-31.31 tok/s`, so 4-way weakness is communication fanout/synchronization, not root-card choice.
 
+## Single-Card Follow-Up
+
+Focused single-card flag sweep:
+
+- Output summary: `/home/steve/bench-results/qwen36-q4_0-gguf/sycl-single-selector2-dnn-fa-ub-sweep-n256-20260504T052313Z.tsv`.
+- Shape: selector `2`, `-dev SYCL0`, `-sm none`, 256 generated tokens, f16 KV, no speculative decode.
+- Best short result: oneDNN enabled, flash attention disabled, `-ub 128`: `24.449 tok/s`.
+- Flash attention was slightly slower in this decode-only shape.
+- oneDNN on/off and `-ub 32/64/128/256` did not move the result meaningfully.
+
+Build comparison:
+
+- Output summary: `/home/steve/bench-results/qwen36-q4_0-gguf/sycl-single-build-compare-n256-20260504T053253Z.tsv`.
+- `aot-dnn`: `24.805 tok/s`.
+- `dnn`: `24.756 tok/s`.
+- `aot`: `24.561 tok/s`.
+- current base build: `24.498 tok/s`.
+
+Conclusion: the Linux single-card Q4_0 path is still below the Windows `>27 tok/s` target. The gap is not explained by oneDNN, flash attention, ubatch, or the current AOT build variants; next single-card work should profile the Q4_0 reordered MMVQ/matvec path and driver/runtime scheduling.
+
 ## Current Read
 
 The best quality-preserving GGUF/SYCL single-session setup is three B70s, equal tensor split, selector order `2,1,3`, `-ub 32`, `--poll 50`, and the env-gated single-kernel allreduce path.
