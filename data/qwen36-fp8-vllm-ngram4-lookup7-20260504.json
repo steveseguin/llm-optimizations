@@ -1,0 +1,60 @@
+{
+  "date": "2026-05-04",
+  "model": {
+    "hfId": "vrfai/Qwen3.6-27B-FP8",
+    "localPath": "/home/steve/models/qwen3.6-27b-fp8-vrfai",
+    "quantization": "compressed-tensors fp8"
+  },
+  "engine": {
+    "name": "vllm",
+    "version": "0.20.1",
+    "backend": "xpu-fa2",
+    "tensorParallel": 4,
+    "kvCacheDtype": "auto"
+  },
+  "hardware": {
+    "gpuName": "Intel Arc Pro B70 32GB",
+    "gpuCount": 4,
+    "vramGb": 32,
+    "os": "Ubuntu 24.04"
+  },
+  "speculativeConfig": {
+    "method": "ngram",
+    "num_speculative_tokens": 4,
+    "prompt_lookup_min": 2,
+    "prompt_lookup_max": 7
+  },
+  "runs": [
+    {
+      "name": "lookup7_screen",
+      "promptTokens": 512,
+      "outputTokens": 512,
+      "warmupIters": 1,
+      "measuredIters": 2,
+      "avgLatencySec": 10.420615476497915,
+      "computedOutputTokS": 49.13337423828148,
+      "computedTotalTokS": 98.26674847656297,
+      "json": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp4-in512-out512-bs1-20260504T223831Z.json",
+      "log": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp4-in512-out512-bs1-20260504T223831Z.log"
+    },
+    {
+      "name": "lookup7_validation",
+      "promptTokens": 512,
+      "outputTokens": 512,
+      "warmupIters": 1,
+      "measuredIters": 3,
+      "latenciesSec": [
+        9.696336338005494,
+        13.080743639002321,
+        11.141297394002322
+      ],
+      "avgLatencySec": 11.306125790336713,
+      "computedOutputTokS": 45.28518517259057,
+      "computedTotalTokS": 90.57037034518115,
+      "json": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp4-in512-out512-bs1-20260504T224053Z.json",
+      "log": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp4-in512-out512-bs1-20260504T224053Z.log"
+    }
+  ],
+  "interpretation": "The two-iteration screen looked like a new best, but the three-iteration validation regressed below the ngram4 lookup 2/5 result. Do not submit; current best remains ngram4 prompt_lookup_min/max 2/5 at 46.066742 tok/s.",
+  "localmaxxingSubmitted": false
+}
