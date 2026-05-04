@@ -24,14 +24,14 @@ ls -l /dev/dri || true
 
 echo
 echo "== b70 pci devices =="
-for dev in 0000:e3:00.0 0000:83:00.0; do
-  if [[ -e "/sys/bus/pci/devices/$dev" ]]; then
-    printf '%s ' "$dev"
-    cat "/sys/bus/pci/devices/$dev/vendor" "/sys/bus/pci/devices/$dev/device" 2>/dev/null | tr '\n' ' '
-    printf 'driver='
-    readlink "/sys/bus/pci/devices/$dev/driver" 2>/dev/null || printf 'none'
-    printf '\n'
-  fi
+for devpath in /sys/bus/pci/devices/*; do
+  [[ -f "$devpath/vendor" && -f "$devpath/device" ]] || continue
+  vendor="$(<"$devpath/vendor")"
+  device="$(<"$devpath/device")"
+  [[ "$vendor" == "0x8086" && "$device" == "0xe223" ]] || continue
+  printf '%s %s %s driver=' "$(basename "$devpath")" "$vendor" "$device"
+  readlink "$devpath/driver" 2>/dev/null || printf 'none'
+  printf '\n'
 done
 
 echo
@@ -45,7 +45,9 @@ timeout "${SYCL_LS_TIMEOUT:-20s}" sycl-ls
 if [[ "${1:-}" == "--smoke" ]]; then
   echo
   echo "== llama-bench smoke =="
-  export ONEAPI_DEVICE_SELECTOR="${ONEAPI_DEVICE_SELECTOR:-level_zero:*}"
+  # Keep the single-card smoke to one visible Level Zero GPU. With four B70s
+  # exposed, single-card tests should not use level_zero:*.
+  export ONEAPI_DEVICE_SELECTOR="${ONEAPI_DEVICE_SELECTOR:-level_zero:0}"
   export ZES_ENABLE_SYSMAN="${ZES_ENABLE_SYSMAN:-1}"
   export UR_L0_ENABLE_RELAXED_ALLOCATION_LIMITS="${UR_L0_ENABLE_RELAXED_ALLOCATION_LIMITS:-1}"
   export GGML_SYCL_DISABLE_GRAPH="${GGML_SYCL_DISABLE_GRAPH:-0}"
