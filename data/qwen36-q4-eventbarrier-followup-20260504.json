@@ -1,0 +1,32 @@
+{
+  "date": "2026-05-04",
+  "model": "Qwen3.6-27B-Q4_0.gguf",
+  "patchEnv": "GGML_SYCL_COMM_EVENT_BARRIER",
+  "followups": [
+    {
+      "gpuCount": 2,
+      "selector": "level_zero:0,3",
+      "shape": "512 prompt / 256 output",
+      "eventBarrierOffTokS": 40.457027,
+      "eventBarrierOnTokS": 40.330932,
+      "decision": "No improvement; do not use as a 2x recommendation.",
+      "logs": [
+        "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-eventbarrier-dual03-p512n256-eb0-20260504T232630Z.jsonl",
+        "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-eventbarrier-dual03-p512n256-eb1-20260504T232724Z.jsonl"
+      ]
+    },
+    {
+      "gpuCount": 4,
+      "selector": "level_zero:0,1,2,3",
+      "shape": "512 prompt / 128 output",
+      "eventBarrierOffTokS": 31.910477,
+      "eventBarrierOnTokS": 32.427299,
+      "decision": "Slight improvement, but still far below 2x/3x; do not submit as an operating point.",
+      "logs": [
+        "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-eventbarrier-quad0123-p512n128-eb0-20260504T232832Z.jsonl",
+        "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-eventbarrier-quad0123-p512n128-eb1-20260504T232953Z.jsonl"
+      ]
+    }
+  ],
+  "conclusion": "The event-barrier marker replacement is a useful 3x topology optimization, but it does not solve 2x or the 4x cliff. The next Q4_0 multi-GPU work should move away from launch-marker tuning and toward fused matmul/allreduce epilogues or reduce-scatter-style graph changes."
+}
