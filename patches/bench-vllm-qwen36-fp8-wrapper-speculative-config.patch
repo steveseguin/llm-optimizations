@@ -1,0 +1,26 @@
+diff --git a/bench-vllm-qwen36-fp8.sh b/bench-vllm-qwen36-fp8.sh
+--- a/bench-vllm-qwen36-fp8.sh
++++ b/bench-vllm-qwen36-fp8.sh
+@@ -15,6 +15,7 @@ WARMUP_ITERS="${WARMUP_ITERS:-1}"
+ KV_CACHE_DTYPE="${KV_CACHE_DTYPE:-auto}"
+ QUANTIZATION="${QUANTIZATION:-fp8}"
++SPECULATIVE_CONFIG="${SPECULATIVE_CONFIG:-}"
+ EXTRA_ARGS="${EXTRA_ARGS:-}"
+@@ -37,6 +38,11 @@ if [[ -n "$QUANTIZATION" && "$QUANTIZATION" != "none" && "$QUANTIZATION" !=
+   quant_args=(--quantization "$QUANTIZATION")
+ fi
+ 
++spec_args=()
++if [[ -n "$SPECULATIVE_CONFIG" ]]; then
++  spec_args=(--speculative-config "$SPECULATIVE_CONFIG")
++fi
++
+ "$VENV/bin/vllm" bench latency \
+@@ -59,6 +65,7 @@ "$VENV/bin/vllm" bench latency \
+   --batch-size "$BATCH_SIZE" \
+   --num-iters "$NUM_ITERS" \
+   --num-iters-warmup "$WARMUP_ITERS" \
++  "${spec_args[@]}" \
+   --output-json "$json" \
+   $EXTRA_ARGS \
+   >"$log" 2>&1
