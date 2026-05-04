@@ -1,0 +1,60 @@
+{
+  "date": "2026-05-04",
+  "model": "vrfai/Qwen3.6-27B-FP8",
+  "hardware": "4x Intel Arc Pro B70 32GB",
+  "results": {
+    "pp2_tp2_512_256": {
+      "log": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-vrfai-pp2-tp2-fa2-pidfd-w1-i2-in512-out256-20260504T194506Z.log",
+      "avgLatencySec": 11.26701237749512,
+      "tokSOut": 22.72119630500609,
+      "tokSTotal": 68.16358891501827,
+      "warmupIters": 1,
+      "measuredIters": 2,
+      "maxModelLen": 1024,
+      "pipelineParallel": 2,
+      "tensorParallel": 2,
+      "kvCacheDtype": "auto"
+    },
+    "pp2_tp2_max262k_smoke": {
+      "log": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-vrfai-pp2-tp2-fa2-pidfd-max262k-smoke-in32-out8-20260504T194807Z.log",
+      "avgLatencySec": 18.292552312996122,
+      "maxModelLen": 262144,
+      "inputTokens": 32,
+      "outputTokens": 8,
+      "reportedGpuKvCacheTokens": 1138148,
+      "reportedMaxConcurrencyAt262144": 4.34,
+      "pipelineParallel": 2,
+      "tensorParallel": 2,
+      "kvCacheDtype": "auto",
+      "note": "Capacity smoke only; do not use as throughput result."
+    },
+    "tp4_max262k_smoke": {
+      "log": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-vrfai-tp4-fa2-pidfd-max262k-smoke-in32-out8-20260504T195135Z.log",
+      "avgLatencySec": 11.320863436994841,
+      "maxModelLen": 262144,
+      "inputTokens": 32,
+      "outputTokens": 8,
+      "reportedGpuKvCacheTokens": 1206355,
+      "reportedMaxConcurrencyAt262144": 4.60,
+      "pipelineParallel": 1,
+      "tensorParallel": 4,
+      "kvCacheDtype": "auto",
+      "note": "Capacity smoke only; do not use as throughput result."
+    },
+    "tp4_kv_fp8_512_256": {
+      "log": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-vrfai-tp4-fa2-kvfp8-w1-i2-in512-out256-20260504T195521Z.log",
+      "avgLatencySec": 9.131148148495413,
+      "tokSOut": 28.035904777449314,
+      "tokSTotal": 84.10771433234794,
+      "warmupIters": 1,
+      "measuredIters": 2,
+      "maxModelLen": 1024,
+      "pipelineParallel": 1,
+      "tensorParallel": 4,
+      "kvCacheDtype": "fp8",
+      "reportedGpuKvCacheTokens": 390656,
+      "note": "vLLM warns FP8 KV may reduce accuracy without proper scaling; slower than auto/BF16 KV on this system."
+    }
+  },
+  "conclusion": "TP4 patched XPU FA2 with auto/BF16 KV remains preferred; PP2xTP2 fits full context but is slower for one sequence; FP8 KV is slower and quality-risky."
+}
