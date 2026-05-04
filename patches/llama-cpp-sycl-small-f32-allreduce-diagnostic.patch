@@ -1,0 +1,71 @@
+diff --git a/ggml/src/ggml-sycl/ggml-sycl.cpp b/ggml/src/ggml-sycl/ggml-sycl.cpp
+--- a/ggml/src/ggml-sycl/ggml-sycl.cpp
++++ b/ggml/src/ggml-sycl/ggml-sycl.cpp
+@@ -73,6 +73,7 @@ int g_ggml_sycl_comm_pairwise4 = 0;
+ int g_ggml_sycl_comm_root_copy = 0;
+ int g_ggml_sycl_comm_rotate_root = 0;
++int g_ggml_sycl_comm_small_f32 = 0;
+ int g_ggml_sycl_enable_flash_attention = 1;
+@@ -450,6 +451,7 @@ static void ggml_check_sycl() try {
+         g_ggml_sycl_comm_pairwise4 = get_sycl_env("GGML_SYCL_COMM_PAIRWISE4", 0);
+         g_ggml_sycl_comm_root_copy = get_sycl_env("GGML_SYCL_COMM_ROOT_COPY", 0);
+         g_ggml_sycl_comm_rotate_root = get_sycl_env("GGML_SYCL_COMM_ROTATE_ROOT", 0);
++        g_ggml_sycl_comm_small_f32 = get_sycl_env("GGML_SYCL_COMM_SMALL_F32", 0);
+@@ -506,6 +508,7 @@ static void ggml_check_sycl() try {
+         GGML_LOG_INFO("  GGML_SYCL_COMM_PAIRWISE4: %d\n", g_ggml_sycl_comm_pairwise4);
+         GGML_LOG_INFO("  GGML_SYCL_COMM_ROOT_COPY: %d\n", g_ggml_sycl_comm_root_copy);
+         GGML_LOG_INFO("  GGML_SYCL_COMM_ROTATE_ROOT: %d\n", g_ggml_sycl_comm_rotate_root);
++        GGML_LOG_INFO("  GGML_SYCL_COMM_SMALL_F32: %d\n", g_ggml_sycl_comm_small_f32);
+@@ -5028,10 +5031,11 @@ static bool ggml_backend_sycl_comm_allreduce_tensor(void * comm_ctx_v, struct gg
+-    const bool use_pairwise4 = g_ggml_sycl_comm_pairwise4 && n_backends == 4;
+-    const bool use_root_copy = g_ggml_sycl_comm_root_copy && n_backends >= 2 && n_backends <= 4;
+-    const bool use_single_kernel = g_ggml_sycl_comm_single_kernel && n_backends >= 2 && n_backends <= 4;
+     const size_t nbytes = ggml_nbytes(tensors[0]);
++    const bool use_pairwise4 = g_ggml_sycl_comm_pairwise4 && n_backends == 4;
++    const bool use_root_copy = g_ggml_sycl_comm_root_copy && n_backends >= 2 && n_backends <= 4;
++    const bool use_single_kernel = g_ggml_sycl_comm_single_kernel && n_backends >= 2 && n_backends <= 4;
++    const bool use_small_f32 = g_ggml_sycl_comm_small_f32 && nbytes == 20480 && n_backends >= 2 && n_backends <= 3;
+@@ -5052,7 +5056,8 @@ static bool ggml_backend_sycl_comm_allreduce_tensor(void * comm_ctx_v, struct gg
+         ggml_backend_sycl_buffer_context * buf_ctx = (ggml_backend_sycl_buffer_context *) buf->context;
+         if (sycl_ctx->device != buf_ctx->device ||
+-                (!use_single_kernel && !use_pairwise4 && !use_root_copy && !comm_ctx->ensure_tmp(i, n_reduce_steps*nbytes))) {
++                (!use_small_f32 && !use_single_kernel && !use_pairwise4 && !use_root_copy &&
++                 !comm_ctx->ensure_tmp(i, n_reduce_steps*nbytes))) {
+             return false;
+         }
+@@ -5066,7 +5071,47 @@ static bool ggml_backend_sycl_comm_allreduce_tensor(void * comm_ctx_v, struct gg
+-    if (use_pairwise4) {
++    if (use_small_f32) {
++        const size_t root = 0;
++        ggml_backend_sycl_context * sycl_ctx_root = (ggml_backend_sycl_context *) comm_ctx->backends[root]->context;
++        const queue_ptr stream_root = sycl_ctx_root->stream(sycl_ctx_root->device, 0);
++        float * dst0 = (float *) tensors[0]->data;
++        float * dst1 = (float *) tensors[1]->data;
++        float * dst2 = n_backends > 2 ? (float *) tensors[2]->data : nullptr;
++        constexpr size_t block_size = 256;
++
++        sycl::event reduce = stream_root->submit([=](sycl::handler & h) {
++            h.depends_on(ready);
++            h.parallel_for(sycl::nd_range<1>(sycl::range<1>(block_size), sycl::range<1>(block_size)), [=](sycl::nd_item<1> item) {
++                for (size_t k = item.get_global_linear_id(); k < (size_t) ne; k += block_size) {
++                    float sum = dst0[k] + dst1[k];
++                    if (n_backends > 2) {
++                        sum += dst2[k];
++                    }
++                    dst0[k] = sum;
++                    dst1[k] = sum;
++                    if (n_backends > 2) {
++                        dst2[k] = sum;
++                    }
++                }
++            });
++        });
++
++        for (size_t i = 1; i < n_backends; ++i) {
++            ggml_backend_sycl_context * sycl_ctx = (ggml_backend_sycl_context *) comm_ctx->backends[i]->context;
++            const queue_ptr stream = sycl_ctx->stream(sycl_ctx->device, 0);
++            stream->ext_oneapi_submit_barrier({reduce});
++        }
++
++        return true;
++    } else if (use_pairwise4) {
