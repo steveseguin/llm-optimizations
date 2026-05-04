@@ -1,0 +1,55 @@
+{
+  "date": "2026-05-04",
+  "model": {
+    "hfId": "Qwen/Qwen3.6-27B",
+    "localFile": "/home/steve/models/qwen3.6-27b-q4_0-gguf/Qwen3.6-27B-Q4_0.gguf",
+    "quantization": "Q4_0"
+  },
+  "hardware": {
+    "gpuName": "Intel Arc Pro B70",
+    "gpuCount": 3,
+    "vramGbPerGpu": 32,
+    "selector": "level_zero:2,1,3",
+    "cpu": "AMD EPYC 9015 8-Core Processor",
+    "os": "Ubuntu 24.04.4 LTS"
+  },
+  "engine": {
+    "name": "llama.cpp",
+    "version": "db44417 local SYCL",
+    "binary": "/home/steve/src/llama.cpp-q4-b70/build-sycl-2026-bmg-g31/bin/llama-bench",
+    "backend": "SYCL Level Zero",
+    "splitMode": "tensor",
+    "tensorSplit": "1/1/1",
+    "gpuLayers": 99,
+    "flashAttention": true,
+    "kvCacheDtype": "f16"
+  },
+  "patch": {
+    "env": "GGML_SYCL_COMM_EVENT_BARRIER=1",
+    "description": "Use ext_oneapi_submit_barrier({reduce}) on non-root allreduce queues instead of a dependent single_task marker in the experimental single-kernel SYCL allreduce path.",
+    "qualityImpact": "None expected. The patch only changes synchronization marker submission after the same allreduce kernel; weights, KV dtype, sampling, and math are unchanged."
+  },
+  "screen": {
+    "shape": "512 prompt / 128 output",
+    "eventBarrierOffTokS": 41.983073,
+    "eventBarrierOnTokS": 43.330808,
+    "offJsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-eventbarrier-triple213-p512n128-eb0-20260504T231527Z.jsonl",
+    "onJsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-eventbarrier-triple213-p512n128-eb1-20260504T231630Z.jsonl"
+  },
+  "validation": {
+    "shape": "512 prompt / 512 output",
+    "repeats": 3,
+    "tokSOut": 43.605046,
+    "tokSPrompt": 135.697394,
+    "tokSTotal": 65.999626,
+    "samplesTokS": [43.9488, 43.4813, 43.385],
+    "jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-eventbarrier-triple213-validate-p512n512-eb1-20260504T231752Z.jsonl",
+    "log": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-eventbarrier-triple213-validate-p512n512-eb1-20260504T231752Z.log"
+  },
+  "localmaxxing": {
+    "submitted": true,
+    "id": "cmortp5vn000el404dj3zqv0u",
+    "status": "APPROVED",
+    "note": "Reduced payload accepted. Full engineFlags payload hit HTTP 500, so command details are stored in localmaxxing_payloads.json and this artifact."
+  }
+}
