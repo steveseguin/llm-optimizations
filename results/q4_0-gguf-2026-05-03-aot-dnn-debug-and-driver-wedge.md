@@ -91,12 +91,13 @@ Failed sanity outputs:
 - `/home/steve/bench-results/qwen36-q4_0-gguf/sycl-dnn-rebuild-single-sanity-dnndis-fa0-ub64-n128-db44417-20260503T235413Z.jsonl` empty.
 - `/home/steve/bench-results/qwen36-q4_0-gguf/sycl-aot-dnn-post-crash-single-sanity-fa0-ub64-n128-db44417-20260503T235510Z.jsonl` empty.
 
-Kernel evidence:
+Kernel and recovery evidence:
 
 - `dmesg` contains repeated Xe engine resets/coredumps on the B70s.
 - `/sys/class/drm/card3/device/devcoredump` was present after the crash sequence.
-- PCI reset via `/sys/bus/pci/devices/{0000:e3:00.0,0000:83:00.0}/reset` completed, but the next `sycl-ls` hung.
-- `dmesg` then reported Xe TLB invalidation timeout/runtime suspend errors.
-- `sycl-ls` and an attempted `pkill` are stuck in kernel `D` state.
+- PCI reset via `/sys/bus/pci/devices/{0000:e3:00.0,0000:83:00.0}/reset` completed, but `sycl-ls` then hung and dmesg reported Xe TLB invalidation/runtime suspend errors.
+- One-at-a-time xe unbind/rebind recreated `/dev/dri/renderD128` and `/dev/dri/renderD129`.
+- Fresh-install permission issue found and fixed: `steve` was added to the `render` group, and current render/card nodes got temporary `steve` ACLs.
+- After permissions were fixed, `sycl-ls` reached the GPU path and wedged again in kernel `D` state.
 
-Conclusion: the host GPU runtime should be considered wedged until reboot or equivalent driver recovery. Do not run more B70 SYCL benchmarks before recovery.
+Conclusion: the host GPU runtime should be considered wedged until reboot. After reboot, verify `id steve` includes `render`, then run `sycl-ls` and a small single-card smoke before any longer benchmark.
