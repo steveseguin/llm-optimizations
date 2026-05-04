@@ -41,6 +41,23 @@ Initial findings to mine for B70 work:
 
 Working conclusion: `llm-scaler` is not yet assumed to be the runtime for Arc Pro B70, but it validates the next engineering direction: reduce, defer, or fuse the many small tensor-parallel reductions and move more decode-stage work into fused XPU kernels.
 
+## 4-GPU Allreduce Trace
+
+A one-token 4-GPU trace was run with the current SYCL single-kernel allreduce and Q8_1 activation cache enabled:
+
+```text
+/home/steve/bench-results/qwen36-q4_0-gguf/sycl-allreduce-order-quad0123-q8cache-p0n1-20260504T164916Z.log
+/home/steve/bench-results/qwen36-q4_0-gguf/sycl-allreduce-order-quad0123-q8cache-p0n1-20260504T164916Z.jsonl
+```
+
+Each measured pass reports:
+
+- 128 allreduces
+- every allreduce is 20,480 bytes
+- ordering is two reductions per layer: `linear_attn_out-N` or `attn_output-N`, followed by `ffn_out-N`, for layers 0 through 63
+
+Conclusion: simple adjacent packing is not the right first patch because these reductions are dependency-ordered through each layer. The next practical prototype should focus on delayed/fused reduction through safe graph regions, or fused row-parallel output kernels that consume partials and emit a mirrored result at the first true synchronization point.
+
 ## Added Track: MiniMax M2.7 Four-GPU Capacity Test
 
 Model path provided by Steve:
