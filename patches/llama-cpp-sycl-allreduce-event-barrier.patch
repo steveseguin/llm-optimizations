@@ -1,0 +1,38 @@
+diff --git a/ggml/src/ggml-sycl/ggml-sycl.cpp b/ggml/src/ggml-sycl/ggml-sycl.cpp
+--- a/ggml/src/ggml-sycl/ggml-sycl.cpp
++++ b/ggml/src/ggml-sycl/ggml-sycl.cpp
+@@
+ int g_ggml_sycl_comm_root_copy = 0;
+ int g_ggml_sycl_comm_rotate_root = 0;
+ int g_ggml_sycl_comm_small_f32 = 0;
++int g_ggml_sycl_comm_event_barrier = 0;
+ int g_ggml_sycl_enable_flash_attention = 1;
+@@
+         g_ggml_sycl_comm_root_copy = get_sycl_env("GGML_SYCL_COMM_ROOT_COPY", 0);
+         g_ggml_sycl_comm_rotate_root = get_sycl_env("GGML_SYCL_COMM_ROTATE_ROOT", 0);
+         g_ggml_sycl_comm_small_f32 = get_sycl_env("GGML_SYCL_COMM_SMALL_F32", 0);
++        g_ggml_sycl_comm_event_barrier = get_sycl_env("GGML_SYCL_COMM_EVENT_BARRIER", 0);
+         g_ggml_sycl_op_stats = get_sycl_env("GGML_SYCL_OP_STATS", 0);
+@@
+         GGML_LOG_INFO("  GGML_SYCL_COMM_ROOT_COPY: %d\n", g_ggml_sycl_comm_root_copy);
+         GGML_LOG_INFO("  GGML_SYCL_COMM_ROTATE_ROOT: %d\n", g_ggml_sycl_comm_rotate_root);
+         GGML_LOG_INFO("  GGML_SYCL_COMM_SMALL_F32: %d\n", g_ggml_sycl_comm_small_f32);
++        GGML_LOG_INFO("  GGML_SYCL_COMM_EVENT_BARRIER: %d\n", g_ggml_sycl_comm_event_barrier);
+         GGML_LOG_INFO("  GGML_SYCL_OP_STATS: %d\n", g_ggml_sycl_op_stats);
+@@
+             }
+             ggml_backend_sycl_context * sycl_ctx = (ggml_backend_sycl_context *) comm_ctx->backends[i]->context;
+             const queue_ptr stream = sycl_ctx->stream(sycl_ctx->device, 0);
+-            stream->submit([=](sycl::handler & h) {
+-                h.depends_on(reduce);
+-                h.single_task([=]() {});
+-            });
++            if (g_ggml_sycl_comm_event_barrier) {
++                stream->ext_oneapi_submit_barrier({reduce});
++            } else {
++                stream->submit([=](sycl::handler & h) {
++                    h.depends_on(reduce);
++                    h.single_task([=]() {});
++                });
++            }
+         }
