@@ -1,0 +1,52 @@
+diff --git a/bench-vllm-qwen36-fp8.sh b/bench-vllm-qwen36-fp8.sh
+--- a/bench-vllm-qwen36-fp8.sh
++++ b/bench-vllm-qwen36-fp8.sh
+@@ -14,13 +14,17 @@ NUM_ITERS="${NUM_ITERS:-3}"
+ WARMUP_ITERS="${WARMUP_ITERS:-1}"
+ KV_CACHE_DTYPE="${KV_CACHE_DTYPE:-auto}"
++QUANTIZATION="${QUANTIZATION:-fp8}"
+ EXTRA_ARGS="${EXTRA_ARGS:-}"
+ 
+ mkdir -p "$OUTDIR"
+ stamp="$(date -u +%Y%m%dT%H%M%SZ)"
+-json="$OUTDIR/vllm-qwen36-fp8-tp${TP}-in${INPUT_LEN}-out${OUTPUT_LEN}-bs${BATCH_SIZE}-${stamp}.json"
++qtag="${QUANTIZATION:-auto}"
++qtag="${qtag//[^[:alnum:]_.-]/_}"
++json="$OUTDIR/vllm-qwen36-fp8-${qtag}-tp${TP}-in${INPUT_LEN}-out${OUTPUT_LEN}-bs${BATCH_SIZE}-${stamp}.json"
+ log="${json%.json}.log"
+@@ -29,12 +33,18 @@ export ONEAPI_DEVICE_SELECTOR="$SELECTOR"
+ export VLLM_NO_USAGE_STATS=1
+ 
++quant_args=()
++if [[ -n "$QUANTIZATION" && "$QUANTIZATION" != "none" && "$QUANTIZATION" != "auto" ]]; then
++  quant_args=(--quantization "$QUANTIZATION")
++fi
++
+ "$VENV/bin/vllm" bench latency \
+   --model "$MODEL_DIR" \
+   --runner generate \
+   --dtype auto \
+-  --quantization fp8 \
++  "${quant_args[@]}" \
+   --language-model-only \
+@@ -56,10 +66,12 @@ "$VENV/bin/vllm" bench latency \
+ 
+ printf 'json=%s\nlog=%s\n' "$json" "$log"
+-python3 - "$json" <<'PY'
++python3 - "$json" "$INPUT_LEN" "$OUTPUT_LEN" <<'PY'
+ import json
+ import sys
+ path = sys.argv[1]
++input_len = int(sys.argv[2])
++output_len = int(sys.argv[3])
+ with open(path, "r", encoding="utf-8") as f:
+     data = json.load(f)
+@@ -77,5 +89,8 @@ interesting = {
+         "gpu_memory_usage",
+     )
+ }
++if data.get("avg_latency"):
++    interesting["computed_output_tok_s"] = output_len / data["avg_latency"]
++    interesting["computed_total_tok_s"] = (input_len + output_len) / data["avg_latency"]
+ print(json.dumps(interesting, sort_keys=True))
+ PY
