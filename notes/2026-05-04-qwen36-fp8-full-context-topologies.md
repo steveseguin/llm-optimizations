@@ -21,7 +21,7 @@ Runtime: local vLLM/XPU source checkout with the singleton compressed-tensors at
 | --- | ---: | ---: | ---: |
 | TP4, patched FA2, auto KV | 1,024 | 512/512 | 41.503 tok/s output |
 | TP4, patched FA2, auto KV | 1,024 | 512/256 | 39.264 tok/s output |
-| PP2xTP2, patched FA2, auto KV | 1,024 | 512/256 | 22.721 tok/s output |
+| PP2xTP2, patched FA2, auto KV | 1,024 | 512/256 | 22.721 tok/s output, LocalMaxxing `cmormmlz0000bky04wpu4oc01` |
 | TP4, patched FA2, auto KV | 262,144 | 32/8 smoke | fits, 1,206,355 KV tokens reported |
 | PP2xTP2, patched FA2, auto KV | 262,144 | 32/8 smoke | fits, 1,138,148 KV tokens reported |
 | TP4, patched FA2, FP8 KV | 1,024 | 512/256 | 28.036 tok/s output |
@@ -32,7 +32,7 @@ Plain TP2 remains blocked by an XPU memory/OOM path around `lm_head` allocation.
 
 For PP2xTP2, do not force `CCL_ZE_IPC_EXCHANGE=sockets`: the model loads but oneCCL fails when pipeline point-to-point traffic starts. Default `pidfd` IPC works.
 
-The PP2xTP2 result should be treated as a capacity fallback for larger models, not a speed target for Qwen3.6 27B. TP4 already fits full configured context and is materially faster.
+The PP2xTP2 result should be treated as a capacity fallback for larger models, not a speed target for Qwen3.6 27B. TP4 already fits full configured context and is materially faster. The PP2xTP2 512/256 number was submitted to LocalMaxxing as a diagnostic topology result; the max-context smokes and FP8-KV screen were not submitted as primary leaderboard operating points.
 
 ## Key Logs
 
