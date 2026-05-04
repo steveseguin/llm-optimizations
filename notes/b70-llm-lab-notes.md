@@ -1,107 +1,80 @@
 # Intel Arc Pro B70 LLM Lab Notes
 
-Date: 2026-05-03
+Date: 2026-05-04
 
-## Current Best State
+This note is the current public/reproducible summary for the B70 optimization work. The active technical plan is `plans/q4_0-gguf-b70-optimization-plan.md`; submitted benchmark IDs and exact payloads are recorded in `notes/localmaxxing-submissions-2026-05-04.md` and `data/localmaxxing-payloads-20260504.json.gz.b64`.
 
-Important correction:
+## Hardware And Constraints
 
-- The over-40 tok/s vLLM result is an INT4 AutoRound result and is not counted as success against the original quality-preserving Q4_0 GGUF target.
-- The active Q4_0 plan is `plans/q4_0-gguf-b70-optimization-plan.md`.
-- New Q4_0 benchmark harnesses:
-  - `scripts/bench-qwen36-q4_0-gguf-vulkan-matrix.sh`
-  - `scripts/bench-qwen36-q4_0-gguf-sycl-matrix.sh`
-
-Best single-B70 speed path so far:
-
-- Engine: vLLM 0.20.1 XPU.
-- Model: `Lorbus/Qwen3.6-27B-int4-AutoRound`.
-- Patch: local XPU MTP fallback for Qwen3.6 Gated DeltaNet speculative metadata.
-- Shape `input=500`, `output=256`: `5.67 s`, about `45.2 output tok/s`, `133.44 total tok/s`.
-- Shape `input=500`, `output=512`: `12.40 s`, about `41.3 output tok/s`, `81.60 total tok/s`.
-- Treat this as a separate quantization tradeoff result, not as Q4_0 GGUF success.
-
-Best dual-B70 speed path so far:
-
-- Engine: vLLM 0.20.1 XPU, tensor parallel size 2, non-MTP.
-- Shape `input=500`, `output=256`: `5.22 s`, about `49.1 output tok/s`, `144.88 total tok/s`.
-- Shape `input=500`, `output=512`: `10.59 s`, about `48.3 output tok/s`, `95.56 total tok/s`.
-- TP2 is useful but still well below the desired 80% single-session uplift over the best single-card MTP path.
-
-GGUF paths so far:
-
-- llama.cpp SYCL single-card Qwen3.6 27B Q4_0 GGUF: about `24.6 tok/s` decode.
-- llama.cpp Vulkan with B70 core-count patch on system Mesa: about `22 tok/s` decode.
-- Windows Q4_0 comparison target is `>=27 tok/s`, with external results up to about `28.8 tok/s`.
-- llama.cpp dual split is not viable locally yet.
-
-## Q4_0 GGUF Continuation
-
-- Decision: do not count the INT4 AutoRound result as meeting the Q4_0 GGUF target.
-- Active plan: `plans/q4_0-gguf-b70-optimization-plan.md`.
-- Added Q4_0 harnesses:
-  - `scripts/bench-qwen36-q4_0-gguf-vulkan-matrix.sh`
-  - `scripts/bench-qwen36-q4_0-gguf-sycl-matrix.sh`
-- Sanity run through the Vulkan harness:
-  - Local output: `/home/steve/bench-results/qwen36-q4_0-gguf/vulkan-20260503T191806Z.jsonl`
-  - Command shape: Vulkan0, Q4_0 GGUF, `-p 0 -n 512`, `-fa 0`, `-ub 64`, `--poll 50`, compute queue, `-ctk f16 -ctv f16`, one rep.
-  - Result: `22.19 tok/s`.
-  - Interpretation: still system-Mesa baseline behavior; no Linux Q4_0 improvement yet.
-
-## LocalMaxxing Submissions
-
-All submitted vLLM INT4 results returned `APPROVED`.
-
-| Label | LocalMaxxing ID | GPUs | Input | Output | tok/s out | tok/s total |
-| --- | --- | ---: | ---: | ---: | ---: | ---: |
-| `vllm-int4-single-b70-mtp-500-256` | `cmoq41b9d001alg043wsnthz2` | 1 | 500 | 256 | 45.2 | 133.44 |
-| `vllm-int4-single-b70-mtp-500-512` | `cmoq47sll0005l104v3i0f9l3` | 1 | 500 | 512 | 41.3 | 81.60 |
-| `vllm-int4-tp2-b70-nonmtp-500-256` | `cmoq4e9dw0002js04ledqyycn` | 2 | 500 | 256 | 49.1 | 144.88 |
-| `vllm-int4-tp2-b70-nonmtp-500-512` | `cmoq4krfb000cl40456wobg7e` | 2 | 500 | 512 | 48.3 | 95.56 |
-| `vllm-int4-single-b70-nonmtp-500-256` | `cmoq4r8rc0001l804tocgibus` | 1 | 500 | 256 | 31.8 | 93.80 |
-| `vllm-int4-tp2-b70-mtp-500-256` | `cmoq4xppt0003ky04xidngli9` | 2 | 500 | 256 | 35.6 | 105.03 |
-
-## Hardware
-
-- Host: Ubuntu 24.04 LTS, kernel 6.17.0-14-generic.
+- Host: Ubuntu 24.04.4 LTS, kernel 6.17.0-22-generic during the latest runs.
 - CPU: AMD EPYC 9015.
-- RAM reported for benchmark payloads: 16 GB.
-- GPUs: 2x Intel Arc Pro B70 / BMG-G31, 32 GB each, exposed as `/dev/dri/renderD128` and `/dev/dri/renderD129`.
-- Intel compute-runtime release installed: 26.14.37833.4.
-- IGC: 2.32.7.
-- Level Zero loader/tools: installed and visible to OpenVINO/SYCL.
-- oneAPI compiler/MKL/DNNL 2026.0 installed.
+- GPUs: 4x Intel Arc Pro B70 32GB, exposed through Level Zero selectors `0-3`.
+- Power-limit / overclocking changes are intentionally out of scope. The current work is software-only.
+- Single-card tests should isolate one device with `ONEAPI_DEVICE_SELECTOR=level_zero:N`.
+- llama.cpp multi-GPU device syntax is slash-separated, for example `-dev SYCL0/SYCL1/SYCL2`.
 
-## Latest Stack Signals
+## Current Best Results
 
-- Intel compute-runtime `26.14.37833.4` is still the latest GitHub release found on 2026-05-03 and is already installed.
-- Local llama.cpp is at `b9010`/`d05fe1d`; `origin/master` is one commit ahead at `db44417`.
-- Upstream llama.cpp still lacks the B70 Vulkan core-count entry for PCI ID `0xE223`, so the local patch remains required.
-- OpenVINO docs include an internal `GatedDeltaNet` op specification, but local OpenVINO 2026.1.2 source does not expose a matching implementation under `src/`; this is now an explicit R&D item.
+Quality-preserving Q4_0 GGUF path, llama.cpp/SYCL:
 
-## XCCL P2P Microbenchmark
+- 1x B70 baseline: about `24.7 tok/s` decode.
+- 2x B70 async-copy tensor split: `37.690 tok/s`, LocalMaxxing `cmoqkcqpv0006la04l5mtlj2q`.
+- 2x B70 single-kernel allreduce: `39.849 tok/s`, LocalMaxxing `cmoqp6jpq0004lb04241n9ns3`.
+- 2x B70 Q8 activation-cache validation, 512 prompt / 512 output: `40.487 tok/s`, LocalMaxxing `cmormylxz000fib04wodwo1ng`.
+- 3x B70 single-kernel allreduce, selector/root order `2,1,3`: `41.737 tok/s`, LocalMaxxing `cmoqqed6s0007jv049wnizwle`.
+- 3x B70 Q8 activation-cache short run, 512 prompt / 256 output: `42.432 tok/s`, LocalMaxxing `cmordq9t5000dl404x309pj48`.
+- 3x B70 Q8 activation-cache validation, 512 prompt / 512 output: `41.659 tok/s`, LocalMaxxing `cmorn71e2000kib0415vo51vj`.
+- 4x B70 Q4_0 remains negative-scaling: `31.482 tok/s` without Q8 cache and `31.913 tok/s` with Q8 cache; LocalMaxxing `cmor2e5r00004jl04o99d26p8` and `cmornec37000okw040zl9563z`.
 
-With `CCL_TOPO_P2P_ACCESS=1`:
+FP8 path, vLLM/XPU:
 
-- 4 KiB: 0.016 ms.
-- 64 KiB: 0.014 ms.
-- 1 MiB: 0.029 ms, about 35.9 GB/s.
-- 16 MiB: 0.408 ms, about 41.2 GB/s.
-- 64 MiB: 1.615 ms, about 41.6 GB/s.
-- 256 MiB: 6.417 ms, about 41.8 GB/s.
+- Official `Qwen/Qwen3.6-27B-FP8` runs, but current XPU block-FP8/requant path is slow: TP2 512-output upper-bound `20.106 tok/s`, LocalMaxxing `cmorb75xb001ckz0489eqc9se`.
+- Static `vrfai/Qwen3.6-27B-FP8` with patched XPU FlashAttention2 reaches `41.503 tok/s` on TP4 for 512 prompt / 512 output, LocalMaxxing `cmork3n3k000ujo04y73lbr1j`.
+- TP4 also fits Qwen3.6 full configured context (`262144`) and reports `1,206,355` GPU KV-cache tokens.
+- PP2 x TP2 is valid as a capacity fallback but slower for one sequence: `22.721 tok/s`, LocalMaxxing `cmormmlz0000bky04wpu4oc01`.
+- FP8 KV cache is not a speed path and is quality-risky without proper scaling: `28.036 tok/s`, LocalMaxxing `cmornlh8g000vkw04yb57ukvl`.
 
-With P2P disabled, large all-reduce falls to about 5 GB/s. Communication bandwidth is not the main TP2 blocker; vLLM's disabled XPU graph capture around communication is the larger issue.
+INT4 AutoRound path:
 
-## Quality Notes
+- `Lorbus/Qwen3.6-27B-int4-AutoRound` produced strong vLLM/XPU speed results, including `45.2 tok/s` on 1x B70 and `49.1 tok/s` on 2x B70.
+- These results are recorded on LocalMaxxing but are not counted as Q4_0 GGUF success because the quantization changes model fidelity.
 
-The over-40 tok/s numbers are from the INT4 AutoRound model, not from the Q4_0 GGUF and not from fp8/fp16. That is a real quantization tradeoff. It should be benchmarked with quality evals before using it as a quality-equivalent replacement.
+## Important Implementation Artifacts
 
-The MTP speedup should not intentionally change accepted-token semantics, but the local XPU MTP fallback is still a patch over a code path vLLM marked unsupported on XPU. Treat it as an optimization result that needs evals, not as proven production quality.
+llama.cpp Q4_0/SYCL work:
 
-## Next Work
+- Combined diff: `patches/llama-cpp-db44417-b70-sycl-combined.diff.gz.b64`.
+- Decode/apply guide: `patches/llama-cpp-db44417-b70-sycl-combined-diff.md`.
+- Key runtime flags for the best Q4_0 runs:
+  - `GGML_SYCL_ASYNC_CPY_TENSOR=1`
+  - `GGML_SYCL_COMM_ALLREDUCE=1`
+  - `GGML_SYCL_COMM_SINGLE_KERNEL=1`
+  - `GGML_SYCL_Q8_CACHE=1`
+- Benchmark harnesses:
+  - `scripts/bench-qwen36-q4_0-gguf-sycl-matrix.sh`
+  - `scripts/bench-qwen36-q4_0-gguf-vulkan-matrix.sh`
 
-- Run the Q4_0 Vulkan and SYCL matrices and submit only comparable GGUF results to LocalMaxxing.
-- Rebuild llama.cpp from current upstream plus the B70 `0xE223` Vulkan patch.
-- Build/test Mesa main ANV locally and compare against system Mesa.
-- Reproduce the Windows SYCL Q4_0 command shape and instrument Q4_0 reorder.
-- Keep dual-GPU GGUF work paused until single-card Q4_0 is at least back in the Windows range.
+vLLM/XPU FP8 work:
+
+- XPU FA2 singleton scale patch: `patches/vllm-xpu-fa2-compressed-tensors-scalar-scales.patch`.
+- Qwen3.5/Qwen3.6 language-only vision skip patch: `patches/vllm-qwen35-language-model-only-skip-vision.patch`.
+- FP8 result notes: `notes/2026-05-04-qwen36-fp8-b70-fa2.md` and `notes/2026-05-04-qwen36-fp8-full-context-topologies.md`.
+- FP8 topology data: `data/qwen36-fp8-b70-topology-screens-20260504.json`.
+
+## Current Diagnosis
+
+- Single-card Q4_0 is not limited by flash attention, ubatch, graph capture, oneDNN, AOT alone, or a missing reordered MMVQ path.
+- Reordered Q4_0 MMVQ is required; disabling it drops single-card speed to about `15 tok/s`.
+- Multi-card Q4_0 improves through async tensor copies, direct allreduce, and Q8 activation caching, but four-card scaling regresses because each token still pays 128 small 20 KiB reductions.
+- Timing hooks show synchronized allreduce cost rises sharply with GPU count: roughly `1.718 ms/token` on 2 GPUs, `5.732 ms/token` on 3 GPUs, and `10.605 ms/token` on 4 GPUs for the same reduction pattern.
+- Four-GPU root/order/topology sweeps are not enough; the next useful work is reducing the number of reductions or fusing delayed reductions through safe graph regions.
+- MiniMax M2.7 currently proves capacity pressure and split-expert allocator issues, not useful performance: tensor split is unsupported for `minimax-m2`, layer split fails large SYCL allocations, and row split currently fails on GPU expert tensor allocation unless experts are left CPU/file-backed.
+
+## Current Next Steps
+
+1. Keep Q4_0 single-card profiling focused on reordered MMVQ and activation quantization launch overhead.
+2. Prototype fewer/fused Meta allreduces for Q4_0 multi-GPU; do not spend more time on simple root-copy or pairwise allreduce topology variants.
+3. Use 3x B70 Q4_0 as the current best quality-preserving speed point; treat 4x Q4_0 as a profiling target until communication overhead is reduced.
+4. Use static FP8 TP4 with patched XPU FA2 as the best high-fidelity four-card path for now.
+5. Keep PP2 x TP2 as a capacity fallback for larger models, not a speed path for Qwen3.6 27B.
+6. Mine Intel `llm-scaler` for reduce-scatter/all-gather, fused output-kernel, Gated DeltaNet, and speculative/MTP ideas, but do not assume it will run directly on Arc/B70.
