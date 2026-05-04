@@ -48,6 +48,7 @@ Q4_0 GGUF: `/home/steve/models/qwen3.6-27b-q4_0-gguf/Qwen3.6-27B-Q4_0.gguf`.
 | 2x B70 tensor validation | `level_zero:0,3` | 512 | n/a | 40.487 tok/s | `/home/steve/bench-results/qwen36-q4_0-gguf/sycl-q8cache-dual03-validate-p512n512-20260504T154332Z.jsonl` |
 | 3x B70 tensor | `level_zero:2,1,3` | 256 | 40.937 tok/s | 42.432 tok/s | `/home/steve/bench-results/qwen36-q4_0-gguf/sycl-q8cache-triple213-p512n256-20260504T154626Z-cache*.jsonl` |
 | 3x B70 tensor validation | `level_zero:2,1,3` | 512 | n/a | 41.659 tok/s | `/home/steve/bench-results/qwen36-q4_0-gguf/sycl-q8cache-triple213-validate-p512n512-20260504T154937Z.jsonl` |
+| 4x B70 tensor smoke | `level_zero:0,1,2,3` | 128 | n/a | 31.913 tok/s | `/home/steve/bench-results/qwen36-q4_0-gguf/sycl-q8cache-quad0123-smoke-p512n128-20260504T155707Z.jsonl` |
 
 3x cache result was submitted to LocalMaxxing with reduced payload due an API 500 on the full payload:
 
@@ -58,4 +59,4 @@ Q4_0 GGUF: `/home/steve/models/qwen3.6-27b-q4_0-gguf/Qwen3.6-27B-Q4_0.gguf`.
 
 ## Interpretation
 
-Q8 caching is a modest multi-GPU optimization, not the single-card breakthrough. It helps where repeated activation quantization and peer Q8 copies are part of the tensor-split path. The larger remaining issue is still the high count of small per-token reductions and launch/synchronization overhead, especially for 4 GPUs.
+Q8 caching is a modest multi-GPU optimization, not the single-card breakthrough. It helps where repeated activation quantization and peer Q8 copies are part of the tensor-split path. The larger remaining issue is still the high count of small per-token reductions and launch/synchronization overhead, especially for 4 GPUs. The 4-GPU cache smoke only reached `31.913 tok/s`, so quad scaling still needs fewer or better cross-device reductions rather than more activation-cache work.
