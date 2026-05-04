@@ -1,0 +1,73 @@
+{
+  "date": "2026-05-04",
+  "model": {
+    "localPath": "/home/steve/models/qwen3.6-27b-fp8-vrfai",
+    "hfId": "vrfai/Qwen3.6-27B-FP8",
+    "quantization": "compressed-tensors fp8"
+  },
+  "hardware": {
+    "hwClass": "DISCRETE_GPU",
+    "gpuName": "Intel Arc Pro B70 32GB",
+    "gpuCount": 4,
+    "vramGb": 32,
+    "cpu": "AMD EPYC 9015 8-Core Processor",
+    "ramGb": 15.2,
+    "os": "Ubuntu 24.04"
+  },
+  "engine": {
+    "name": "vllm",
+    "version": "0.20.1",
+    "backend": "xpu-fa2",
+    "tensorParallel": 4,
+    "kvCacheDtype": "auto",
+    "languageModelOnly": true,
+    "gpuMemUtil": 0.9
+  },
+  "speculativeConfig": {
+    "method": "ngram",
+    "num_speculative_tokens": 4,
+    "prompt_lookup_max": 5,
+    "prompt_lookup_min": 2
+  },
+  "runs": [
+    {
+      "name": "ngram4_512p_512o_screen",
+      "promptTokens": 512,
+      "outputTokens": 512,
+      "warmupIters": 1,
+      "measuredIters": 2,
+      "avgLatencySec": 10.731264134999947,
+      "computedOutputTokS": 47.711061209472554,
+      "computedTotalTokS": 95.42212241894511,
+      "json": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp4-in512-out512-bs1-20260504T221056Z.json",
+      "log": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp4-in512-out512-bs1-20260504T221056Z.log",
+      "localmaxxingSubmitted": false
+    },
+    {
+      "name": "ngram4_512p_512o_validation",
+      "promptTokens": 512,
+      "outputTokens": 512,
+      "warmupIters": 1,
+      "measuredIters": 3,
+      "latenciesSec": [
+        11.833764661001624,
+        11.314851923991228,
+        10.194309921993408
+      ],
+      "avgLatencySec": 11.114308835662086,
+      "computedOutputTokS": 46.06674221226999,
+      "computedTotalTokS": 92.13348442453999,
+      "json": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp4-in512-out512-bs1-20260504T221317Z.json",
+      "log": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp4-in512-out512-bs1-20260504T221317Z.log",
+      "localmaxxingSubmitted": true,
+      "localmaxxingId": "cmorre1hq000fi30421gxpv3j",
+      "localmaxxingStatus": "APPROVED"
+    }
+  ],
+  "baselines": {
+    "tp4Fp8Fa2_512p_512o_tokSOut": 41.503,
+    "tp4Fp8Ngram2_512p_512o_tokSOut": 42.48917312778802,
+    "q4_0Tp3_512p_512o_tokSOut": 41.659
+  },
+  "interpretation": "N-gram with four speculative tokens is the best static FP8 result so far. It is quality-preserving relative to the FP8 target model because draft tokens are verified by the target model. It uses auto/BF16 KV and no power-limit changes."
+}
