@@ -1,0 +1,62 @@
+{
+  "date": "2026-05-04",
+  "model": {
+    "localPath": "/home/steve/models/qwen3.6-27b-fp8-vrfai",
+    "hfId": "vrfai/Qwen3.6-27B-FP8",
+    "quantization": "compressed-tensors fp8"
+  },
+  "hardware": {
+    "gpuName": "Intel Arc Pro B70 32GB",
+    "gpuCount": 4,
+    "vramGb": 32,
+    "os": "Ubuntu 24.04"
+  },
+  "engine": {
+    "name": "vllm",
+    "version": "0.20.1",
+    "backend": "xpu-fa2",
+    "tensorParallel": 4,
+    "kvCacheDtype": "auto"
+  },
+  "commonShape": {
+    "promptTokens": 512,
+    "outputTokens": 512,
+    "warmupIters": 1,
+    "measuredIters": 2,
+    "maxModelLen": 1024,
+    "gpuMemUtil": 0.9,
+    "promptLookupMin": 2,
+    "promptLookupMax": 5
+  },
+  "runs": [
+    {
+      "name": "ngram6_stall",
+      "speculativeConfig": {
+        "method": "ngram",
+        "num_speculative_tokens": 6,
+        "prompt_lookup_max": 5,
+        "prompt_lookup_min": 2
+      },
+      "status": "terminated_stall",
+      "log": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp4-in512-out512-bs1-20260504T222633Z.log",
+      "json": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp4-in512-out512-bs1-20260504T222633Z.json",
+      "finding": "Stalled during initialization/profile before useful benchmark output. Log included 'No available shared memory broadcast block found in 60 seconds'. All four workers were CPU-hot for several minutes before termination.",
+      "localmaxxingSubmitted": false
+    },
+    {
+      "name": "ngram5_stall",
+      "speculativeConfig": {
+        "method": "ngram",
+        "num_speculative_tokens": 5,
+        "prompt_lookup_max": 5,
+        "prompt_lookup_min": 2
+      },
+      "status": "terminated_stall",
+      "log": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp4-in512-out512-bs1-20260504T223215Z.log",
+      "json": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp4-in512-out512-bs1-20260504T223215Z.json",
+      "finding": "Stalled before useful output. Rank 0 was CPU-hot while other workers were mostly idle; terminated manually.",
+      "localmaxxingSubmitted": false
+    }
+  ],
+  "interpretation": "For this vLLM/XPU path, num_speculative_tokens=4 is the best practical setting seen so far. Values 5 and 6 stall before useful output and should not be submitted as benchmarks. Tune prompt lookup windows around 4 next."
+}
