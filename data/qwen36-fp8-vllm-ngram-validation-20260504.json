@@ -1,0 +1,77 @@
+{
+  "date": "2026-05-04",
+  "model": {
+    "localPath": "/home/steve/models/qwen3.6-27b-fp8-vrfai",
+    "hfId": "vrfai/Qwen3.6-27B-FP8",
+    "quantization": "compressed-tensors fp8"
+  },
+  "hardware": {
+    "hwClass": "DISCRETE_GPU",
+    "gpuName": "Intel Arc Pro B70 32GB",
+    "gpuCount": 4,
+    "vramGb": 32,
+    "cpu": "AMD EPYC 9015 8-Core Processor",
+    "ramGb": 15.2,
+    "os": "Ubuntu 24.04"
+  },
+  "engine": {
+    "name": "vllm",
+    "version": "0.20.1",
+    "backend": "xpu-fa2",
+    "tensorParallel": 4,
+    "kvCacheDtype": "auto",
+    "languageModelOnly": true,
+    "gpuMemUtil": 0.9
+  },
+  "patches": [
+    "patches/vllm-xpu-qwen35-gdn-spec-fallback-contiguous-state.patch",
+    "patches/bench-vllm-qwen36-fp8-wrapper-quantization.patch",
+    "patches/bench-vllm-qwen36-fp8-wrapper-speculative-config.patch"
+  ],
+  "speculativeConfig": {
+    "method": "ngram",
+    "num_speculative_tokens": 2,
+    "prompt_lookup_max": 5,
+    "prompt_lookup_min": 2
+  },
+  "runs": [
+    {
+      "name": "ngram2_512p_256o_screen",
+      "promptTokens": 512,
+      "outputTokens": 256,
+      "warmupIters": 1,
+      "measuredIters": 2,
+      "avgLatencySec": 6.05994565400033,
+      "computedOutputTokS": 42.244603271484394,
+      "computedTotalTokS": 126.7338098144532,
+      "json": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp4-in512-out256-bs1-20260504T220138Z.json",
+      "log": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp4-in512-out256-bs1-20260504T220138Z.log",
+      "localmaxxingSubmitted": false
+    },
+    {
+      "name": "ngram2_512p_512o_validation",
+      "promptTokens": 512,
+      "outputTokens": 512,
+      "warmupIters": 1,
+      "measuredIters": 3,
+      "latenciesSec": [
+        11.795413790998282,
+        12.598177527994267,
+        11.756794460001402
+      ],
+      "avgLatencySec": 12.050128592997984,
+      "computedOutputTokS": 42.48917312778802,
+      "computedTotalTokS": 84.97834625557604,
+      "json": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp4-in512-out512-bs1-20260504T220350Z.json",
+      "log": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp4-in512-out512-bs1-20260504T220350Z.log",
+      "localmaxxingSubmitted": true,
+      "localmaxxingId": "cmorr43b30004jj04h4hhb6v1",
+      "localmaxxingStatus": "APPROVED"
+    }
+  ],
+  "baselines": {
+    "tp4Fp8Fa2_512p_256o_tokSOut": 39.264,
+    "tp4Fp8Fa2_512p_512o_tokSOut": 41.503
+  },
+  "interpretation": "N-gram speculative decode is a modest quality-preserving speed path for the patched static FP8 TP4 path. It does not use FP8 KV and does not raise power limits. Backend is vLLM XPU/FA2; LocalMaxxing backend field was omitted because the API backend enum has no xpu value."
+}
