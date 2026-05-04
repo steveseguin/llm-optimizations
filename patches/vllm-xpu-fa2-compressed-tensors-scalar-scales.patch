@@ -1,0 +1,21 @@
+diff --git a/vllm/model_executor/layers/quantization/compressed_tensors/compressed_tensors.py b/vllm/model_executor/layers/quantization/compressed_tensors/compressed_tensors.py
+index 8d16a143b..06d07575b 100644
+--- a/vllm/model_executor/layers/quantization/compressed_tensors/compressed_tensors.py
++++ b/vllm/model_executor/layers/quantization/compressed_tensors/compressed_tensors.py
+@@ -1119,9 +1119,13 @@ class CompressedTensorsKVCacheMethod(BaseKVCacheMethod):
+         Override the default vLLM placeholder scales with the llm-compressor loaded
+         scales. Zero points are not used as only symmetric quantization is supported.
+         """
+-        layer._k_scale = layer.k_scale
+-        layer._v_scale = layer.v_scale
+-        layer._q_scale = layer.q_scale
++        def _attention_scale_view(tensor: torch.Tensor) -> torch.Tensor:
++            # XPU FA2 accepts singleton descale tensors only as scalar views.
++            return tensor.reshape(()) if tensor.numel() == 1 else tensor
++
++        layer._k_scale = _attention_scale_view(layer.k_scale)
++        layer._v_scale = _attention_scale_view(layer.v_scale)
++        layer._q_scale = _attention_scale_view(layer.q_scale)
+ 
+         # Set the _float variants that the attention backend uses.
+         def _to_scalar(tensor: torch.Tensor) -> float:
