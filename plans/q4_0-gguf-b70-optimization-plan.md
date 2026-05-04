@@ -8,8 +8,15 @@ The INT4 AutoRound vLLM result is interesting but does not count as success agai
 
 Current local single-B70 GGUF baselines:
 
+- SYCL graph enabled, oneDNN enabled, Q4_0/f16 KV: `24.553-24.570 tok/s` stable warmup-enabled result.
 - SYCL graph enabled, oneDNN disabled, Q4_0/f16 KV: `24.249 tok/s` stable warmup-enabled result.
 - Vulkan, patched B70 core count, system Mesa: `22.19 tok/s`.
+
+Current host state after the latest crash sequence:
+
+- SYCL/Level Zero should be treated as wedged until reboot or equivalent driver recovery.
+- Fresh single-card sanity runs now fail with Level Zero OOM in `MUL_MAT`, including the previously working AOT+DNN binary.
+- PCI reset completed but did not recover the stack; `sycl-ls` then stuck in kernel `D` state and dmesg reported Xe TLB invalidation timeout/runtime suspend errors.
 
 Comparable external B70 Q4_0 results:
 
@@ -26,12 +33,23 @@ Therefore the Linux target is not speculative: first reach `>=27 tok/s`, then `>
 - Upstream llama.cpp `origin/master` still lacks the Intel Arc Pro B70 Vulkan core-count entry for PCI ID `0xE223`, so the local Vulkan B70 patch remains required.
 - In current upstream llama.cpp, Vulkan's Intel Q4_0 MMVQ disable is still correct for B70 single-token decode: forcing MMVQ dropped Q4_0 decode to about `10.35 tok/s`.
 - SYCL graph mode is important on this host. `GGML_SYCL_DISABLE_GRAPH=0` improved single-B70 Q4_0 from the first `19.17 tok/s` run to a stable `24.249 tok/s`.
+- oneDNN enabled is a small but repeatable single-card gain:
+  - non-AOT oneDNN build: `24.553 tok/s`;
+  - BMG-G31 AOT plus oneDNN build: `24.570 tok/s`.
+- BMG-G31 AOT by itself is valid after the CMake flag fix, but it only adds about `0.09 tok/s` versus the non-AOT DNN-disabled build.
+- Existing SYCL debug logs confirm single-card Q4_0 decode already uses reordered MMVQ:
+  - one-token debug run had `344` reordered Q4_0 MMVQ calls and no plain Q4_0 MMVQ calls.
+  - Therefore the next single-card work should target kernel/runtime efficiency rather than assuming reorder is missing.
+- `GGML_SYCL_PRIORITIZE_DMMV=1` is currently unsafe on the combined AOT+DNN build: it produced a segmentation fault and an empty JSONL result.
 - SYCL row split had real source issues:
   - split-buffer factory signature did not match the backend ABI;
   - split-buffer metadata did not model CUDA's per-main-device split buffer type;
   - split-buffer init only had one queue pointer but indexed by device;
   - reorder optimization tried to use dummy split-buffer base pointers.
 - After fixing those local SYCL row-split issues, row mode starts generation but is still unusably slow: a 128-token smoke run timed out after 300 seconds.
+- Dual tensor debug with `-fa 1` preserves the reordered Q4_0 path but introduces heavy copy traffic:
+  - one-token debug run logged `113` explicit SYCL copy calls and `48` memcpy-path copies before Level Zero OOM under debug.
+  - This supports the working theory that tensor split is copy/synchronization bound, not missing the Q4_0 matvec kernel.
 - OpenVINO 2026.1 docs list an internal `GatedDeltaNet` operation, but the local OpenVINO 2026.1.2 source tree does not expose a matching implementation symbol under `src/`. This is worth investigating, but OpenVINO remains an R&D track until the recurrent Qwen3.6 path can stay on GPU.
 
 ## Quality Constraints
@@ -94,15 +112,20 @@ Goal: reproduce or beat the Windows SYCL `27.03 tok/s` Q4_0 result on Linux.
 
 Steps:
 
-1. Keep `GGML_SYCL_DISABLE_GRAPH=0` as the current best single-card path.
-2. Re-run the known Windows command shape where possible against the clean `db44417` build.
-3. Compare `GGML_SYCL_F16=ON/OFF` builds, oneDNN on/off, and BMG AOT variants.
-4. Instrument Q4_0 reorder:
-   - log which tensors are reordered;
-   - check for reorder temp-buffer fallbacks;
-   - verify Q4_0 decode hot matvecs use the reordered kernels.
-5. If reorder is incomplete, patch tensor eligibility or layout handling before changing quantization.
-6. Investigate why `GGML_SYCL_DEVICE_ARCH=intel_gpu_bmg_g31` is reported as unused by `icpx`; if AOT is not actually happening, find the correct oneAPI 2026 flag shape or rely on JIT explicitly.
+1. Reboot or otherwise recover the Xe/Level Zero runtime before running more SYCL GPU benchmarks.
+2. After recovery, start with `sycl-ls`, then a one-token/small-token single-card sanity run before any matrix.
+3. Keep `GGML_SYCL_DISABLE_GRAPH=0` as the current best single-card path.
+4. Re-run the known Windows command shape where possible against the clean `db44417` build.
+5. Keep oneDNN enabled for the current best reproducible single-card run.
+6. Keep BMG-G31 AOT as a reproducible build variant, but do not expect it alone to reach the Windows target.
+7. Avoid `GGML_SYCL_PRIORITIZE_DMMV=1` until the segfault is isolated.
+8. Instrument or profile kernel time for the reordered Q4_0 MMVQ path and recurrent ops:
+   - `reorder_mul_mat_vec_q4_0_q8_1_sycl`;
+   - `quantize_row_q8_1_sycl`;
+   - `GATED_DELTA_NET`;
+   - `SSM_CONV`;
+   - recurrent state copy/update paths.
+9. Compare Linux oneAPI/Level Zero runtime behavior against the known Windows SYCL result; the reorder path is not the missing piece.
 
 ### Track C: Dual B70 Without Quality Loss
 
@@ -115,15 +138,25 @@ Known blockers:
 - SYCL layer split is stable but only matches single-card: `23.978 tok/s` versus `24.249 tok/s` single-card.
 - SYCL tensor split is stable with flash attention but slower: `19.524 tok/s` on a 128-token smoke run.
 - SYCL row split now reaches generation after local fixes, but the split matmul/copy path is far too slow: 128-token smoke timed out after 300 seconds.
+- After the latest experimental split safety rebuild, row split still timed out on a 16-token smoke run, and tensor split regressed to Level Zero OOM at the final `output.weight` projection.
+- SYCL tensor split debug shows many small copies in the decode step, including recurrent state copies. A one-token debug run saw `113` SYCL copy calls before Level Zero OOM under debug.
+- SYCL row split had a direct matmul pointer bug: split weights must use `src0_extra->data_device[i]`, not dummy `src0->data`.
+- SYCL recurrent kernels that directly dereference `tensor->data` must not accept split-buffer inputs until they are made split-aware.
 
 Steps:
 
-1. Fix single-card Q4_0 first; current best is `24.249 tok/s`, target remains `>=27`.
-2. Treat layer split as a memory-capacity/throughput-for-multiple-sessions path, not a single-session acceleration path.
-3. For SYCL row split, profile the split matmul/copy loop after the correctness fixes. The next likely issue is excessive per-layer/per-token copying across devices.
-4. For SYCL split buffers, implement split-aware Q4_0 reorder only if row split becomes close enough to matter; the current correctness guard disables reorder for split tensors.
-5. For Vulkan tensor split, profile synchronization and per-op ownership instead of sweeping blind flags.
-6. Revisit true dual-B70 speedup through speculative/draft batching only after the non-speculative single-card backend reaches the Windows range.
+1. Do not run more dual-B70 SYCL tests until the current driver wedge is cleared.
+2. Fix single-card Q4_0 first; current best is `24.570 tok/s`, target remains `>=27`.
+3. Treat layer split as a memory-capacity/throughput-for-multiple-sessions path, not a single-session acceleration path.
+4. Keep the current SYCL split safety edits marked experimental, not accepted:
+   - use per-device split tensor pointers for split matmul;
+   - keep `SSM_CONV` and `GATED_DELTA_NET` away from split buffers.
+5. Split the dual-GPU work into two separate investigations:
+   - row split: fix correctness and then remove serial activation broadcast/gather waits;
+   - tensor/meta split: fix the final projection OOM/regression and reduce copy/sync costs.
+6. For tensor split, avoid blind split-ratio sweeps until the final `output.weight` OOM is understood.
+7. For Vulkan tensor split, profile synchronization and per-op ownership instead of sweeping blind flags.
+8. Revisit true dual-B70 speedup through speculative/draft batching only after the non-speculative single-card backend reaches the Windows range.
 
 ### Track D: OpenVINO R&D
 
