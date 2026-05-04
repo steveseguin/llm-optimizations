@@ -1,0 +1,80 @@
+{
+  "date": "2026-05-04",
+  "model": "Qwen3.6-27B Q4_0 GGUF",
+  "model_path": "/home/steve/models/qwen3.6-27b-q4_0-gguf/Qwen3.6-27B-Q4_0.gguf",
+  "engine": "llama.cpp",
+  "build_dir": "/home/steve/src/llama.cpp-q4-b70/build-sycl-2026-bmg-g31",
+  "patch": "GGML_SYCL_COMM_ROTATE_ROOT",
+  "quality_preserving": true,
+  "localmaxxing_submitted": false,
+  "submission_reason": "Diagnostic did not improve the recommended operating point; existing Q4_0 LocalMaxxing submissions already cover best 2x/3x and 4x negative-scaling learnings.",
+  "runs": [
+    {
+      "label": "quad-smoke-control",
+      "selector": "0,1,2,3",
+      "devices": "SYCL0/SYCL1/SYCL2/SYCL3",
+      "prompt_tokens": 512,
+      "output_tokens": 32,
+      "rotate_root": 0,
+      "tok_s_out": 30.493557,
+      "jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-rotate-root4-smoke-p512n32-r0-20260504T211424Z.jsonl",
+      "log": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-rotate-root4-smoke-p512n32-r0-20260504T211424Z.log"
+    },
+    {
+      "label": "quad-smoke-rotate",
+      "selector": "0,1,2,3",
+      "devices": "SYCL0/SYCL1/SYCL2/SYCL3",
+      "prompt_tokens": 512,
+      "output_tokens": 32,
+      "rotate_root": 1,
+      "tok_s_out": 30.728515,
+      "jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-rotate-root4-smoke-p512n32-r1-20260504T211535Z.jsonl",
+      "log": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-rotate-root4-smoke-p512n32-r1-20260504T211535Z.log"
+    },
+    {
+      "label": "triple-control",
+      "selector": "2,1,3",
+      "devices": "SYCL0/SYCL1/SYCL2",
+      "prompt_tokens": 512,
+      "output_tokens": 128,
+      "rotate_root": 0,
+      "tok_s_out": 42.573364,
+      "jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-rotate-root-triple213-p512n128-r0-20260504T211712Z.jsonl",
+      "log": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-rotate-root-triple213-p512n128-r0-20260504T211712Z.log"
+    },
+    {
+      "label": "triple-rotate",
+      "selector": "2,1,3",
+      "devices": "SYCL0/SYCL1/SYCL2",
+      "prompt_tokens": 512,
+      "output_tokens": 128,
+      "rotate_root": 1,
+      "tok_s_out": 41.359099,
+      "jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-rotate-root-triple213-p512n128-r1-20260504T211814Z.jsonl",
+      "log": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-rotate-root-triple213-p512n128-r1-20260504T211814Z.log"
+    },
+    {
+      "label": "quad-control",
+      "selector": "0,1,2,3",
+      "devices": "SYCL0/SYCL1/SYCL2/SYCL3",
+      "prompt_tokens": 512,
+      "output_tokens": 128,
+      "rotate_root": 0,
+      "tok_s_out": 32.164634,
+      "jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-rotate-root-quad0123-p512n128-r0-20260504T211915Z.jsonl",
+      "log": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-rotate-root-quad0123-p512n128-r0-20260504T211915Z.log"
+    },
+    {
+      "label": "quad-rotate",
+      "selector": "0,1,2,3",
+      "devices": "SYCL0/SYCL1/SYCL2/SYCL3",
+      "prompt_tokens": 512,
+      "output_tokens": 128,
+      "rotate_root": 1,
+      "tok_s_out": 31.753918,
+      "jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-rotate-root-quad0123-p512n128-r1-20260504T212035Z.jsonl",
+      "log": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-rotate-root-quad0123-p512n128-r1-20260504T212035Z.log"
+    }
+  ],
+  "conclusion": "Stable diagnostic only. Rotate-root does not improve the recommended Q4_0 operating point."
+}
