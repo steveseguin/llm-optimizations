@@ -1,0 +1,78 @@
+{
+  "date": "2026-05-04",
+  "model": {
+    "name": "MiniMax M2.7 UD-IQ4_XS GGUF",
+    "path": "/home/steve/models/minimax-m2.7-ud-iq4_xs-gguf/UD-IQ4_XS/MiniMax-M2.7-UD-IQ4_XS-00001-of-00004.gguf",
+    "shards": 4,
+    "totalSizeApproxGb": 101
+  },
+  "hardware": {
+    "gpuName": "Intel Arc Pro B70",
+    "gpuCount": 4,
+    "vramGbPerGpu": 32,
+    "systemRamGbApprox": 15,
+    "os": "Ubuntu 24.04.4 LTS"
+  },
+  "engine": {
+    "name": "llama.cpp",
+    "binary": "/home/steve/src/llama.cpp-q4-b70/build-sycl-2026-bmg-g31/bin/llama-bench",
+    "backend": "SYCL Level Zero",
+    "splitMode": "row",
+    "tensorSplit": "1/1/1/1"
+  },
+  "commandTemplate": "ONEAPI_DEVICE_SELECTOR=level_zero:0,1,2,3 GGML_SYCL_DISABLE_DNN=1 llama-bench -v -m <model> -dev SYCL0/SYCL1/SYCL2/SYCL3 -ngl 99 -sm row -ts 1/1/1/1 -ncmoe <N> -p 0 -n 1 -b 128 -ub 32 -fa 0 -ctk f16 -ctv f16 -t 8 -r 1 -o jsonl -oe jsonl",
+  "results": [
+    {
+      "ncmoe": 13,
+      "outcome": "load_failed",
+      "failedTensor": "blk.25.ffn_gate_exps.weight",
+      "tensorType": "iq3_s",
+      "device": 1,
+      "rows": "[98304, 196608)",
+      "allocationBytes": 129761280,
+      "log": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/minimax-m27-quad-row-ngl99-ncmoe13-verbose-20260504T224723Z.log"
+    },
+    {
+      "ncmoe": 26,
+      "outcome": "load_failed",
+      "failedTensor": "blk.37.ffn_up_exps.weight",
+      "tensorType": "iq3_s",
+      "device": 0,
+      "rows": "[0, 98304)",
+      "allocationBytes": 129761280,
+      "log": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/minimax-m27-quad-row-ngl99-ncmoe26-verbose-20260504T224846Z.log"
+    },
+    {
+      "ncmoe": 38,
+      "outcome": "load_failed",
+      "failedTensor": "blk.49.ffn_gate_exps.weight",
+      "tensorType": "iq3_s",
+      "device": 1,
+      "rows": "[98304, 196608)",
+      "allocationBytes": 129761280,
+      "log": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/minimax-m27-quad-row-ngl99-ncmoe38-verbose-20260504T225001Z.log"
+    },
+    {
+      "ncmoe": 50,
+      "outcome": "load_failed",
+      "failedTensor": "blk.60.ffn_up_exps.weight",
+      "tensorType": "iq3_s",
+      "device": 0,
+      "rows": "[0, 98304)",
+      "allocationBytes": 129761280,
+      "log": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/minimax-m27-quad-row-ngl99-ncmoe50-verbose-20260504T225119Z.log"
+    }
+  ],
+  "interpretation": [
+    "Each additional ncmoe block moves the first failed GPU expert allocation roughly 12 layers later.",
+    "The failures are small 129761280 byte split expert allocations after cumulative GPU-resident expert pressure, not one malformed tensor.",
+    "The current row-split path can only keep about 12-13 expert layers per B70 before split-buffer allocation fails.",
+    "ncmoe=62 can load because the experts are effectively CPU/file-backed, but that is not a useful performance mode on this low-RAM host.",
+    "Do not submit MiniMax performance to LocalMaxxing until GPU-resident expert execution works."
+  ],
+  "nextActions": [
+    "Stop treating MiniMax as flag tuning.",
+    "Implement or prototype SYCL split-buffer allocation behavior suitable for expert tensors.",
+    "Implement expert-aligned GGML_OP_MUL_MAT_ID execution for SYCL split buffers, or keep selected experts on the owning B70 and assemble outputs correctly."
+  ]
+}
