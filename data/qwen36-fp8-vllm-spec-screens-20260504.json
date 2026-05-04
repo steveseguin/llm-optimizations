@@ -1,0 +1,77 @@
+{
+  "date": "2026-05-04",
+  "model": {
+    "localPath": "/home/steve/models/qwen3.6-27b-fp8-vrfai",
+    "hfId": "vrfai/Qwen3.6-27B-FP8",
+    "quantization": "compressed-tensors fp8"
+  },
+  "hardware": {
+    "hwClass": "DISCRETE_GPU",
+    "gpuName": "Intel Arc Pro B70 32GB",
+    "gpuCount": 4,
+    "vramGb": 32,
+    "os": "Ubuntu 24.04.4 LTS"
+  },
+  "engine": {
+    "name": "vllm",
+    "version": "0.20.1",
+    "backend": "xpu-fa2",
+    "tensorParallel": 4,
+    "kvCacheDtype": "auto",
+    "languageModelOnly": true
+  },
+  "runs": [
+    {
+      "name": "mtp1_smoke",
+      "status": "hung_killed",
+      "promptTokens": 32,
+      "outputTokens": 8,
+      "speculativeConfig": {
+        "method": "mtp",
+        "num_speculative_tokens": 1
+      },
+      "log": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-vrfai-tp4-fa2-mtp1-smoke-in32-out8-20260504T214352Z.log",
+      "finding": "Target Qwen3_5ForConditionalGeneration and draft Qwen3_5MTP resolved, XCCL ranks initialized, then rank 1 spun in sched_yield before useful generation.",
+      "localmaxxingSubmitted": false
+    },
+    {
+      "name": "ngram2_before_contiguous_patch",
+      "status": "failed_runtime_error",
+      "promptTokens": 32,
+      "outputTokens": 8,
+      "speculativeConfig": {
+        "method": "ngram",
+        "num_speculative_tokens": 2,
+        "prompt_lookup_max": 5,
+        "prompt_lookup_min": 2
+      },
+      "log": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-vrfai-tp4-fa2-ngram2-smoke-in32-out8-20260504T215101Z.log",
+      "finding": "XPU Gated DeltaNet custom op required non_spec_state_indices_tensor to be contiguous.",
+      "error": "RuntimeError: non_spec_state_indices_tensor must be contiguous",
+      "localmaxxingSubmitted": false
+    },
+    {
+      "name": "ngram2_after_contiguous_patch",
+      "status": "completed_smoke",
+      "promptTokens": 32,
+      "outputTokens": 8,
+      "speculativeConfig": {
+        "method": "ngram",
+        "num_speculative_tokens": 2,
+        "prompt_lookup_max": 5,
+        "prompt_lookup_min": 2
+      },
+      "log": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-vrfai-tp4-fa2-ngram2-contigfix-smoke-in32-out8-20260504T215426Z.log",
+      "json": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-vrfai-tp4-fa2-ngram2-contigfix-smoke-in32-out8-20260504T215426Z.json",
+      "avgLatencySec": 6.131081808009185,
+      "computedOutputTokS": 1.3048268234733715,
+      "computedTotalTokS": 6.524134117366858,
+      "finding": "Cold one-iteration correctness smoke completed after the contiguous metadata patch. Not a valid speed benchmark.",
+      "localmaxxingSubmitted": false
+    }
+  ],
+  "patches": [
+    "patches/vllm-xpu-qwen35-gdn-spec-fallback-contiguous-state.patch",
+    "patches/bench-vllm-qwen36-fp8-wrapper-quantization.patch"
+  ]
+}
