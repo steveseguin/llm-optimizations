@@ -5,6 +5,7 @@
   "results": {
     "pp2_tp2_512_256": {
       "log": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-vrfai-pp2-tp2-fa2-pidfd-w1-i2-in512-out256-20260504T194506Z.log",
+      "localmaxxingId": "cmormmlz0000bky04wpu4oc01",
       "avgLatencySec": 11.26701237749512,
       "tokSOut": 22.72119630500609,
       "tokSTotal": 68.16358891501827,
@@ -13,7 +14,8 @@
       "maxModelLen": 1024,
       "pipelineParallel": 2,
       "tensorParallel": 2,
-      "kvCacheDtype": "auto"
+      "kvCacheDtype": "auto",
+      "note": "Submitted as a diagnostic topology result; not the recommended operating point."
     },
     "pp2_tp2_max262k_smoke": {
       "log": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-vrfai-pp2-tp2-fa2-pidfd-max262k-smoke-in32-out8-20260504T194807Z.log",
