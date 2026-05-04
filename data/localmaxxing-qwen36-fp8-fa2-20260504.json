@@ -1,0 +1,62 @@
+[
+  {
+    "id": "cmorjwgi8000el7041jdd8faa",
+    "hfId": "vrfai/Qwen3.6-27B-FP8",
+    "hardware": {
+      "hwClass": "DISCRETE_GPU",
+      "gpuName": "Intel Arc Pro B70 32GB",
+      "gpuCount": 4,
+      "vramGb": 32,
+      "cpu": "AMD EPYC 9015",
+      "ramGb": 16,
+      "os": "Ubuntu 24.04.4 LTS"
+    },
+    "engineName": "vllm",
+    "engineVersion": "0.20.1",
+    "quantization": "FP8",
+    "promptTokens": 512,
+    "outputTokens": 256,
+    "contextLength": 1024,
+    "batchSize": 1,
+    "tokSOut": 39.264203,
+    "tokSTotal": 117.792609,
+    "engineFlags": {
+      "tensorParallel": 4,
+      "gpuMemUtil": 0.9,
+      "attentionBackend": "xpu_flash_attn2",
+      "flashAttn": true,
+      "specDecoding": false,
+      "commandSnippet": "ONEAPI_DEVICE_SELECTOR=level_zero:0,1,2,3 CCL_ATL_TRANSPORT=ofi CCL_ZE_IPC_EXCHANGE=sockets vllm bench latency --model /home/steve/models/qwen3.6-27b-fp8-vrfai --tensor-parallel-size 4 --quantization compressed-tensors --max-model-len 1024 --input-len 512 --output-len 256 --num-iters-warmup 1 --num-iters 5 --gpu-memory-utilization 0.90 --disable-log-stats --no-enable-prefix-caching --language-model-only"
+    }
+  },
+  {
+    "id": "cmork3n3k000ujo04y73lbr1j",
+    "hfId": "vrfai/Qwen3.6-27B-FP8",
+    "hardware": {
+      "hwClass": "DISCRETE_GPU",
+      "gpuName": "Intel Arc Pro B70 32GB",
+      "gpuCount": 4,
+      "vramGb": 32,
+      "cpu": "AMD EPYC 9015",
+      "ramGb": 16,
+      "os": "Ubuntu 24.04.4 LTS"
+    },
+    "engineName": "vllm",
+    "engineVersion": "0.20.1",
+    "quantization": "FP8",
+    "promptTokens": 512,
+    "outputTokens": 512,
+    "contextLength": 1024,
+    "batchSize": 1,
+    "tokSOut": 41.503063,
+    "tokSTotal": 83.006125,
+    "engineFlags": {
+      "tensorParallel": 4,
+      "gpuMemUtil": 0.9,
+      "attentionBackend": "xpu_flash_attn2",
+      "flashAttn": true,
+      "specDecoding": false,
+      "commandSnippet": "ONEAPI_DEVICE_SELECTOR=level_zero:0,1,2,3 CCL_ATL_TRANSPORT=ofi CCL_ZE_IPC_EXCHANGE=sockets vllm bench latency --model /home/steve/models/qwen3.6-27b-fp8-vrfai --tensor-parallel-size 4 --quantization compressed-tensors --max-model-len 1024 --input-len 512 --output-len 512 --num-iters-warmup 1 --num-iters 5 --gpu-memory-utilization 0.90 --disable-log-stats --no-enable-prefix-caching --language-model-only"
+    }
+  }
+]
