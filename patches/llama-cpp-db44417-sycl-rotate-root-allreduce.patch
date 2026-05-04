@@ -1,0 +1,42 @@
+diff --git a/ggml/src/ggml-sycl/ggml-sycl.cpp b/ggml/src/ggml-sycl/ggml-sycl.cpp
+--- a/ggml/src/ggml-sycl/ggml-sycl.cpp
++++ b/ggml/src/ggml-sycl/ggml-sycl.cpp
+@@
+ int g_ggml_sycl_comm_allreduce = 0;
+ int g_ggml_sycl_comm_single_kernel = 0;
+ int g_ggml_sycl_comm_pairwise4 = 0;
+ int g_ggml_sycl_comm_root_copy = 0;
++int g_ggml_sycl_comm_rotate_root = 0;
+@@
+         g_ggml_sycl_comm_single_kernel = get_sycl_env("GGML_SYCL_COMM_SINGLE_KERNEL", 0);
+         g_ggml_sycl_comm_pairwise4 = get_sycl_env("GGML_SYCL_COMM_PAIRWISE4", 0);
+         g_ggml_sycl_comm_root_copy = get_sycl_env("GGML_SYCL_COMM_ROOT_COPY", 0);
++        g_ggml_sycl_comm_rotate_root = get_sycl_env("GGML_SYCL_COMM_ROTATE_ROOT", 0);
+@@
+         GGML_LOG_INFO("  GGML_SYCL_COMM_SINGLE_KERNEL: %d\n", g_ggml_sycl_comm_single_kernel);
+         GGML_LOG_INFO("  GGML_SYCL_COMM_PAIRWISE4: %d\n", g_ggml_sycl_comm_pairwise4);
+         GGML_LOG_INFO("  GGML_SYCL_COMM_ROOT_COPY: %d\n", g_ggml_sycl_comm_root_copy);
++        GGML_LOG_INFO("  GGML_SYCL_COMM_ROTATE_ROOT: %d\n", g_ggml_sycl_comm_rotate_root);
+@@
+ struct ggml_backend_sycl_comm_context {
+     std::vector<ggml_backend_t> backends;
+     std::vector<void *>         tmp_ptrs;
+     std::vector<size_t>         tmp_sizes;
++    uint64_t                    allreduce_calls = 0;
+ };
+@@
+-        ggml_backend_sycl_context * sycl_ctx0 = (ggml_backend_sycl_context *) comm_ctx->backends[0]->context;
+-        const queue_ptr stream0 = sycl_ctx0->stream(sycl_ctx0->device, 0);
++        const size_t root = g_ggml_sycl_comm_rotate_root ? comm_ctx->allreduce_calls++ % n_backends : 0;
++        ggml_backend_sycl_context * sycl_ctx_root = (ggml_backend_sycl_context *) comm_ctx->backends[root]->context;
++        const queue_ptr stream_root = sycl_ctx_root->stream(sycl_ctx_root->device, 0);
+@@
+-        sycl::event reduce = stream0->submit([=](sycl::handler & h) {
++        sycl::event reduce = stream_root->submit([=](sycl::handler & h) {
+@@
+-        for (size_t i = 1; i < n_backends; ++i) {
++        for (size_t i = 0; i < n_backends; ++i) {
++            if (i == root) {
++                continue;
++            }
+             ggml_backend_sycl_context * sycl_ctx = (ggml_backend_sycl_context *) comm_ctx->backends[i]->context;
