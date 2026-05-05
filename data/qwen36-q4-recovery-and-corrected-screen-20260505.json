@@ -1,0 +1,49 @@
+{
+  "date_utc": "2026-05-05",
+  "model": "Qwen3.6-27B-Q4_0.gguf",
+  "hardware": "4x Intel Arc Pro B70 32GB",
+  "engine": "llama.cpp db44417 local SYCL experimental tree",
+  "runtime_recovery": {
+    "trigger": "MiniMax split MUL_MAT_ID prototype stalled in sched_yield; first post-MiniMax Q4 run also stalled before log output",
+    "kernel_signals": [
+      "xe 0000:03:00.0 GT0 engine reset and devcoredump at 2026-05-04 20:41:13 local",
+      "xe 0000:83:00.0 GT0 Schedule disable failed to respond and reset at 2026-05-04 21:00:47 local"
+    ],
+    "recovery_action": "used /sys/kernel/debug/dri/<pci>/gt*/force_reset_sync with no active compute processes; OpenCL enumeration still listed four 0xe223 devices afterward",
+    "smoke_test": {
+      "jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-recovery-smoke-single-p16n8-20260505T010215Z.jsonl",
+      "single_b70_decode_tok_s": 24.630274,
+      "prompt_tokens": 16,
+      "output_tokens": 8,
+      "interpretation": "runtime recovered; tiny smoke only, not a benchmark submission"
+    }
+  },
+  "corrected_q4_screen": {
+    "common_env": {
+      "GGML_SYCL_DISABLE_DNN": "1",
+      "GGML_SYCL_Q8_CACHE": "1",
+      "GGML_SYCL_ASYNC_CPY_TENSOR": "1",
+      "GGML_SYCL_COMM_ALLREDUCE": "1",
+      "GGML_SYCL_COMM_SINGLE_KERNEL": "1",
+      "GGML_SYCL_COMM_EVENT_BARRIER": "1"
+    },
+    "triple213": {
+      "selector": "level_zero:2,1,3",
+      "jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-eventbarrier-triple213-dnn0-p512n128-20260505T010300Z.jsonl",
+      "prompt_tok_s": 135.587966,
+      "decode_tok_s": 42.169557,
+      "prompt_tokens": 512,
+      "output_tokens": 128
+    },
+    "quad0123": {
+      "selector": "level_zero:0,1,2,3",
+      "jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-eventbarrier-quad0123-dnn0-p512n128-20260505T010415Z.jsonl",
+      "prompt_tok_s": 102.061374,
+      "decode_tok_s": 32.477453,
+      "prompt_tokens": 512,
+      "output_tokens": 128
+    }
+  },
+  "interpretation": "The corrected DNN-off screen confirms the 4x Q4 path remains substantially slower than 3x. The regression is not from oneDNN being accidentally enabled; it is a real communication/synchronization scaling issue.",
+  "localmaxxing": "not_submitted_current_4x_result_is_duplicate_of_prior_negative_tp4_submission"
+}
