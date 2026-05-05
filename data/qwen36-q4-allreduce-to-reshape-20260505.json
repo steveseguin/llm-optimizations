@@ -1,0 +1,106 @@
+{
+  "date": "2026-05-05",
+  "experiment": "qwen36_q4_allreduce_to_reshape",
+  "model": {
+    "hfId": "Qwen/Qwen3.6-27B",
+    "localPath": "/home/steve/models/qwen3.6-27b-q4_0-gguf/Qwen3.6-27B-Q4_0.gguf",
+    "format": "GGUF",
+    "quantization": "Q4_0"
+  },
+  "hardware": {
+    "gpuName": "Intel Arc Pro B70",
+    "gpuCountAvailable": 4,
+    "vramGbPerGpu": 32,
+    "os": "Ubuntu 24.04.4 LTS",
+    "kernel": "6.17.0-22-generic"
+  },
+  "engine": {
+    "name": "llama.cpp",
+    "backend": "SYCL/Level Zero",
+    "buildCommit": "db44417",
+    "binary": "/home/steve/src/llama.cpp-q4-b70/build-sycl-2026-bmg-g31/bin/llama-bench"
+  },
+  "patchSummary": [
+    "Added ggml_backend_comm_allreduce_to_tensor backend hook.",
+    "Added Meta backend PARTIAL -> RESHAPE fusion detection behind GGML_META_FUSE_ALLREDUCE_RESHAPE=1.",
+    "Added SYCL single-kernel allreduce-to-output prototype for 2-4 backends."
+  ],
+  "commonFlags": {
+    "GGML_SYCL_DISABLE_DNN": "1",
+    "GGML_SYCL_Q8_CACHE": "1",
+    "GGML_SYCL_ASYNC_CPY_TENSOR": "1",
+    "GGML_SYCL_COMM_ALLREDUCE": "1",
+    "GGML_SYCL_COMM_SINGLE_KERNEL": "1",
+    "GGML_SYCL_COMM_EVENT_BARRIER": "1",
+    "GGML_META_FUSE_ALLREDUCE_ADD": "1",
+    "GGML_META_FUSE_ALLREDUCE_RESHAPE": "1",
+    "llamaBenchFlags": "-ngl 99 -fa 1 -ub 32 -ctk f16 -ctv f16 -t 8 --poll 50 -o jsonl"
+  },
+  "trace": {
+    "selector": "level_zero:0,1,2,3",
+    "devices": "SYCL0/SYCL1/SYCL2/SYCL3",
+    "tensorSplit": "1/1/1/1",
+    "promptTokens": 0,
+    "outputTokens": 1,
+    "backendPlusReshapeCount": 96,
+    "backendPlusAddCount": 158,
+    "backendPlainCount": 2,
+    "representativeAllreduceTotalMs": 6.617,
+    "representativeAllreduceAvgUs": 51.693,
+    "json": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-reshape-fuse-probe-quad0123-p0n1-20260505T052621Z.jsonl",
+    "log": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-reshape-fuse-probe-quad0123-p0n1-20260505T052621Z.log"
+  },
+  "results": [
+    {
+      "name": "4x fused-add control same build",
+      "selector": "level_zero:0,1,2,3",
+      "devices": "SYCL0/SYCL1/SYCL2/SYCL3",
+      "tensorSplit": "1/1/1/1",
+      "promptTokens": 512,
+      "outputTokens": 128,
+      "reshapeFuse": false,
+      "tokSOut": 33.497463,
+      "json": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-fuseadd-control-quad0123-p512n128-20260505T052928Z.jsonl",
+      "log": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-fuseadd-control-quad0123-p512n128-20260505T052928Z.log"
+    },
+    {
+      "name": "4x fused-add plus reshape",
+      "selector": "level_zero:0,1,2,3",
+      "devices": "SYCL0/SYCL1/SYCL2/SYCL3",
+      "tensorSplit": "1/1/1/1",
+      "promptTokens": 512,
+      "outputTokens": 128,
+      "reshapeFuse": true,
+      "tokSOut": 33.743952,
+      "json": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-reshape-fuse-quad0123-p512n128-20260505T052742Z.jsonl",
+      "log": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-reshape-fuse-quad0123-p512n128-20260505T052742Z.log"
+    },
+    {
+      "name": "3x selector 2,1,3 fused-add plus reshape screen",
+      "selector": "level_zero:2,1,3",
+      "devices": "SYCL0/SYCL1/SYCL2",
+      "tensorSplit": "1/1/1",
+      "promptTokens": 512,
+      "outputTokens": 128,
+      "reshapeFuse": true,
+      "tokSOut": 44.353959,
+      "json": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-reshape-fuse-triple213-p512n128-20260505T053049Z.jsonl",
+      "log": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-reshape-fuse-triple213-p512n128-20260505T053049Z.log"
+    },
+    {
+      "name": "3x selector 2,1,3 fused-add plus reshape validation",
+      "selector": "level_zero:2,1,3",
+      "devices": "SYCL0/SYCL1/SYCL2",
+      "tensorSplit": "1/1/1",
+      "promptTokens": 512,
+      "outputTokens": 512,
+      "repetitions": 3,
+      "reshapeFuse": true,
+      "tokSOut": 43.734996,
+      "promptTokS": 135.667935,
+      "json": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-reshape-fuse-validate-triple213-p512n512-r3-20260505T053216Z.jsonl",
+      "log": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-reshape-fuse-validate-triple213-p512n512-r3-20260505T053216Z.log"
+    }
+  ],
+  "decision": "Negative/marginal. Dispatch works, but 3x steady validation regresses versus the existing 44.004344 tok/s fused-add-only best. Do not submit as an improved LocalMaxxing result."
+}
