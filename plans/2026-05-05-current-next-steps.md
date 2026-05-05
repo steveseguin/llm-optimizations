@@ -63,34 +63,57 @@ This note supersedes the stale portions of `plans/q4_0-gguf-b70-optimization-pla
   - log: `/home/steve/bench-results/qwen36-q4_0-gguf/sycl-k617023-reshapeadd-triple213-p512n512-r3-20260505T125442Z.log`;
   - LocalMaxxing id: `cmosmudwl0004k004hzz6l4u6`;
   - patch: `patches/llama-cpp-sycl-current-q4-reshapeadd-20260505.patch`.
+- Post-reshape 4x/regression diagnostics:
+  - 4x reshape-through-ADD trace fused the expected `48` reshape-through-ADD sites;
+  - 4x allreduce summary worsened to `90.900 us` average for each 20KB f32 reduction, versus `47.632 us` on the 3x best path;
+  - 4x root/order/helper screen degraded to roughly `23 tok/s` across root `0/1/2/3`, root-residual, skip-root-ready, and local-write variants;
+  - current 3x subsets also degraded to roughly `32 tok/s` at `p512/n128`;
+  - longer 3x `p512/n512/r1` recovered only to `40.699249 tok/s`, still below the validated `44.812806 tok/s`;
+  - allreduce timing, Q4_0 reordered MMVQ dispatch, and GT0 boost clocks looked normal during the degraded state;
+  - corrected PCIe AER `RxErr` / `BadTLP` events appeared on upstream bridge `0000:a1:00.0`;
+  - disabling runtime PM / ASPM for a test did not recover performance;
+  - PCI function reset of the B70 endpoints is unsafe on this stack: xe logged GT1 PF self-configuration timeouts and `sycl-ls` hung in uninterruptible sleep.
+- Post-reboot recovery validation:
+  - Level Zero enumerates all four B70s and `/home/steve/sycl-peer-read-test` passes;
+  - 3x Q4_0 reshape-through-ADD, `p512/n512/r3`: prompt `135.469357 tok/s`, decode `45.624065 tok/s`, computed total `68.259384 tok/s`;
+  - LocalMaxxing: `cmot9sgsi000lib042rqd6c62`;
+  - clean 4x Q4_0 reshape-through-ADD, `p512/n512/r1`: prompt `102.210613 tok/s`, decode `34.375523 tok/s`, computed total `51.448022 tok/s`;
+  - LocalMaxxing diagnostic negative-scaling result: `cmota1fpx0001l404wepbjtb7`;
+  - immediate 3x health after clean 4x run remained good at `45.043267 tok/s` for `p512/n128`.
 
 ## Interpretation
 
 - Q4_0 4x scaling is not fixed by root selection, root-copy, local-write, or residual-read avoidance. The next useful work must reduce the number of tiny reductions or fuse communication into a lower-level matmul/reduction epilogue.
 - FP8 TP4 is now the fastest validated single-session Qwen3.6 27B mode on this host, but adjacent n-gram flags are exhausted enough for now. Further FP8 work should target backend/runtime behavior rather than speculative flag sweeps.
 - MiniMax M2.7 is currently blocked earlier than MoE/expert placement. The immediate issue is the SYCL `q8_0 x vector` dense attention matvec path on block 0.
-- The runtime is recovered after reboot. The headless `xe` options avoided the display-probe deadlock, and the Q4_0 3x result is reproducible on GuC 70.49.4.
+- The runtime recovered after reboot. Clean 4x no longer wedges the runtime, but it remains slower than 3x. Avoid FLR/PCI reset for B70 recovery.
 
 ## Next Work
 
-1. Q4_0 llama.cpp/SYCL:
-   - use the reshape-through-ADD 3x `44.812806 tok/s` run as the current control;
+1. Runtime recovery:
+   - treat reboot plus peer-read as the recovery procedure if xe/Level Zero degrades;
+   - after any suspected runtime issue, confirm `sycl-ls` enumerates all four B70s and `/home/steve/sycl-peer-read-test` passes;
+   - rerun the known-good Q4_0 3x validation before treating new benchmark data as valid;
+   - record whether corrected PCIe AER on `0000:a1:00.0` returns under 3x/4x load;
+   - do not use PCI function reset as a recovery method on this driver stack.
+2. Q4_0 llama.cpp/SYCL:
+   - use the post-reboot reshape-through-ADD 3x `45.624065 tok/s` run as the current control;
    - inspect the final remaining plain allreduce, `attn_output-63 -> GET_ROWS`, and determine whether it can be fused safely;
-   - retest 4x scaling with reshape-through-ADD before lower-level collective work;
+   - stop spending time on 4x root/order/local-write sweeps unless a new collective implementation changes the tradeoff;
    - tune the 20KB f32 allreduce fast path only after the remaining graph-level fusions are exhausted;
    - prototype fewer reductions or a fused row-parallel output kernel only where mathematically safe;
    - keep local-write/root-residual env gates diagnostic-only.
-2. FP8 vLLM/XPU:
+3. FP8 vLLM/XPU:
    - keep the PP2 x TP2 `self.drafter` getattr patch;
    - quarantine PP2+n-gram until stale speculative placeholder cleanup is fixed;
    - test real draft-model speculative decode if a compatible smaller Qwen draft model fits;
    - review oneCCL/XCCL options that affect TP4 latency without forcing the slower sockets/topology path.
-3. MiniMax:
+4. MiniMax:
    - do not rerun MiniMax before Qwen recovery validation is clean;
    - stop treating the next blocker as MoE until the first dense q8_0 attention matvec is isolated;
    - build a small `q8_0 x vector` SYCL repro using the observed `[3072,6144]` by `[3072,1]` shape;
    - add focused traces or an env-gated fallback for q8_0 attention projections to verify whether the graph can reach MoE.
-4. llm-scaler:
+5. llm-scaler:
    - continue mining Intel `llm-scaler` for ideas around reduce-scatter/all-gather, fused norm+GEMV, Gated DeltaNet kernels, MTP/EAGLE kernels, and oneDNN FP8 primitive caching;
    - treat it as a reference source first, not a production backend assumption for Arc/B70.
 
