@@ -31,16 +31,25 @@ This note supersedes the stale portions of `plans/q4_0-gguf-b70-optimization-pla
   - first blocker is `blk.0.attn_q.weight` `q8_0` `[3072,6144]` x `attn_norm-0` f32 `[3072,1]`;
   - default reordered MMVQ hangs after `quantize_row_q8_1_sycl`;
   - forced DMMV segfaults after `to_fp16_sycl`.
+- Runtime recovery blocker after device-lost:
+  - PCI reset of all four B70 VGA functions did not cleanly recover Level Zero;
+  - `sycl-ls` then aborted in NEO DRM initialization at `drm_neo.cpp:445`;
+  - `xe` unbind/rebind deadlocked during `0000:83:00.0` bind;
+  - kernel stack is in `xe_display_init_early` / connector probing;
+  - `/etc/modprobe.d/xe-b70-headless.conf` now sets `options xe disable_display=1 probe_display=0` for next boot.
 
 ## Interpretation
 
 - Q4_0 4x scaling is not fixed by root selection, root-copy, local-write, or residual-read avoidance. The next useful work must reduce the number of tiny reductions or fuse communication into a lower-level matmul/reduction epilogue.
 - FP8 TP4 is now the fastest validated single-session Qwen3.6 27B mode on this host, but adjacent n-gram flags are exhausted enough for now. Further FP8 work should target backend/runtime behavior rather than speculative flag sweeps.
 - MiniMax M2.7 is currently blocked earlier than MoE/expert placement. The immediate issue is the SYCL `q8_0 x vector` dense attention matvec path on block 0.
+- Current system state is blocked until reboot. Only one B70 is visible to Level Zero, with one `xe` bind task in uninterruptible kernel sleep and two B70s left unbound.
 
 ## Next Work
 
 1. Q4_0 llama.cpp/SYCL:
+   - after reboot, validate `sycl-ls` and `/home/steve/sycl-peer-read-test` across all four GPUs before full model runs;
+   - rerun the known-good 3-card Qwen Q4 `p16/n8` smoke before changing code;
    - inspect reduction sites that remain after fused allreduce+ADD;
    - tune the 20KB f32 allreduce fast path before adding broader graph rewrites;
    - test root rotation, root-ready event skipping, fixed event vectors, and single-task/barrier alternatives for the tiny collective;
@@ -52,6 +61,7 @@ This note supersedes the stale portions of `plans/q4_0-gguf-b70-optimization-pla
    - test real draft-model speculative decode if a compatible smaller Qwen draft model fits;
    - review oneCCL/XCCL options that affect TP4 latency without forcing the slower sockets/topology path.
 3. MiniMax:
+   - do not rerun MiniMax before Qwen recovery validation is clean;
    - stop treating the next blocker as MoE until the first dense q8_0 attention matvec is isolated;
    - build a small `q8_0 x vector` SYCL repro using the observed `[3072,6144]` by `[3072,1]` shape;
    - add focused traces or an env-gated fallback for q8_0 attention projections to verify whether the graph can reach MoE.
