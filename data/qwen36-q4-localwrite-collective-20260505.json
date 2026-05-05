@@ -1,0 +1,59 @@
+{
+  "date": "2026-05-05",
+  "model": "Qwen/Qwen3.6-27B",
+  "localModel": "/home/steve/models/qwen3.6-27b-q4_0-gguf/Qwen3.6-27B-Q4_0.gguf",
+  "engine": "llama.cpp",
+  "engineVersion": "db44417+sycl-localwrite-diagnostics",
+  "quantization": "Q4_0",
+  "hardware": {
+    "gpu": "Intel Arc Pro B70 32GB",
+    "gpuCount": 4,
+    "selector": "level_zero:0,1,2,3",
+    "os": "Ubuntu 24.04.4 LTS, kernel 6.17.0-22-generic"
+  },
+  "baseline": {
+    "name": "root fused-add",
+    "decodeTokS": 33.219955,
+    "jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-fastshape-quad0123-fuseadd-p512n128-20260505T031139Z.jsonl"
+  },
+  "runs": [
+    {
+      "name": "localwrite_all_sites",
+      "env": {
+        "GGML_SYCL_COMM_LOCAL_WRITE": "1",
+        "GGML_META_FUSE_ALLREDUCE_ADD": "1"
+      },
+      "promptTokens": 512,
+      "outputTokens": 128,
+      "promptTokS": 284.565634,
+      "decodeTokS": 30.681785,
+      "jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-localwrite-quad0123-fuseadd-p512n128-20260505T033050Z.jsonl"
+    },
+    {
+      "name": "localwrite_fused_only",
+      "env": {
+        "GGML_SYCL_COMM_LOCAL_WRITE": "2",
+        "GGML_META_FUSE_ALLREDUCE_ADD": "1"
+      },
+      "promptTokens": 512,
+      "outputTokens": 128,
+      "promptTokS": 102.137400,
+      "decodeTokS": 32.365769,
+      "jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-localwrite2-fuseonly-quad0123-p512n128-20260505T033941Z.jsonl"
+    },
+    {
+      "name": "root_residual_reuse",
+      "env": {
+        "GGML_SYCL_COMM_FUSEADD_ROOT_RESIDUAL": "1",
+        "GGML_META_FUSE_ALLREDUCE_ADD": "1"
+      },
+      "promptTokens": 512,
+      "outputTokens": 128,
+      "promptTokS": 102.109921,
+      "decodeTokS": 33.074515,
+      "jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-rootresid-quad0123-fuseadd-p512n128-20260505T034916Z.jsonl"
+    }
+  ],
+  "localmaxxing": "not submitted; negative/diagnostic",
+  "conclusion": "Per-device local-write and root-residual reuse do not solve the 4x decode bottleneck. Keep env gates diagnostic-only."
+}
