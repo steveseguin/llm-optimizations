@@ -1,0 +1,73 @@
+{
+  "date_utc": "2026-05-05",
+  "hardware": "4x Intel Arc Pro B70 32GB",
+  "os": "Ubuntu 24.04.4 LTS",
+  "kernel": "6.17.0-22-generic",
+  "runtime_packages": {
+    "intel-opencl-icd": "26.14.37833.4-0",
+    "libze-intel-gpu1": "26.14.37833.4-0",
+    "intel-ocloc": "26.14.37833.4-0",
+    "intel-igc-core-2": "2.32.7",
+    "intel-igc-opencl-2": "2.32.7",
+    "libigdgmm12": "22.9.0"
+  },
+  "experiments": [
+    {
+      "name": "minimax_m27_split_mulmatid_hostbounce_ncmoe60",
+      "model": "MiniMax-M2.7-UD-IQ4_XS",
+      "env": {
+        "ONEAPI_DEVICE_SELECTOR": "level_zero:0,1,2,3",
+        "UR_L0_ENABLE_RELAXED_ALLOCATION_LIMITS": "1",
+        "GGML_SYCL_DISABLE_DNN": "1",
+        "GGML_SYCL_MUL_MAT_ID_SPLIT": "1",
+        "GGML_SYCL_MUL_MAT_ID_SPLIT_DEBUG": "1",
+        "GGML_SYCL_MUL_MAT_ID_SPLIT_HOST_BOUNCE": "1"
+      },
+      "command_summary": "-dev SYCL0/SYCL1/SYCL2/SYCL3 -sm row -ts 1/1/1/1 -p 0 -n 1 -r 1 -ngl 99 -ncmoe 60 -fa 1 -ub 32 -ctk f16 -ctv f16 --no-warmup",
+      "status": "timeout_no_metric",
+      "timeout_seconds": 360,
+      "jsonl": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/minimax-m27-quad-row-ngl99-ncmoe60-split-mulmatid-hostbounce-debug1-p0n1-20260505T012833Z.jsonl",
+      "log": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/minimax-m27-quad-row-ngl99-ncmoe60-split-mulmatid-hostbounce-debug1-p0n1-20260505T012833Z.log",
+      "kernel_events": [
+        "2026-05-04 21:29:32 xe 0000:03:00.0 GT0 CCS engine reset",
+        "2026-05-04 21:34:32 xe 0000:83:00.0 GT0 BCS engine reset"
+      ],
+      "localmaxxing": "not_submitted_no_valid_metric"
+    },
+    {
+      "name": "qwen36_q4_0_4x_skip_root_ready",
+      "model": "Qwen3.6-27B-Q4_0.gguf",
+      "env": {
+        "ONEAPI_DEVICE_SELECTOR": "level_zero:0,1,2,3",
+        "GGML_SYCL_DISABLE_DNN": "1",
+        "GGML_SYCL_Q8_CACHE": "1",
+        "GGML_SYCL_ASYNC_CPY_TENSOR": "1",
+        "GGML_SYCL_COMM_ALLREDUCE": "1",
+        "GGML_SYCL_COMM_SINGLE_KERNEL": "1",
+        "GGML_SYCL_COMM_EVENT_BARRIER": "1",
+        "GGML_SYCL_COMM_SKIP_ROOT_READY": "1"
+      },
+      "command_summary": "-dev SYCL0/SYCL1/SYCL2/SYCL3 -sm tensor -ts 1/1/1/1 -p 512 -n 128 -r 2 -ngl 99 -fa 1 -ub 32 -ctk f16 -ctv f16",
+      "prompt_tok_s": 101.475153,
+      "decode_tok_s": 32.776781,
+      "control_decode_tok_s_same_build": 32.720377,
+      "interpretation": "neutral; about 0.17 percent over same-build control",
+      "jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-skiprootready-quad0123-dnn0-p512n128-20260505T014426Z.jsonl",
+      "control_jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-controlpost-quad0123-dnn0-p512n128-20260505T014610Z.jsonl",
+      "localmaxxing": "not_submitted_neutral_screen"
+    },
+    {
+      "name": "xccl_standalone_2rank_post_followups",
+      "env": {
+        "ONEAPI_DEVICE_SELECTOR": "level_zero:0,1",
+        "CCL_ZE_IPC_EXCHANGE": "sockets"
+      },
+      "command_summary": "python -m torch.distributed.run --standalone --nproc_per_node=2 /home/steve/b70_xccl_allreduce_bench.py",
+      "status": "failed",
+      "exit_status": 1,
+      "failure": "rank 0 and rank 1 exited with SIGSEGV before measured allreduce rows",
+      "log": "/home/steve/bench-results/qwen36-fp8-vllm/xccl-standalone-2rank-post-q4-minimax-20260505T014812Z.log",
+      "interpretation": "keep vLLM FP8 TP validation paused until reboot or driver reload restores standalone XCCL"
+    }
+  ]
+}
