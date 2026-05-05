@@ -1,0 +1,59 @@
+{
+  "dateUtc": "2026-05-05",
+  "status": "blocked_until_reboot",
+  "localMaxxingSubmitted": false,
+  "reasonNotSubmitted": "Runtime recovery blocker; no valid benchmark metric.",
+  "hardware": {
+    "gpuName": "Intel Arc Pro B70",
+    "gpuCountInstalled": 4,
+    "vramGbPerGpu": 32,
+    "os": "Ubuntu 24.04.4 LTS",
+    "kernel": "6.17.0-22-generic",
+    "driver": "xe"
+  },
+  "trigger": [
+    "MiniMax M2.7 SYCL runs produced UR_RESULT_ERROR_DEVICE_LOST.",
+    "Forced DMMV MiniMax q8_0 path segfaulted.",
+    "Qwen multi-device runs then failed in oneMKL GEMM with UR_RESULT_ERROR_DEVICE_LOST."
+  ],
+  "recoveryAttempts": [
+    {
+      "action": "PCI function reset of 0000:03:00.0, 0000:83:00.0, 0000:a3:00.0, 0000:e3:00.0",
+      "result": "NEO DRM initialization abort on sycl-ls and peer-read test"
+    },
+    {
+      "action": "xe unbind/rebind",
+      "result": "bind of 0000:83:00.0 entered uninterruptible kernel sleep"
+    }
+  ],
+  "currentState": {
+    "visibleLevelZeroDevices": 1,
+    "visibleBdf": "0000:03:00.0",
+    "stuckBindingBdf": "0000:83:00.0",
+    "unboundBdfs": [
+      "0000:a3:00.0",
+      "0000:e3:00.0"
+    ],
+    "kernelBlockedPath": [
+      "intel_edp_init_connector",
+      "intel_dp_init_connector",
+      "intel_setup_outputs",
+      "xe_display_init_early",
+      "xe_device_probe",
+      "xe_pci_probe"
+    ]
+  },
+  "recommendedRecovery": {
+    "requiresReboot": true,
+    "modprobeOptions": "options xe disable_display=1 probe_display=0",
+    "rationale": "The B70s are headless compute GPUs and the kernel deadlock is in xe display probing."
+  },
+  "postRebootValidation": [
+    "sycl-ls should show four level_zero GPUs",
+    "ONEAPI_DEVICE_SELECTOR=level_zero:0,1,2,3 /home/steve/sycl-peer-read-test should pass",
+    "Retry Qwen Q4 3-card p16/n8 smoke before full screens"
+  ],
+  "artifacts": {
+    "note": "/home/steve/llm-optimization-artifacts/notes/2026-05-05-xe-reset-deadlock-recovery.md"
+  }
+}
