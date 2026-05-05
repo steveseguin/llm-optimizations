@@ -6,7 +6,7 @@ This note supersedes the stale portions of `plans/q4_0-gguf-b70-optimization-pla
 
 ## Current Best Results
 
-- Qwen3.6 27B Q4_0 GGUF, llama.cpp/SYCL, 3x B70 selector `2,1,3`: kernel `6.17.0-23` / GuC 70.49.4 validation `44.238455 tok/s` decode, quality-preserving, software-only.
+- Qwen3.6 27B Q4_0 GGUF, llama.cpp/SYCL, 3x B70 selector `2,1,3`: reshape-through-ADD fusion validation `44.812806 tok/s` decode, quality-preserving, software-only.
 - Qwen3.6 27B static FP8, `vrfai/Qwen3.6-27B-FP8`, patched vLLM/XPU TP4 + FlashAttention2 + n-gram speculative decode: `47.674832 tok/s` decode, `95.349664 tok/s` total.
 - Current FP8 best LocalMaxxing id: `cmos3pnqo000kkz04o4aiup22`.
 
@@ -54,6 +54,15 @@ This note supersedes the stale portions of `plans/q4_0-gguf-b70-optimization-pla
   - JSONL: `/home/steve/bench-results/qwen36-q4_0-gguf/sycl-k617023-guc70494-nondnn-triple213-exactfast-p512n512-r3-20260505T123032Z.jsonl`;
   - log: `/home/steve/bench-results/qwen36-q4_0-gguf/sycl-k617023-guc70494-nondnn-triple213-exactfast-p512n512-r3-20260505T123032Z.log`;
   - LocalMaxxing id: `cmosm05ke0005ib048aljq6pl`.
+- Q4_0 reshape-through-ADD fusion:
+  - graph trace fused all 48 `linear_attn_out -> RESHAPE -> ADD` decode sites into the existing allreduce+residual-add helper;
+  - remaining decode allreduce paths: `127` `backend+add`, `1` plain `backend`;
+  - 512 prompt / 512 output, 3 reps: prompt `135.806175 tok/s`, decode `44.812806 tok/s`, total `67.388784 tok/s`;
+  - output samples: `44.8839`, `44.8199`, `44.7346 tok/s`;
+  - JSONL: `/home/steve/bench-results/qwen36-q4_0-gguf/sycl-k617023-reshapeadd-triple213-p512n512-r3-20260505T125442Z.jsonl`;
+  - log: `/home/steve/bench-results/qwen36-q4_0-gguf/sycl-k617023-reshapeadd-triple213-p512n512-r3-20260505T125442Z.log`;
+  - LocalMaxxing id: `cmosmudwl0004k004hzz6l4u6`;
+  - patch: `patches/llama-cpp-sycl-current-q4-reshapeadd-20260505.patch`.
 
 ## Interpretation
 
@@ -65,10 +74,10 @@ This note supersedes the stale portions of `plans/q4_0-gguf-b70-optimization-pla
 ## Next Work
 
 1. Q4_0 llama.cpp/SYCL:
-   - use the post-reboot 3x `44.238455 tok/s` run as the current control;
-   - inspect reduction sites that remain after fused allreduce+ADD;
-   - tune the 20KB f32 allreduce fast path before adding broader graph rewrites;
-   - test root rotation, root-ready event skipping, fixed event vectors, and single-task/barrier alternatives for the tiny collective;
+   - use the reshape-through-ADD 3x `44.812806 tok/s` run as the current control;
+   - inspect the final remaining plain allreduce, `attn_output-63 -> GET_ROWS`, and determine whether it can be fused safely;
+   - retest 4x scaling with reshape-through-ADD before lower-level collective work;
+   - tune the 20KB f32 allreduce fast path only after the remaining graph-level fusions are exhausted;
    - prototype fewer reductions or a fused row-parallel output kernel only where mathematically safe;
    - keep local-write/root-residual env gates diagnostic-only.
 2. FP8 vLLM/XPU:
