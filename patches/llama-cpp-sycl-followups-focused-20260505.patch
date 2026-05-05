@@ -1,0 +1,104 @@
+diff --git a/ggml/src/ggml-sycl/ggml-sycl.cpp b/ggml/src/ggml-sycl/ggml-sycl.cpp
+--- a/ggml/src/ggml-sycl/ggml-sycl.cpp
++++ b/ggml/src/ggml-sycl/ggml-sycl.cpp
+@@
+ int g_ggml_sycl_comm_event_barrier = 0;
++int g_ggml_sycl_comm_skip_root_ready = 0;
+ int g_ggml_sycl_mul_mat_id_split = 0;
+ int g_ggml_sycl_mul_mat_id_split_debug = 0;
++int g_ggml_sycl_mul_mat_id_split_host_bounce = 1;
+@@
+         g_ggml_sycl_comm_event_barrier = get_sycl_env("GGML_SYCL_COMM_EVENT_BARRIER", 0);
++        g_ggml_sycl_comm_skip_root_ready = get_sycl_env("GGML_SYCL_COMM_SKIP_ROOT_READY", 0);
+         g_ggml_sycl_mul_mat_id_split = get_sycl_env("GGML_SYCL_MUL_MAT_ID_SPLIT", 0);
+         g_ggml_sycl_mul_mat_id_split_debug = get_sycl_env("GGML_SYCL_MUL_MAT_ID_SPLIT_DEBUG", 0);
++        g_ggml_sycl_mul_mat_id_split_host_bounce = get_sycl_env("GGML_SYCL_MUL_MAT_ID_SPLIT_HOST_BOUNCE", 1);
+@@
+         GGML_LOG_INFO("  GGML_SYCL_COMM_EVENT_BARRIER: %d\n", g_ggml_sycl_comm_event_barrier);
++        GGML_LOG_INFO("  GGML_SYCL_COMM_SKIP_ROOT_READY: %d\n", g_ggml_sycl_comm_skip_root_ready);
+         GGML_LOG_INFO("  GGML_SYCL_MUL_MAT_ID_SPLIT: %d\n", g_ggml_sycl_mul_mat_id_split);
+         GGML_LOG_INFO("  GGML_SYCL_MUL_MAT_ID_SPLIT_DEBUG: %d\n", g_ggml_sycl_mul_mat_id_split_debug);
++        GGML_LOG_INFO("  GGML_SYCL_MUL_MAT_ID_SPLIT_HOST_BOUNCE: %d\n", g_ggml_sycl_mul_mat_id_split_host_bounce);
+@@
+     int src1_device = ctx.device;
+     int dst_device = ctx.device;
+     const bool src1_is_sycl = src1->buffer != nullptr && ggml_backend_buffer_is_sycl(src1->buffer);
+     const bool dst_is_sycl = dst->buffer != nullptr && ggml_backend_buffer_is_sycl(dst->buffer);
+     const bool src1_is_host = src1->buffer != nullptr && ggml_backend_buffer_is_host(src1->buffer);
+     const bool dst_is_host = dst->buffer != nullptr && ggml_backend_buffer_is_host(dst->buffer);
++
++    if (src1_is_sycl) {
++        ggml_backend_sycl_buffer_context * src1_buf_ctx =
++            (ggml_backend_sycl_buffer_context *) src1->buffer->context;
++        src1_device = src1_buf_ctx->device;
++    }
++    if (dst_is_sycl) {
++        ggml_backend_sycl_buffer_context * dst_buf_ctx =
++            (ggml_backend_sycl_buffer_context *) dst->buffer->context;
++        dst_device = dst_buf_ctx->device;
++    }
+@@
+             "%s: src0=%s type=%s src1=%s dst=%s ids=%lldx%lld experts=%lld expert_rows=%lld "
+-            "src1_device=%d dst_device=%d\n",
++            "src1_device=%d dst_device=%d host_bounce=%d\n",
+             __func__, src0->name, ggml_type_name(src0->type), src1->name, dst->name,
+             (long long) ids->ne[0], (long long) ids->ne[1],
+             (long long) n_as, (long long) expert_rows,
+-            src1_device, dst_device);
++            src1_device, dst_device, g_ggml_sycl_mul_mat_id_split_host_bounce);
+@@
+-                src1_dev = src1_dev_alloc.alloc(ctx.pool(dev), ne10);
+-                SYCL_CHECK(CHECK_TRY_ERROR(
+-                    stream->memcpy(src1_dev, src1_original, ne10 * sizeof(float)).wait()));
++                src1_dev = src1_dev_alloc.alloc(ctx.pool(dev), ne10);
++                const size_t src1_copy_bytes = ne10 * sizeof(float);
++                if (src1_is_sycl && !src1_is_host && g_ggml_sycl_mul_mat_id_split_host_bounce) {
++                    const queue_ptr src1_stream = ctx.stream(src1_device, 0);
++                    dev2dev_memcpy(*stream, *src1_stream, src1_dev, src1_original, src1_copy_bytes);
++                } else {
++                    SYCL_CHECK(CHECK_TRY_ERROR(
++                        stream->memcpy(src1_dev, src1_original, src1_copy_bytes).wait()));
++                }
+                 src1_row.buffer = dst->buffer;
+@@
+-                SYCL_CHECK(CHECK_TRY_ERROR(
+-                    stream->memcpy(dst_slice, dst_dev, dst_copy_bytes).wait()));
++                if (dst_is_sycl && !dst_is_host && dst_device != dev &&
++                        g_ggml_sycl_mul_mat_id_split_host_bounce) {
++                    const queue_ptr dst_stream = ctx.stream(dst_device, 0);
++                    dev2dev_memcpy(*dst_stream, *stream, dst_slice, dst_dev, dst_copy_bytes);
++                } else {
++                    SYCL_CHECK(CHECK_TRY_ERROR(
++                        stream->memcpy(dst_slice, dst_dev, dst_copy_bytes).wait()));
++                }
+@@
+     const bool use_root_copy = g_ggml_sycl_comm_root_copy && n_backends >= 2 && n_backends <= 4;
+     const bool use_single_kernel = g_ggml_sycl_comm_single_kernel && n_backends >= 2 && n_backends <= 4;
+     const size_t single_kernel_root = use_single_kernel ?
+         (g_ggml_sycl_comm_rotate_root ? comm_ctx->allreduce_calls++ % n_backends : 0) : 0;
++    const bool skip_root_ready = use_single_kernel && g_ggml_sycl_comm_skip_root_ready;
+@@
+-        ready[i] = stream->ext_oneapi_submit_barrier();
++        if (!(skip_root_ready && i == single_kernel_root)) {
++            ready[i] = stream->ext_oneapi_submit_barrier();
++        }
+@@
+-        sycl::event reduce = stream_root->submit([=](sycl::handler & h) {
+-            h.depends_on(ready);
++        std::vector<sycl::event> reduce_deps;
++        if (skip_root_ready) {
++            reduce_deps.reserve(n_backends - 1);
++            for (size_t i = 0; i < n_backends; ++i) {
++                if (i != root) {
++                    reduce_deps.push_back(ready[i]);
++                }
++            }
++        } else {
++            reduce_deps = ready;
++        }
++
++        sycl::event reduce = stream_root->submit([=](sycl::handler & h) {
++            h.depends_on(reduce_deps);
+             h.parallel_for(sycl::range<1>((size_t) ne), [=](sycl::id<1> idx) {
+                 const size_t k = idx[0];
+                 float sum = dst0[k] + dst1[k];
