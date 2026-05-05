@@ -1,0 +1,95 @@
+{
+  "dateUtc": "2026-05-05",
+  "status": "blocked",
+  "localMaxxingSubmitted": false,
+  "reasonNotSubmitted": "No valid throughput metric; the run fails before token generation.",
+  "hardware": {
+    "gpuName": "Intel Arc Pro B70",
+    "gpuCount": 4,
+    "vramGbPerGpu": 32,
+    "os": "Ubuntu 24.04.4 LTS"
+  },
+  "model": {
+    "name": "MiniMax M2.7 UD-IQ4_XS GGUF",
+    "path": "/home/steve/models/minimax-m2.7-ud-iq4_xs-gguf/UD-IQ4_XS/MiniMax-M2.7-UD-IQ4_XS-00001-of-00004.gguf",
+    "quantization": "UD-IQ4_XS with q8_0 dense attention projection weights observed"
+  },
+  "engine": {
+    "name": "llama.cpp",
+    "backend": "SYCL/Level Zero",
+    "sourcePath": "/home/steve/src/llama.cpp-q4-b70",
+    "buildPath": "/home/steve/src/llama.cpp-q4-b70/build-sycl-2026-bmg-g31"
+  },
+  "commonCommandShape": {
+    "devices": "SYCL0,SYCL1,SYCL2,SYCL3",
+    "splitMode": "row",
+    "tensorSplit": "1/1/1/1",
+    "gpuLayers": 99,
+    "cpuMoELayers": 60,
+    "flashAttention": true,
+    "ubatch": 32,
+    "kvCache": "f16",
+    "promptTokens": 0,
+    "outputTokens": 1,
+    "repetitions": 1,
+    "selector": "ONEAPI_DEVICE_SELECTOR=level_zero:0,1,2,3"
+  },
+  "findings": [
+    {
+      "run": "scheduler-compute-trace",
+      "log": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/minimax-m27-quad-row-ngl99-ncmoe60-split-schedcompute-p0n1-20260505T061326Z.log",
+      "exit": "timeout",
+      "evidence": [
+        "graph nodes = 3975",
+        "graph splits = 122",
+        "split 1 backend SYCL0 has 44 nodes",
+        "hang at split=1 graph_compute_begin backend=SYCL0 n_nodes=44"
+      ]
+    },
+    {
+      "run": "opstats-no-verbose",
+      "log": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/minimax-m27-quad-row-ngl99-ncmoe60-split-opstats-nov-p0n1-20260505T062119Z.log",
+      "exit": "abort",
+      "evidence": [
+        "op=RMS_NORM name=norm-0 nbytes=12288 elapsed_us=8679.985",
+        "UR_RESULT_ERROR_DEVICE_LOST"
+      ]
+    },
+    {
+      "run": "sycl-debug-default-q8-mmvq",
+      "log": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/minimax-m27-quad-row-ngl99-ncmoe60-split-sycldebug-p0n1-20260505T062638Z.log",
+      "exit": "timeout",
+      "firstFailingOperation": "blk.0.attn_q.weight q8_0 x attn_norm-0 f32 -> Qcur-0 f32",
+      "evidence": [
+        "ggml_sycl_rms_norm done",
+        "ggml_sycl_mul done",
+        "quantize_row_q8_1_sycl done",
+        "no q8_0 matvec completion line before timeout"
+      ]
+    },
+    {
+      "run": "forced-dmmv",
+      "log": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/minimax-m27-quad-row-ngl99-ncmoe60-split-dmmv-p0n1-20260505T063128Z.log",
+      "exit": "segmentation fault",
+      "firstFailingOperation": "blk.0.attn_q.weight q8_0 x attn_norm-0 f32 -> Qcur-0 f32",
+      "evidence": [
+        "ggml_sycl_rms_norm done",
+        "ggml_sycl_mul done",
+        "to_fp16_sycl done",
+        "segfault immediately after forced DMMV conversion"
+      ]
+    }
+  ],
+  "conclusion": "MiniMax does not currently reach MUL_MAT_ID/MoE split execution. The immediate blocker is the first q8_0 dense attention matvec in block 0 on the SYCL backend.",
+  "nextSteps": [
+    "Create a targeted q8_0 x vector SYCL repro using the observed [3072,6144] by [3072,1] shape.",
+    "Instrument reordered q8_0 MMVQ and q8_0 DMMV kernel launches separately.",
+    "Add an env-gated fallback for q8_0 attention projections to test whether the graph can reach MoE paths.",
+    "Consider a MiniMax GGUF variant without q8_0 dense attention projections if available."
+  ],
+  "artifacts": {
+    "note": "/home/steve/llm-optimization-artifacts/notes/2026-05-05-minimax-q8-attn-matvec-blocker.md",
+    "schedulerTracePatch": "/home/steve/llm-optimization-artifacts/patches/llama-cpp-scheduler-compute-trace-20260505.patch",
+    "schedulerTracePatchGzB64": "/home/steve/llm-optimization-artifacts/patches/llama-cpp-scheduler-compute-trace-20260505.patch.gz.b64"
+  }
+}
