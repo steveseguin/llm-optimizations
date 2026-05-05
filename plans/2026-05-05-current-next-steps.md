@@ -21,26 +21,40 @@ This note supersedes the stale portions of `plans/q4_0-gguf-b70-optimization-pla
   - n-gram `3`, lookup `2/4`: `40.697016 tok/s`;
   - n-gram `4`, lookup `2/3`: `43.130893 tok/s`;
   - n-gram `5`, lookup `2/4`: `44.163969 tok/s`.
+- Q4_0 allreduce-to-reshape fusion was technically correct but not a useful speed win:
+  - 4x fused-add control, 512/128: `33.497463 tok/s`;
+  - 4x fused-add plus reshape fuse, 512/128: `33.743952 tok/s`;
+  - 3x fused-add plus reshape fuse, 512/512, 3 reps: `43.734996 tok/s`, below the fused-add-only validation at `44.004344 tok/s`.
+- MiniMax M2.7 UD-IQ4_XS does not yet reach token generation:
+  - scheduler tracing reaches split 1 on `SYCL0`;
+  - SYCL op tracing completes `RMS_NORM` and elementwise `MUL`;
+  - first blocker is `blk.0.attn_q.weight` `q8_0` `[3072,6144]` x `attn_norm-0` f32 `[3072,1]`;
+  - default reordered MMVQ hangs after `quantize_row_q8_1_sycl`;
+  - forced DMMV segfaults after `to_fp16_sycl`.
 
 ## Interpretation
 
 - Q4_0 4x scaling is not fixed by root selection, root-copy, local-write, or residual-read avoidance. The next useful work must reduce the number of tiny reductions or fuse communication into a lower-level matmul/reduction epilogue.
 - FP8 TP4 is now the fastest validated single-session Qwen3.6 27B mode on this host, but adjacent n-gram flags are exhausted enough for now. Further FP8 work should target backend/runtime behavior rather than speculative flag sweeps.
-- MiniMax M2.7 is currently blocked by llama.cpp split support for `minimax-m2` and split expert tensor allocation, not by total installed VRAM alone.
+- MiniMax M2.7 is currently blocked earlier than MoE/expert placement. The immediate issue is the SYCL `q8_0 x vector` dense attention matvec path on block 0.
 
 ## Next Work
 
 1. Q4_0 llama.cpp/SYCL:
    - inspect reduction sites that remain after fused allreduce+ADD;
-   - prototype fewer reductions or a fused row-parallel output kernel where mathematically safe;
+   - tune the 20KB f32 allreduce fast path before adding broader graph rewrites;
+   - test root rotation, root-ready event skipping, fixed event vectors, and single-task/barrier alternatives for the tiny collective;
+   - prototype fewer reductions or a fused row-parallel output kernel only where mathematically safe;
    - keep local-write/root-residual env gates diagnostic-only.
 2. FP8 vLLM/XPU:
-   - inspect and fix the PP2 x TP2 speculative drafter path where `XPUModelRunner` lacks `drafter`;
+   - keep the PP2 x TP2 `self.drafter` getattr patch;
+   - quarantine PP2+n-gram until stale speculative placeholder cleanup is fixed;
    - test real draft-model speculative decode if a compatible smaller Qwen draft model fits;
    - review oneCCL/XCCL options that affect TP4 latency without forcing the slower sockets/topology path.
 3. MiniMax:
-   - avoid full first-token runs until split expert tensor allocation is patched or isolated;
-   - start with a synthetic split-expert allocation/dequant harness for `ffn_down_exps` / `iq4_xs`.
+   - stop treating the next blocker as MoE until the first dense q8_0 attention matvec is isolated;
+   - build a small `q8_0 x vector` SYCL repro using the observed `[3072,6144]` by `[3072,1]` shape;
+   - add focused traces or an env-gated fallback for q8_0 attention projections to verify whether the graph can reach MoE.
 4. llm-scaler:
    - continue mining Intel `llm-scaler` for ideas around reduce-scatter/all-gather, fused norm+GEMV, Gated DeltaNet kernels, MTP/EAGLE kernels, and oneDNN FP8 primitive caching;
    - treat it as a reference source first, not a production backend assumption for Arc/B70.
