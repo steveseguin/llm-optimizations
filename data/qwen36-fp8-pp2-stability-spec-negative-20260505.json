@@ -1,0 +1,74 @@
+{
+  "date": "2026-05-05",
+  "model": "vrfai/Qwen3.6-27B-FP8",
+  "modelPath": "/home/steve/models/qwen3.6-27b-fp8-vrfai",
+  "engine": "vllm",
+  "engineVersion": "0.20.1+xpu-fa2-pp2-drafter-fix",
+  "quantization": "fp8/compressed-tensors",
+  "hardware": {
+    "gpu": "Intel Arc Pro B70 32GB",
+    "gpuCount": 4,
+    "selector": "level_zero:0,1,2,3",
+    "os": "Ubuntu 24.04.4 LTS, kernel 6.17.0-22-generic"
+  },
+  "nonSpeculativePP2": {
+    "status": "passed",
+    "tensorParallel": 2,
+    "pipelineParallel": 2,
+    "promptTokens": 512,
+    "outputTokens": 128,
+    "contextLength": 1024,
+    "batchSize": 1,
+    "gpuMemUtil": 0.8,
+    "avgLatencySec": 4.723338066491124,
+    "latenciesSec": [
+      4.772338055990986,
+      4.674338076991262
+    ],
+    "tokSOut": 27.099478842743245,
+    "tokSTotal": 135.49739421371623,
+    "json": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp2-pp2-in512-out128-bs1-20260505T044235Z.json",
+    "log": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp2-pp2-in512-out128-bs1-20260505T044235Z.log"
+  },
+  "speculativePP2": [
+    {
+      "status": "failed",
+      "method": "ngram",
+      "numSpeculativeTokens": 4,
+      "promptLookupMin": 2,
+      "promptLookupMax": 4,
+      "promptTokens": 512,
+      "outputTokens": 128,
+      "gpuMemUtil": 0.8,
+      "error": "Scheduler emitted num_scheduled_tokens=-3 and total_num_scheduled_tokens=-3 during warmup.",
+      "log": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp2-pp2-in512-out128-bs1-20260505T044601Z.log"
+    },
+    {
+      "status": "failed",
+      "method": "ngram",
+      "numSpeculativeTokens": 2,
+      "promptLookupMin": 2,
+      "promptLookupMax": 4,
+      "promptTokens": 512,
+      "outputTokens": 128,
+      "gpuMemUtil": 0.8,
+      "error": "Scheduler emitted num_scheduled_tokens=-1 and total_num_scheduled_tokens=-1 during warmup.",
+      "log": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp2-pp2-in512-out128-bs1-20260505T044829Z.log"
+    },
+    {
+      "status": "failed",
+      "method": "ngram",
+      "numSpeculativeTokens": 4,
+      "promptLookupMin": 2,
+      "promptLookupMax": 4,
+      "promptTokens": 512,
+      "outputTokens": 128,
+      "gpuMemUtil": 0.7,
+      "patchAttempt": "Changed scheduler guard from num_new_tokens == 0 to num_new_tokens <= 0.",
+      "error": "Rejected patch: XPU vectorized gather kernel index out of bounds, likely from stale -1 speculative placeholders.",
+      "log": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp2-pp2-in512-out128-bs1-20260505T045336Z.log"
+    }
+  ],
+  "localmaxxing": "not submitted; no improved validated speed result",
+  "conclusion": "PP2 x TP2 non-spec works but is not competitive. PP2+n-gram needs a real scheduler/spec placeholder cleanup fix before further benchmarking."
+}
