@@ -1,0 +1,49 @@
+{
+  "date": "2026-05-05",
+  "model": "vrfai/Qwen3.6-27B-FP8",
+  "modelPath": "/home/steve/models/qwen3.6-27b-fp8-vrfai",
+  "engine": "vllm",
+  "engineVersion": "0.20.1+xpu-fa2-ngram-pp2-drafter-fix",
+  "quantization": "fp8/compressed-tensors",
+  "hardware": {
+    "gpu": "Intel Arc Pro B70 32GB",
+    "gpuCount": 4,
+    "selector": "level_zero:0,1,2,3",
+    "os": "Ubuntu 24.04.4 LTS, kernel 6.17.0-22-generic"
+  },
+  "patch": {
+    "file": "vllm/v1/worker/gpu_model_runner.py",
+    "summary": "Use getattr(self, \"drafter\", None) in _build_attention_metadata so non-last PP ranks with speculative_config do not crash."
+  },
+  "smoke": {
+    "status": "passed",
+    "tensorParallel": 2,
+    "pipelineParallel": 2,
+    "promptTokens": 32,
+    "outputTokens": 8,
+    "contextLength": 1024,
+    "batchSize": 1,
+    "speculative": {
+      "method": "ngram",
+      "numSpeculativeTokens": 4,
+      "promptLookupMin": 2,
+      "promptLookupMax": 4
+    },
+    "avgLatencySec": 0.32795706900651567,
+    "tokSOut": 24.393437,
+    "tokSTotal": 121.967183,
+    "json": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp2-pp2-in32-out8-bs1-20260505T043249Z.json",
+    "log": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp2-pp2-in32-out8-bs1-20260505T043249Z.log"
+  },
+  "largerRun": {
+    "status": "failed",
+    "tensorParallel": 2,
+    "pipelineParallel": 2,
+    "promptTokens": 512,
+    "outputTokens": 256,
+    "error": "UR_RESULT_ERROR_DEVICE_LOST during model load/memory accounting, followed by oneCCL broken-pipe cleanup.",
+    "log": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp2-pp2-in512-out256-bs1-20260505T043606Z.log"
+  },
+  "localmaxxing": "not submitted; smoke-only and larger run failed",
+  "conclusion": "The PP2 x TP2 n-gram drafter AttributeError is fixed, but PP2 x TP2 remains a runtime stability track rather than a validated speed path."
+}
