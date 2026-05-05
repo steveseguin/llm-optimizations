@@ -1,0 +1,16 @@
+diff --git a/vllm/v1/core/sched/scheduler.py b/vllm/v1/core/sched/scheduler.py
+--- a/vllm/v1/core/sched/scheduler.py
++++ b/vllm/v1/core/sched/scheduler.py
+@@ -439,7 +439,7 @@ class Scheduler:
+             if self.need_mamba_block_aligned_split:
+                 num_new_tokens = self._mamba_block_aligned_split(
+                     request, num_new_tokens
+                 )
+ 
+-            if num_new_tokens == 0:
++            if num_new_tokens <= 0:
+                 # The request cannot be scheduled because one of the following
+                 # reasons:
+                 # 1. No new tokens to schedule. This may happen when
+
+This patch is intentionally rejected. It avoids the negative scheduled-token assert in PP2+n-gram, but the run then fails in XPU with `vectorized gather kernel index out of bounds`, likely because stale `-1` speculative placeholders still reach downstream gather/sample code.
