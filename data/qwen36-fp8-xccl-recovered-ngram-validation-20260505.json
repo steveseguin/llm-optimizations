@@ -1,0 +1,67 @@
+{
+  "date": "2026-05-05",
+  "model": "vrfai/Qwen3.6-27B-FP8",
+  "modelPath": "/home/steve/models/qwen3.6-27b-fp8-vrfai",
+  "engine": "vllm",
+  "engineVersion": "0.20.1+xpu-fa2-ngram",
+  "quantization": "fp8/compressed-tensors",
+  "hardware": {
+    "gpu": "Intel Arc Pro B70 32GB",
+    "gpuCount": 4,
+    "selector": "level_zero:0,1,2,3",
+    "os": "Ubuntu 24.04.4 LTS, kernel 6.17.0-22-generic"
+  },
+  "xcclGate": {
+    "selector": "level_zero:0,1",
+    "env": {
+      "CCL_ZE_IPC_EXCHANGE": "sockets"
+    },
+    "status": "passed",
+    "maxBytes": 268435456,
+    "payloadGBpsAt256MiB": 41.80,
+    "log": "/home/steve/bench-results/qwen36-fp8-vllm/xccl-standalone-2rank-post-q4-localwrite-20260505T035142Z.log"
+  },
+  "validatedBest": {
+    "speculative": {
+      "method": "ngram",
+      "numSpeculativeTokens": 4,
+      "promptLookupMin": 2,
+      "promptLookupMax": 4
+    },
+    "env": {
+      "CCL_ATL_TRANSPORT": "ofi",
+      "CCL_ZE_IPC_EXCHANGE": "default",
+      "CCL_TOPO_P2P_ACCESS": "default"
+    },
+    "promptTokens": 512,
+    "outputTokens": 512,
+    "contextLength": 1024,
+    "batchSize": 1,
+    "latenciesSec": [
+      10.523862531001214,
+      11.585105771999224,
+      10.109288829989964
+    ],
+    "avgLatencySec": 10.739419044330134,
+    "tokSOut": 47.674832,
+    "tokSTotal": 95.349664,
+    "json": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp4-pp1-in512-out512-bs1-20260505T035653Z.json",
+    "log": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp4-pp1-in512-out512-bs1-20260505T035653Z.log",
+    "localmaxxingId": "cmos3pnqo000kkz04o4aiup22"
+  },
+  "negativeScreens": [
+    {
+      "name": "lookup_2_4_forced_sockets_topop2p",
+      "tokSOut": 43.342333,
+      "tokSTotal": 86.684666,
+      "json": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp4-pp1-in512-out512-bs1-20260505T035224Z.json"
+    },
+    {
+      "name": "lookup_2_5_default_ipc_topology",
+      "tokSOut": 42.159878,
+      "tokSTotal": 84.319756,
+      "json": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp4-pp1-in512-out512-bs1-20260505T040134Z.json"
+    }
+  ],
+  "conclusion": "Current validated FP8 best is TP4 n-gram 4 with lookup min/max 2/4, CCL_ATL_TRANSPORT=ofi, and default IPC/topology recognition."
+}
