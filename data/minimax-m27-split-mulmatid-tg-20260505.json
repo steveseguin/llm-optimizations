@@ -1,0 +1,39 @@
+{
+  "date_utc": "2026-05-05",
+  "model": "MiniMax-M2.7-UD-IQ4_XS",
+  "model_path": "/home/steve/models/minimax-m2.7-ud-iq4_xs-gguf/UD-IQ4_XS/MiniMax-M2.7-UD-IQ4_XS-00001-of-00004.gguf",
+  "hardware": "4x Intel Arc Pro B70 32GB",
+  "engine": "llama.cpp db44417 local SYCL experimental tree",
+  "patch": "/home/steve/llm-optimization-artifacts/patches/llama-cpp-sycl-minimax-split-mulmatid-tg.patch",
+  "focused_patch": "/home/steve/llm-optimization-artifacts/patches/llama-cpp-sycl-minimax-split-mulmatid-tg-focused.patch",
+  "env": {
+    "ONEAPI_DEVICE_SELECTOR": "level_zero:0,1,2,3",
+    "ZES_ENABLE_SYSMAN": "1",
+    "UR_L0_ENABLE_RELAXED_ALLOCATION_LIMITS": "1",
+    "GGML_SYCL_MUL_MAT_ID_SPLIT": "1",
+    "GGML_SYCL_DISABLE_DNN": "1",
+    "LLAMA_EXPERT_PLACEMENT_DEBUG": "1"
+  },
+  "tests": [
+    {
+      "name": "ncmoe50_split_mulmatid_verbose_p0n1",
+      "command_summary": "-sm row -ts 1/1/1/1 -p 0 -n 1 -r 1 -ngl 99 -ncmoe 50 -fa 1 -ub 32 -ctk f16 -ctv f16 --no-warmup",
+      "jsonl": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/minimax-m27-quad-row-ngl99-ncmoe50-split-mulmatid-verbose-p0n1-20260505T003850Z.jsonl",
+      "log": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/minimax-m27-quad-row-ngl99-ncmoe50-split-mulmatid-verbose-p0n1-20260505T003850Z.log",
+      "outcome": "load_failed_after_split_expert_placement",
+      "important_result": "late expert tensors stayed on SYCL3_Split instead of falling back to a 20GB monolithic SYCL3 allocation",
+      "failure": "device 0 allocation of 129761280 bytes for blk.60.ffn_up_exps.weight row shard"
+    },
+    {
+      "name": "ncmoe60_split_mulmatid_verbose_p0n1",
+      "command_summary": "-sm row -ts 1/1/1/1 -p 0 -n 1 -r 1 -ngl 99 -ncmoe 60 -fa 1 -ub 32 -ctk f16 -ctv f16 --no-warmup",
+      "jsonl": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/minimax-m27-quad-row-ngl99-ncmoe60-split-mulmatid-verbose-p0n1-20260505T004014Z.jsonl",
+      "log": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/minimax-m27-quad-row-ngl99-ncmoe60-split-mulmatid-verbose-p0n1-20260505T004014Z.log",
+      "outcome": "terminated_after_first_decode_stall",
+      "important_result": "model loaded, context constructed, KV assigned across all 4 B70s, graph reserved with 3975 nodes and 122 splits",
+      "failure": "after more than 8 minutes the JSONL was still empty and strace showed the main llama-bench thread spinning in sched_yield, indicating an event/queue wait that did not complete"
+    }
+  ],
+  "interpretation": "The split MUL_MAT_ID capability removes the earlier monolithic expert placement blocker. Runtime is not viable yet; the naive token-generation helper likely stalls in a SYCL event/queue wait during first decode.",
+  "localmaxxing": "not_submitted_no_valid_decode_metric_yet"
+}
