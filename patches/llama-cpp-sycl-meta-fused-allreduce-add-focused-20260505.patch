@@ -1,0 +1,669 @@
+diff --git a/tmp/llama-q4-before-fuseadd/ggml/include/ggml-backend.h b/ggml/include/ggml-backend.h
+index d0c7e5a..92fa597 100644
+--- a/tmp/llama-q4-before-fuseadd/ggml/include/ggml-backend.h
++++ b/ggml/include/ggml-backend.h
+@@ -206,6 +206,8 @@ extern "C" {
+     typedef void * (*ggml_backend_comm_init_t)(ggml_backend_t * backends, size_t n_backends);
+     typedef void   (*ggml_backend_comm_free_t)(void * comm_ctx);
+     typedef bool   (*ggml_backend_comm_allreduce_tensor_t)(void * comm_ctx, struct ggml_tensor ** tensors);
++    typedef bool   (*ggml_backend_comm_allreduce_add_tensor_t)(
++            void * comm_ctx, struct ggml_tensor ** partials, struct ggml_tensor ** residuals, struct ggml_tensor ** outputs);
+ 
+     // Split buffer type for tensor parallelism (old)
+     typedef ggml_backend_buffer_type_t   (*ggml_backend_split_buffer_type_t)(int main_device, const float * tensor_split);
+diff --git a/tmp/llama-q4-before-fuseadd/ggml/src/ggml-backend-meta.cpp b/ggml/src/ggml-backend-meta.cpp
+index c0ffd9a..77b2389 100644
+--- a/tmp/llama-q4-before-fuseadd/ggml/src/ggml-backend-meta.cpp
++++ b/ggml/src/ggml-backend-meta.cpp
+@@ -7,9 +7,11 @@
+ 
+ #include <algorithm>
+ #include <cassert>
++#include <chrono>
+ #include <cmath>
+ #include <cstddef>
+ #include <cstdint>
++#include <cstdio>
+ #include <cstring>
+ #include <map>
+ #include <memory>
+@@ -1010,8 +1012,23 @@ static struct ggml_backend_meta_split_state ggml_backend_meta_get_split_state(co
+                             sum += src_ss[i].ne[s*n_bufs + j];
+                         }
+                         // Assert that ratio is consistent:
+-                        GGML_ASSERT(split_state.ne[j] * tensor->src[i]->ne[src_ss[i].axis]
+-                                               == sum * tensor->ne[split_state.axis]);
++                        const int64_t lhs = split_state.ne[j] * tensor->src[i]->ne[src_ss[i].axis];
++                        const int64_t rhs = sum * tensor->ne[split_state.axis];
++                        if (lhs != rhs) {
++                            GGML_ABORT(
++                                "split ratio mismatch in %s[%s] src %zu %s[%s]: "
++                                "dst_axis=%s dst_ne=%lld split_ne=%lld src_axis=%s src_ne=%lld src_sum=%lld lhs=%lld rhs=%lld",
++                                tensor->name, ggml_op_name(tensor->op),
++                                i, tensor->src[i]->name, ggml_op_name(tensor->src[i]->op),
++                                ggml_backend_meta_split_axis_name(split_state.axis),
++                                (long long) tensor->ne[split_state.axis],
++                                (long long) split_state.ne[j],
++                                ggml_backend_meta_split_axis_name(src_ss[i].axis),
++                                (long long) tensor->src[i]->ne[src_ss[i].axis],
++                                (long long) sum,
++                                (long long) lhs,
++                                (long long) rhs);
++                        }
+                     }
+                 }
+                 first_src_split_by_axis = false;
+@@ -1492,6 +1509,8 @@ struct ggml_backend_meta_context {
+     struct cgraph_config {
+         ggml_cgraph * cgraph_main = nullptr;
+         int           offset      = 0; // Node offset vs. original graph
++        int           offset_end  = 0; // Exclusive node offset vs. original graph
++        int           fused_add   = -1;
+ 
+         std::vector<ggml_cgraph *> cgraphs_aux;
+     };
+@@ -1520,6 +1539,7 @@ struct ggml_backend_meta_context {
+ 
+     void *                               comm_ctx       = nullptr;
+     ggml_backend_comm_allreduce_tensor_t comm_allreduce = nullptr;
++    ggml_backend_comm_allreduce_add_tensor_t comm_allreduce_add = nullptr;
+ 
+     ggml_backend_meta_context(ggml_backend_dev_t meta_dev, const char * params) {
+         const size_t n_devs = ggml_backend_meta_dev_n_devs(meta_dev);
+@@ -1551,6 +1571,9 @@ struct ggml_backend_meta_context {
+                 ggml_backend_reg_get_proc_address(ggml_backend_dev_backend_reg(
+                     ggml_backend_get_device(simple_backends[0])), "ggml_backend_comm_allreduce_tensor");
+             GGML_ASSERT(comm_allreduce != nullptr);
++            comm_allreduce_add = (ggml_backend_comm_allreduce_add_tensor_t)
++                ggml_backend_reg_get_proc_address(ggml_backend_dev_backend_reg(
++                    ggml_backend_get_device(simple_backends[0])), "ggml_backend_comm_allreduce_add_tensor");
+         }
+     }
+ 
+@@ -1673,6 +1696,18 @@ static enum ggml_status ggml_backend_meta_graph_compute(ggml_backend_t backend,
+     GGML_ASSERT(cgraph->grads == nullptr);
+     const size_t n_backends = ggml_backend_meta_n_backends(backend);
+     ggml_backend_meta_context * backend_ctx = (ggml_backend_meta_context *) backend->context;
++    const char * stats_env = getenv("GGML_META_ALLREDUCE_STATS");
++    const int allreduce_stats = stats_env ? atoi(stats_env) : 0;
++    const char * fuse_add_env = getenv("GGML_META_FUSE_ALLREDUCE_ADD");
++    const bool fuse_allreduce_add = fuse_add_env && atoi(fuse_add_env) != 0 && backend_ctx->comm_allreduce_add != nullptr;
++    const char * fuse_add_limit_env = getenv("GGML_META_FUSE_ALLREDUCE_ADD_LIMIT");
++    const int fuse_allreduce_add_limit = fuse_add_limit_env ? atoi(fuse_add_limit_env) : cgraph->n_nodes;
++    int fused_allreduce_add_count = 0;
++    size_t allreduce_count = 0;
++    size_t allreduce_bytes_total = 0;
++    uint64_t allreduce_time_ns_total = 0;
++    std::map<size_t, size_t> allreduce_size_counts;
++    std::map<size_t, uint64_t> allreduce_size_time_ns;
+ 
+     // If the previous cgraph had a defined UID it can be used to skip rebuilding the subgraphs per simple backend.
+     const bool needs_rebuild = (cgraph->uid == 0) || (cgraph->uid != backend_ctx->uid);
+@@ -1826,31 +1861,68 @@ static enum ggml_status ggml_backend_meta_graph_compute(ggml_backend_t backend,
+                     continue;
+                 }
+ 
+-                const int i_delayed = get_i_delayed(i);
++                int i_stop = i;
++                int fused_add = -1;
++
++                if (fuse_allreduce_add && fused_allreduce_add_count < fuse_allreduce_add_limit &&
++                        split_state.axis == GGML_BACKEND_SPLIT_AXIS_PARTIAL && i + 1 < cgraph->n_nodes) {
++                    ggml_tensor * next = cgraph->nodes[i + 1];
++                    const bool partial_is_src0 = next->op == GGML_OP_ADD && next->src[0] == node;
++                    const bool partial_is_src1 = next->op == GGML_OP_ADD && next->src[1] == node;
++                    ggml_tensor * residual = partial_is_src0 ? next->src[1] : (partial_is_src1 ? next->src[0] : nullptr);
++                    const ggml_backend_meta_split_state residual_split_state = residual ?
++                        ggml_backend_meta_get_split_state(residual, /*assume_sync =*/ false) :
++                        ggml_backend_meta_split_state{GGML_BACKEND_SPLIT_AXIS_UNKNOWN, {0}, 1};
++                    const ggml_backend_meta_split_state next_split_state =
++                        ggml_backend_meta_get_split_state(next, /*assume_sync =*/ false);
++
++                    if ((partial_is_src0 || partial_is_src1) &&
++                            ggml_node_get_use_count(cgraph, i) == 1 &&
++                            next->type == GGML_TYPE_F32 &&
++                            node->type == GGML_TYPE_F32 &&
++                            residual != nullptr && residual->type == GGML_TYPE_F32 &&
++                            ggml_nbytes(next) == ggml_nbytes(node) &&
++                            ggml_nbytes(residual) == ggml_nbytes(node) &&
++                            ggml_nbytes(node) <= 64*1024 &&
++                            residual_split_state.axis == GGML_BACKEND_SPLIT_AXIS_MIRRORED &&
++                            next_split_state.axis == GGML_BACKEND_SPLIT_AXIS_MIRRORED) {
++                        fused_add = i + 1;
++                        fused_allreduce_add_count++;
++                    }
++                }
+ 
+-                // If we can delay the AllReduce we need to consider the interaction with zero-sized tensor slices.
+-                // A backend with such a slice would normally have valid data after participating in the AllReduce with a node that has
+-                //     its compute flag disabled and thus gets its data zeroed out.
+-                // If the AllReduce is delayed then the nodes until that point also need to have their compute flag disabled.
+-                if (i_delayed > i) {
+-                    for (size_t j = 0; j < n_backends; j++) {
+-                        auto & bcj = backend_ctx->backend_configs[j];
+-                        if ((bcj.nodes[i]->flags & GGML_TENSOR_FLAG_COMPUTE) == 0) {
+-                            for (int ii = i + 1; ii <= i_delayed; ii++) {
+-                                bcj.nodes[ii]->flags &= ~GGML_TENSOR_FLAG_COMPUTE;
++                if (fused_add < 0) {
++                    const int i_delayed = get_i_delayed(i);
++
++                    // If we can delay the AllReduce we need to consider the interaction with zero-sized tensor slices.
++                    // A backend with such a slice would normally have valid data after participating in the AllReduce with a node that has
++                    //     its compute flag disabled and thus gets its data zeroed out.
++                    // If the AllReduce is delayed then the nodes until that point also need to have their compute flag disabled.
++                    if (i_delayed > i) {
++                        for (size_t j = 0; j < n_backends; j++) {
++                            auto & bcj = backend_ctx->backend_configs[j];
++                            if ((bcj.nodes[i]->flags & GGML_TENSOR_FLAG_COMPUTE) == 0) {
++                                for (int ii = i + 1; ii <= i_delayed; ii++) {
++                                    bcj.nodes[ii]->flags &= ~GGML_TENSOR_FLAG_COMPUTE;
++                                }
+                             }
+                         }
+                     }
+-                }
+ 
+-                i = i_delayed;
++                    i_stop = i_delayed;
++                    i = i_delayed;
++                } else {
++                    i = fused_add;
++                }
+ 
+                 for (size_t j = 0; j < n_backends; j++) {
+                     auto & bcj = backend_ctx->backend_configs[j];
+                     bcj.cgraphs[n_subgraphs].offset = i_start;
++                    bcj.cgraphs[n_subgraphs].offset_end = i_stop + 1;
++                    bcj.cgraphs[n_subgraphs].fused_add = fused_add;
+                 }
+                 n_subgraphs++;
+-                i_start = i + 1;
++                i_start = (fused_add >= 0 ? fused_add : i_stop) + 1;
+             }
+             GGML_ASSERT(i_start == cgraph->n_nodes);
+         }
+@@ -1870,8 +1942,8 @@ static enum ggml_status ggml_backend_meta_graph_compute(ggml_backend_t backend,
+ 
+         if (max_nnodes_raised || n_subgraphs > backend_ctx->max_subgraphs) {
+             backend_ctx->max_subgraphs = std::max(backend_ctx->max_subgraphs, n_subgraphs);
+-            const size_t n_nodes_per_device = 3 * backend_ctx->n_reduce_steps; // tmp + ADD (+zeroing) graph per step and device
+-            const size_t n_cgraphs_per_device = 2 * backend_ctx->n_reduce_steps; // ADD ( + zeroing) graph per step and device
++            const size_t n_nodes_per_device = 3 * backend_ctx->n_reduce_steps + 1; // tmp + ADD (+zeroing) graph per step and device
++            const size_t n_cgraphs_per_device = 2 * backend_ctx->n_reduce_steps + 1; // ADD (+zeroing/fused fallback) graph per step and device
+             const size_t mem_per_device_graphs_main = backend_ctx->max_subgraphs*ggml_graph_overhead_custom(backend_ctx->max_nnodes, cgraph->grads);
+             const size_t mem_per_device_graphs_aux = n_cgraphs_per_device*backend_ctx->max_subgraphs*ggml_graph_overhead_custom(1, cgraph->grads);
+             const size_t mem_per_device_nodes_aux = n_nodes_per_device*backend_ctx->max_subgraphs*ggml_tensor_overhead();
+@@ -1902,7 +1974,9 @@ static enum ggml_status ggml_backend_meta_graph_compute(ggml_backend_t backend,
+             for (size_t i_graph = 0; i_graph < n_subgraphs; i_graph++) {
+                 ggml_cgraph * cgraph_ij = bcj.cgraphs[i_graph].cgraph_main;
+                 const size_t i_node_start = bcj.cgraphs[i_graph].offset;
+-                const size_t i_node_stop = i_graph + 1 < n_subgraphs ? bcj.cgraphs[i_graph + 1].offset : cgraph->n_nodes;
++                const size_t i_node_stop = bcj.cgraphs[i_graph].offset_end > 0 ?
++                    bcj.cgraphs[i_graph].offset_end :
++                    (i_graph + 1 < n_subgraphs ? bcj.cgraphs[i_graph + 1].offset : cgraph->n_nodes);
+                 cgraph_ij->n_nodes = i_node_stop - i_node_start;
+                 ggml_hash_set_reset(&cgraph_ij->visited_hash_set);
+                 for (size_t i_node = i_node_start; i_node < i_node_stop; i_node++) {
+@@ -2061,6 +2135,20 @@ static enum ggml_status ggml_backend_meta_graph_compute(ggml_backend_t backend,
+         return GGML_STATUS_SUCCESS;
+     };
+ 
++    auto compute_aux_node = [&](int node_i) -> ggml_status {
++        for (size_t j = 0; j < n_backends; j++) {
++            auto & bcj = backend_ctx->backend_configs[j];
++            ggml_cgraph * cgraph_aux = get_cgraph_aux();
++            cgraph_aux->nodes[0] = bcj.nodes[node_i];
++            cgraph_aux->n_nodes = 1;
++            const ggml_status status = ggml_backend_graph_compute_async(bcj.backend, cgraph_aux);
++            if (status != GGML_STATUS_SUCCESS) {
++                return status;
++            }
++        }
++        return GGML_STATUS_SUCCESS;
++    };
++
+ 
+     for (size_t i = 0; i < backend_ctx->n_subgraphs; i++) {
+         for (size_t j = 0; j < n_backends; j++) {
+@@ -2073,6 +2161,29 @@ static enum ggml_status ggml_backend_meta_graph_compute(ggml_backend_t backend,
+ 
+         if (n_backends > 1 && i < backend_ctx->n_subgraphs - 1) {
+             bool backend_allreduce_success = false;
++            bool backend_allreduce_add_success = false;
++            ggml_cgraph * cgraph_i0 = backend_ctx->backend_configs[0].cgraphs[i].cgraph_main;
++            const int fused_add_i = backend_ctx->backend_configs[0].cgraphs[i].fused_add;
++            ggml_tensor * node0 = cgraph_i0->nodes[cgraph_i0->n_nodes - 1];
++            const size_t allreduce_nbytes = ggml_nbytes(node0);
++            if (allreduce_stats) {
++                allreduce_count++;
++                allreduce_bytes_total += allreduce_nbytes;
++                allreduce_size_counts[allreduce_nbytes]++;
++            }
++
++            auto sync_backends = [&backend_ctx, n_backends]() {
++                for (size_t j = 0; j < n_backends; j++) {
++                    ggml_backend_synchronize(backend_ctx->backend_configs[j].backend);
++                }
++            };
++
++            std::chrono::steady_clock::time_point allreduce_t0;
++            if (allreduce_stats >= 3) {
++                sync_backends();
++                allreduce_t0 = std::chrono::steady_clock::now();
++            }
++
+             if (backend_ctx->comm_ctx) {
+                 std::vector<ggml_tensor *> nodes;
+                 nodes.reserve(n_backends);
+@@ -2081,7 +2192,38 @@ static enum ggml_status ggml_backend_meta_graph_compute(ggml_backend_t backend,
+                     ggml_cgraph * cgraph_ij = bcj.cgraphs[i].cgraph_main;
+                     nodes.push_back(cgraph_ij->nodes[cgraph_ij->n_nodes-1]);
+                 }
+-                backend_allreduce_success = backend_ctx->comm_allreduce(backend_ctx->comm_ctx, nodes.data());
++                if (fused_add_i >= 0 && backend_ctx->comm_allreduce_add != nullptr) {
++                    std::vector<ggml_tensor *> residuals;
++                    std::vector<ggml_tensor *> outputs;
++                    residuals.reserve(n_backends);
++                    outputs.reserve(n_backends);
++                    bool valid_fused_add = true;
++                    for (size_t j = 0; j < n_backends; j++) {
++                        auto & bcj = backend_ctx->backend_configs[j];
++                        ggml_tensor * add_node = bcj.nodes[fused_add_i];
++                        if (add_node->op != GGML_OP_ADD) {
++                            valid_fused_add = false;
++                            break;
++                        }
++                        if (add_node->src[0] == nodes[j]) {
++                            residuals.push_back(add_node->src[1]);
++                        } else if (add_node->src[1] == nodes[j]) {
++                            residuals.push_back(add_node->src[0]);
++                        } else {
++                            valid_fused_add = false;
++                            break;
++                        }
++                        outputs.push_back(add_node);
++                    }
++                    if (valid_fused_add) {
++                        backend_allreduce_add_success = backend_ctx->comm_allreduce_add(
++                                backend_ctx->comm_ctx, nodes.data(), residuals.data(), outputs.data());
++                        backend_allreduce_success = backend_allreduce_add_success;
++                    }
++                }
++                if (!backend_allreduce_success) {
++                    backend_allreduce_success = backend_ctx->comm_allreduce(backend_ctx->comm_ctx, nodes.data());
++                }
+             }
+ 
+             if (!backend_allreduce_success) {
+@@ -2090,6 +2232,52 @@ static enum ggml_status ggml_backend_meta_graph_compute(ggml_backend_t backend,
+                     return status;
+                 }
+             }
++            if (fused_add_i >= 0 && !backend_allreduce_add_success) {
++                const ggml_status status = compute_aux_node(fused_add_i);
++                if (status != GGML_STATUS_SUCCESS) {
++                    return status;
++                }
++            }
++
++            uint64_t allreduce_time_ns = 0;
++            if (allreduce_stats >= 3) {
++                sync_backends();
++                const auto allreduce_t1 = std::chrono::steady_clock::now();
++                allreduce_time_ns = (uint64_t) std::chrono::duration_cast<std::chrono::nanoseconds>(allreduce_t1 - allreduce_t0).count();
++                allreduce_time_ns_total += allreduce_time_ns;
++                allreduce_size_time_ns[allreduce_nbytes] += allreduce_time_ns;
++            }
++
++            if (allreduce_stats >= 2) {
++                fprintf(stderr, "%s: allreduce[%zu] path=%s name=%s op=%s type=%s ne=%lld nbytes=%zu",
++                        __func__, i, backend_allreduce_add_success ? "backend+add" :
++                            (backend_allreduce_success ? "backend" : "fallback"),
++                        node0->name, ggml_op_name(node0->op), ggml_type_name(node0->type),
++                        (long long) ggml_nelements(node0), allreduce_nbytes);
++                if (allreduce_stats >= 3) {
++                    fprintf(stderr, " time_us=%.3f", (double) allreduce_time_ns / 1.0e3);
++                }
++                fprintf(stderr, "\n");
++            }
++        }
++    }
++    if (allreduce_stats && allreduce_count > 0) {
++        fprintf(stderr, "%s: allreduce summary n_backends=%zu count=%zu total_bytes=%zu",
++                __func__, n_backends, allreduce_count, allreduce_bytes_total);
++        if (allreduce_stats >= 3) {
++            fprintf(stderr, " total_time_ms=%.3f avg_time_us=%.3f",
++                    (double) allreduce_time_ns_total / 1.0e6,
++                    (double) allreduce_time_ns_total / (double) allreduce_count / 1.0e3);
++        }
++        fprintf(stderr, "\n");
++        for (const auto & [nbytes, count] : allreduce_size_counts) {
++            fprintf(stderr, "%s: allreduce size nbytes=%zu count=%zu", __func__, nbytes, count);
++            if (allreduce_stats >= 3) {
++                const uint64_t ns = allreduce_size_time_ns[nbytes];
++                fprintf(stderr, " total_time_ms=%.3f avg_time_us=%.3f",
++                        (double) ns / 1.0e6, (double) ns / (double) count / 1.0e3);
++            }
++            fprintf(stderr, "\n");
+         }
+     }
+     return GGML_STATUS_SUCCESS;
+@@ -2140,4 +2328,3 @@ ggml_backend_t ggml_backend_meta_simple_backend(ggml_backend_t meta_backend, siz
+     const ggml_backend_meta_context * backend_ctx = (const ggml_backend_meta_context *) meta_backend->context;
+     return backend_ctx->backend_configs[index].backend;
+ }
+-
+diff --git a/tmp/llama-q4-before-fuseadd/ggml/src/ggml-sycl/ggml-sycl.cpp b/ggml/src/ggml-sycl/ggml-sycl.cpp
+index 164b17f..29862c8 100644
+--- a/tmp/llama-q4-before-fuseadd/ggml/src/ggml-sycl/ggml-sycl.cpp
++++ b/ggml/src/ggml-sycl/ggml-sycl.cpp
+@@ -4315,6 +4315,7 @@ static bool ggml_sycl_mul_mat_id_split_tg(
+             (long long) ids->ne[0], (long long) ids->ne[1],
+             (long long) n_as, (long long) expert_rows,
+             src1_device, dst_device, g_ggml_sycl_mul_mat_id_split_host_bounce);
++        fflush(stderr);
+     }
+ 
+     ggml_tensor src0_row = *src0;
+@@ -4360,6 +4361,14 @@ static bool ggml_sycl_mul_mat_id_split_tg(
+             float * dst_original =
+                 (float *) ((char *) dst->data + i1*nb1 + i2*nb2);
+ 
++            if (g_ggml_sycl_mul_mat_id_split_debug > 1) {
++                fprintf(stderr,
++                        "%s: id_begin src0=%s dst=%s expert=%d id=%lld iid1=%lld n_devs=%d\n",
++                        __func__, src0->name, dst->name, (int) i02,
++                        (long long) id, (long long) iid1, ggml_sycl_info().device_count);
++                fflush(stderr);
++            }
++
+             for (int dev = 0; dev < ggml_sycl_info().device_count; ++dev) {
+                 int64_t dev_row_low;
+                 int64_t dev_row_high;
+@@ -4383,12 +4392,28 @@ static bool ggml_sycl_mul_mat_id_split_tg(
+ 
+                 float * src1_dev = nullptr;
+                 float * dst_dev = dst_dev_alloc.get();
++                if (g_ggml_sycl_mul_mat_id_split_debug > 1) {
++                    fprintf(stderr,
++                            "%s: shard_begin expert=%d dev=%d dev_rows=[%lld,%lld) shard=[%lld,%lld) row_diff=%lld\n",
++                            __func__, (int) i02, dev,
++                            (long long) dev_row_low, (long long) dev_row_high,
++                            (long long) shard_low, (long long) shard_high,
++                            (long long) row_diff);
++                    fflush(stderr);
++                }
+                 if (src1_is_sycl && src1_device == dev) {
+                     src1_dev = const_cast<float *>(src1_original);
+                     src1_row.buffer = src1->buffer;
+                 } else {
+                     src1_dev = src1_dev_alloc.alloc(ctx.pool(dev), ne10);
+                     const size_t src1_copy_bytes = ne10 * sizeof(float);
++                    if (g_ggml_sycl_mul_mat_id_split_debug > 2) {
++                        fprintf(stderr, "%s: src1_copy_begin expert=%d dev=%d bytes=%zu cross=%d host_bounce=%d\n",
++                                __func__, (int) i02, dev, src1_copy_bytes,
++                                src1_is_sycl && src1_device != dev,
++                                g_ggml_sycl_mul_mat_id_split_host_bounce);
++                        fflush(stderr);
++                    }
+                     if (src1_is_sycl && !src1_is_host && g_ggml_sycl_mul_mat_id_split_host_bounce) {
+                         const queue_ptr src1_stream = ctx.stream(src1_device, 0);
+                         dev2dev_memcpy(*stream, *src1_stream, src1_dev, src1_original, src1_copy_bytes);
+@@ -4396,6 +4421,10 @@ static bool ggml_sycl_mul_mat_id_split_tg(
+                         SYCL_CHECK(CHECK_TRY_ERROR(
+                             stream->memcpy(src1_dev, src1_original, src1_copy_bytes).wait()));
+                     }
++                    if (g_ggml_sycl_mul_mat_id_split_debug > 2) {
++                        fprintf(stderr, "%s: src1_copy_done expert=%d dev=%d\n", __func__, (int) i02, dev);
++                        fflush(stderr);
++                    }
+                     src1_row.buffer = dst->buffer;
+                 }
+ 
+@@ -4412,11 +4441,28 @@ static bool ggml_sycl_mul_mat_id_split_tg(
+ 
+                 ctx.device = dev;
+                 ctx.opt_feature = ggml_sycl_info().devices[dev].opt_feature;
++                if (g_ggml_sycl_mul_mat_id_split_debug > 1) {
++                    fprintf(stderr, "%s: shard_matmul_begin expert=%d dev=%d row_diff=%lld\n",
++                            __func__, (int) i02, dev, (long long) row_diff);
++                    fflush(stderr);
++                }
+                 ggml_sycl_mul_mat(ctx, &src0_row, &src1_row, &dst_row);
+                 SYCL_CHECK(CHECK_TRY_ERROR(stream->wait()));
++                if (g_ggml_sycl_mul_mat_id_split_debug > 1) {
++                    fprintf(stderr, "%s: shard_matmul_done expert=%d dev=%d row_diff=%lld\n",
++                            __func__, (int) i02, dev, (long long) row_diff);
++                    fflush(stderr);
++                }
+ 
+                 const size_t dst_copy_bytes = row_diff * sizeof(float);
+                 float * dst_slice = dst_original + row_low_in_expert;
++                if (g_ggml_sycl_mul_mat_id_split_debug > 2) {
++                    fprintf(stderr, "%s: dst_copy_begin expert=%d dev=%d bytes=%zu cross=%d host_bounce=%d\n",
++                            __func__, (int) i02, dev, dst_copy_bytes,
++                            dst_is_sycl && dst_device != dev,
++                            g_ggml_sycl_mul_mat_id_split_host_bounce);
++                    fflush(stderr);
++                }
+                 if (dst_is_sycl && !dst_is_host && dst_device != dev &&
+                         g_ggml_sycl_mul_mat_id_split_host_bounce) {
+                     const queue_ptr dst_stream = ctx.stream(dst_device, 0);
+@@ -4425,6 +4471,10 @@ static bool ggml_sycl_mul_mat_id_split_tg(
+                     SYCL_CHECK(CHECK_TRY_ERROR(
+                         stream->memcpy(dst_slice, dst_dev, dst_copy_bytes).wait()));
+                 }
++                if (g_ggml_sycl_mul_mat_id_split_debug > 2) {
++                    fprintf(stderr, "%s: dst_copy_done expert=%d dev=%d\n", __func__, (int) i02, dev);
++                    fflush(stderr);
++                }
+ 
+                 if (g_ggml_sycl_mul_mat_id_split_debug > 1) {
+                     GGML_LOG_INFO(
+@@ -4433,6 +4483,7 @@ static bool ggml_sycl_mul_mat_id_split_tg(
+                         (long long) shard_low, (long long) shard_high, (long long) row_diff,
+                         src1_dev == src1_original ? "direct" : "copy",
+                         dst_is_sycl && dst_device != dev ? "cross" : "local");
++                    fflush(stderr);
+                 }
+             }
+         }
+@@ -4441,6 +4492,10 @@ static bool ggml_sycl_mul_mat_id_split_tg(
+     ctx.device = saved_device;
+     ctx.opt_feature = saved_opt_feature;
+     ggml_sycl_set_device(saved_device);
++    if (g_ggml_sycl_mul_mat_id_split_debug) {
++        fprintf(stderr, "%s: split_done src0=%s dst=%s\n", __func__, src0->name, dst->name);
++        fflush(stderr);
++    }
+     return true;
+ }
+ catch (sycl::exception const & exc) {
+@@ -4467,6 +4522,7 @@ static void ggml_sycl_mul_mat_id(ggml_backend_sycl_context & ctx,
+             (long long) ids->ne[0], (long long) ids->ne[1], (long long) ids->ne[2], (long long) ids->ne[3],
+             dst->name,
+             (long long) dst->ne[0], (long long) dst->ne[1], (long long) dst->ne[2], (long long) dst->ne[3]);
++        fflush(stderr);
+     }
+ 
+     const ggml_tensor *ids = dst->src[2];
+@@ -4491,6 +4547,11 @@ static void ggml_sycl_mul_mat_id(ggml_backend_sycl_context & ctx,
+     SYCL_CHECK(CHECK_TRY_ERROR(stream->wait()));
+ 
+     if (split_src0) {
++        if (g_ggml_sycl_mul_mat_id_split_debug) {
++            fprintf(stderr, "%s: split_helper_dispatch src0=%s dst=%s ids_nbytes=%zu\n",
++                    __func__, src0->name, dst->name, ggml_nbytes(ids));
++            fflush(stderr);
++        }
+         if (ggml_sycl_mul_mat_id_split_tg(ctx, src0, src1, ids, dst, ids_host.data())) {
+             return;
+         }
+@@ -5236,6 +5297,157 @@ static void * ggml_backend_sycl_comm_init(ggml_backend_t * backends, size_t n_ba
+     return ret;
+ }
+ 
++static bool ggml_backend_sycl_comm_allreduce_add_tensor(
++        void * comm_ctx_v, struct ggml_tensor ** partials, struct ggml_tensor ** residuals, struct ggml_tensor ** outputs) try {
++    if (!g_ggml_sycl_comm_allreduce || !g_ggml_sycl_comm_single_kernel || comm_ctx_v == nullptr) {
++        return false;
++    }
++
++    ggml_backend_sycl_comm_context * comm_ctx = (ggml_backend_sycl_comm_context *) comm_ctx_v;
++    const size_t n_backends = comm_ctx->backends.size();
++    if (n_backends < 2 || n_backends > 4) {
++        return false;
++    }
++
++    const int64_t ne = ggml_nelements(partials[0]);
++    if (ne == 0) {
++        return true;
++    }
++
++    if (partials[0]->type != GGML_TYPE_F32 || residuals[0]->type != GGML_TYPE_F32 ||
++            outputs[0]->type != GGML_TYPE_F32 || !ggml_is_contiguously_allocated(partials[0]) ||
++            !ggml_is_contiguously_allocated(residuals[0]) || !ggml_is_contiguously_allocated(outputs[0])) {
++        return false;
++    }
++
++    const size_t nbytes = ggml_nbytes(partials[0]);
++    if (nbytes != ggml_nbytes(residuals[0]) || nbytes != ggml_nbytes(outputs[0]) || nbytes > 64*1024) {
++        return false;
++    }
++
++    const size_t root = g_ggml_sycl_comm_rotate_root ? comm_ctx->allreduce_calls++ % n_backends : 0;
++    const bool skip_root_ready = g_ggml_sycl_comm_skip_root_ready;
++
++    for (size_t i = 0; i < n_backends; ++i) {
++        if (partials[i] == nullptr || residuals[i] == nullptr || outputs[i] == nullptr ||
++                partials[i]->type != GGML_TYPE_F32 || residuals[i]->type != GGML_TYPE_F32 ||
++                outputs[i]->type != GGML_TYPE_F32 ||
++                ggml_nelements(partials[i]) != ne || ggml_nelements(residuals[i]) != ne ||
++                ggml_nelements(outputs[i]) != ne ||
++                ggml_nbytes(partials[i]) != nbytes || ggml_nbytes(residuals[i]) != nbytes ||
++                ggml_nbytes(outputs[i]) != nbytes ||
++                !ggml_is_contiguously_allocated(partials[i]) ||
++                !ggml_is_contiguously_allocated(residuals[i]) ||
++                !ggml_is_contiguously_allocated(outputs[i])) {
++            return false;
++        }
++
++        ggml_backend_buffer_t partial_buf = partials[i]->view_src ? partials[i]->view_src->buffer : partials[i]->buffer;
++        ggml_backend_buffer_t residual_buf = residuals[i]->view_src ? residuals[i]->view_src->buffer : residuals[i]->buffer;
++        ggml_backend_buffer_t output_buf = outputs[i]->view_src ? outputs[i]->view_src->buffer : outputs[i]->buffer;
++        if (!ggml_backend_buffer_is_sycl(partial_buf) ||
++                !ggml_backend_buffer_is_sycl(residual_buf) ||
++                !ggml_backend_buffer_is_sycl(output_buf)) {
++            return false;
++        }
++
++        ggml_backend_sycl_context * sycl_ctx = (ggml_backend_sycl_context *) comm_ctx->backends[i]->context;
++        ggml_backend_sycl_buffer_context * partial_ctx = (ggml_backend_sycl_buffer_context *) partial_buf->context;
++        ggml_backend_sycl_buffer_context * residual_ctx = (ggml_backend_sycl_buffer_context *) residual_buf->context;
++        ggml_backend_sycl_buffer_context * output_ctx = (ggml_backend_sycl_buffer_context *) output_buf->context;
++        if (sycl_ctx->device != partial_ctx->device ||
++                sycl_ctx->device != residual_ctx->device ||
++                sycl_ctx->device != output_ctx->device) {
++            return false;
++        }
++    }
++
++    std::vector<sycl::event> ready(n_backends);
++    for (size_t i = 0; i < n_backends; ++i) {
++        ggml_backend_sycl_context * sycl_ctx = (ggml_backend_sycl_context *) comm_ctx->backends[i]->context;
++        const queue_ptr stream = sycl_ctx->stream(sycl_ctx->device, 0);
++        if ((partials[i]->flags & GGML_TENSOR_FLAG_COMPUTE) == 0) {
++            stream->memset(partials[i]->data, 0, nbytes);
++        }
++        if (!(skip_root_ready && i == root)) {
++            ready[i] = stream->ext_oneapi_submit_barrier();
++        }
++    }
++
++    ggml_backend_sycl_context * sycl_ctx_root = (ggml_backend_sycl_context *) comm_ctx->backends[root]->context;
++    const queue_ptr stream_root = sycl_ctx_root->stream(sycl_ctx_root->device, 0);
++
++    float * p0 = (float *) partials[0]->data;
++    float * p1 = (float *) partials[1]->data;
++    float * p2 = n_backends > 2 ? (float *) partials[2]->data : nullptr;
++    float * p3 = n_backends > 3 ? (float *) partials[3]->data : nullptr;
++    float * r0 = (float *) residuals[0]->data;
++    float * r1 = (float *) residuals[1]->data;
++    float * r2 = n_backends > 2 ? (float *) residuals[2]->data : nullptr;
++    float * r3 = n_backends > 3 ? (float *) residuals[3]->data : nullptr;
++    float * o0 = (float *) outputs[0]->data;
++    float * o1 = (float *) outputs[1]->data;
++    float * o2 = n_backends > 2 ? (float *) outputs[2]->data : nullptr;
++    float * o3 = n_backends > 3 ? (float *) outputs[3]->data : nullptr;
++
++    std::vector<sycl::event> reduce_deps;
++    if (skip_root_ready) {
++        reduce_deps.reserve(n_backends - 1);
++        for (size_t i = 0; i < n_backends; ++i) {
++            if (i != root) {
++                reduce_deps.push_back(ready[i]);
++            }
++        }
++    } else {
++        reduce_deps = ready;
++    }
++
++    sycl::event reduce = stream_root->submit([=](sycl::handler & h) {
++        h.depends_on(reduce_deps);
++        h.parallel_for(sycl::range<1>((size_t) ne), [=](sycl::id<1> idx) {
++            const size_t k = idx[0];
++            float sum = p0[k] + p1[k];
++            if (n_backends > 2) {
++                sum += p2[k];
++            }
++            if (n_backends > 3) {
++                sum += p3[k];
++            }
++            o0[k] = sum + r0[k];
++            o1[k] = sum + r1[k];
++            if (n_backends > 2) {
++                o2[k] = sum + r2[k];
++            }
++            if (n_backends > 3) {
++                o3[k] = sum + r3[k];
++            }
++        });
++    });
++
++    for (size_t i = 0; i < n_backends; ++i) {
++        if (i == root) {
++            continue;
++        }
++        ggml_backend_sycl_context * sycl_ctx = (ggml_backend_sycl_context *) comm_ctx->backends[i]->context;
++        const queue_ptr stream = sycl_ctx->stream(sycl_ctx->device, 0);
++        if (g_ggml_sycl_comm_event_barrier) {
++            stream->ext_oneapi_submit_barrier({reduce});
++        } else {
++            stream->submit([=](sycl::handler & h) {
++                h.depends_on(reduce);
++                h.single_task([=]() {});
++            });
++        }
++    }
++
++    return true;
++}
++catch (sycl::exception const &exc) {
++    std::cerr << exc.what() << "Exception caught at file:" << __FILE__
++              << ", line:" << __LINE__ << std::endl;
++    return false;
++}
++
+ static bool ggml_backend_sycl_comm_allreduce_tensor(void * comm_ctx_v, struct ggml_tensor ** tensors) try {
+     if (!g_ggml_sycl_comm_allreduce || comm_ctx_v == nullptr) {
+         return false;
+@@ -6333,6 +6545,9 @@ static void *ggml_backend_sycl_reg_get_proc_address(ggml_backend_reg_t reg, cons
+     if (strcmp(name, "ggml_backend_comm_allreduce_tensor") == 0) {
+         return (void *)ggml_backend_sycl_comm_allreduce_tensor;
+     }
++    if (strcmp(name, "ggml_backend_comm_allreduce_add_tensor") == 0) {
++        return (void *)ggml_backend_sycl_comm_allreduce_add_tensor;
++    }
+ 
+     // SYCL doesn't support registering host memory, left here for reference
+     // "ggml_backend_register_host_buffer"
