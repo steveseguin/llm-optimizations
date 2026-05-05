@@ -1,0 +1,55 @@
+{
+  "date_utc": "2026-05-05T12:15:40Z",
+  "model": {
+    "hf_id": "Qwen/Qwen3.6-27B",
+    "local_file": "/home/steve/models/qwen3.6-27b-q4_0-gguf/Qwen3.6-27B-Q4_0.gguf",
+    "quantization": "Q4_0"
+  },
+  "hardware": {
+    "gpu": "Intel Arc Pro B70 32GB",
+    "gpu_count": 3,
+    "selector": "level_zero:2,1,3",
+    "cpu": "AMD EPYC 9015",
+    "ram_gb": 16,
+    "os": "Ubuntu 24.04.4 LTS",
+    "kernel": "6.17.0-22-generic",
+    "xe_options": "disable_display=1 probe_display=0",
+    "bmg_guc_version": "70.49.4",
+    "bmg_guc_sha256": "328d57b5af4b373c02db5b8e42e25f67ce3dc7afc7e1c1882940d0ea70ebd6d8"
+  },
+  "engine": {
+    "name": "llama.cpp",
+    "commit": "db44417-dirty",
+    "backend": "SYCL Level Zero",
+    "build": "/home/steve/src/llama.cpp-q4-b70/build-sycl-2026-bmg-g31/bin/llama-bench",
+    "quality_affecting_changes": "none; no speculative decode; no power-limit changes"
+  },
+  "command": "ONEAPI_DEVICE_SELECTOR=level_zero:2,1,3 GGML_SYCL_DISABLE_DNN=1 GGML_SYCL_Q8_CACHE=1 GGML_SYCL_ASYNC_CPY_TENSOR=1 GGML_SYCL_COMM_ALLREDUCE=1 GGML_SYCL_COMM_SINGLE_KERNEL=1 GGML_SYCL_COMM_EVENT_BARRIER=1 GGML_META_FUSE_ALLREDUCE_ADD=1 /home/steve/src/llama.cpp-q4-b70/build-sycl-2026-bmg-g31/bin/llama-bench -m /home/steve/models/qwen3.6-27b-q4_0-gguf/Qwen3.6-27B-Q4_0.gguf -dev SYCL0/SYCL1/SYCL2 -ngl 99 -sm tensor -ts 1/1/1 -fa 1 -ub 32 -ctk f16 -ctv f16 -t 8 -p 512 -n 512 -r 3 --poll 50 -o jsonl",
+  "metrics": {
+    "prompt_tokens": 512,
+    "output_tokens": 512,
+    "context_length": 1024,
+    "batch_size": 1,
+    "prompt_tok_s": 135.705541,
+    "prompt_stddev_tok_s": 0.128581,
+    "decode_tok_s": 44.180797,
+    "decode_stddev_tok_s": 0.035825,
+    "total_tok_s": 66.659637,
+    "decode_samples_tok_s": [44.2132, 44.1869, 44.1423]
+  },
+  "artifacts": {
+    "jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-guc70494-nondnn-build-triple213-exactfast-p512n512-r3-20260505T121540Z.jsonl",
+    "log": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-guc70494-nondnn-build-triple213-exactfast-p512n512-r3-20260505T121540Z.log"
+  },
+  "localmaxxing": {
+    "submitted": true,
+    "id": "cmoslhw0i0008jj04h59bb96n",
+    "submitted_payload": "reduced payload; detailed flags recorded in notes/data because detailed engineFlags validation is currently inconsistent"
+  },
+  "dnn_build_smoke": {
+    "build": "/home/steve/src/llama.cpp-q4-b70/build-sycl-2026-bmg-g31-aot-dnn-current",
+    "result": "multi-card tiny prompt/decode smokes completed without reset, but were slower than the non-DNN fast path",
+    "dual_jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-guc70494-aotdnn-current-dual21-tensor-f16kv-p16n8-20260505T120405Z.jsonl",
+    "triple_jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-guc70494-aotdnn-current-triple213-tensor-f16kv-p16n8-20260505T120504Z.jsonl"
+  }
+}
