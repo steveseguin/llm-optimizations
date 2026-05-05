@@ -1,0 +1,66 @@
+diff --git a/src/llama-model-loader.cpp b/src/llama-model-loader.cpp
+--- a/src/llama-model-loader.cpp
++++ b/src/llama-model-loader.cpp
+@@
+ #include <array>
+ #include <cinttypes>
+ #include <cstdint>
++#include <cstdlib>
+ #include <cstring>
+ #include <future>
+ #include <regex>
+@@
+ static const size_t kiB = 1024;
+ static const size_t MiB = 1024*kiB;
+ static const size_t GiB = 1024*MiB;
++
++static bool llama_model_loader_expert_placement_debug() {
++    static const int enabled = []() {
++        const char * env = std::getenv("LLAMA_EXPERT_PLACEMENT_DEBUG");
++        return env ? std::atoi(env) : 0;
++    }();
++    return enabled > 0;
++}
++
++static bool llama_model_loader_is_expert_weight(const char * name) {
++    return std::strstr(name, ".ffn_gate_exps.weight") != nullptr ||
++           std::strstr(name, ".ffn_down_exps.weight") != nullptr ||
++           std::strstr(name, ".ffn_up_exps.weight") != nullptr;
++}
+@@
+     auto buft_for_tensor = [&](ggml_tensor * t_meta) -> ggml_backend_buffer_type_t {
+         if (!t_meta) {
+             if (flags & TENSOR_NOT_REQUIRED) {
+                 return nullptr;
+             }
+             throw std::runtime_error(format("missing tensor '%s'", tn.str().c_str()));
+         }
++
++        const std::string tensor_name = tn.str();
+@@
+         if (tensor_buft_overrides) {
+-            std::string tensor_name = tn.str();
+             for (const auto * overrides = tensor_buft_overrides; overrides->pattern != nullptr; ++overrides) {
+                 std::regex pattern(overrides->pattern);
+                 if (std::regex_search(tensor_name, pattern)) {
+@@
+             n_tensors_moved++;
+         }
++
++        if (llama_model_loader_expert_placement_debug() && llama_model_loader_is_expert_weight(tensor_name.c_str())) {
++            ggml_backend_dev_t selected_dev = ggml_backend_buft_get_device(buft);
++            ggml_backend_buffer_type_t preferred_buft = buft_list->front().second;
++            ggml_backend_dev_t preferred_dev = ggml_backend_buft_get_device(preferred_buft);
++            LLAMA_LOG_WARN(
++                    "expert_placement: tensor=%s op=%s type=%s nbytes=%zu ne=[%lld,%lld,%lld,%lld] selected_buft=%s selected_dev=%s preferred_buft=%s preferred_dev=%s moved=%d use_mmap=%d\n",
++                    tensor_name.c_str(), ggml_op_name(op), ggml_type_name(t_meta->type), ggml_nbytes(t_meta),
++                    (long long) t_meta->ne[0], (long long) t_meta->ne[1], (long long) t_meta->ne[2], (long long) t_meta->ne[3],
++                    ggml_backend_buft_name(buft),
++                    selected_dev ? ggml_backend_dev_name(selected_dev) : "none",
++                    ggml_backend_buft_name(preferred_buft),
++                    preferred_dev ? ggml_backend_dev_name(preferred_dev) : "none",
++                    buft != preferred_buft, use_mmap);
++        }
+ 
+         return buft;
+     };
