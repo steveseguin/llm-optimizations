@@ -1,0 +1,82 @@
+{
+  "date_utc": "2026-05-05",
+  "results": [
+    {
+      "id": "qwen36-fp8-vllm-tp2-pp2-no-spec-warm-cache",
+      "model": "vrfai/Qwen3.6-27B-FP8",
+      "engine": "vllm 0.20.1",
+      "hardware": "4x Intel Arc Pro B70 32GB",
+      "command_shape": "TP=2 PP=2 compressed-tensors, XPU FA2, input=64, output=64, batch=1, warmup=1, iters=2",
+      "json": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp2-pp2-in64-out64-bs1-20260504T234215Z.json",
+      "avg_latency_s": 2.302550203501596,
+      "tok_s_out": 27.795268004437947,
+      "decision": "not competitive for Qwen3.6 27B single-stream speed; keep as possible capacity fallback"
+    },
+    {
+      "id": "qwen36-fp8-vllm-tp2-pp2-ngram-bug",
+      "model": "vrfai/Qwen3.6-27B-FP8",
+      "engine": "vllm 0.20.1",
+      "hardware": "4x Intel Arc Pro B70 32GB",
+      "command_shape": "TP=2 PP=2 compressed-tensors, ngram num_speculative_tokens=4, lookup min/max=2/5, input=512, output=128",
+      "log": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp2-pp2-in512-out128-bs1-20260504T234431Z.log",
+      "error": "AttributeError: 'XPUModelRunner' object has no attribute 'drafter'",
+      "decision": "vLLM/XPU PP2 plus ngram bug; do not benchmark until fixed"
+    },
+    {
+      "id": "qwen36-fp8-vllm-tp4-ngram-ccl-topology-off",
+      "model": "vrfai/Qwen3.6-27B-FP8",
+      "engine": "vllm 0.20.1",
+      "hardware": "4x Intel Arc Pro B70 32GB",
+      "command_shape": "TP=4 PP=1 compressed-tensors, CCL_TOPO_FABRIC_VERTEX_CONNECTION_CHECK=0, ngram num_speculative_tokens=4, lookup min/max=2/5, input=512, output=256",
+      "json": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp4-pp1-in512-out256-bs1-20260505T000600Z.json",
+      "avg_latency_s": 6.392204069496074,
+      "tok_s_out": 40.04878399011776,
+      "baseline_tok_s_out": 42.244603271484394,
+      "decision": "regression; keep default oneCCL topology recognition"
+    },
+    {
+      "id": "qwen36-q4-gguf-quad-smallf32",
+      "model": "Qwen/Qwen3.6-27B",
+      "quantization": "Q4_0 GGUF",
+      "engine": "llama.cpp db44417 local SYCL",
+      "hardware": "4x Intel Arc Pro B70 32GB",
+      "command_shape": "selector=0,1,2,3, tensor split 1/1/1/1, GGML_SYCL_COMM_SMALL_F32=1, event barrier on, prompt=512, output=128",
+      "jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-smallf32-quad0123-p512n128-eb1-20260504T235811Z.jsonl",
+      "tok_s_out": 31.76288,
+      "baseline_tok_s_out": 32.427299,
+      "decision": "regression; do not use small-F32 path"
+    },
+    {
+      "id": "qwen36-q4-gguf-triple-smallf32",
+      "model": "Qwen/Qwen3.6-27B",
+      "quantization": "Q4_0 GGUF",
+      "engine": "llama.cpp db44417 local SYCL",
+      "hardware": "3x Intel Arc Pro B70 32GB",
+      "command_shape": "selector=2,1,3, tensor split 1/1/1, GGML_SYCL_COMM_SMALL_F32=1, event barrier on, prompt=512, output=128",
+      "jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-smallf32-triple213-p512n128-eb1-20260504T235950Z.jsonl",
+      "tok_s_out": 34.873658,
+      "baseline_tok_s_out": 43.330808,
+      "decision": "regression; do not use small-F32 path"
+    },
+    {
+      "id": "minimax-m27-mulmatid-guard-ncmoe13",
+      "model": "MiniMax-M2.7-UD-IQ4_XS",
+      "engine": "llama.cpp db44417 local SYCL",
+      "hardware": "4x Intel Arc Pro B70 32GB",
+      "command_shape": "row split, n_gpu_layers=99, n_cpu_moe=13, prompt=0, output=1",
+      "log": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/minimax-m27-quad-row-ngl99-ncmoe13-mulmatid-guard-verbose-20260505T000310Z.log",
+      "error": "unable to allocate SYCL1 buffer of size 26877100032",
+      "decision": "guard is diagnostic only; fallback allocation is too coarse"
+    },
+    {
+      "id": "minimax-m27-mulmatid-guard-ncmoe50",
+      "model": "MiniMax-M2.7-UD-IQ4_XS",
+      "engine": "llama.cpp db44417 local SYCL",
+      "hardware": "4x Intel Arc Pro B70 32GB",
+      "command_shape": "row split, n_gpu_layers=99, n_cpu_moe=50, prompt=0, output=1",
+      "log": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/minimax-m27-quad-row-ngl99-ncmoe50-mulmatid-guard-verbose-20260505T000424Z.log",
+      "error": "unable to allocate SYCL3 buffer of size 20157825024",
+      "decision": "guard is diagnostic only; real fix needs split-buffer MUL_MAT_ID or expert-owned execution"
+    }
+  ]
+}
