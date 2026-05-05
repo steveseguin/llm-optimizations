@@ -1,0 +1,65 @@
+{
+  "date_utc": "2026-05-05",
+  "model": "vrfai/Qwen3.6-27B-FP8",
+  "model_path": "/home/steve/models/qwen3.6-27b-fp8-vrfai",
+  "hardware": "4x Intel Arc Pro B70 32GB",
+  "engine": "vLLM 0.20.1 patched XPU experimental tree",
+  "best_submitted_result": {
+    "localmaxxing_id": "cmorre1hq000fi30421gxpv3j",
+    "tok_s_out": 46.066742,
+    "shape": "512 prompt / 512 output",
+    "speculative_config": {
+      "method": "ngram",
+      "num_speculative_tokens": 4,
+      "prompt_lookup_min": 2,
+      "prompt_lookup_max": 5
+    }
+  },
+  "candidate_not_submitted": {
+    "json": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp4-in512-out512-bs1-20260504T230143Z.json",
+    "log": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp4-in512-out512-bs1-20260504T230143Z.log",
+    "tok_s_out": 50.193182,
+    "tok_s_total": 100.386364,
+    "measured_iterations": 2,
+    "speculative_config": {
+      "method": "ngram",
+      "num_speculative_tokens": 4,
+      "prompt_lookup_min": 2,
+      "prompt_lookup_max": 4
+    },
+    "reason_not_submitted": "needs longer validation; new validation is blocked by XCCL segfaults in this boot session"
+  },
+  "failed_validation": {
+    "log": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp4-pp1-in512-out512-bs1-20260505T010938Z.log",
+    "outcome": "segfault in XCCL communicator initialization before model load/benchmark JSON",
+    "stack_summary": "oneCCL coll_init -> SYCL ProgramManager -> Level Zero urProgramBuildExp"
+  },
+  "standalone_xccl_smokes": [
+    {
+      "world_size": 4,
+      "selector": "level_zero:0,1,2,3",
+      "env": "default topology",
+      "outcome": "segfault before first measured allreduce"
+    },
+    {
+      "world_size": 4,
+      "selector": "level_zero:0,1,2,3",
+      "env": "CCL_TOPO_FABRIC_VERTEX_CONNECTION_CHECK=0",
+      "outcome": "segfault before first measured allreduce"
+    },
+    {
+      "world_size": 2,
+      "selector": "level_zero:0,3",
+      "env": "default topology",
+      "outcome": "segfault before first measured allreduce"
+    },
+    {
+      "world_size": 2,
+      "selector": "level_zero:0,3",
+      "env": "CCL_ATL_TRANSPORT=mpi",
+      "outcome": "segfault before first measured allreduce"
+    }
+  ],
+  "interpretation": "Do not continue TP vLLM/FP8 benchmarks until standalone XCCL allreduce succeeds after reboot or driver reload.",
+  "localmaxxing": "no_new_submission"
+}
