@@ -1,0 +1,101 @@
+{
+  "date": "2026-05-05",
+  "model": "vrfai/Qwen3.6-27B-FP8",
+  "modelPath": "/home/steve/models/qwen3.6-27b-fp8-vrfai",
+  "engine": "vllm",
+  "engineVersion": "0.20.1+xpu-fa2-ngram",
+  "quantization": "fp8/compressed-tensors",
+  "hardware": {
+    "gpu": "Intel Arc Pro B70 32GB",
+    "gpuCount": 4,
+    "selector": "level_zero:0,1,2,3",
+    "os": "Ubuntu 24.04.4 LTS, kernel 6.17.0-22-generic"
+  },
+  "commonConfig": {
+    "tensorParallel": 4,
+    "pipelineParallel": 1,
+    "promptTokens": 512,
+    "outputTokens": 512,
+    "contextLength": 1024,
+    "batchSize": 1,
+    "ccLAtlTransport": "ofi",
+    "ccLZeIpcExchange": "default",
+    "ccLTopoP2PAccess": "default",
+    "flashAttention": true,
+    "prefixCaching": false,
+    "chunkedPrefill": true
+  },
+  "validatedBestForComparison": {
+    "speculative": {
+      "method": "ngram",
+      "numSpeculativeTokens": 4,
+      "promptLookupMin": 2,
+      "promptLookupMax": 4
+    },
+    "tokSOut": 47.674832,
+    "tokSTotal": 95.349664,
+    "json": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp4-pp1-in512-out512-bs1-20260505T035653Z.json",
+    "localmaxxingId": "cmos3pnqo000kkz04o4aiup22"
+  },
+  "runs": [
+    {
+      "name": "ngram3_lookup2_4",
+      "speculative": {
+        "method": "ngram",
+        "numSpeculativeTokens": 3,
+        "promptLookupMin": 2,
+        "promptLookupMax": 4
+      },
+      "latenciesSec": [
+        11.252256139996462,
+        13.293061526987003,
+        13.197006911010249
+      ],
+      "avgLatencySec": 12.580774859331237,
+      "tokSOut": 40.697016,
+      "tokSTotal": 81.394033,
+      "json": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp4-pp1-in512-out512-bs1-20260505T042012Z.json",
+      "log": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp4-pp1-in512-out512-bs1-20260505T042012Z.log"
+    },
+    {
+      "name": "ngram4_lookup2_3",
+      "speculative": {
+        "method": "ngram",
+        "numSpeculativeTokens": 4,
+        "promptLookupMin": 2,
+        "promptLookupMax": 3
+      },
+      "latenciesSec": [
+        11.920894248993136,
+        11.668266908993246,
+        12.023363611995592
+      ],
+      "avgLatencySec": 11.870841589993992,
+      "tokSOut": 43.130893,
+      "tokSTotal": 86.261786,
+      "json": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp4-pp1-in512-out512-bs1-20260505T042304Z.json",
+      "log": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp4-pp1-in512-out512-bs1-20260505T042304Z.log"
+    },
+    {
+      "name": "ngram5_lookup2_4",
+      "speculative": {
+        "method": "ngram",
+        "numSpeculativeTokens": 5,
+        "promptLookupMin": 2,
+        "promptLookupMax": 4
+      },
+      "latenciesSec": [
+        10.808337638998637,
+        10.912250684996252,
+        13.058894768997561
+      ],
+      "avgLatencySec": 11.593161030997484,
+      "tokSOut": 44.163969,
+      "tokSTotal": 88.327937,
+      "json": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp4-pp1-in512-out512-bs1-20260505T042552Z.json",
+      "log": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp4-pp1-in512-out512-bs1-20260505T042552Z.log"
+    }
+  ],
+  "localmaxxing": "not submitted; negative boundary sweep",
+  "conclusion": "The validated FP8 TP4 best remains ngram tokens 4 with lookup min/max 2/4. Next FP8 work should move to other levers instead of nearby n-gram lookup/depth tweaks."
+}
