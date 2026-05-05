@@ -20,6 +20,12 @@ A smaller focused patch for the new split `MUL_MAT_ID` pieces, intended to be ap
 
 `/home/steve/llm-optimization-artifacts/patches/llama-cpp-sycl-minimax-split-mulmatid-tg-focused.patch`
 
+The GitHub artifact repo stores this focused patch as base64 at `patches/llama-cpp-sycl-minimax-split-mulmatid-tg-focused.patch.b64`. Decode with:
+
+```bash
+base64 -d patches/llama-cpp-sycl-minimax-split-mulmatid-tg-focused.patch.b64 > llama-cpp-sycl-minimax-split-mulmatid-tg-focused.patch
+```
+
 ## Implementation Shape
 
 The prototype is intentionally narrow:
