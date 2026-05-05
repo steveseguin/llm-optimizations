@@ -1,0 +1,37 @@
+diff --git a/ggml/src/ggml-sycl/ggml-sycl.cpp b/ggml/src/ggml-sycl/ggml-sycl.cpp
+--- a/ggml/src/ggml-sycl/ggml-sycl.cpp
++++ b/ggml/src/ggml-sycl/ggml-sycl.cpp
+@@
+ static void ggml_sycl_mul_mat_id(ggml_backend_sycl_context & ctx,
+                                  ggml_tensor *dst) try {
+     scope_op_debug_print scope_dbg_print(__func__, dst, /*num_src=*/3);
+     const ggml_tensor *src0 = dst->src[0];
+     const ggml_tensor *src1 = dst->src[1];
++    if (ggml_backend_buffer_is_sycl_split(src0->buffer)) {
++        const ggml_tensor *ids = dst->src[2];
++        GGML_LOG_WARN(
++            "%s: unsupported split MUL_MAT_ID src0=%s type=%s ne=[%lld,%lld,%lld,%lld] nb=[%zu,%zu,%zu,%zu] "
++            "src1_ne=[%lld,%lld,%lld,%lld] ids_ne=[%lld,%lld,%lld,%lld] dst=%s dst_ne=[%lld,%lld,%lld,%lld]\n",
++            __func__, src0->name, ggml_type_name(src0->type),
++            (long long) src0->ne[0], (long long) src0->ne[1], (long long) src0->ne[2], (long long) src0->ne[3],
++            src0->nb[0], src0->nb[1], src0->nb[2], src0->nb[3],
++            (long long) src1->ne[0], (long long) src1->ne[1], (long long) src1->ne[2], (long long) src1->ne[3],
++            (long long) ids->ne[0], (long long) ids->ne[1], (long long) ids->ne[2], (long long) ids->ne[3],
++            dst->name,
++            (long long) dst->ne[0], (long long) dst->ne[1], (long long) dst->ne[2], (long long) dst->ne[3]);
++    }
+     GGML_ASSERT(!ggml_backend_buffer_is_sycl_split(src0->buffer) && "mul_mat_id does not support split buffers");
+ 
+     const ggml_tensor *ids = dst->src[2];
+@@
+         case GGML_OP_MUL_MAT_ID:
+             {
+                 struct ggml_tensor * a = op->src[0];
+                 struct ggml_tensor * b = op->src[1];
++
++                if (op->op == GGML_OP_MUL_MAT_ID && a->buffer != nullptr && ggml_backend_buffer_is_sycl_split(a->buffer)) {
++                    return false;
++                }
+ 
+                 // disable Q1_0 until implementation
+                 if (a->type == GGML_TYPE_Q1_0 || b->type == GGML_TYPE_Q1_0) {
