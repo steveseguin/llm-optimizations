@@ -6,7 +6,7 @@ This note supersedes the stale portions of `plans/q4_0-gguf-b70-optimization-pla
 
 ## Current Best Results
 
-- Qwen3.6 27B Q4_0 GGUF, llama.cpp/SYCL, 3x B70 selector `2,1,3`: post-reboot/GuC 70.49.4 validation `44.180797 tok/s` decode, quality-preserving, software-only.
+- Qwen3.6 27B Q4_0 GGUF, llama.cpp/SYCL, 3x B70 selector `2,1,3`: kernel `6.17.0-23` / GuC 70.49.4 validation `44.238455 tok/s` decode, quality-preserving, software-only.
 - Qwen3.6 27B static FP8, `vrfai/Qwen3.6-27B-FP8`, patched vLLM/XPU TP4 + FlashAttention2 + n-gram speculative decode: `47.674832 tok/s` decode, `95.349664 tok/s` total.
 - Current FP8 best LocalMaxxing id: `cmos3pnqo000kkz04o4aiup22`.
 
@@ -47,6 +47,13 @@ This note supersedes the stale portions of `plans/q4_0-gguf-b70-optimization-pla
   - LocalMaxxing id: `cmoslhw0i0008jj04h59bb96n`;
   - note: `notes/2026-05-05-post-reboot-guc70494-q4-validation.md`;
   - data: `data/qwen36-q4-post-guc70494-validation-20260505.json`.
+- Q4_0 kernel `6.17.0-23` revalidation:
+  - same exact fast 3x command shape;
+  - 512 prompt / 512 output, 3 reps: prompt `135.771640 tok/s`, decode `44.238455 tok/s`, total `66.735480 tok/s`;
+  - output samples: `44.1095`, `44.3139`, `44.292 tok/s`;
+  - JSONL: `/home/steve/bench-results/qwen36-q4_0-gguf/sycl-k617023-guc70494-nondnn-triple213-exactfast-p512n512-r3-20260505T123032Z.jsonl`;
+  - log: `/home/steve/bench-results/qwen36-q4_0-gguf/sycl-k617023-guc70494-nondnn-triple213-exactfast-p512n512-r3-20260505T123032Z.log`;
+  - LocalMaxxing id: `cmosm05ke0005ib048aljq6pl`.
 
 ## Interpretation
 
@@ -58,7 +65,7 @@ This note supersedes the stale portions of `plans/q4_0-gguf-b70-optimization-pla
 ## Next Work
 
 1. Q4_0 llama.cpp/SYCL:
-   - use the post-reboot 3x `44.180797 tok/s` run as the current control;
+   - use the post-reboot 3x `44.238455 tok/s` run as the current control;
    - inspect reduction sites that remain after fused allreduce+ADD;
    - tune the 20KB f32 allreduce fast path before adding broader graph rewrites;
    - test root rotation, root-ready event skipping, fixed event vectors, and single-task/barrier alternatives for the tiny collective;
