@@ -1,0 +1,15 @@
+{
+  "date_utc": "2026-05-05",
+  "model": "MiniMax-M2.7-UD-IQ4_XS",
+  "hardware": "4x Intel Arc Pro B70 32GB",
+  "engine": "llama.cpp db44417 local SYCL",
+  "command_shape": "row split, n_gpu_layers=99, n_cpu_moe=50, prompt=0, output=1, LLAMA_EXPERT_PLACEMENT_DEBUG=1",
+  "log": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/minimax-m27-quad-row-ngl99-ncmoe50-expert-placement-20260505T001625Z.log",
+  "placement_records": 186,
+  "selected_buffer_counts": {
+    "CPU": 150,
+    "SYCL3": 36
+  },
+  "failure": "unable to allocate SYCL3 buffer of size 20157825024",
+  "interpretation": "After SYCL split buffers are rejected for GGML_OP_MUL_MAT_ID, the remaining 12 GPU-resident expert layers are placed as full monolithic tensors on SYCL3. This creates the 20.158 GB allocation and confirms that MiniMax needs split-buffer or expert-sharded MUL_MAT_ID execution rather than fallback placement."
+}
