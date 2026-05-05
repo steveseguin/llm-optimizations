@@ -1,0 +1,99 @@
+{
+  "date": "2026-05-05",
+  "model": "Qwen/Qwen3.6-27B",
+  "engine": "llama.cpp",
+  "engineVersion": "db44417+sycl-fused-add",
+  "quantization": "Q4_0",
+  "qualityPreserving": true,
+  "runs": [
+    {
+      "name": "quad0123_control",
+      "selector": "level_zero:0,1,2,3",
+      "devices": "SYCL0/SYCL1/SYCL2/SYCL3",
+      "tensorSplit": "1/1/1/1",
+      "explicitBatch": null,
+      "reportedBatch": 2048,
+      "promptTokens": 512,
+      "outputTokens": 128,
+      "promptTokS": 102.311360,
+      "decodeTokS": 32.383337,
+      "env": {
+        "GGML_SYCL_DISABLE_DNN": "1",
+        "GGML_SYCL_Q8_CACHE": "1",
+        "GGML_SYCL_ASYNC_CPY_TENSOR": "1",
+        "GGML_SYCL_COMM_ALLREDUCE": "1",
+        "GGML_SYCL_COMM_SINGLE_KERNEL": "1",
+        "GGML_SYCL_COMM_EVENT_BARRIER": "1",
+        "GGML_META_FUSE_ALLREDUCE_ADD": "0"
+      },
+      "jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-fastshape-quad0123-base-p512n128-20260505T031139Z.jsonl"
+    },
+    {
+      "name": "quad0123_fused_add",
+      "selector": "level_zero:0,1,2,3",
+      "devices": "SYCL0/SYCL1/SYCL2/SYCL3",
+      "tensorSplit": "1/1/1/1",
+      "explicitBatch": null,
+      "reportedBatch": 2048,
+      "promptTokens": 512,
+      "outputTokens": 128,
+      "promptTokS": 102.062786,
+      "decodeTokS": 33.219955,
+      "env": {
+        "GGML_SYCL_DISABLE_DNN": "1",
+        "GGML_SYCL_Q8_CACHE": "1",
+        "GGML_SYCL_ASYNC_CPY_TENSOR": "1",
+        "GGML_SYCL_COMM_ALLREDUCE": "1",
+        "GGML_SYCL_COMM_SINGLE_KERNEL": "1",
+        "GGML_SYCL_COMM_EVENT_BARRIER": "1",
+        "GGML_META_FUSE_ALLREDUCE_ADD": "1"
+      },
+      "jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-fastshape-quad0123-fuseadd-p512n128-20260505T031139Z.jsonl"
+    },
+    {
+      "name": "dual03_control",
+      "selector": "level_zero:0,3",
+      "devices": "SYCL0/SYCL1",
+      "tensorSplit": "1/1",
+      "explicitBatch": 512,
+      "reportedBatch": 512,
+      "promptTokens": 512,
+      "outputTokens": 256,
+      "promptTokS": 158.587630,
+      "decodeTokS": 40.278630,
+      "env": {
+        "GGML_SYCL_DISABLE_DNN": "1",
+        "GGML_SYCL_Q8_CACHE": "1",
+        "GGML_SYCL_ASYNC_CPY_TENSOR": "1",
+        "GGML_SYCL_COMM_ALLREDUCE": "1",
+        "GGML_SYCL_COMM_SINGLE_KERNEL": "1",
+        "GGML_SYCL_COMM_EVENT_BARRIER": "1",
+        "GGML_META_FUSE_ALLREDUCE_ADD": "0"
+      },
+      "jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-bestshape-dual03-base-b512-p512n256-20260505T031512Z.jsonl"
+    },
+    {
+      "name": "dual03_fused_add",
+      "selector": "level_zero:0,3",
+      "devices": "SYCL0/SYCL1",
+      "tensorSplit": "1/1",
+      "explicitBatch": 512,
+      "reportedBatch": 512,
+      "promptTokens": 512,
+      "outputTokens": 256,
+      "promptTokS": 158.513361,
+      "decodeTokS": 40.265194,
+      "env": {
+        "GGML_SYCL_DISABLE_DNN": "1",
+        "GGML_SYCL_Q8_CACHE": "1",
+        "GGML_SYCL_ASYNC_CPY_TENSOR": "1",
+        "GGML_SYCL_COMM_ALLREDUCE": "1",
+        "GGML_SYCL_COMM_SINGLE_KERNEL": "1",
+        "GGML_SYCL_COMM_EVENT_BARRIER": "1",
+        "GGML_META_FUSE_ALLREDUCE_ADD": "1"
+      },
+      "jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-bestshape-dual03-fuseadd-b512-p512n256-20260505T031512Z.jsonl"
+    }
+  ],
+  "conclusion": "Fused allreduce + residual add is useful on 3x B70 and slightly helpful on 4x, but 4x remains bottlenecked by the collective topology. Dual 0,3 is neutral under the known-good -b 512 shape."
+}
