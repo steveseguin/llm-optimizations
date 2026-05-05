@@ -1,0 +1,382 @@
+diff --git a/vllm/_xpu_ops.py b/vllm/_xpu_ops.py
+index 0b39a4000..642f8632a 100644
+--- a/vllm/_xpu_ops.py
++++ b/vllm/_xpu_ops.py
+@@ -121,6 +121,14 @@ def _gdn_attention_core_xpu_impl(
+         self.conv1d.weight.size(0), self.conv1d.weight.size(2)
+     )
+ 
++    non_spec_state_indices_tensor = attn_metadata.non_spec_state_indices_tensor  # type: ignore[attr-defined]
++    if non_spec_state_indices_tensor is not None:
++        non_spec_state_indices_tensor = non_spec_state_indices_tensor.contiguous()
++
++    non_spec_query_start_loc = attn_metadata.non_spec_query_start_loc  # type: ignore[attr-defined]
++    if non_spec_query_start_loc is not None:
++        non_spec_query_start_loc = non_spec_query_start_loc.contiguous()
++
+     torch.ops._xpu_C.gdn_attention(
+         core_attn_out,
+         z,
+@@ -140,8 +148,8 @@ def _gdn_attention_core_xpu_impl(
+         num_prefills=attn_metadata.num_prefills,  # type: ignore[attr-defined]
+         num_decodes=attn_metadata.num_decodes,  # type: ignore[attr-defined]
+         has_initial_state=attn_metadata.has_initial_state,  # type: ignore[attr-defined]
+-        non_spec_query_start_loc=attn_metadata.non_spec_query_start_loc,  # type: ignore[attr-defined]
+-        non_spec_state_indices_tensor=attn_metadata.non_spec_state_indices_tensor,  # type: ignore[attr-defined]
++        non_spec_query_start_loc=non_spec_query_start_loc,
++        non_spec_state_indices_tensor=non_spec_state_indices_tensor,
+         num_actual_tokens=attn_metadata.num_actual_tokens,  # type: ignore[attr-defined]
+         tp_size=self.tp_size,
+         reorder_input=not self.gqa_interleaved_layout,
+diff --git a/vllm/model_executor/kernels/linear/__init__.py b/vllm/model_executor/kernels/linear/__init__.py
+index 5d513f767..2010d78e1 100644
+--- a/vllm/model_executor/kernels/linear/__init__.py
++++ b/vllm/model_executor/kernels/linear/__init__.py
+@@ -140,6 +140,8 @@ from vllm.model_executor.kernels.linear.scaled_mm.triton import (
+     TritonInt8ScaledMMLinearKernel,
+ )
+ from vllm.model_executor.kernels.linear.scaled_mm.xpu import (
++    XPUBF16Fp8BlockScaledMMLinearKernel,
++    XPURequantFp8BlockScaledMMLinearKernel,
+     XPUFP8ScaledMMLinearKernel,
+ )
+ from vllm.model_executor.layers.quantization.utils.quant_utils import QuantKey
+@@ -199,6 +201,10 @@ _POSSIBLE_FP8_BLOCK_KERNELS: dict[
+         AiterFp8BlockScaledMMKernel,
+         TritonFp8BlockScaledMMKernel,
+     ],
++    PlatformEnum.XPU: [
++        XPURequantFp8BlockScaledMMLinearKernel,
++        XPUBF16Fp8BlockScaledMMLinearKernel,
++    ],
+ }
+ 
+ _POSSIBLE_WFP8A16_KERNELS: dict[PlatformEnum, list[type[FP8ScaledMMLinearKernel]]] = {
+diff --git a/vllm/model_executor/kernels/linear/scaled_mm/xpu.py b/vllm/model_executor/kernels/linear/scaled_mm/xpu.py
+index 6d75a420e..dc1fee592 100644
+--- a/vllm/model_executor/kernels/linear/scaled_mm/xpu.py
++++ b/vllm/model_executor/kernels/linear/scaled_mm/xpu.py
+@@ -2,14 +2,24 @@
+ # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
+ 
+ from collections.abc import Sequence
++import os
+ 
+ import torch
++import torch.nn.functional as F
+ 
++from vllm import _custom_ops as ops
+ from vllm.model_executor.kernels.linear import (  # noqa: E501
+     FP8ScaledMMLinearKernel,
+     FP8ScaledMMLinearLayerConfig,
+ )
++from vllm.model_executor.kernels.linear.scaled_mm.BlockScaledMMLinearKernel import (
++    Fp8BlockScaledMMLinearKernel,
++)
++from vllm.model_executor.layers.quantization.utils.fp8_utils import (
++    process_fp8_weight_block_strategy,
++)
+ from vllm.model_executor.layers.quantization.utils.quant_utils import (
++    kFp8Static128BlockSym,
+     kFp8StaticChannelSym,
+     kFp8StaticTensorSym,
+ )
+@@ -70,3 +80,174 @@ class XPUFP8ScaledMMLinearKernel(FP8ScaledMMLinearKernel):
+         output_shape: list,
+     ) -> torch.Tensor:
+         pass
++
++
++class XPUBF16Fp8BlockScaledMMLinearKernel(Fp8BlockScaledMMLinearKernel):
++    """BF16 fallback for block-FP8 checkpoints on XPU.
++
++    Intel's current XPU kernel set exposes FP8 weight-only GEMM, but not the
++    128x128 block-scaled W8A8 GEMM used by Qwen3.6 FP8 checkpoints. This path
++    keeps the checkpoint's FP8 values and scales exact by dequantizing weights
++    once after load, then using the regular BF16 matmul path.
++    """
++
++    @classmethod
++    def is_supported(
++        cls, compute_capability: int | None = None
++    ) -> tuple[bool, str | None]:
++        if not current_platform.is_xpu():
++            return False, "XPUBF16Fp8BlockScaledMM only supports XPU"
++        return True, None
++
++    @classmethod
++    def can_implement(
++        cls, config: FP8ScaledMMLinearLayerConfig
++    ) -> tuple[bool, str | None]:
++        can_implement, failure_reason = super().can_implement(config)
++        if not can_implement:
++            return can_implement, failure_reason
++
++        if config.weight_quant_key != kFp8Static128BlockSym:
++            return (
++                False,
++                "XPUBF16Fp8BlockScaledMM only supports static 128x128 FP8 blocks",
++            )
++        if config.weight_quant_key.dtype not in {
++            torch.float8_e5m2,
++            torch.float8_e4m3fn,
++        }:
++            return False, "XPUBF16Fp8BlockScaledMM only supports FP8 weight dtype"
++        return True, None
++
++    def process_weights_after_loading(self, layer: torch.nn.Module) -> None:
++        params = self._get_layer_params(layer)
++        weight_scale = (
++            params.weight_scale
++            if params.weight_scale_inv is None
++            else params.weight_scale_inv
++        )
++        assert weight_scale is not None
++
++        weight, weight_scale = process_fp8_weight_block_strategy(
++            params.weight,
++            weight_scale,
++        )
++        block_n, block_k = self.weight_group_shape
++        scale = weight_scale.to(torch.bfloat16)
++        expanded_scale = scale.repeat_interleave(block_n, dim=0).repeat_interleave(
++            block_k, dim=1
++        )
++        expanded_scale = expanded_scale[: weight.shape[0], : weight.shape[1]]
++        weight_bf16 = weight.to(torch.bfloat16) * expanded_scale
++
++        replace_parameter(layer, params.WEIGHT, weight_bf16.contiguous())
++        layer.input_scale = None
++
++    def apply_weights(
++        self,
++        layer: torch.nn.Module,
++        x: torch.Tensor,
++        bias: torch.Tensor | None = None,
++        **kwargs,
++    ) -> torch.Tensor:
++        return F.linear(x, layer.weight, bias)
++
++    def apply_block_scaled_mm(
++        self,
++        A: torch.Tensor,
++        B: torch.Tensor,
++        As: torch.Tensor,
++        Bs: torch.Tensor,
++    ) -> torch.Tensor:
++        raise NotImplementedError("XPUBF16Fp8BlockScaledMM uses apply_weights")
++
++
++class XPURequantFp8BlockScaledMMLinearKernel(Fp8BlockScaledMMLinearKernel):
++    """Experimental XPU path that maps block-FP8 checkpoints to W8A16 FP8 GEMM.
++
++    This is faster and more memory efficient than the BF16 fallback, but it
++    requantizes the checkpoint from 128x128 block-scaled FP8 into per-channel
++    FP8 weights. Keep it opt-in until quality impact is measured.
++    """
++
++    @classmethod
++    def is_supported(
++        cls, compute_capability: int | None = None
++    ) -> tuple[bool, str | None]:
++        if not current_platform.is_xpu():
++            return False, "XPURequantFp8BlockScaledMM only supports XPU"
++        if os.getenv("VLLM_XPU_BLOCK_FP8_REQUANT", "0") != "1":
++            return False, "set VLLM_XPU_BLOCK_FP8_REQUANT=1 to enable"
++        return True, None
++
++    @classmethod
++    def can_implement(
++        cls, config: FP8ScaledMMLinearLayerConfig
++    ) -> tuple[bool, str | None]:
++        can_implement, failure_reason = super().can_implement(config)
++        if not can_implement:
++            return can_implement, failure_reason
++
++        if config.weight_quant_key != kFp8Static128BlockSym:
++            return (
++                False,
++                "XPURequantFp8BlockScaledMM only supports static 128x128 FP8 blocks",
++            )
++        if config.weight_quant_key.dtype not in {
++            torch.float8_e5m2,
++            torch.float8_e4m3fn,
++        }:
++            return False, "XPURequantFp8BlockScaledMM only supports FP8 weight dtype"
++        return True, None
++
++    def process_weights_after_loading(self, layer: torch.nn.Module) -> None:
++        params = self._get_layer_params(layer)
++        weight_scale = (
++            params.weight_scale
++            if params.weight_scale_inv is None
++            else params.weight_scale_inv
++        )
++        assert weight_scale is not None
++
++        weight, weight_scale = process_fp8_weight_block_strategy(
++            params.weight,
++            weight_scale,
++        )
++        block_n, block_k = self.weight_group_shape
++        scale = weight_scale.to(torch.bfloat16)
++        expanded_scale = scale.repeat_interleave(block_n, dim=0).repeat_interleave(
++            block_k, dim=1
++        )
++        expanded_scale = expanded_scale[: weight.shape[0], : weight.shape[1]]
++        weight_bf16 = weight.to(torch.bfloat16) * expanded_scale
++
++        qweight, qscale = ops.scaled_fp8_quant(
++            weight_bf16.contiguous(),
++            use_per_token_if_dynamic=True,
++        )
++        replace_parameter(layer, params.WEIGHT, qweight.t().contiguous())
++        replace_parameter(layer, params.WEIGHT_SCALE_INV, qscale.flatten().contiguous())
++        layer.input_scale = None
++
++    def apply_weights(
++        self,
++        layer: torch.nn.Module,
++        x: torch.Tensor,
++        bias: torch.Tensor | None = None,
++        **kwargs,
++    ) -> torch.Tensor:
++        return torch.ops._xpu_C.fp8_gemm_w8a16(
++            x,
++            layer.weight,
++            layer.weight_scale_inv,
++            bias,
++        )
++
++    def apply_block_scaled_mm(
++        self,
++        A: torch.Tensor,
++        B: torch.Tensor,
++        As: torch.Tensor,
++        Bs: torch.Tensor,
++    ) -> torch.Tensor:
++        raise NotImplementedError("XPURequantFp8BlockScaledMM uses apply_weights")
+diff --git a/vllm/model_executor/layers/mamba/gdn_linear_attn.py b/vllm/model_executor/layers/mamba/gdn_linear_attn.py
+index a621ab962..0da1c027f 100644
+--- a/vllm/model_executor/layers/mamba/gdn_linear_attn.py
++++ b/vllm/model_executor/layers/mamba/gdn_linear_attn.py
+@@ -623,15 +623,51 @@ class GatedDeltaNetAttention(PluggableLayer, MambaBase):
+             dtype=hidden_states.dtype,
+             device=hidden_states.device,
+         )
+-        z = torch.empty_like(core_attn_out)
++        forward_context = get_forward_context()
++        attn_metadata_raw = forward_context.attn_metadata
++        use_generic_spec_core = False
++        if isinstance(attn_metadata_raw, dict):
++            attn_metadata = attn_metadata_raw.get(self.prefix)
++            use_generic_spec_core = (
++                isinstance(attn_metadata, GDNAttentionMetadata)
++                and attn_metadata.spec_sequence_masks is not None
++            )
+ 
+-        torch.ops.vllm.gdn_attention_core_xpu(
+-            core_attn_out,
+-            z,
+-            projected_states_qkvz,
+-            projected_states_ba,
+-            self.prefix,
+-        )
++        if use_generic_spec_core:
++            if self.gqa_interleaved_layout:
++                query, key, value, z, b, a = self.fix_query_key_value_ordering(
++                    projected_states_qkvz, projected_states_ba
++                )
++                query, key, value = map(
++                    lambda x: rearrange(x, "l p d -> l (p d)"), (query, key, value)
++                )
++                mixed_qkv = torch.cat((query, key, value), dim=-1)
++            else:
++                qkv_size = (self.key_dim * 2 + self.value_dim) // self.tp_size
++                z_size = self.value_dim // self.tp_size
++                mixed_qkv, z = projected_states_qkvz.split(
++                    [qkv_size, z_size], dim=-1
++                )
++                z = z.reshape(z.size(0), -1, self.head_v_dim)
++                b, a = projected_states_ba.chunk(2, dim=-1)
++                b = b.contiguous()
++                a = a.contiguous()
++
++            self._forward_core(
++                mixed_qkv=mixed_qkv,
++                b=b,
++                a=a,
++                core_attn_out=core_attn_out,
++            )
++        else:
++            z = torch.empty_like(core_attn_out)
++            torch.ops.vllm.gdn_attention_core_xpu(
++                core_attn_out,
++                z,
++                projected_states_qkvz,
++                projected_states_ba,
++                self.prefix,
++            )
+ 
+         # ============================================================
+         # Part 3: Output Projection
+diff --git a/vllm/model_executor/layers/quantization/compressed_tensors/compressed_tensors.py b/vllm/model_executor/layers/quantization/compressed_tensors/compressed_tensors.py
+index 8d16a143b..06d07575b 100644
+--- a/vllm/model_executor/layers/quantization/compressed_tensors/compressed_tensors.py
++++ b/vllm/model_executor/layers/quantization/compressed_tensors/compressed_tensors.py
+@@ -1119,9 +1119,13 @@ class CompressedTensorsKVCacheMethod(BaseKVCacheMethod):
+         Override the default vLLM placeholder scales with the llm-compressor loaded
+         scales. Zero points are not used as only symmetric quantization is supported.
+         """
+-        layer._k_scale = layer.k_scale
+-        layer._v_scale = layer.v_scale
+-        layer._q_scale = layer.q_scale
++        def _attention_scale_view(tensor: torch.Tensor) -> torch.Tensor:
++            # XPU FA2 accepts singleton descale tensors only as scalar views.
++            return tensor.reshape(()) if tensor.numel() == 1 else tensor
++
++        layer._k_scale = _attention_scale_view(layer.k_scale)
++        layer._v_scale = _attention_scale_view(layer.v_scale)
++        layer._q_scale = _attention_scale_view(layer.q_scale)
+ 
+         # Set the _float variants that the attention backend uses.
+         def _to_scalar(tensor: torch.Tensor) -> float:
+diff --git a/vllm/model_executor/models/qwen3_5.py b/vllm/model_executor/models/qwen3_5.py
+index 2449724cd..d0ed014c2 100644
+--- a/vllm/model_executor/models/qwen3_5.py
++++ b/vllm/model_executor/models/qwen3_5.py
+@@ -597,13 +597,14 @@ class Qwen3_5ForConditionalGeneration(Qwen3VLForConditionalGeneration, IsHybrid)
+         # Qwen3.5 does not support multimodal pruning (EVS).
+         self.is_multimodal_pruning_enabled = False
+ 
+-        with self._mark_tower_model(vllm_config, {"image", "video"}):
+-            self.visual = Qwen3_VisionTransformer(
+-                config.vision_config,
+-                norm_eps=getattr(config, "rms_norm_eps", 1e-6),
+-                quant_config=quant_config,
+-                prefix=maybe_prefix(prefix, "visual"),
+-            )
++        if not multimodal_config.language_model_only:
++            with self._mark_tower_model(vllm_config, {"image", "video"}):
++                self.visual = Qwen3_VisionTransformer(
++                    config.vision_config,
++                    norm_eps=getattr(config, "rms_norm_eps", 1e-6),
++                    quant_config=quant_config,
++                    prefix=maybe_prefix(prefix, "visual"),
++                )
+ 
+         with self._mark_language_model(vllm_config):
+             self.language_model = Qwen3_5ForCausalLM(
+@@ -702,9 +703,12 @@ class Qwen3_5ForConditionalGeneration(Qwen3VLForConditionalGeneration, IsHybrid)
+         return hidden_states
+ 
+     def load_weights(self, weights: Iterable[tuple[str, torch.Tensor]]) -> set[str]:
++        skip_prefixes = ["mtp."]
++        if self.multimodal_config.language_model_only:
++            skip_prefixes.append("visual.")
+         loader = AutoWeightsLoader(
+             self,
+-            skip_prefixes=["mtp."],
++            skip_prefixes=skip_prefixes,
+         )
+         return loader.load_weights(weights, mapper=self.hf_to_vllm_mapper)
