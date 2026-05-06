@@ -1,0 +1,96 @@
+{
+  "date": "2026-05-06",
+  "model": {
+    "hfId": "z-lab/Qwen3.6-27B-DFlash",
+    "localPath": "/home/steve/models/qwen3.6-27b-q4_0-gguf/Qwen3.6-27B-Q4_0.gguf",
+    "quantization": "Q4_0"
+  },
+  "hardware": {
+    "gpuName": "Intel Arc Pro B70 32GB",
+    "gpuCount": 3,
+    "selector": "level_zero:2,1,3",
+    "os": "Ubuntu 24.04.4 LTS",
+    "kernel": "6.17.0-23-generic",
+    "gucFirmware": "xe/bmg_guc_70.bin 70.49.4"
+  },
+  "engine": {
+    "name": "llama.cpp",
+    "backend": "sycl",
+    "buildDir": "/home/steve/src/llama.cpp-q4-b70/build-sycl-2026-bmg-g31",
+    "commitLabel": "db44417"
+  },
+  "quality": {
+    "weights": "same Q4_0 GGUF",
+    "kvCache": "f16/f16",
+    "speculativeDecode": false,
+    "powerLimitChange": false
+  },
+  "patch": {
+    "envGate": "GGML_META_FUSE_ALLREDUCE_GET_ROWS=1",
+    "description": "Experimental fused allreduce plus GET_ROWS helper for small f32 mirrored partials",
+    "patchFile": "/home/steve/llm-optimization-artifacts/patches/llama-cpp-sycl-meta-getrows-fusion-current-20260506.patch",
+    "patchFileGzipBase64": "/home/steve/llm-optimization-artifacts/patches/llama-cpp-sycl-meta-getrows-fusion-current-20260506.patch.gz.b64"
+  },
+  "runs": [
+    {
+      "name": "getrows-fusion-probe",
+      "promptTokens": 0,
+      "outputTokens": 1,
+      "repetitions": 1,
+      "resultTokSOut": 26.774031,
+      "log": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-k617023-getrows-fuse-probe-triple213-p0n1-20260506T000738Z.log",
+      "jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-k617023-getrows-fuse-probe-triple213-p0n1-20260506T000738Z.jsonl",
+      "observations": {
+        "backendAddPaths": 254,
+        "backendGetRowsPaths": 2,
+        "plainBackendPaths": 0,
+        "capturedNode": "attn_output-63 -> GET_ROWS"
+      }
+    },
+    {
+      "name": "getrows-fusion-short-screen",
+      "promptTokens": 512,
+      "outputTokens": 128,
+      "repetitions": 2,
+      "tokSPrompt": 135.504744,
+      "tokSOut": 45.129276,
+      "jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-k617023-getrows-fuse-triple213-p512n128-r2-20260506T000850Z.jsonl",
+      "log": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-k617023-getrows-fuse-triple213-p512n128-r2-20260506T000850Z.log"
+    },
+    {
+      "name": "getrows-fusion-full-validation",
+      "promptTokens": 512,
+      "outputTokens": 512,
+      "repetitions": 3,
+      "tokSPrompt": 135.626208,
+      "tokSOut": 45.375471,
+      "tokSTotalComputed": 68.00050808306554,
+      "jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-k617023-getrows-fuse-triple213-p512n512-r3-20260506T001019Z.jsonl",
+      "log": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-k617023-getrows-fuse-triple213-p512n512-r3-20260506T001019Z.log"
+    },
+    {
+      "name": "same-build-gate-off-control",
+      "promptTokens": 512,
+      "outputTokens": 512,
+      "repetitions": 3,
+      "tokSPrompt": 135.671512,
+      "tokSOut": 45.340867,
+      "tokSTotalComputed": 67.96732925410481,
+      "jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-k617023-getrows-control-gateoff-triple213-p512n512-r3-20260506T001228Z.jsonl",
+      "log": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-k617023-getrows-control-gateoff-triple213-p512n512-r3-20260506T001228Z.log"
+    },
+    {
+      "name": "current-best-reference",
+      "promptTokens": 512,
+      "outputTokens": 512,
+      "repetitions": 3,
+      "tokSPrompt": 135.469357,
+      "tokSOut": 45.624065,
+      "tokSTotalComputed": 68.259384,
+      "jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-k617023-postreboot-reshapeadd-triple213-p512n512-r3-20260505T233641Z.jsonl",
+      "log": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-k617023-postreboot-reshapeadd-triple213-p512n512-r3-20260505T233641Z.log",
+      "localmaxxingId": "cmot9sgsi000lib042rqd6c62"
+    }
+  ],
+  "conclusion": "GET_ROWS fusion captures the remaining plain decode allreduce site, but it is neutral at best and should remain off by default. Continue toward lower-level row-parallel epilogues or fewer repeated small reductions."
+}
