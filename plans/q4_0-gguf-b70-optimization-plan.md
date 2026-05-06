@@ -1047,6 +1047,29 @@ Goal: improve quality-preserving Q4_0 performance without power-limit changes.
      - stop simple split-ratio and communication-flag sweeps for 4x Q4_0 unless a profiler identifies a narrower cause;
      - focus on reducing the number of per-token collectives or fusing output projection/allreduce/residual work;
      - consider using the fourth B70 for speculative draft work or a second session while 3x remains the main Q4_0 speed path.
+56. 2026-05-06 Q4_0 speculative draft follow-ups:
+   - downloaded a small draft candidate:
+     - repo: `llmware/qwen-3.5-4b-gguf`;
+     - file: `/home/steve/models/qwen3.5-4b-gguf/Qwen3.5-4B-Q4_K_M.gguf`;
+     - size: `2.6G`.
+   - target 3x plus draft on fourth B70:
+     - selector `level_zero:2,1,3,0`;
+     - target `-dev SYCL0,SYCL1,SYCL2 -sm tensor -ts 1,1,1`;
+     - draft `--spec-draft-device SYCL3 --spec-draft-ngl 99`;
+     - isolated `--fit off`, `n=1` run still failed with Level Zero `UR_RESULT_ERROR_OUT_OF_DEVICE_MEMORY`;
+     - interpretation: exposing the fourth B70 for the draft still makes target tensor split interact with global SYCL device count, so target 3x plus draft 1x needs source work around active-device-aware split buffers.
+   - CPU draft control:
+     - completed but was invalid as a speed path;
+     - `n_drafted=128`, `n_accept=0`, `accept=0.000%`;
+     - decode section: `33` tokens in `3.747 s`, `8.807 tok/s`;
+     - log had repeated inconsistent sequence-position failures.
+   - target-only n-gram:
+     - `llama-speculative` requires `--model-draft`;
+     - `llama-cli --spec-type ngram-mod` timed out after `180 s` before useful timings.
+   - decision:
+     - do not use generic Qwen3.5 4B as a Qwen3.6 27B draft for speed claims;
+     - prefer Qwen3.6-specific MTP/DFlash draft heads or vLLM FP8 speculative paths;
+     - if returning to llama.cpp target+draft, first fix SYCL split-buffer active-device accounting so the target can use 3 B70s while the draft owns the fourth.
 
 ## Success Criteria
 

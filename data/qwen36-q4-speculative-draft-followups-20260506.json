@@ -1,0 +1,85 @@
+{
+  "date": "2026-05-06",
+  "label": "qwen36-q4-speculative-draft-followups",
+  "model": {
+    "targetLocalPath": "/home/steve/models/qwen3.6-27b-q4_0-gguf/Qwen3.6-27B-Q4_0.gguf",
+    "targetQuantization": "Q4_0",
+    "targetKvCacheDtype": "f16",
+    "draftRepo": "llmware/qwen-3.5-4b-gguf",
+    "draftLocalPath": "/home/steve/models/qwen3.5-4b-gguf/Qwen3.5-4B-Q4_K_M.gguf",
+    "draftQuantization": "Q4_K_M",
+    "draftSizeOnDisk": "2.6G"
+  },
+  "engine": {
+    "name": "llama.cpp",
+    "backend": "SYCL Level Zero",
+    "commit": "db44417",
+    "build": "/home/steve/src/llama.cpp-q4-b70/build-sycl-2026-bmg-g31"
+  },
+  "hardware": {
+    "gpuName": "Intel Arc Pro B70",
+    "gpuCount": 4,
+    "vramGbPerGpu": 32,
+    "powerLimitChanges": false
+  },
+  "download": {
+    "log": "/home/steve/download-logs/qwen3.5-4b-gguf-20260506T160015Z.log",
+    "status": "complete"
+  },
+  "draftOnFourthGpu": {
+    "selector": "level_zero:2,1,3,0",
+    "targetDevices": "SYCL0,SYCL1,SYCL2",
+    "draftDevice": "SYCL3",
+    "commandShape": "target -sm tensor -ts 1,1,1; draft --spec-draft-device SYCL3 --spec-draft-ngl 99",
+    "logs": [
+      "/home/steve/bench-results/qwen36-q4_0-gguf/spec-qwen35-4b-draft-target3x-draft1x-n64-20260506T160617Z.log",
+      "/home/steve/bench-results/qwen36-q4_0-gguf/spec-qwen35-4b-draftgpu-fitoff-target3x-draft1x-n1-20260506T161441Z.log"
+    ],
+    "status": "failed",
+    "failure": "Level Zero UR_RESULT_ERROR_OUT_OF_DEVICE_MEMORY before useful generation",
+    "interpretation": "Exposing all four GPUs for the draft model makes the target tensor-split path interact with global ggml_sycl_info().device_count; target 3x plus draft 1x likely needs active-device-aware split-buffer accounting."
+  },
+  "cpuDraftControl": {
+    "selector": "level_zero:2,1,3",
+    "targetDevices": "SYCL0,SYCL1,SYCL2",
+    "draftPlacement": "CPU",
+    "log": "/home/steve/bench-results/qwen36-q4_0-gguf/spec-qwen35-4b-draftcpu-target3x-n32-20260506T160741Z.log",
+    "status": "completed_but_not_valid_speed_path",
+    "nDraft": 4,
+    "nDrafted": 128,
+    "nAccept": 0,
+    "acceptPercent": 0.0,
+    "decodedTokens": 33,
+    "decodeSeconds": 3.747,
+    "tokSOutApprox": 8.807,
+    "failureSignals": [
+      "repeated inconsistent sequence positions",
+      "zero accepted draft tokens"
+    ],
+    "decision": "Do not use Qwen3.5 4B Q4_K_M as a Qwen3.6 27B draft model for speed claims."
+  },
+  "targetOnlyNgram": {
+    "tool": "llama-cli",
+    "log": "/home/steve/bench-results/qwen36-q4_0-gguf/cli-spec-ngrammod-target3x-n64-20260506T160921Z.log",
+    "status": "timeout",
+    "returnCode": 124,
+    "timeoutSeconds": 180,
+    "notes": "llama-speculative requires a draft model; target-only ngram through llama-cli timed out before useful timings."
+  },
+  "runtimeHealth": {
+    "jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/post-spec-sanity-triple213-p0n16-20260506T161324Z.jsonl",
+    "tokSOut": 40.818979,
+    "nGen": 16,
+    "status": "healthy_after_failed_spec_attempts"
+  },
+  "localMaxxing": {
+    "submitted": false,
+    "reason": "All speculative Q4 follow-ups were failed or invalid speed paths."
+  },
+  "next": [
+    "Use a Qwen3.6-specific MTP/DFlash draft rather than a generic Qwen3.5 4B draft.",
+    "Make llama.cpp/SYCL split buffers active-device-aware before target 3x plus draft 1x in one process.",
+    "Keep vLLM FP8 n-gram/MTP as the currently more promising speculative track.",
+    "Consider the fourth B70 for concurrent sessions until target/draft placement is source-correct."
+  ]
+}
