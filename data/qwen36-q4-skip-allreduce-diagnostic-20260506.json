@@ -1,0 +1,98 @@
+{
+  "date": "2026-05-06",
+  "model": {
+    "hfId": "unsloth/Qwen3.6-27B-GGUF",
+    "localPath": "/home/steve/models/qwen3.6-27b-q4_0-gguf/Qwen3.6-27B-Q4_0.gguf",
+    "quantization": "Q4_0"
+  },
+  "engine": {
+    "name": "llama.cpp",
+    "backend": "SYCL/Level Zero",
+    "buildCommit": "db44417",
+    "binary": "/home/steve/src/llama.cpp-q4-b70/build-sycl-2026-bmg-g31/bin/llama-bench",
+    "patch": "GGML_SYCL_COMM_SKIP_ALLREDUCE diagnostic gate"
+  },
+  "hardware": {
+    "gpuName": "Intel Arc Pro B70 32GB",
+    "os": "Ubuntu 24.04.4 LTS",
+    "kernel": "6.17.0-23-generic"
+  },
+  "commonEnv": {
+    "GGML_SYCL_DISABLE_DNN": "1",
+    "GGML_SYCL_Q8_CACHE": "1",
+    "GGML_SYCL_ASYNC_CPY_TENSOR": "1",
+    "GGML_SYCL_COMM_ALLREDUCE": "1",
+    "GGML_SYCL_COMM_SINGLE_KERNEL": "1",
+    "GGML_SYCL_COMM_EVENT_BARRIER": "1",
+    "GGML_META_FUSE_ALLREDUCE_ADD": "1",
+    "GGML_SYCL_COMM_PAIRWISE4": "0",
+    "GGML_SYCL_COMM_SKIP_ROOT_READY": "0",
+    "GGML_SYCL_COMM_LOCAL_WRITE": "0",
+    "GGML_SYCL_COMM_FUSEADD_ROOT_RESIDUAL": "0",
+    "GGML_META_FUSE_ALLREDUCE_GET_ROWS": "0"
+  },
+  "commonFlags": "-ngl 99 -sm tensor -fa 1 -ub 32 -ctk f16 -ctv f16 -t 8 -p 512 -n 128 -r 1 --poll 50 -o jsonl",
+  "results": [
+    {
+      "name": "3x skip-allreduce",
+      "validQuality": false,
+      "oneapiDeviceSelector": "level_zero:2,1,3",
+      "devices": "SYCL0/SYCL1/SYCL2",
+      "tensorSplit": "1/1/1",
+      "envOverrides": {
+        "GGML_SYCL_COMM_SKIP_ALLREDUCE": "1"
+      },
+      "promptTokS": 238.387693,
+      "decodeTokS": 43.698372,
+      "jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-k617023-skipallreduce-triple213-p512n128-r1-20260506T012317Z.jsonl",
+      "log": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-k617023-skipallreduce-triple213-p512n128-r1-20260506T012317Z.log"
+    },
+    {
+      "name": "3x same-build control",
+      "validQuality": true,
+      "oneapiDeviceSelector": "level_zero:2,1,3",
+      "devices": "SYCL0/SYCL1/SYCL2",
+      "tensorSplit": "1/1/1",
+      "envOverrides": {
+        "GGML_SYCL_COMM_SKIP_ALLREDUCE": "0"
+      },
+      "promptTokS": 135.534672,
+      "decodeTokS": 43.991643,
+      "jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-k617023-skipcontrol-triple213-p512n128-r1-20260506T012704Z.jsonl",
+      "log": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-k617023-skipcontrol-triple213-p512n128-r1-20260506T012704Z.log"
+    },
+    {
+      "name": "4x skip-allreduce",
+      "validQuality": false,
+      "oneapiDeviceSelector": "level_zero:0,1,2,3",
+      "devices": "SYCL0/SYCL1/SYCL2/SYCL3",
+      "tensorSplit": "1/1/1/1",
+      "envOverrides": {
+        "GGML_SYCL_COMM_SKIP_ALLREDUCE": "1"
+      },
+      "promptTokS": 315.89274,
+      "decodeTokS": 33.341518,
+      "jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-k617023-skipallreduce-quad0123-p512n128-r1-20260506T012444Z.jsonl",
+      "log": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-k617023-skipallreduce-quad0123-p512n128-r1-20260506T012444Z.log"
+    },
+    {
+      "name": "4x same-build control",
+      "validQuality": true,
+      "oneapiDeviceSelector": "level_zero:0,1,2,3",
+      "devices": "SYCL0/SYCL1/SYCL2/SYCL3",
+      "tensorSplit": "1/1/1/1",
+      "envOverrides": {
+        "GGML_SYCL_COMM_SKIP_ALLREDUCE": "0"
+      },
+      "promptTokS": 101.657601,
+      "decodeTokS": 34.124205,
+      "jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-k617023-skipcontrol-quad0123-p512n128-r1-20260506T012813Z.jsonl",
+      "log": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-k617023-skipcontrol-quad0123-p512n128-r1-20260506T012813Z.log"
+    }
+  ],
+  "interpretation": "Correctness-breaking skip-allreduce significantly improves prefill but not decode. Q4_0 decode is likely dominated by local matvec/dispatch and repeated token work rather than the standalone f32 collective cost alone.",
+  "localmaxxing": {
+    "submitted": false,
+    "reason": "The skip-allreduce gate intentionally breaks tensor-parallel correctness."
+  }
+}
