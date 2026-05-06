@@ -30,6 +30,8 @@
 - The best 3x path is `45.954130 tok/s` decode and passed a 16-step full-logit repeat.
 - 4x with sync-after is repeatable in a 4-step full-logit smoke test but only reaches `34.920977 tok/s`, so it is not a throughput win.
 - `GGML_SYCL_COMM_SYNC_AFTER=2` (`reduce.wait()`) is quality-cleared on 3x and improves decode slightly to `46.194319 tok/s`; it does not improve 4x, which remains `34.929313 tok/s`.
+- The 4x pairwise/tree branch can be made deterministic, but its best waited decode result was only `25.314923 tok/s`.
+- The 4x striped-root branch also fails as a performance path: no-wait striped roots are nondeterministic, while waited striped roots pass a 16-token repeat but decode at only `21.297448 tok/s`.
 - Multi-GPU PPL remains a noisy oracle and should not be used for pass/fail quality on these tensor-split paths.
 
 ## Correctness findings
@@ -45,9 +47,10 @@
 
 1. Retry LocalMaxxing with a minimal `engineFlags` object after the five-minute POST window to isolate which structured flag causes the API 500.
 2. Promote `GGML_SYCL_COMM_SYNC_AFTER=2` as the preferred 3x mode after one longer correctness run, while keeping mode `1` as the conservative fallback.
-3. Replace the 4x single-root allreduce with a pairwise/tree collective; root-order sweep showed only `34.28` to `35.07 tok/s`, so root choice is not the main cause.
+3. Stop pursuing the current pairwise/tree and striped-root 4x collectives for speed; both add ordering/kernel overhead and regress decode.
 4. Gate or rewrite the generic custom allreduce path so it cannot silently use the in-place race.
 5. Keep `GGML_SYCL_ASYNC_CPY_TENSOR=0` in all recommended tensor-split recipes until the scheduler copy API can propagate a correct destination event.
 6. Port the exact Q4_0/Q8_1 ESIMD fused2 prototype into llama.cpp behind a second opt-in gate, then re-run single, 2x, 3x, and 4x benchmarks.
 7. Investigate deeper FFN fusion around `ffn_gate + ffn_up + swiglu`, because it may remove another graph node and reduce memory traffic.
 8. Keep FP8/vLLM TP4 and Q4_0 GGUF tracks separate in notes and submissions, because they trade different quantization and runtime behavior.
+9. Revisit Qwen3.6 27B FP8 on vLLM/XPU and OpenVINO/IR as a 2x2-style candidate: two-card tensor/pipeline parallelism per session could use the 64GB pair cleanly and avoid the Q4_0 GGUF 4-card collective bottleneck.
