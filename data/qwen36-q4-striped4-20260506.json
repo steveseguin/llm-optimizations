@@ -1,0 +1,49 @@
+{
+  "date": "2026-05-06",
+  "model": {
+    "name": "Qwen3.6 27B Q4_0 GGUF",
+    "path": "/home/steve/models/qwen3.6-27b-q4_0-gguf/Qwen3.6-27B-Q4_0.gguf"
+  },
+  "hardware": {
+    "gpuName": "Intel Arc Pro B70",
+    "gpuCount": 4,
+    "vramGbPerCard": 32
+  },
+  "baseline4x": {
+    "label": "single_root_syncafter2",
+    "decodeTokS": 34.929313,
+    "jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-syncafter2-reducewait-fusemmvq2-quad2130-p512n512-r3-20260506T055829Z.jsonl"
+  },
+  "striped4NoWait": {
+    "env": {
+      "GGML_SYCL_COMM_STRIPED4": "1",
+      "GGML_SYCL_COMM_SYNC_AFTER": "0"
+    },
+    "correctness": "failed_repeatability",
+    "path": "/home/steve/bench-results/qwen36-q4_0-gguf/correctness/striped4-syncafter0-repeat-20260506T070044Z"
+  },
+  "striped4Waited": {
+    "env": {
+      "ONEAPI_DEVICE_SELECTOR": "level_zero:2,1,3,0",
+      "GGML_SYCL_DISABLE_DNN": "1",
+      "GGML_SYCL_Q8_CACHE": "1",
+      "GGML_SYCL_ASYNC_CPY_TENSOR": "0",
+      "GGML_SYCL_ASYNC_PEER_COPY": "1",
+      "GGML_SYCL_COMM_ALLREDUCE": "1",
+      "GGML_SYCL_COMM_SINGLE_KERNEL": "0",
+      "GGML_SYCL_COMM_PAIRWISE4": "0",
+      "GGML_SYCL_COMM_STRIPED4": "1",
+      "GGML_SYCL_COMM_EVENT_BARRIER": "1",
+      "GGML_SYCL_COMM_SYNC_AFTER": "2",
+      "GGML_META_FUSE_ALLREDUCE_ADD": "1",
+      "GGML_SYCL_FUSE_MMVQ2": "1"
+    },
+    "correctness": "passed_16_token_repeat",
+    "correctnessPath": "/home/steve/bench-results/qwen36-q4_0-gguf/correctness/striped4-syncafter2-repeat-20260506T070314Z",
+    "promptTokS": 81.674316,
+    "decodeTokS": 21.297448,
+    "jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-striped4-syncafter2-fusemmvq2-quad2130-p512n512-r3-20260506T070550Z.jsonl",
+    "log": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-striped4-syncafter2-fusemmvq2-quad2130-p512n512-r3-20260506T070550Z.log"
+  },
+  "conclusion": "Striped roots do not improve 4x decode. The no-wait variant is nondeterministic; the waited variant is much slower than single-root."
+}
