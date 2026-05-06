@@ -1,0 +1,108 @@
+{
+  "date": "2026-05-06",
+  "model": {
+    "hfId": "Qwen/Qwen3.6-27B",
+    "localPath": "/home/steve/models/qwen3.6-27b-q4_0-gguf/Qwen3.6-27B-Q4_0.gguf",
+    "quantization": "Q4_0"
+  },
+  "hardware": {
+    "gpu": "Intel Arc Pro B70",
+    "vramGbPerCard": 32,
+    "cpu": "AMD EPYC 9015 8-Core Processor",
+    "ramGb": 16,
+    "os": "Ubuntu 24.04.4 LTS",
+    "kernel": "6.17.0-23-generic"
+  },
+  "software": {
+    "engine": "llama.cpp",
+    "commit": "db44417",
+    "backend": "SYCL Level Zero",
+    "build": "/home/steve/src/llama.cpp-q4-b70/build-sycl-2026-bmg-g31/bin/llama-bench",
+    "newGates": [
+      "GGML_SYCL_FUSE_MMVQ2",
+      "GGML_SYCL_FUSE_MMVQ2_PROBE"
+    ],
+    "qualityPreserving": true,
+    "powerLimitChanges": false
+  },
+  "localmaxxing": {
+    "submitted": true,
+    "id": "cmotg6zz50004jo04eyqocxli",
+    "note": "Accepted with reduced payload because full engineFlags payload returned HTTP 500 and backend enum rejected sycl-level-zero."
+  },
+  "graphProbe": {
+    "singleB70": {
+      "selector": "level_zero:2",
+      "promptTokens": 0,
+      "outputTokens": 1,
+      "candidatePairsPerGraph": 80,
+      "ffnGateUpPairs": 64,
+      "vcurKcurPairs": 16,
+      "jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-k617023-fusemmvq2-probe-single2-p0n1-r1-20260506T020938Z.jsonl",
+      "log": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-k617023-fusemmvq2-probe-single2-p0n1-r1-20260506T020938Z.log"
+    },
+    "tripleB70": {
+      "selector": "level_zero:2,1,3",
+      "promptTokens": 0,
+      "outputTokens": 1,
+      "candidatePairHitsAcrossTwoExecutions": 480,
+      "normalizedModelLevelPairsPerToken": 80,
+      "jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-k617023-fusemmvq2-probe-triple213-p0n1-r1-20260506T021019Z.jsonl",
+      "log": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-k617023-fusemmvq2-probe-triple213-p0n1-r1-20260506T021019Z.log"
+    }
+  },
+  "prototypeQ8Esimd": {
+    "source": "/home/steve/llm-optimization-artifacts/prototypes/q4_0_esimd_probe/bench_q4_0_q8_1_esimd.cpp",
+    "binary": "/home/steve/llm-optimization-artifacts/prototypes/q4_0_esimd_probe/bench_q4_0_q8_1_esimd",
+    "buildCommand": "source /opt/intel/oneapi/setvars.sh && icpx -O3 -std=c++20 -fsycl -fsycl-device-code-split=per_kernel -fsycl-targets=spir64_gen -Xs \"-device bmg\" bench_q4_0_q8_1_esimd.cpp -o bench_q4_0_q8_1_esimd",
+    "results": [
+      {"n": 17408, "k": 5120, "singleMedianUs": 127.916, "fused2MedianUs": 191.146, "fused2VsTwoSinglesSpeedupPct": 25.3},
+      {"n": 5808, "k": 5120, "singleMedianUs": 48.854, "fused2MedianUs": 59.896, "fused2VsTwoSinglesSpeedupPct": 38.7},
+      {"n": 4352, "k": 5120, "singleMedianUs": 39.271, "fused2MedianUs": 55.521, "fused2VsTwoSinglesSpeedupPct": 29.3},
+      {"n": 1024, "k": 5120, "singleMedianUs": 11.146, "fused2MedianUs": 13.750, "fused2VsTwoSinglesSpeedupPct": 38.3},
+      {"n": 5120, "k": 6144, "singleMedianUs": 50.625, "fused2MedianUs": 72.084, "fused2VsTwoSinglesSpeedupPct": 28.8}
+    ]
+  },
+  "inTreeBenchmarks": {
+    "singleB70Short": {
+      "selector": "level_zero:2",
+      "promptTokens": 0,
+      "outputTokens": 128,
+      "repetitions": 2,
+      "controlTokSOut": 24.340948,
+      "fusedTokSOut": 24.600702
+    },
+    "tripleB70Short": {
+      "selector": "level_zero:2,1,3",
+      "promptTokens": 0,
+      "outputTokens": 128,
+      "repetitions": 2,
+      "controlTokSOut": 43.789841,
+      "fusedTokSOut": 45.322169
+    },
+    "tripleB70Full": {
+      "selector": "level_zero:2,1,3",
+      "promptTokens": 512,
+      "outputTokens": 512,
+      "repetitions": 3,
+      "promptTokS": 135.810565,
+      "decodeTokS": 46.117650,
+      "computedTotalTokS": 68.854236,
+      "localmaxxingId": "cmotg6zz50004jo04eyqocxli",
+      "jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-k617023-fusemmvq2-fused-triple213-p512n512-r3-20260506T023132Z.jsonl",
+      "log": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-k617023-fusemmvq2-fused-triple213-p512n512-r3-20260506T023132Z.log"
+    },
+    "quadB70Short": {
+      "selector": "level_zero:0,1,2,3",
+      "promptTokens": 0,
+      "outputTokens": 128,
+      "repetitions": 2,
+      "fusedTokSOut": 34.842442
+    }
+  },
+  "artifacts": {
+    "note": "/home/steve/llm-optimization-artifacts/notes/2026-05-06-q4-fused-mmvq2.md",
+    "patch": "/home/steve/llm-optimization-artifacts/patches/llama-cpp-sycl-fuse-mmvq2-current-20260506.patch.gz.b64",
+    "localmaxxingResponse": "/tmp/localmaxxing-fusemmvq2-submit.json"
+  }
+}
