@@ -1,0 +1,112 @@
+{
+  "date": "2026-05-06",
+  "model": {
+    "hfIdSubmitted": "unsloth/Qwen3.6-27B",
+    "localPath": "/home/steve/models/qwen3.6-27b-q4_0-gguf/Qwen3.6-27B-Q4_0.gguf",
+    "quantization": "Q4_0",
+    "kvCacheDtype": "f16"
+  },
+  "hardware": {
+    "gpuName": "Intel Arc Pro B70",
+    "vramGbPerGpu": 32,
+    "cpu": "AMD EPYC 9015 8-Core Processor",
+    "ramGb": 16,
+    "os": "Ubuntu 24.04.4 LTS"
+  },
+  "engine": {
+    "name": "llama.cpp",
+    "backend": "SYCL Level Zero",
+    "commit": "db44417",
+    "build": "/home/steve/src/llama.cpp-q4-b70/build-sycl-2026-bmg-g31"
+  },
+  "patch": {
+    "envGate": "GGML_SYCL_FUSE_RMS_NORM_MUL=1",
+    "artifact": "patches/llama-cpp-sycl-rmsnormmul-current-20260506.patch.gz.b64",
+    "filesTouched": [
+      "ggml/src/ggml-sycl/norm.hpp",
+      "ggml/src/ggml-sycl/norm.cpp",
+      "ggml/src/ggml-sycl/ggml-sycl.cpp",
+      "ggml/src/ggml-backend-meta.cpp",
+      "ggml/src/ggml-alloc.c"
+    ]
+  },
+  "correctness": {
+    "method": "llama-completion greedy decode, same prompt and seed, fused MMVQ2 and fused SwiGLU enabled on both sides",
+    "baselineSha256": "f7254271342a273042f88b21af7267f2fe5a06340ba68a9fc765746090a645aa",
+    "rmsNormMulSha256": "f7254271342a273042f88b21af7267f2fe5a06340ba68a9fc765746090a645aa",
+    "debugFusedCallsOneToken": 418,
+    "outputsIdentical": true
+  },
+  "commonEnv": {
+    "GGML_SYCL_DISABLE_DNN": "1",
+    "GGML_SYCL_Q8_CACHE": "1",
+    "GGML_SYCL_FUSE_MMVQ2": "1",
+    "GGML_SYCL_FUSE_MMVQ2_SWIGLU": "1",
+    "GGML_SYCL_FUSE_RMS_NORM_MUL": "1",
+    "GGML_SYCL_COMM_ALLREDUCE": "1",
+    "GGML_SYCL_COMM_SINGLE_KERNEL": "1",
+    "GGML_SYCL_COMM_EVENT_BARRIER": "1",
+    "GGML_SYCL_COMM_SYNC_AFTER": "2",
+    "GGML_META_FUSE_ALLREDUCE_ADD": "1"
+  },
+  "results": [
+    {
+      "label": "single-sycl2-rmsnormmul",
+      "gpuCount": 1,
+      "devices": "SYCL2",
+      "promptTokens": 512,
+      "outputTokens": 512,
+      "decodeTokS": 24.960284,
+      "promptTokS": 525.603352,
+      "totalTokS": 47.655433,
+      "jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/rms-norm-mul-20260506/single-sycl2-p512n512/rmsmul-20260506T204001Z.jsonl",
+      "log": "/home/steve/bench-results/qwen36-q4_0-gguf/rms-norm-mul-20260506/single-sycl2-p512n512/rmsmul-20260506T204001Z.log"
+    },
+    {
+      "label": "tp2-sycl21-rmsnormmul-ub128",
+      "gpuCount": 2,
+      "devices": "SYCL2/SYCL1",
+      "splitMode": "tensor",
+      "tensorSplit": "1/1",
+      "ubatch": 128,
+      "promptTokens": 512,
+      "outputTokens": 512,
+      "decodeTokS": 42.106013,
+      "decodeStddevTokS": 0.011783,
+      "promptTokS": 368.495701,
+      "totalTokS": 75.570584,
+      "jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/rms-norm-mul-20260506/tensor2-sycl21-p512n512/rmsmul-p512n512-r3-ub128-20260506T205122Z.jsonl",
+      "log": "/home/steve/bench-results/qwen36-q4_0-gguf/rms-norm-mul-20260506/tensor2-sycl21-p512n512/rmsmul-p512n512-r3-ub128-20260506T205122Z.log"
+    },
+    {
+      "label": "tp3-sycl213-rmsnormmul-ub128",
+      "gpuCount": 3,
+      "devices": "SYCL2/SYCL1/SYCL3",
+      "splitMode": "tensor",
+      "tensorSplit": "1/1/1",
+      "ubatch": 128,
+      "promptTokens": 512,
+      "outputTokens": 512,
+      "decodeTokS": 49.366188,
+      "decodeStddevTokS": 0.486931,
+      "promptTokS": 206.347938,
+      "totalTokS": 79.667255,
+      "localMaxxingId": "cmoujcois00esld01c5s6bwht",
+      "jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/rms-norm-mul-20260506/tensor3-sycl213-p512n512/rmsmul-p512n512-r3-ub128-20260506T204554Z.jsonl",
+      "log": "/home/steve/bench-results/qwen36-q4_0-gguf/rms-norm-mul-20260506/tensor3-sycl213-p512n512-r3-ub128-20260506T204554Z.log",
+      "localMaxxingResponse": "/home/steve/bench-results/localmaxxing-qwen36-q4-rmsnormmul-3x-simple-20260506T205435Z.json"
+    }
+  ],
+  "failedDiagnostics": [
+    {
+      "label": "tp4-assist005-rmsnormmul",
+      "gpuCount": 4,
+      "selector": "level_zero:2,1,3,0",
+      "tensorSplit": "1/1/1/0.05",
+      "outcome": "failed",
+      "reason": "UR_RESULT_ERROR_OUT_OF_DEVICE_MEMORY during MUL_MAT",
+      "jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/rms-norm-mul-20260506/tensor4-assist005-sg2-p512n512/rmsmul-p512n512-r2-ub32-20260506T204412Z.jsonl",
+      "log": "/home/steve/bench-results/qwen36-q4_0-gguf/rms-norm-mul-20260506/tensor4-assist005-sg2-p512n512/rmsmul-p512n512-r2-ub32-20260506T204412Z.log"
+    }
+  ]
+}
