@@ -1087,6 +1087,26 @@ Goal: improve quality-preserving Q4_0 performance without power-limit changes.
      - do not submit these failed speculative runs to LocalMaxxing;
      - stop treating generic Qwen3.5 4B as a useful Qwen3.6 27B draft candidate;
      - prefer Qwen3.6-specific MTP/DFlash or vLLM FP8 speculative paths.
+58. 2026-05-06 FP8 MTP hybrid follow-up:
+   - dynamic FP8 directory `/home/steve/models/qwen3.6-27b-fp8-hf` contains real `mtp.safetensors`;
+   - static compressed-tensors directory `/home/steve/models/qwen3.6-27b-fp8-vrfai` has no `mtp.*` tensors, so earlier static MTP runs were not clean MTP data;
+   - created hybrid symlink directory `/home/steve/models/qwen3.6-27b-fp8-vrfai-mtp-hybrid` with static main weights plus dynamic `mtp.safetensors`;
+   - vLLM confirmed checkpoint size `33.90 GiB` and loaded `2/2` safetensors shards;
+   - patched `vllm/model_executor/models/qwen3_5_mtp.py` so packed-name matching uses the original checkpoint tensor name for each candidate:
+     - patch: `/home/steve/llm-optimization-artifacts/patches/vllm-qwen35-mtp-loader-original-name-20260506.patch`;
+     - this removed bogus doubled names like `qkqkv_proj` and `gate_gate_up_proj`.
+   - measured 32 prompt / 8 output TP4 smoke results:
+     - dynamic FP8 real MTP eager: `0.960369 tok/s`;
+     - hybrid MTP eager before loader patch: `7.409132 tok/s`;
+     - hybrid MTP eager after loader patch: `7.818582 tok/s`;
+     - hybrid MTP compiled/async after loader patch: `0.581715 tok/s`.
+   - remaining issue:
+     - packed scale tensors are still skipped for `qkv_proj`, `gate_up_proj`, `down_proj`, and `o_proj`;
+     - this appears to be missing packed scale parameters in the compressed-tensors MTP parameter dict, not the previous string-mutation bug.
+   - decision:
+     - do not submit these MTP smokes to LocalMaxxing;
+     - keep MTP as a source/debug track, but do not run longer MTP speed claims until packed scale loading is clean;
+     - validated non-spec static FP8 TP4 and Q4_0 TP3 remain the useful performance baselines.
 
 ## Success Criteria
 

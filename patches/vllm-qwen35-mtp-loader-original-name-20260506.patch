@@ -1,0 +1,31 @@
+diff --git a/vllm/model_executor/models/qwen3_5_mtp.py b/vllm/model_executor/models/qwen3_5_mtp.py
+index e86b205b9..e27cafed8 100644
+--- a/vllm/model_executor/models/qwen3_5_mtp.py
++++ b/vllm/model_executor/models/qwen3_5_mtp.py
+@@ -223,18 +223,22 @@ class Qwen3_5MultiTokenPredictor(nn.Module):
+             if "rotary_emb.inv_freq" in name:
+                 continue
+ 
++            loaded_name = name
+             for param_name, weight_name, shard_id in stacked_params_mapping:
+-                if "experts.gate_up_proj" in name or "experts.down_proj" in name:
++                if (
++                    "experts.gate_up_proj" in loaded_name
++                    or "experts.down_proj" in loaded_name
++                ):
+                     is_fused_expert = True
+                     expert_params_mapping = fused_expert_params_mapping
+ 
+-                if weight_name not in name:
++                if weight_name not in loaded_name:
+                     continue
+ 
+-                if "mlp.experts" in name:
++                if "mlp.experts" in loaded_name:
+                     continue
+ 
+-                name = name.replace(weight_name, param_name)
++                name = loaded_name.replace(weight_name, param_name)
+                 # Skip loading extra bias for GPTQ models.
+                 if name.endswith(".bias") and name not in params_dict:
+                     continue

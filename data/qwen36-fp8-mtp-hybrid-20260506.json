@@ -1,0 +1,77 @@
+{
+  "date": "2026-05-06",
+  "system": {
+    "gpu": "Intel Arc Pro B70 32GB",
+    "gpu_count": 4,
+    "os": "Ubuntu 24.04.4 LTS",
+    "kernel": "6.17.0-23-generic"
+  },
+  "models": {
+    "dynamic_fp8_hf": "/home/steve/models/qwen3.6-27b-fp8-hf",
+    "static_fp8_compressed": "/home/steve/models/qwen3.6-27b-fp8-vrfai",
+    "hybrid_static_plus_mtp": "/home/steve/models/qwen3.6-27b-fp8-vrfai-mtp-hybrid"
+  },
+  "patches": [
+    "/home/steve/llm-optimization-artifacts/patches/vllm-qwen35-mtp-loader-original-name-20260506.patch"
+  ],
+  "runs": [
+    {
+      "name": "dynamic-fp8-real-mtp-eager",
+      "json": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-fp8-tp4-pp1-in32-out8-bs1-20260506T165253Z.json",
+      "log": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-fp8-tp4-pp1-in32-out8-bs1-20260506T165253Z.log",
+      "quantization": "fp8",
+      "tensor_parallel": 4,
+      "pipeline_parallel": 1,
+      "input_tokens": 32,
+      "output_tokens": 8,
+      "avg_latency_s": 8.33013085499988,
+      "tok_s_out": 0.9603690673356314,
+      "speculative_config": {
+        "method": "qwen3_next_mtp",
+        "num_speculative_tokens": 1,
+        "enforce_eager": true,
+        "disable_padded_drafter_batch": true
+      }
+    },
+    {
+      "name": "hybrid-mtp-eager-before-loader-patch",
+      "json": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp4-pp1-in32-out8-bs1-20260506T165628Z.json",
+      "log": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp4-pp1-in32-out8-bs1-20260506T165628Z.log",
+      "quantization": "compressed-tensors",
+      "tensor_parallel": 4,
+      "pipeline_parallel": 1,
+      "input_tokens": 32,
+      "output_tokens": 8,
+      "avg_latency_s": 1.0797485539951595,
+      "tok_s_out": 7.409132404391128
+    },
+    {
+      "name": "hybrid-mtp-eager-after-loader-patch",
+      "json": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp4-pp1-in32-out8-bs1-20260506T165946Z.json",
+      "log": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp4-pp1-in32-out8-bs1-20260506T165946Z.log",
+      "quantization": "compressed-tensors",
+      "tensor_parallel": 4,
+      "pipeline_parallel": 1,
+      "input_tokens": 32,
+      "output_tokens": 8,
+      "avg_latency_s": 1.0232034549990203,
+      "tok_s_out": 7.818581887028186
+    },
+    {
+      "name": "hybrid-mtp-compiled-async-after-loader-patch",
+      "json": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp4-pp1-in32-out8-bs1-20260506T170150Z.json",
+      "log": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp4-pp1-in32-out8-bs1-20260506T170150Z.log",
+      "quantization": "compressed-tensors",
+      "tensor_parallel": 4,
+      "pipeline_parallel": 1,
+      "input_tokens": 32,
+      "output_tokens": 8,
+      "avg_latency_s": 13.752427986997645,
+      "tok_s_out": 0.5817154619943236
+    }
+  ],
+  "localmaxxing": {
+    "submitted": false,
+    "reason": "Diagnostic MTP runs are slower than validated baselines and hybrid compressed-tensors MTP scale loading is incomplete."
+  }
+}
