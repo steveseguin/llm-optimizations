@@ -81,6 +81,63 @@ Fourth-card assist-ratio sweep:
 - `1/1/1/0.40`: `36.435045 tok/s`
 - `1/1/1/0.60`: `35.307680 tok/s`
 
+Fine assist-ratio sweep after the validated `0.05` run:
+
+- TSV: `/home/steve/bench-results/qwen36-q4_0-gguf/tensorsplit-quad-sg2-fine-assist-ratio-p0n128-r2-20260506T143835Z.tsv`
+- `1/1/1/0.01`: failed with Level Zero `UR_RESULT_ERROR_OUT_OF_DEVICE_MEMORY` during `MUL_MAT`
+- `1/1/1/0.02`: failed with Level Zero `UR_RESULT_ERROR_OUT_OF_DEVICE_MEMORY` during `MUL_MAT`
+- `1/1/1/0.03`: `38.822236 tok/s`
+- `1/1/1/0.04`: `38.135548 tok/s`
+- `1/1/1/0.05`: `38.270868 tok/s`
+- `1/1/1/0.06`: `37.856266 tok/s`
+- `1/1/1/0.07`: `38.485052 tok/s`
+- `1/1/1/0.08`: `38.311132 tok/s`
+- `1/1/1/0.12`: `37.762326 tok/s`
+
+This finer sweep did not beat the previous short `0.05` screen or the full validated `39.204149 tok/s` run. The lower `0.01` and `0.02` ratios are not just slower; they can produce a driver/runtime OOM in this path, likely because extremely small shards interact badly with tensor-split allocation or graph planning.
+
+## Allreduce Probe
+
+One-token allreduce stats on the four-card assist split:
+
+- JSONL: `/home/steve/bench-results/qwen36-q4_0-gguf/sycl-stats4-assist005-quad2130-p0n1-r1-20260506T145113Z.jsonl`
+- Log: `/home/steve/bench-results/qwen36-q4_0-gguf/sycl-stats4-assist005-quad2130-p0n1-r1-20260506T145113Z.log`
+- Decode throughput under stats instrumentation: `24.699805 tok/s`
+- Allreduce count: `128` per token
+- Allreduce size: `20,480` bytes each
+- Total allreduce payload: `2,621,440` bytes per token
+- Warm stats summary: `4.213 ms` total allreduce time per token, `32.913 us` average
+- First/cold stats summary: `6.724 ms` total allreduce time per token, `52.528 us` average
+
+Every decoded token still performs two partial-output reductions per layer, mostly fused as `backend+add`. The fusion removes follow-on residual ADD scheduling, but it does not reduce the collective count. On the current 4x assist split, the warm collective cost is roughly one-sixth of the measured token budget, so communication remains worth optimizing.
+
+Fused Q4 MMVQ2 status:
+
+- Debug JSONL: `/home/steve/bench-results/qwen36-q4_0-gguf/sycl-debug-fused2-triple213-p0n1-r1-20260506T144944Z.jsonl`
+- Debug log: `/home/steve/bench-results/qwen36-q4_0-gguf/sycl-debug-fused2-triple213-p0n1-r1-20260506T144944Z.log`
+- Debug counts: `480` fused2 calls and `1,584` plain reordered MMVQ calls
+
+The fused2 kernel path is active in tensor split, including FFN gate/up pairs and some V/K pairs. Further Q4 work should focus on communication and narrow-shard MMVQ efficiency, not on merely enabling fused2.
+
+## Communication Flag Sweep
+
+Existing allreduce-path variants on the four-card assist split:
+
+- TSV: `/home/steve/bench-results/qwen36-q4_0-gguf/comm-flag-sweep-quad-assist005-p0n128-r2-20260506T145544Z.tsv`
+- Baseline `sync_after=2`: `38.195956 tok/s`
+- `sync_after=0`: `38.354083 tok/s`
+- `sync_after=1`: `37.158215 tok/s`
+- `skip_root_ready`: `37.971362 tok/s`
+- `rotate_root`: `37.087460 tok/s`
+- `fuseadd_root_residual`: `37.898128 tok/s`
+- `skiproot_fuseaddroot`: `38.218925 tok/s`
+- `pairwise4`: `28.156880 tok/s`
+- `striped4`: `26.468293 tok/s`
+- `local_write`: `37.208619 tok/s`
+- `no_fuseadd_smallf32`: `28.999878 tok/s`
+
+No existing communication flag meaningfully beat the current single-kernel allreduce-add path. The tiny `sync_after=0` lift is within short-run noise and should not replace the validated command without a longer run. Pairwise, striped, and non-fused small-f32 paths are clearly worse for this 20 KB per-layer reduction shape.
+
 ## Interpretation
 
 The fourth card is not bad; prior topology sweeps showed all pairs and triples are healthy. The current four-way regression is a software scheduling/kernel-shape problem. Equal four-way row shards appear too narrow for the current reordered Q4_0 MMVQ path, and the added communication/synchronization overhead outweighs the reduced work per card.
