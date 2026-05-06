@@ -7,11 +7,11 @@ large connector writes have truncated base64 patch artifacts.
 ## Local full patch
 
 - Path: `/home/steve/llm-optimization-artifacts/patches/llama-cpp-sycl-q4-fusemmvq2-syncafter-current-20260506.patch`
-- Size: `130059` bytes
-- SHA256: `746ced486da0b9d6ff153352a2f38d2bf6a49b4572bf328aed2431fc7f149435`
+- Size: `130148` bytes
+- SHA256: `eecd45715ba4f623f0ebfd4b26b6ea8ce3f53b56f0b108aaa5d0066a9bd9422c`
 - Base64 gzip path: `/home/steve/llm-optimization-artifacts/patches/llama-cpp-sycl-q4-fusemmvq2-syncafter-current-20260506.patch.gz.b64`
-- Base64 gzip size: `27461` bytes
-- Base64 gzip SHA256: `0515ce24c63f11311fa1dfe776117624e53b2d88eb3686997db0081346a244c7`
+- Base64 gzip size: `27481` bytes
+- Base64 gzip SHA256: `907501c1bc9108bf45a659115ed0a390f371e445674ec5170be2ad20df5fee3f`
 
 Do not trust the previously uploaded `patch.gz.b64` copy in GitHub history; it was
 deleted after fetch verification showed truncation/corruption.
