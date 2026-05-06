@@ -6,12 +6,12 @@ large connector writes have truncated base64 patch artifacts.
 
 ## Local full patch
 
-- Path: `/home/steve/llm-optimization-artifacts/patches/llama-cpp-sycl-q4-fusemmvq2-syncafter-current-20260506.patch`
-- Size: `130148` bytes
-- SHA256: `eecd45715ba4f623f0ebfd4b26b6ea8ce3f53b56f0b108aaa5d0066a9bd9422c`
-- Base64 gzip path: `/home/steve/llm-optimization-artifacts/patches/llama-cpp-sycl-q4-fusemmvq2-syncafter-current-20260506.patch.gz.b64`
-- Base64 gzip size: `27481` bytes
-- Base64 gzip SHA256: `907501c1bc9108bf45a659115ed0a390f371e445674ec5170be2ad20df5fee3f`
+- Path: `/home/steve/llm-optimization-artifacts/patches/llama-cpp-sycl-q4-fusemmvq2-syncafter-pairwise-striped-current-20260506.patch`
+- Size: `196859` bytes
+- SHA256: `ee537ccd706220adc70257b00d5f2b015867ac914ced4d865f96c5fc73a0800d`
+- Gzip path: `/home/steve/llm-optimization-artifacts/patches/llama-cpp-sycl-q4-fusemmvq2-syncafter-pairwise-striped-current-20260506.patch.gz`
+- Gzip size: `31673` bytes
+- Gzip SHA256: `e1635a02bf771faca3e603ef1e7c38087392d18f16e7ebfed63873197c5130c6`
 
 Do not trust the previously uploaded `patch.gz.b64` copy in GitHub history; it was
 deleted after fetch verification showed truncation/corruption.
@@ -38,6 +38,12 @@ Repository: `/home/steve/src/llama.cpp-q4-b70`
       than mode `1`.
     - `GGML_SYCL_COMM_STAGED_ROOT_COPY=1` copies peer partials to root temp
       buffers before reducing. It failed repeatability and should remain off.
+    - `GGML_SYCL_COMM_PAIRWISE4=1` adds a diagnostic pairwise 4-card branch.
+      It can be made deterministic with waits, but decode regressed to roughly
+      `25.31 tok/s`.
+    - `GGML_SYCL_COMM_STRIPED4=1` adds a diagnostic striped-root 4-card branch.
+      No-wait mode failed repeatability; waited mode passed but decoded at only
+      `21.30 tok/s`.
   - `ggml_sycl_try_fuse_mmvq2`
     - Fuses adjacent Q4_0 reordered MMVQ graph nodes sharing the same one-token
       activation, currently covering `ffn_gate + ffn_up` and `Vcur + Kcur`.
@@ -88,8 +94,8 @@ Result:
 - 2x single-kernel allreduce is stable with scheduler async tensor copy off.
 - 3x and 4x single-kernel allreduce require `GGML_SYCL_COMM_SYNC_AFTER=1` for
   repeatability.
-- 4x is repeatable in a short smoke test but slower than 3x, so the next work is
-  reducing collective/root ordering overhead rather than adding more devices.
+- 4x single-root mode is repeatable in a short smoke test but slower than 3x.
+- Pairwise4 and striped4 are diagnostic negatives, not recommended launch modes.
 
 ## Next patch direction
 
@@ -101,4 +107,8 @@ overhead and making 4x competitive again.
 Update: the first narrower mode is implemented as `GGML_SYCL_COMM_SYNC_AFTER=2`
 and uses `reduce.wait()`. It improved 3x Qwen3.6 27B Q4_0 from `45.954130` to
 `46.194319 tok/s`, passed a 16-step full-logit repeat, but did not improve 4x
-(`34.929313 tok/s`). 4x now needs a non-single-root collective.
+(`34.929313 tok/s`). Two non-single-root 4x collectives have since been tested:
+pairwise4 and striped4. Both can be made deterministic only with waits that
+erase performance, so the next patch direction is below the collective layer:
+deeper Q4/Q8 matvec fusion, graph launch reduction, or a higher-level 2x2
+runtime layout for FP8/Q4 sessions.
