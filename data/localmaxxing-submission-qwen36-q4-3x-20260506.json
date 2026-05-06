@@ -1,6 +1,6 @@
 {
-  "submittedAtUtc": "2026-05-06T05:39:20.527Z",
-  "localmaxxingId": "cmotmnnm6000aqu01uzb9wk12",
+  "submittedAtUtc": "2026-05-06T06:07:51.475Z",
+  "localmaxxingId": "cmotnobsj0017qu01icxnv6ek",
   "hfId": "unsloth/Qwen3.6-27B",
   "quantization": "Q4_0",
   "engineName": "llama.cpp",
@@ -19,10 +19,10 @@
     "contextLengthMeasured": 512
   },
   "localmaxxingRecordedFields": {
-    "promptTokens": 0,
-    "outputTokens": 0,
-    "contextLength": 2048,
-    "notes": null,
+    "promptTokens": 512,
+    "outputTokens": 512,
+    "contextLength": 512,
+    "notes": "Quality-cleared Qwen3.6-27B Q4_0 GGUF on 3x Arc Pro B70. Full-logit deterministic repeat passed for 16 greedy decode steps. Key flags: ASYNC_CPY_TENSOR=0, COMM_SINGLE_KERNEL=1, COMM_SYNC_AFTER=1, FUSE_MMVQ2=1. No power-limit/overclock changes.",
     "engineFlags": {
       "commandSnippet": "",
       "tensorParallel": null,
@@ -36,8 +36,9 @@
   "apiNotes": [
     "Initial POST failed with 400 because LocalMaxxing rejects GGUF distribution repositories and requested base hfId unsloth/Qwen3.6-27B.",
     "Full detailed payload with the corrected hfId returned 500 Internal Server Error.",
-    "A compact required-field payload succeeded and created the listed benchmark ID.",
-    "Need retry a compact-but-detailed payload after the 5 minute POST rate window, or ask LocalMaxxing for an edit endpoint, because the accepted row currently lacks flags/context/notes."
+    "A compact required-field payload succeeded first as cmotmnnm6000aqu01uzb9wk12 but lacked context/notes.",
+    "A second payload with prompt/output/context/notes but no engineFlags succeeded as the listed benchmark ID.",
+    "Need retry engineFlags after the 5 minute POST rate window to isolate which engineFlags key causes the server error."
   ],
   "localPayloads": {
     "detailedPayload": "/home/steve/llm-optimization-artifacts/data/localmaxxing-pending-qwen36-q4-3x-20260506.json",
