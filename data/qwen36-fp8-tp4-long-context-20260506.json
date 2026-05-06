@@ -1,0 +1,70 @@
+{
+  "date_utc": "2026-05-06",
+  "title": "Qwen3.6 27B FP8 vLLM XPU TP4 longer-context run",
+  "hardware": {
+    "gpu_name": "Intel Arc Pro B70",
+    "gpu_count": 4,
+    "vram_gb_each": 32,
+    "os": "Ubuntu 24.04.4 LTS",
+    "kernel": "6.17.0-23-generic"
+  },
+  "model": {
+    "hf_id": "Qwen/Qwen3.6-27B",
+    "local_path": "/home/steve/models/qwen3.6-27b-fp8-vrfai",
+    "quantization": "FP8",
+    "vllm_quantization": "compressed-tensors"
+  },
+  "configuration": {
+    "engine": "vllm",
+    "engine_version": "0.20.1",
+    "backend": "xpu",
+    "tensor_parallel": 4,
+    "pipeline_parallel": 1,
+    "input_tokens": 2048,
+    "output_tokens": 512,
+    "batch_size": 1,
+    "max_model_len": 4096,
+    "gpu_mem_util": 0.85,
+    "kv_cache_dtype": "auto",
+    "oneapi_device_selector": "level_zero:0,1,2,3",
+    "ccl_atl_transport": "ofi",
+    "ld_library_path_prefix": "/home/steve/.venvs/vllm-xpu-managed/lib",
+    "speculative_config": {
+      "method": "ngram",
+      "num_speculative_tokens": 4,
+      "prompt_lookup_min": 2,
+      "prompt_lookup_max": 4
+    }
+  },
+  "logs": {
+    "json": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp4-pp1-in2048-out512-bs1-20260506T085730Z.json",
+    "log": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp4-pp1-in2048-out512-bs1-20260506T085730Z.log",
+    "json_sha256": "68b488f6ae604d2f3f31c949b217518a6dbb91e2b41be709070d3ab96b373c71"
+  },
+  "metrics": {
+    "avg_latency_s": 11.719340341674979,
+    "latencies_s": [
+      11.088092756006517,
+      11.858566274007899,
+      12.21136199501052
+    ],
+    "output_tokens_per_second": 43.688465824248155,
+    "total_tokens_per_second": 218.44232912124076,
+    "prompt_throughput_observed_tokens_per_second": 204.1
+  },
+  "speculative_decode_observations": {
+    "measured_avg_draft_acceptance_pct": [
+      28.3,
+      20.1,
+      18.5
+    ],
+    "interpretation": "Longer prompt remains stable but lower draft acceptance reduces decode speed versus the 512/512 best."
+  },
+  "localmaxxing": {
+    "submitted": true,
+    "id": "cmottw16x002wqy01jvbluobl",
+    "status": "APPROVED",
+    "submitted_tok_s_out": 43.688465824248155,
+    "submitted_tok_s_total": 218.44232912124076
+  }
+}
