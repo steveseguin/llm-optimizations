@@ -24,9 +24,12 @@ struct args_t {
     int n = 17408;
     int k = 5120;
     int ks = 1;
+    int subgroups = 32;
+    int warp = 16;
     int iters = 200;
     int warmup = 20;
     int seed = 1;
+    std::string mode = "esimd";
 };
 
 static int parse_int_arg(int argc, char ** argv, const char * name, int def) {
@@ -45,9 +48,18 @@ static args_t parse_args(int argc, char ** argv) {
     args.n = parse_int_arg(argc, argv, "n", args.n);
     args.k = parse_int_arg(argc, argv, "k", args.k);
     args.ks = parse_int_arg(argc, argv, "ks", args.ks);
+    args.subgroups = parse_int_arg(argc, argv, "subgroups", args.subgroups);
+    args.warp = parse_int_arg(argc, argv, "warp", args.warp);
     args.iters = parse_int_arg(argc, argv, "iters", args.iters);
     args.warmup = parse_int_arg(argc, argv, "warmup", args.warmup);
     args.seed = parse_int_arg(argc, argv, "seed", args.seed);
+    const std::string mode_key = "--mode=";
+    for (int i = 1; i < argc; ++i) {
+        const std::string cur(argv[i]);
+        if (cur.rfind(mode_key, 0) == 0) {
+            args.mode = cur.substr(mode_key.size());
+        }
+    }
     if (args.n <= 0 || args.k <= 0 || args.iters <= 0 || args.warmup < 0) {
         throw std::runtime_error("invalid non-positive argument");
     }
@@ -56,6 +68,16 @@ static args_t parse_args(int argc, char ** argv) {
     }
     if (!(args.ks == 1 || args.ks == 2 || args.ks == 4 || args.ks == 8)) {
         throw std::runtime_error("ks must be one of 1, 2, 4, 8");
+    }
+    if (!(args.subgroups == 1 || args.subgroups == 2 || args.subgroups == 4 || args.subgroups == 8 ||
+          args.subgroups == 16 || args.subgroups == 32)) {
+        throw std::runtime_error("subgroups must be one of 1, 2, 4, 8, 16, 32");
+    }
+    if (!(args.warp == 16 || args.warp == 32)) {
+        throw std::runtime_error("warp must be 16 or 32");
+    }
+    if (!(args.mode == "esimd" || args.mode == "sgdp4a")) {
+        throw std::runtime_error("mode must be esimd or sgdp4a");
     }
     if (args.k % args.ks != 0 || (args.k / args.ks) % TILE_K != 0) {
         throw std::runtime_error("k / ks must be a multiple of 128");
@@ -116,8 +138,8 @@ static void cpu_ref_q4_0_q8_1(
                 const uint8_t byte = packed[j];
                 const int lo = byte & 0x0f;
                 const int hi = (byte >> 4) & 0x0f;
-                dot += lo * static_cast<int>(q8_qs[base + 2 * j + 0]);
-                dot += hi * static_cast<int>(q8_qs[base + 2 * j + 1]);
+                dot += lo * static_cast<int>(q8_qs[base + j]);
+                dot += hi * static_cast<int>(q8_qs[base + QK4_0 / 2 + j]);
             }
             const float d4 = static_cast<float>(row_d[b]);
             const float d8 = static_cast<float>(q8_d[b]);
@@ -125,6 +147,109 @@ static void cpu_ref_q4_0_q8_1(
             acc += d4 * (static_cast<float>(dot) * d8 - 8.0f * s8);
         }
         out[row] = acc;
+    }
+}
+
+static inline int dp4a_u8s8(const int a, const int b, int c) {
+    const uint32_t au = static_cast<uint32_t>(a);
+    const uint32_t bu = static_cast<uint32_t>(b);
+#pragma unroll
+    for (int i = 0; i < 4; ++i) {
+        const int x = static_cast<int>((au >> (8 * i)) & 0xffu);
+        const int y = static_cast<int>(static_cast<int8_t>((bu >> (8 * i)) & 0xffu));
+        c += x * y;
+    }
+    return c;
+}
+
+static inline int load_i32_u8(const uint8_t * p, const int i32) {
+    return reinterpret_cast<const int *>(p)[i32];
+}
+
+static inline int load_i32_i8(const int8_t * p, const int i32) {
+    return reinterpret_cast<const int *>(p)[i32];
+}
+
+template <int WARP_SIZE>
+static void run_sgdp4a_impl(
+        sycl::queue & q,
+        const uint8_t * d_q4_qs,
+        const sycl::half * d_q4_d,
+        const int8_t * d_q8_qs,
+        const sycl::half * d_q8_d,
+        const sycl::half * d_q8_s,
+        float * d_out,
+        int n,
+        int k,
+        int subgroups) {
+    static constexpr int VDR = 2;
+    static constexpr int QI4_0 = 4;
+    const int blocks_per_row = k / QK4_0;
+    const int block_num_y = ((n + subgroups - 1) / subgroups) * subgroups;
+    const sycl::range<1> global(block_num_y * WARP_SIZE);
+    const sycl::range<1> local(subgroups * WARP_SIZE);
+
+    q.submit([&](sycl::handler & cgh) {
+        cgh.parallel_for(sycl::nd_range<1>(global, local), [=](sycl::nd_item<1> item)
+                [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
+            const auto sg = item.get_sub_group();
+            const int sg_range = sg.get_group_linear_range();
+            const int row = item.get_group(0) * sg_range + sg.get_group_linear_id();
+            if (row >= n) {
+                return;
+            }
+
+            const int lane = sg.get_local_linear_id();
+            constexpr int blocks_per_subgroup = (VDR * WARP_SIZE + QI4_0 - 1) / QI4_0;
+            constexpr int block_elements_per_subgroup = QI4_0 / VDR;
+            float partial = 0.0f;
+
+            for (int i = lane / block_elements_per_subgroup; i < blocks_per_row; i += blocks_per_subgroup) {
+                const int ibx = row * blocks_per_row + i;
+                const uint8_t * q4 = d_q4_qs + static_cast<size_t>(ibx) * (QK4_0 / 2);
+                const int8_t * q8 = d_q8_qs + i * QK4_0;
+                const int iqs = VDR * (lane % block_elements_per_subgroup);
+
+                int sumi = 0;
+#pragma unroll
+                for (int v = 0; v < VDR; ++v) {
+                    const int q4i = load_i32_u8(q4, iqs + v);
+                    const int vi0 = (q4i >> 0) & 0x0f0f0f0f;
+                    const int vi1 = (q4i >> 4) & 0x0f0f0f0f;
+                    sumi = dp4a_u8s8(vi0, load_i32_i8(q8, iqs + v), sumi);
+                    sumi = dp4a_u8s8(vi1, load_i32_i8(q8, iqs + v + QI4_0), sumi);
+                }
+
+                const float d4 = static_cast<float>(d_q4_d[ibx]);
+                const float d8 = static_cast<float>(d_q8_d[i]);
+                const float s8 = static_cast<float>(d_q8_s[i]);
+                partial += d4 * (static_cast<float>(sumi) * d8 - 4.0f * s8);
+            }
+
+            const float sum = sycl::reduce_over_group(sg, partial, sycl::plus<float>());
+            if (sg.leader()) {
+                d_out[row] = sum;
+            }
+        });
+    });
+}
+
+static void run_sgdp4a(
+        sycl::queue & q,
+        const uint8_t * d_q4_qs,
+        const sycl::half * d_q4_d,
+        const int8_t * d_q8_qs,
+        const sycl::half * d_q8_d,
+        const sycl::half * d_q8_s,
+        float * d_out,
+        int n,
+        int k,
+        int subgroups,
+        int warp) {
+    if (warp == 16) {
+        run_sgdp4a_impl<16>(q, d_q4_qs, d_q4_d, d_q8_qs, d_q8_d, d_q8_s, d_out, n, k, subgroups);
+    } else {
+        run_sgdp4a_impl<32>(q, d_q4_qs, d_q4_d, d_q8_qs, d_q8_d, d_q8_s, d_out, n, k, subgroups);
     }
 }
 
@@ -171,13 +296,13 @@ struct q4_0_q8_1_gemv_kernel {
                 esimd::simd<float, Q4_BYTES> lo = esimd::convert<float>(packed16 & 0x000f);
                 esimd::simd<float, Q4_BYTES> hi = esimd::convert<float>((packed16 >> 4) & 0x000f);
 
-                esimd::simd<int8_t, Q4_BYTES> q8_even_i = q8.template select<Q4_BYTES, 2>(sub * QK4_0);
-                esimd::simd<int8_t, Q4_BYTES> q8_odd_i = q8.template select<Q4_BYTES, 2>(sub * QK4_0 + 1);
-                esimd::simd<float, Q4_BYTES> q8_even = esimd::convert<float>(q8_even_i);
-                esimd::simd<float, Q4_BYTES> q8_odd = esimd::convert<float>(q8_odd_i);
+                esimd::simd<int8_t, Q4_BYTES> q8_lo_i = q8.template select<Q4_BYTES, 1>(sub * QK4_0);
+                esimd::simd<int8_t, Q4_BYTES> q8_hi_i = q8.template select<Q4_BYTES, 1>(sub * QK4_0 + Q4_BYTES);
+                esimd::simd<float, Q4_BYTES> q8_lo = esimd::convert<float>(q8_lo_i);
+                esimd::simd<float, Q4_BYTES> q8_hi = esimd::convert<float>(q8_hi_i);
 
                 const int block = kk / QK4_0 + sub;
-                const float dot = esimd::reduce<float>(lo * q8_even + hi * q8_odd, std::plus<>());
+                const float dot = esimd::reduce<float>(lo * q8_lo + hi * q8_hi, std::plus<>());
                 const float d4 = static_cast<float>(row_d[block]);
                 const float d8 = static_cast<float>(q8_d[block]);
                 const float s8 = static_cast<float>(q8_s[block]);
@@ -305,13 +430,21 @@ int main(int argc, char ** argv) {
         q.wait();
 
         for (int i = 0; i < args.warmup; ++i) {
-            run_esimd_ks(q, d_q4_qs, d_q4_d, d_q8_qs, d_q8_d, d_q8_s, d_out, n, k, args.ks);
+            if (args.mode == "esimd") {
+                run_esimd_ks(q, d_q4_qs, d_q4_d, d_q8_qs, d_q8_d, d_q8_s, d_out, n, k, args.ks);
+            } else {
+                run_sgdp4a(q, d_q4_qs, d_q4_d, d_q8_qs, d_q8_d, d_q8_s, d_out, n, k, args.subgroups, args.warp);
+            }
         }
         q.wait();
 
         const auto t0 = std::chrono::steady_clock::now();
         for (int i = 0; i < args.iters; ++i) {
-            run_esimd_ks(q, d_q4_qs, d_q4_d, d_q8_qs, d_q8_d, d_q8_s, d_out, n, k, args.ks);
+            if (args.mode == "esimd") {
+                run_esimd_ks(q, d_q4_qs, d_q4_d, d_q8_qs, d_q8_d, d_q8_s, d_out, n, k, args.ks);
+            } else {
+                run_sgdp4a(q, d_q4_qs, d_q4_d, d_q8_qs, d_q8_d, d_q8_s, d_out, n, k, args.subgroups, args.warp);
+            }
         }
         q.wait();
         const auto t1 = std::chrono::steady_clock::now();
@@ -339,9 +472,11 @@ int main(int argc, char ** argv) {
         const double gbps = (weight_gb + q8_gb + out_gb) / (avg_us * 1.0e-6);
 
         std::cout << std::fixed << std::setprecision(6)
-                  << "n=" << n << " k=" << k << " ks=" << args.ks << " iters=" << args.iters << " warmup=" << args.warmup << "\n"
+                  << "mode=" << args.mode << " n=" << n << " k=" << k << " ks=" << args.ks
+                  << " subgroups=" << args.subgroups << " warp=" << args.warp
+                  << " iters=" << args.iters << " warmup=" << args.warmup << "\n"
                   << "cpu_ref_ms=" << ref_ms << "\n"
-                  << "esimd_avg_us=" << avg_us << "\n"
+                  << "kernel_avg_us=" << avg_us << "\n"
                   << "approx_gbps=" << gbps << "\n"
                   << "max_abs=" << max_abs << " max_rel=" << max_rel << " rms_abs=" << rms << "\n";
 
