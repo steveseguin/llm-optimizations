@@ -1,0 +1,53 @@
+{
+  "date": "2026-05-06",
+  "model": "unsloth/Qwen3.6-27B-GGUF Q4_0",
+  "hardware": "Intel Arc Pro B70 32GB",
+  "engine": "llama.cpp SYCL/Level Zero",
+  "patch": {
+    "description": "Runtime override for Q4_0 reordered MMVQ subgroup count",
+    "env": "GGML_SYCL_REORDER_MMVQ_SUBGROUPS_RUNTIME",
+    "path": "/home/steve/llm-optimization-artifacts/patches/llama-cpp-sycl-q4-runtime-subgroups-current-20260506.patch",
+    "sha256": "19ed486971012f9d695c2e5946db99c6fe7a9ccfc11b5bd3cacc4305352fa543",
+    "gzip_path": "/home/steve/llm-optimization-artifacts/patches/llama-cpp-sycl-q4-runtime-subgroups-current-20260506.patch.gz",
+    "gzip_sha256": "a9d4135f4c997604745f6bfbf1605bc291f411b2b93c711239b7a3141d821dc7"
+  },
+  "single_b70_p0n128_r2": {
+    "selector": "level_zero:2",
+    "summary_tsv": "/home/steve/bench-results/qwen36-q4_0-gguf/subgroup-runtime-single-sweep-p0n128-r2-20260506T101208Z.tsv",
+    "results": [
+      {"subgroups": "default", "tok_s_out": 24.676064},
+      {"subgroups": "1", "tok_s_out": 24.658384},
+      {"subgroups": "2", "tok_s_out": 24.662854},
+      {"subgroups": "4", "tok_s_out": 24.640353},
+      {"subgroups": "8", "tok_s_out": 24.708439},
+      {"subgroups": "16", "tok_s_out": 24.808761}
+    ]
+  },
+  "triple_b70_p0n128_r2": {
+    "selector": "level_zero:2,1,3",
+    "summary_tsv": "/home/steve/bench-results/qwen36-q4_0-gguf/subgroup-runtime-triple213-sweep-p0n128-r2-20260506T101606Z.tsv",
+    "results": [
+      {"subgroups": "default", "tok_s_out": 44.882959},
+      {"subgroups": "8", "tok_s_out": 44.444759},
+      {"subgroups": "16", "tok_s_out": 45.248504}
+    ]
+  },
+  "triple_b70_p512n512_r3": {
+    "selector": "level_zero:2,1,3",
+    "results": [
+      {
+        "subgroups": "16",
+        "tok_s_prompt": 118.426089,
+        "tok_s_out": 45.411030,
+        "jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-runtime-sg16-triple213-p512n512-r3-20260506T101943Z.jsonl"
+      },
+      {
+        "subgroups": "default",
+        "tok_s_prompt": 118.146716,
+        "tok_s_out": 45.932216,
+        "jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-runtime-default-triple213-p512n512-r3-20260506T102146Z.jsonl"
+      }
+    ]
+  },
+  "conclusion": "No LocalMaxxing submission; subgroup override is diagnostic only and does not beat the existing 46.194319 tok/s Q4_0 3x result."
+}
