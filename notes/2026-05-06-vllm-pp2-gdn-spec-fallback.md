@@ -108,15 +108,58 @@ Result:
   - Decode: `45.104294 tok/s`
 - Treat this as a runtime stability failure after repeated vLLM load/unload cycles, not a model benchmark and not validation of the fallback patch.
 
+### Post-reboot forced-repeat validation
+
+Log:
+
+`/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp2-pp2-in512-out32-bs1-20260506T142903Z.log`
+
+JSON:
+
+`/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp2-pp2-in512-out32-bs1-20260506T142903Z.json`
+
+Result:
+
+- Completed after reboot with the fallback patch active.
+- The forced-repeat prompt again exercised the real PP speculative path:
+  - PP1 proposed `draft_lens=[4]`;
+  - PP0 scheduled `spec_lens={'0-800bfba5': 4}`.
+- The run did not hit the old `_gdn_attention_core_xpu_impl()` assertion, so the GDN speculative fallback is validated at the previous crash site.
+- Measured short-run latency was `3.668104977 s` for 32 output tokens, or `8.723851 tok/s` output, which is not a useful speed result.
+- Do not submit to LocalMaxxing because this is a short correctness/plumbing validation, not a benchmark-quality speed run.
+
+### Post-validation longer PP2 retry
+
+Log:
+
+`/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp2-pp2-in512-out128-bs1-20260506T143147Z.log`
+
+Result:
+
+- Failed during the next vLLM model load, before inference.
+- The immediate failure was `UR_RESULT_ERROR_DEVICE_LOST` while copying `vocab_parallel_embedding` weights.
+- oneCCL then emitted broken-pipe cleanup errors because one worker died during initialization.
+- Post-failure sanity:
+  - `sycl-ls` still enumerated all four B70s;
+  - a small Torch XPU allocation and synchronization succeeded on all four devices.
+- This confirms a repeatable vLLM/XPU FP8 load/unload stability issue independent of the GDN fallback correctness.
+
 ## Interpretation
 
-The fallback patch is source-correct and compiles, but it still needs a clean validation run after the Level Zero memory/device-lost episode.
+The fallback patch is source-correct, compiles, and completed a post-reboot forced-repeat PP2 run that scheduled real speculative tokens through the previous GDN assertion site.
+
+The remaining blocker is runtime stability and performance, not the original assertion:
+
+- PP2 speculative fallback works for a short validation run.
+- Repeated static FP8 PP2 loads can still trigger Level Zero `DEVICE_LOST` during weight copy.
+- The short validation speed is poor, so PP2 is not a current performance path.
 
 Do not submit these PP2 runs to LocalMaxxing:
 
 - the assertion failure is diagnostic;
 - the eager run did not actually speculate;
 - the patched retry failed at load time.
+- the post-reboot successful run is a short 32-token validation with poor throughput.
 
 The currently shareable FP8 result remains the already submitted TP4 static FP8 run:
 
@@ -126,7 +169,7 @@ The currently shareable FP8 result remains the already submitted TP4 static FP8 
 
 ## Next
 
-- Give vLLM/XPU a cool-down or reboot before another PP2 validation, because repeated FP8 loads can leave the Level Zero runtime unstable.
-- Re-run the forced-repeat PP2 test with the fallback patch and confirm whether it reaches the generic GDN spec path.
-- If the fallback reaches inference, validate correctness against non-spec output on a tiny deterministic prompt before attempting speed runs.
+- Keep the GDN fallback patch, but stop treating PP2 as a near-term speed path until the repeated-load `DEVICE_LOST` issue is addressed.
+- If returning to PP2, use one long-lived server/process instead of repeated `bench latency` process loads, or add a safer unload/reset path.
+- Validate correctness against non-spec output in a single long-lived process before attempting another speed run.
 - Keep Q4_0 GGUF and TP4 FP8 as the active speed paths while PP2 GDN speculation remains experimental.
