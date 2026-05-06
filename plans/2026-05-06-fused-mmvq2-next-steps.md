@@ -20,13 +20,15 @@
 
 ## Quality status
 
-- This path should be quality preserving because it computes the same two matvecs with the same Q4_0 weights and the same Q8_1 activation cache, only in a shared kernel launch.
-- Still required: deterministic generation/logit comparison with `GGML_SYCL_FUSE_MMVQ2=0` vs `1` on the target model and high-water 3-GPU config.
+- Single-card PPL matched exactly with `GGML_SYCL_FUSE_MMVQ2=0` vs `1`: `PPL = 2.0500 +/- 0.56981` for both.
+- 3-card forced non-conversation deterministic generation matched byte-for-byte with temp 0.
+- 3-card PPL is not a stable quality oracle yet: a fusion-disabled repeat run varied from `PPL = 2.1587` to `2.3188`.
+- Treat `GGML_SYCL_FUSE_MMVQ2=1` as experimental for multi-GPU until a better token/logit correctness harness is built.
 
 ## Next steps
 
-1. Run a fixed-prompt correctness harness comparing fused vs unfused output at temperature 0.
-2. If output matches, keep `GGML_SYCL_FUSE_MMVQ2=1` in the default benchmark recipe for Q4_0.
+1. Build a token/logit correctness harness that avoids the current multi-GPU PPL nondeterminism.
+2. Keep `GGML_SYCL_FUSE_MMVQ2=1` opt-in only until that harness clears the 3-card and 4-card paths.
 3. Port the exact Q4_0/Q8_1 ESIMD fused2 prototype into llama.cpp behind a second opt-in gate, then re-run single, 3x, and 4x benchmarks.
 4. Investigate a deeper FFN fusion around `ffn_gate + ffn_up + swiglu`, because it may remove another graph node and reduce memory traffic.
 5. Re-test 4x B70 after the local-kernel changes. Current 4x remains below 3x, so broad root-order sweeps are lower priority than reducing per-device launch/collective overhead.
