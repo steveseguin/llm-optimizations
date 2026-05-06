@@ -28,6 +28,8 @@ log="${json%.json}.log"
 
 export ONEAPI_DEVICE_SELECTOR="$SELECTOR"
 export VLLM_NO_USAGE_STATS=1
+export LD_LIBRARY_PATH="$VENV/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+export CCL_ATL_TRANSPORT="${CCL_ATL_TRANSPORT:-ofi}"
 
 quant_args=()
 if [[ -n "$QUANTIZATION" && "$QUANTIZATION" != "none" && "$QUANTIZATION" != "auto" ]]; then
