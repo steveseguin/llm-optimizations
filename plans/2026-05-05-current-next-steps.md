@@ -99,6 +99,17 @@ This note supersedes the stale portions of `plans/q4_0-gguf-b70-optimization-pla
   - note: `notes/2026-05-06-q4-pairwise4-fusedadd-negative.md`;
   - data: `data/qwen36-q4-pairwise4-fusedadd-20260506.json`;
   - patch: `patches/llama-cpp-sycl-meta-pairwise4-fusedadd-current-20260506.patch.gz.b64`.
+- Q4_0 skip-allreduce diagnostic:
+  - implemented `GGML_SYCL_COMM_SKIP_ALLREDUCE=1` across the SYCL allreduce, allreduce+add, allreduce+reshape, and allreduce+get_rows backend hooks;
+  - this mode is correctness-breaking and not valid for output quality;
+  - 3x selector `2,1,3`, `p512/n128/r1`: skip prompt `238.387693 tok/s`, skip decode `43.698372 tok/s`;
+  - 3x same-build control: prompt `135.534672 tok/s`, decode `43.991643 tok/s`;
+  - 4x selector `0,1,2,3`, `p512/n128/r1`: skip prompt `315.892740 tok/s`, skip decode `33.341518 tok/s`;
+  - 4x same-build control: prompt `101.657601 tok/s`, decode `34.124205 tok/s`;
+  - conclusion: the allreduce helper is a large prefill cost, but not the current decode limiter; keep this gate diagnostic-only and do not submit to LocalMaxxing;
+  - note: `notes/2026-05-06-q4-skip-allreduce-diagnostic.md`;
+  - data: `data/qwen36-q4-skip-allreduce-diagnostic-20260506.json`;
+  - patch: `patches/llama-cpp-sycl-skip-allreduce-current-20260506.patch.gz.b64`.
 - llm-scaler inspection:
   - useful references: ESIMD INT4 GEMV, fused residual-add/RMSNorm/GEMV, two-GEMV sharing one input, QKV split/norm/RoPE, and MTP/speculative decode scaffolding;
   - important negative evidence: its optimized Arc row-parallel `o_proj`/`down_proj` paths still call tensor-parallel allreduce afterward, so there is no ready-made fused row-parallel allreduce epilogue to port;
@@ -107,8 +118,9 @@ This note supersedes the stale portions of `plans/q4_0-gguf-b70-optimization-pla
 
 ## Interpretation
 
-- Q4_0 4x scaling is not fixed by root selection, root-copy, local-write, or residual-read avoidance. The next useful work must reduce the number of tiny reductions or fuse communication into a lower-level matmul/reduction epilogue.
+- Q4_0 4x scaling is not fixed by root selection, root-copy, local-write, residual-read avoidance, pairwise fused-add, or skipping allreduce as a decode diagnostic. The next useful work should target local Q4/Q8 vector matvec efficiency, dispatch overhead, and ways to amortize repeated token work.
 - A 4x pairwise tree for the fused-add collective also does not fix decode scaling; it likely adds kernel/event overhead while leaving the per-token count of 20 KiB reductions unchanged.
+- Skip-allreduce shows that prefill has large allreduce overhead, but decode does not gain when the collective is removed. That lowers the expected payoff of fp16 allreduce buffers unless paired with a quality harness and a broader local-kernel change.
 - FP8 TP4 is now the fastest validated single-session Qwen3.6 27B mode on this host, but adjacent n-gram flags are exhausted enough for now. Further FP8 work should target backend/runtime behavior rather than speculative flag sweeps.
 - MiniMax M2.7 is currently blocked earlier than MoE/expert placement. The immediate issue is the SYCL `q8_0 x vector` dense attention matvec path on block 0.
 - The runtime recovered after reboot. Clean 4x no longer wedges the runtime, but it remains slower than 3x. Avoid FLR/PCI reset for B70 recovery.
@@ -128,9 +140,10 @@ This note supersedes the stale portions of `plans/q4_0-gguf-b70-optimization-pla
    - tune the 20KB f32 allreduce fast path only after the remaining graph-level fusions are exhausted;
    - prototype fewer reductions or a fused row-parallel output kernel only where mathematically safe;
    - investigate whether the row-parallel output projection can produce the mirrored post-allreduce output directly, eliminating the separate small collective rather than moving it later;
-   - add a diagnostic "skip allreduce" timing gate to isolate local Q4_0 GEMV time from collective time, following the llm-scaler `SKIP_ALL_REDUCE` measurement idea;
-   - prototype an fp16 allreduce-buffer mode only behind an explicit quality-risk gate, and validate numerical impact before treating it as a speed result;
-   - study llm-scaler ESIMD INT4 GEMV for possible local matvec speedups, but do not expect it to remove the communication bottleneck by itself;
+   - treat the skip-allreduce timing gate as complete: it isolates prefill allreduce cost but does not expose decode headroom;
+   - defer fp16 allreduce-buffer mode until there is a numerical-quality harness, since the skip diagnostic did not show decode upside from removing the f32 collective;
+   - prioritize studying/porting llm-scaler ESIMD INT4 GEMV and fused norm/GEMV ideas for local matvec speedups;
+   - measure Q4_0 per-token dispatch/kernel mix with focused stats before writing another collective variant;
    - keep local-write/root-residual env gates diagnostic-only.
 3. FP8 vLLM/XPU:
    - keep the PP2 x TP2 `self.drafter` getattr patch;
