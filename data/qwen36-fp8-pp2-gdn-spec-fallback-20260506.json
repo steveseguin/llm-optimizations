@@ -103,7 +103,62 @@
         }
       },
       "localmaxxing": "not_submitted"
+    },
+    {
+      "name": "post_reboot_forced_repeat_pp2_after_fallback_patch",
+      "topology": {
+        "tp": 2,
+        "pp": 2,
+        "selector": "level_zero:0,1,2,3"
+      },
+      "tokens": {
+        "prompt": 512,
+        "output": 32,
+        "max_model_len": 1024
+      },
+      "speculative_config": {
+        "method": "ngram",
+        "num_speculative_tokens": 4,
+        "prompt_lookup_min": 2,
+        "prompt_lookup_max": 4
+      },
+      "prompt_control": {
+        "VLLM_BENCH_LATENCY_PROMPT_MODE": "repeat",
+        "VLLM_BENCH_LATENCY_REPEAT_PERIOD": 16,
+        "VLLM_BENCH_LATENCY_PROMPT_SEED": 123
+      },
+      "log": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp2-pp2-in512-out32-bs1-20260506T142903Z.log",
+      "json": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp2-pp2-in512-out32-bs1-20260506T142903Z.json",
+      "result": "completed_with_real_speculation",
+      "finding": "PP1 proposed draft_lens=[4] and PP0 scheduled spec_lens with 4 draft tokens. The run completed instead of hitting the previous _gdn_attention_core_xpu_impl spec_sequence_masks assertion.",
+      "metrics": {
+        "avg_latency_s": 3.6681049770122627,
+        "computed_output_tok_s": 8.723850653277806,
+        "computed_total_tok_s": 148.3054611057227
+      },
+      "localmaxxing": "not_submitted_short_validation"
+    },
+    {
+      "name": "post_validation_pp2_output128_retry",
+      "topology": {
+        "tp": 2,
+        "pp": 2,
+        "selector": "level_zero:0,1,2,3"
+      },
+      "tokens": {
+        "prompt": 512,
+        "output": 128,
+        "max_model_len": 1024
+      },
+      "log": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp2-pp2-in512-out128-bs1-20260506T143147Z.log",
+      "result": "failed_before_inference",
+      "failure": "UR_RESULT_ERROR_DEVICE_LOST during vocab_parallel_embedding weight copy on the next vLLM load, followed by oneCCL broken-pipe cleanup errors.",
+      "post_failure_sanity": {
+        "sycl_ls": "enumerated four B70s",
+        "torch_xpu_small_alloc": "succeeded on all four devices"
+      },
+      "localmaxxing": "not_submitted"
     }
   ],
-  "conclusion": "The PP2 GDN speculative blocker is the XPU custom op assertion on spec_sequence_masks. A generic-core fallback has been patched and compiled, but still needs clean validation after the Level Zero load-time device-lost episode."
+  "conclusion": "The PP2 GDN speculative blocker at spec_sequence_masks is fixed for a short post-reboot forced-repeat validation run. The remaining blocker is vLLM/XPU static FP8 PP2 stability and speed: repeated loads can still trigger Level Zero DEVICE_LOST during weight copy, and the successful 32-token validation is too slow to treat as a performance path."
 }
