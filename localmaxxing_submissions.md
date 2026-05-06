@@ -99,14 +99,17 @@ Model: `unsloth/Qwen3.6-27B`, local GGUF file `Qwen3.6-27B-Q4_0.gguf`.
 | `llamacpp-qwen36-27b-q4_0-sycl-tp4-syncafter2-equal-negative-p512-n512` | `cmotpxzii000pqy019v46swqn` | 4 | 512 | 512 | 34.929 | 49.748 |
 | `llamacpp-qwen36-27b-q4_0-sycl-tp4-assist005-sg2-p512-n512` | `cmou581wv002dld0197mffpco` | 4 | 512 | 512 | 39.204 | 52.816 |
 | `llamacpp-qwen36-27b-q4_0-sycl-tp3-swiglu-ub128-p512-n512` | `cmougm58m00dpld012rbm9rbs` | 3 | 512 | 512 | 46.805 | 75.218 |
+| `llamacpp-qwen36-27b-q4_0-sycl-tp3-rmsnormmul-ub128-p512-n512` | `cmoujcois00esld01c5s6bwht` | 3 | 512 | 512 | 49.366 | 79.667 |
 
-Note: `cmotnyi25001jqu01fccla8cf` is the current best quality-preserving Q4_0 GGUF result. It uses the same Q4_0 weights, f16 KV cache, flash attention, no speculative decoding, no power-limit changes, and software-only SYCL/Level Zero patches including Q8 activation cache, fused MMVQ2, event-barrier allreduce, fused allreduce+ADD, and `GGML_SYCL_COMM_SYNC_AFTER=2`.
+Note: `cmotnyi25001jqu01fccla8cf` is the pre-fused-SwiGLU Q4_0 GGUF baseline. It uses the same Q4_0 weights, f16 KV cache, flash attention, no speculative decoding, no power-limit changes, and software-only SYCL/Level Zero patches including Q8 activation cache, fused MMVQ2, event-barrier allreduce, fused allreduce+ADD, and `GGML_SYCL_COMM_SYNC_AFTER=2`.
 
 Note: `cmotpxzii000pqy019v46swqn` is a useful negative equal-split four-card result. It confirms that the fourth B70 is not automatically beneficial for single-session Q4_0 because row shards become too narrow and add launch/quantization/collective overhead.
 
 Note: `cmou581wv002dld0197mffpco` is the best current four-card Q4_0 result. It uses a small fourth-card assist split (`-ts 1/1/1/0.05`) plus `GGML_SYCL_REORDER_MMVQ_SUBGROUPS_RUNTIME=2`, improving equal 4x from `34.929313 tok/s` to `39.204149 tok/s`, but it still trails the three-card result.
 
-Note: `cmougm58m00dpld012rbm9rbs` is the current best submitted quality-preserving Q4_0 GGUF result. It adds the opt-in `GGML_SYCL_FUSE_MMVQ2_SWIGLU=1` path, which fuses Q4_0 FFN gate/up matvecs with split SwiGLU. A short greedy decode matched baseline stdout byte-for-byte. The valid 512/512 TP3 run requires `-ub 128`; default `-ub 512` currently fails meta compute-buffer reservation after the active patch stack.
+Note: `cmougm58m00dpld012rbm9rbs` is the pre-RMS_NORM+MUL Q4_0 GGUF result. It adds the opt-in `GGML_SYCL_FUSE_MMVQ2_SWIGLU=1` path, which fuses Q4_0 FFN gate/up matvecs with split SwiGLU. A short greedy decode matched baseline stdout byte-for-byte. The valid 512/512 TP3 run requires `-ub 128`; default `-ub 512` currently fails meta compute-buffer reservation after the active patch stack.
+
+Note: `cmoujcois00esld01c5s6bwht` is the current best submitted quality-preserving Q4_0 GGUF result. It adds the opt-in `GGML_SYCL_FUSE_RMS_NORM_MUL=1` path on top of fused MMVQ2 and fused MMVQ2+SwiGLU. Greedy decode matched baseline stdout byte-for-byte. The full annotated payload returned HTTP 500 from the API, but a reduced payload with core metrics and notes was accepted.
 
 Date: 2026-05-06
 

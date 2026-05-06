@@ -1205,6 +1205,113 @@ Goal: improve quality-preserving Q4_0 performance without power-limit changes.
      - for Qwen3.6 27B FP8, prefer TP4/PP1 over TP2/PP2 for single-session speed and 32k context;
      - keep PP2 as a fallback for larger models or future pipeline-parallel experiments, not as the primary 27B path;
      - keep Q4_0 optimization focused on deeper llama.cpp same-activation multi-GEMV / norm+GEMV fusion.
+62. 2026-05-06 active-device row-split patch and row-split safety screen:
+   - implemented a focused llama.cpp patch in `src/llama-model.cpp` so `LLAMA_SPLIT_MODE_ROW` split-buffer creation maps selected model devices back to physical backend-registry indices before calling `ggml_backend_split_buffer_type`;
+   - motivation:
+     - llama.cpp `tensor_split` is selected-device-order;
+     - SYCL split buffers interpret `tensor_split` as global physical SYCL device order;
+     - with four visible B70s, a target using only two or three B70s could unintentionally assign row shards to an unselected B70.
+   - build:
+     - `llama-bench` and `llama-cli` rebuilt successfully in `/home/steve/src/llama.cpp-q4-b70/build-sycl-2026-bmg-g31`;
+     - patch artifact: `/home/steve/llm-optimizations/patches/llama-cpp-active-device-row-split-current-20260506.patch`.
+   - tensor-split sanity after patch:
+     - Qwen3.6 27B Q4_0 GGUF, three B70s `SYCL2/SYCL1/SYCL3`, tensor split `1/1/1`;
+     - `128` prompt / `128` output;
+     - decode result: `45.065268 tok/s`;
+     - prefill result: `106.106708 tok/s`;
+     - log: `/home/steve/bench-results/qwen36-q4_0-gguf/sanity-tensor3-after-active-split-20260506T183355Z.log`.
+   - row-split safety screen:
+     - Qwen3.5 4B Q4_K_M, row split on `SYCL2/SYCL3`, `32` prompt / `8` output;
+     - still failed with Level Zero `UR_RESULT_ERROR_DEVICE_LOST` inside `oneapi::mkl::blas::column_major::gemm` from `ggml_sycl_op_mul_mat_sycl`;
+     - kernel log recorded an `xe 0000:a3:00.0` GT reset at `2026-05-06 14:32:41 America/Toronto`;
+     - log: `/home/steve/bench-results/active-split/qwen35-4b-row-sycl23-smoke-20260506T183238Z.log`.
+   - decision:
+     - active-device accounting is patched and should be kept for reproducibility;
+     - row split remains unsafe for throughput work until the SYCL split matmul path is fixed;
+     - do not use row split as the production Q4 path and do not submit this diagnostic to LocalMaxxing.
+63. 2026-05-06 Q4_0 fused MMVQ2 + split SwiGLU patch:
+   - implemented an opt-in SYCL path behind `GGML_SYCL_FUSE_MMVQ2_SWIGLU=1`;
+   - target graph:
+     - two Q4_0 FFN gate/up matvecs;
+     - same F32 activation input;
+     - split `GGML_OP_GLU` with `GGML_GLU_OP_SWIGLU`;
+     - contiguous non-split SYCL buffers;
+     - direct write of `silu(gate) * up` to the GLU output tensor;
+   - build:
+     - rebuilt `llama-bench` and `llama-cli` successfully in `/home/steve/src/llama.cpp-q4-b70/build-sycl-2026-bmg-g31`;
+     - patch artifact: `/home/steve/llm-optimizations/patches/llama-cpp-sycl-fused-mmvq2-swiglu-current-20260506.patch.gz.b64`;
+   - correctness:
+     - `llama-completion`, greedy decode, same prompt/seed, 8 generated tokens;
+     - baseline and fused stdout SHA256 both `a7514e8196ec963459785822b3fcf25b1743096a4bdd5ec746225a7c9a29be19`;
+     - this is quality-preserving for the tested decode path: same target model, same Q4_0 weights, same f16 KV, no speculative decoding, no power changes;
+   - single-B70 512/512:
+     - baseline fused MMVQ2: `24.567164 tok/s`;
+     - fused MMVQ2 + SwiGLU: `24.657839 tok/s`;
+     - gain: `+0.37%`;
+     - conclusion: correct but not enough to close the single-B70 Linux gap to the Windows Q4_0 result;
+   - three-B70 tensor split 512/512:
+     - devices: `SYCL2/SYCL1/SYCL3`;
+     - split: `-sm tensor -ts 1/1/1`;
+     - required `-ub 128` because default `-ub 512` now fails graph reservation with `GGML_ASSERT(buffer) failed` in `ggml_backend_buffer_get_size()` while allocating meta compute buffers;
+     - baseline `-ub 128`: `45.745560 tok/s`;
+     - fused MMVQ2 + SwiGLU `-r 2 -ub 128`: `46.804859 tok/s`, `75.217668 total tok/s`;
+     - LocalMaxxing ID: `cmougm58m00dpld012rbm9rbs`;
+   - decision:
+     - keep the fused SwiGLU env gate as a valid incremental win;
+     - treat `-ub 128` as the current required 3-B70 512/512 validation knob;
+     - next source-level target should fuse a broader same-activation GEMV group or norm+projection path because FFN SwiGLU launch removal alone is too small on one B70.
+64. 2026-05-06 Q4_0 RMS_NORM + scale-MUL fusion:
+   - implemented an opt-in SYCL path behind `GGML_SYCL_FUSE_RMS_NORM_MUL=1`;
+   - target graph:
+     - F32 `RMS_NORM`;
+     - immediately consumed by F32 `MUL`;
+     - other MUL input is a contiguous one-dimensional F32 scale tensor;
+     - all tensors on the same non-split SYCL device buffer;
+     - direct write of normalized-and-scaled output to the MUL destination;
+   - added allocator diagnostics while investigating the 3x `-ub 512` failure:
+     - meta buffer allocation now logs the failing simple backend and size before returning allocation failure;
+     - `ggml_vbuffer_alloc` logs the failing chunk/buft/size;
+     - confirmed `-ub 512` fails while reserving a roughly `529530880` byte meta compute buffer, with `SYCL3` failing the allocation;
+   - build:
+     - rebuilt `llama-bench` and `llama-completion` successfully in `/home/steve/src/llama.cpp-q4-b70/build-sycl-2026-bmg-g31`;
+     - patch artifact: `/home/steve/llm-optimizations/patches/llama-cpp-sycl-rmsnormmul-current-20260506.patch.gz.b64`;
+   - correctness:
+     - `llama-completion`, greedy decode, same prompt/seed, fused MMVQ2 and fused SwiGLU enabled on both sides;
+     - baseline and fused stdout SHA256 both `f7254271342a273042f88b21af7267f2fe5a06340ba68a9fc765746090a645aa`;
+     - debug 1-token run confirmed `418` RMS_NORM+MUL fused calls;
+     - this is quality-preserving for the tested decode path: same target model, same Q4_0 weights, same f16 KV, no speculative decoding, no sampling change, no power changes;
+   - single-B70 512/512:
+     - devices: `SYCL2`;
+     - decode: `24.960284 tok/s`;
+     - previous fused MMVQ2+SwiGLU single result: `24.657839 tok/s`;
+     - total throughput: `47.655433 tok/s`;
+   - two-B70 tensor split 512/512:
+     - devices: `SYCL2/SYCL1`;
+     - split: `-sm tensor -ts 1/1`;
+     - best validation used `-ub 128`;
+     - decode: `42.106013 tok/s`, stddev `0.011783`;
+     - total throughput: `75.570584 tok/s`;
+   - three-B70 tensor split 512/512:
+     - devices: `SYCL2/SYCL1/SYCL3`;
+     - split: `-sm tensor -ts 1/1/1`;
+     - `-ub 128`;
+     - decode: `49.366188 tok/s`, stddev `0.486931`;
+     - total throughput: `79.667255 tok/s`;
+     - previous fused MMVQ2+SwiGLU 3x result: `46.804859 tok/s`;
+     - LocalMaxxing ID: `cmoujcois00esld01c5s6bwht`;
+   - four-B70 assist split:
+     - selector `level_zero:2,1,3,0`;
+     - split `1/1/1/0.05`;
+     - failed before benchmark JSON with `UR_RESULT_ERROR_OUT_OF_DEVICE_MEMORY` during `MUL_MAT`;
+     - log: `/home/steve/bench-results/qwen36-q4_0-gguf/rms-norm-mul-20260506/tensor4-assist005-sg2-p512n512/rmsmul-p512n512-r2-ub32-20260506T204412Z.log`;
+     - decision: record as a failed diagnostic, do not submit to LocalMaxxing;
+   - artifacts:
+     - note: `/home/steve/llm-optimizations/notes/2026-05-06-q4-rmsnormmul.md`;
+     - data: `/home/steve/llm-optimizations/data/qwen36-q4-rmsnormmul-20260506.json`;
+   - decision:
+     - keep `GGML_SYCL_FUSE_RMS_NORM_MUL=1` in the Q4_0 best stack;
+     - current quality-preserving Q4_0 GGUF best is now 3x B70 at `49.366188 tok/s`;
+     - next source-level target should be fused output-projection plus allreduce/residual epilogues or a broader same-activation GEMV group, because single-B70 is still short of the Windows Q4_0 target and 4x remains bottlenecked by narrow shards/collectives.
 
 ## Success Criteria
 
@@ -1213,8 +1320,8 @@ Goal: improve quality-preserving Q4_0 performance without power-limit changes.
 - FP8 investigation success: official `Qwen/Qwen3.6-27B-FP8` reaches or beats the current Q4_0 TP3 result while preserving output quality.
 - Static FP8 current best: `vrfai/Qwen3.6-27B-FP8` on four B70s with patched vLLM/XPU FlashAttention2 plus n-gram speculative decode reaches `49.581893 tok/s` on 512 prompt / 512 output. This is ahead of the Q4_0 TP3 validation while preserving more fidelity than INT4 paths.
 - Static FP8 32k-context status: TP4 with patched vLLM/XPU FlashAttention2 succeeds at `max_model_len=32768` and reports `1,133,163` GPU KV-cache tokens with `42.996276 tok/s` at 2048 prompt / 256 output. TP2/PP2 also fits but is slower (`26.361533 tok/s`) and reports slightly less 32k KV capacity.
-- Current dual-card milestone reached: Q4_0 GGUF single session `37.690 tok/s`, quality preserving, software-only.
-- Current improved multi-card milestone: Q4_0 GGUF single session `44.181 tok/s` on three B70s for 512 prompt / 512 output with `GGML_SYCL_Q8_CACHE=1`, async copy, single-kernel allreduce, `GGML_SYCL_COMM_EVENT_BARRIER=1`, and `GGML_META_FUSE_ALLREDUCE_ADD=1`. This is quality preserving and software-only.
-- Current four-card Q4_0 status: assist split `1/1/1/0.05` reaches `39.204149 tok/s`, improving the equal-split four-card result by `12.24%` but still trailing the best three-card result, so quad Q4_0 remains a kernel/scheduling investigation rather than the production path.
+- Current dual-card milestone reached: Q4_0 GGUF single session `42.106013 tok/s` on two B70s for 512 prompt / 512 output with the current fused stack, quality preserving, software-only.
+- Current improved multi-card milestone: Q4_0 GGUF single session `49.366188 tok/s` on three B70s for 512 prompt / 512 output with Q8 activation cache, fused MMVQ2, fused MMVQ2+SwiGLU, fused RMS_NORM+scale-MUL, single-kernel allreduce, fused allreduce+ADD, `GGML_SYCL_COMM_SYNC_AFTER=2`, and `-ub 128`. This is quality preserving and software-only.
+- Current four-card Q4_0 status: assist split `1/1/1/0.05` reaches `39.204149 tok/s`, improving the equal-split four-card result by `12.24%` but still trailing the best three-card result, so quad Q4_0 remains a kernel/scheduling investigation rather than the production path. The RMS_NORM+MUL rerun of that assist split failed with Level Zero OOM during `MUL_MAT`.
 - Dual-card success: Q4_0 GGUF single session `>=48 tok/s` first, then `>=52 tok/s`, without switching away from Q4_0.
 - Four-card success: Q4_0 GGUF single session must exceed dual-card by a meaningful margin before treating quad tensor split as viable.

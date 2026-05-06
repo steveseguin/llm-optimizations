@@ -93,7 +93,7 @@
       "totalTokS": 79.667255,
       "localMaxxingId": "cmoujcois00esld01c5s6bwht",
       "jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/rms-norm-mul-20260506/tensor3-sycl213-p512n512/rmsmul-p512n512-r3-ub128-20260506T204554Z.jsonl",
-      "log": "/home/steve/bench-results/qwen36-q4_0-gguf/rms-norm-mul-20260506/tensor3-sycl213-p512n512-r3-ub128-20260506T204554Z.log",
+      "log": "/home/steve/bench-results/qwen36-q4_0-gguf/rms-norm-mul-20260506/tensor3-sycl213-p512n512/rmsmul-p512n512-r3-ub128-20260506T204554Z.log",
       "localMaxxingResponse": "/home/steve/bench-results/localmaxxing-qwen36-q4-rmsnormmul-3x-simple-20260506T205435Z.json"
     }
   ],
