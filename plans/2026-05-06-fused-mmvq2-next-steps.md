@@ -26,7 +26,7 @@
 ## Quality status
 
 - `GGML_SYCL_FUSE_MMVQ2=1` is quality-cleared on the fast 2x and 3x paths using the token/logit harness.
-- A standalone Q4_0 x Q8_1 ESIMD harness now exists at `tools/q4_0_gemv_esimd_bench.cpp`; it matches GGML math and passes correctness against CPU reference.
+- A standalone Q4_0 x Q8_1 harness now exists at `tools/q4_0_gemv_esimd_bench.cpp`; it now includes a corrected ESIMD path and a production-style subgroup `sgdp4a` baseline.
 - The best 2x path is `40.933579 tok/s` decode and passed a 16-step full-logit repeat.
 - The best 3x path is `45.954130 tok/s` decode and passed a 16-step full-logit repeat.
 - 4x with sync-after is repeatable in a 4-step full-logit smoke test but only reaches `34.920977 tok/s`, so it is not a throughput win.
@@ -40,7 +40,8 @@
 - FP8 TP4 post-patch sweep confirms no deterministic TP4 regression: depth-4 n-gram reran at `48.198021 tok/s`, depth 5 at `48.298516 tok/s`, depth 3 at `43.023391 tok/s`, and depth 6 at `41.724557 tok/s`. The earlier submitted depth-4 `49.581893 tok/s` run remains the best row.
 - FP8 TP4 `ngram_gpu` is not worth pursuing for this prompt shape yet: it runs without the PP2 buffer crash but only reaches `43.450599 tok/s` because draft acceptance stays around `3.5-4.9%` in the measured windows.
 - FP8 TP4 longer-context 2048/512 run is stable at `43.688466 tok/s` output and `218.442329 tok/s` total with `MAX_MODEL_LEN=4096`; submitted to LocalMaxxing as `cmottw16x002wqy01jvbluobl`.
-- The first Q4_0 ESIMD GEMV prototype is not ready for llama.cpp integration: best large-shape timings are `125.134858 us` for `N=17408 K=5120` and `121.849692 us` for `N=5120 K=17408`, only around `400 GB/s` effective. It is useful as a correctness/timing harness for further kernel work.
+- The first Q4_0 ESIMD GEMV prototype is not ready for llama.cpp integration. A corrected reference found that the old harness used adjacent low/high nibble pairing instead of GGML Q4_0 half-block pairing. After correction, the production-style subgroup baseline is faster on major FFN shapes; with production `warp=16`, `N=17408 K=5120` was `90.872058 us` at `subgroups=4` versus `128-144 us` for the ESIMD float path.
+- A llama.cpp build with `-DGGML_SYCL_REORDER_MMVQ_SUBGROUPS=4` is not usable yet: 1x correctness matched default and 1x speed was neutral (`24.659991 tok/s`), but 3x tensor split aborted in `ggml_backend_meta_buffer_type_alloc_buffer` during context reservation.
 - Multi-GPU PPL remains a noisy oracle and should not be used for pass/fail quality on these tensor-split paths.
 
 ## Correctness findings
@@ -59,11 +60,11 @@
 3. Stop pursuing the current pairwise/tree and striped-root 4x collectives for speed; both add ordering/kernel overhead and regress decode.
 4. Gate or rewrite the generic custom allreduce path so it cannot silently use the in-place race.
 5. Keep `GGML_SYCL_ASYNC_CPY_TENSOR=0` in all recommended tensor-split recipes until the scheduler copy API can propagate a correct destination event.
-6. Iterate on the Q4_0/Q8_1 ESIMD harness before llama.cpp integration: use packed integer dot products, specialize hot shapes, and compare against current MMVQ in a controlled microbenchmark.
+6. Iterate on the Q4_0/Q8_1 kernel harness before llama.cpp integration: the current ESIMD float path is superseded by the corrected subgroup baseline. Next attempts should use packed integer ESIMD/XMX or specialize around current reordered MMVQ rather than float unpack/FMA.
 7. Investigate deeper FFN fusion around `ffn_gate + ffn_up + swiglu`, because it may remove another graph node and reduce memory traffic.
 8. Keep FP8/vLLM TP4 and Q4_0 GGUF tracks separate in notes and submissions, because they trade different quantization and runtime behavior.
 9. Revisit Qwen3.6 27B FP8 on vLLM/XPU and OpenVINO/IR as a 2x2-style candidate: two-card tensor/pipeline parallelism per session could use the 64GB pair cleanly and avoid the Q4_0 GGUF 4-card collective bottleneck.
 10. For torch/vLLM runs, keep `/home/steve/.venvs/vllm-xpu-managed/lib` first in `LD_LIBRARY_PATH`; sourcing oneAPI `setvars.sh` before vLLM caused XCCL barrier/allreduce segfaults.
 11. Do not spend more time on PP2 speculation without first instrumenting why CPU n-gram never schedules draft tokens under PP and why GPU n-gram valid counts are always zero. Treat PP2 as a memory-capacity path, not the speed path, until that is fixed.
 12. Next high-value FP8 tests: keep TP4 CPU n-gram at 4 or 5 draft tokens; test longer context. Deprioritize `ngram_gpu` unless acceptance can be improved.
-13. Next high-value Q4 tests: keep 3x `GGML_SYCL_COMM_SYNC_AFTER=2` as the best validated GGUF path, then work on fused Q4_0/Q8_1 ESIMD and deeper FFN fusion rather than additional 4x collective topologies.
+13. Next high-value Q4 tests: keep 3x `GGML_SYCL_COMM_SYNC_AFTER=2` as the best validated GGUF path, then work on packed integer/XMX Q4_0/Q8_1 kernels and deeper FFN fusion rather than additional 4x collective topologies or the current ESIMD float kernel.
