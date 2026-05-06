@@ -40,6 +40,7 @@ Two B70s, `SYCL2/SYCL1`, tensor split `1/1`, `-ub 128`, 512 prompt / 512 output:
 - plus RMS_NORM+MUL fusion: `42.106013 tok/s`
 - total throughput: `75.570584 tok/s`
 - stddev: `0.011783 tok/s`
+- LocalMaxxing: `cmouju3dx00f3ld01rzmp9u76`
 
 Three B70s, `SYCL2/SYCL1/SYCL3`, tensor split `1/1/1`, `-ub 128`, 512 prompt / 512 output:
 

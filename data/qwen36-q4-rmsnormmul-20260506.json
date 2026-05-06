@@ -75,8 +75,10 @@
       "decodeStddevTokS": 0.011783,
       "promptTokS": 368.495701,
       "totalTokS": 75.570584,
+      "localMaxxingId": "cmouju3dx00f3ld01rzmp9u76",
       "jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/rms-norm-mul-20260506/tensor2-sycl21-p512n512/rmsmul-p512n512-r3-ub128-20260506T205122Z.jsonl",
-      "log": "/home/steve/bench-results/qwen36-q4_0-gguf/rms-norm-mul-20260506/tensor2-sycl21-p512n512/rmsmul-p512n512-r3-ub128-20260506T205122Z.log"
+      "log": "/home/steve/bench-results/qwen36-q4_0-gguf/rms-norm-mul-20260506/tensor2-sycl21-p512n512/rmsmul-p512n512-r3-ub128-20260506T205122Z.log",
+      "localMaxxingResponse": "/home/steve/bench-results/localmaxxing-qwen36-q4-rmsnormmul-2x-min-20260506T210807Z.json"
     },
     {
       "label": "tp3-sycl213-rmsnormmul-ub128",
