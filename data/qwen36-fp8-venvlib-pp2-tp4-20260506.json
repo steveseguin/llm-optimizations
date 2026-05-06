@@ -1,0 +1,75 @@
+{
+  "date": "2026-05-06",
+  "model": "vrfai/Qwen3.6-27B-FP8",
+  "modelPath": "/home/steve/models/qwen3.6-27b-fp8-vrfai",
+  "engine": "vllm",
+  "engineVersion": "0.20.1+xpu",
+  "quantization": "fp8/compressed-tensors",
+  "libraryOrderingFix": {
+    "issue": "XCCL segfaulted at dist.barrier() when oneAPI setvars libraries preceded the vLLM venv libraries.",
+    "fix": "Prepend /home/steve/.venvs/vllm-xpu-managed/lib to LD_LIBRARY_PATH for torch/vLLM runs and avoid oneAPI setvars for vLLM.",
+    "wrapper": "/home/steve/bench-vllm-qwen36-fp8.sh"
+  },
+  "xcclGate": {
+    "selector": "level_zero:0,1",
+    "env": {
+      "LD_LIBRARY_PATH_PREFIX": "/home/steve/.venvs/vllm-xpu-managed/lib",
+      "CCL_ATL_TRANSPORT": "ofi"
+    },
+    "status": "passed",
+    "payloadGBpsAt256MiB": 41.75,
+    "log": "/home/steve/bench-results/qwen36-fp8-vllm/xccl-standalone-2rank-venvlib-post-reboot-20260506T072239Z.log"
+  },
+  "pp2Tp2NoSpec": {
+    "status": "stable_but_slow",
+    "topology": {
+      "tensorParallel": 2,
+      "pipelineParallel": 2,
+      "gpuCount": 4
+    },
+    "promptTokens": 512,
+    "outputTokens": 512,
+    "contextLength": 1024,
+    "batchSize": 1,
+    "latenciesSec": [
+      18.831783488996734,
+      18.411271026998293,
+      18.654142821003916
+    ],
+    "avgLatencySec": 18.63239911233298,
+    "tokSOut": 27.479016,
+    "tokSTotal": 54.958033,
+    "json": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp2-pp2-in512-out512-bs1-20260506T072309Z.json",
+    "log": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp2-pp2-in512-out512-bs1-20260506T072309Z.log"
+  },
+  "tp4NgramBest": {
+    "status": "new_validated_best",
+    "topology": {
+      "tensorParallel": 4,
+      "pipelineParallel": 1,
+      "gpuCount": 4
+    },
+    "speculative": {
+      "method": "ngram",
+      "numSpeculativeTokens": 4,
+      "promptLookupMin": 2,
+      "promptLookupMax": 4
+    },
+    "promptTokens": 512,
+    "outputTokens": 512,
+    "contextLength": 1024,
+    "batchSize": 1,
+    "latenciesSec": [
+      10.693160828996042,
+      11.773327080001764,
+      8.512563062999106
+    ],
+    "avgLatencySec": 10.326350323998971,
+    "tokSOut": 49.581893,
+    "tokSTotal": 99.163787,
+    "json": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp4-pp1-in512-out512-bs1-20260506T072633Z.json",
+    "log": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp4-pp1-in512-out512-bs1-20260506T072633Z.log",
+    "localmaxxingId": "cmotql1v60013qy01016jcs7r"
+  },
+  "conclusion": "Current fastest FP8 path is TP4 with n-gram speculative decoding. PP2 x TP2 is stable at 512/512 but too slow without speculative decode."
+}
