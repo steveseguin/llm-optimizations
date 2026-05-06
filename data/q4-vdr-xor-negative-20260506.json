@@ -1,0 +1,68 @@
+{
+  "date": "2026-05-06",
+  "model": {
+    "name": "Qwen3.6 27B Q4_0 GGUF",
+    "path": "/home/steve/models/qwen3.6-27b-q4_0-gguf/Qwen3.6-27B-Q4_0.gguf"
+  },
+  "hardware": {
+    "gpu": "Intel Arc Pro B70 32GB",
+    "gpu_count": 1,
+    "selector": "ONEAPI_DEVICE_SELECTOR=level_zero:2"
+  },
+  "engine": {
+    "name": "llama.cpp",
+    "backend": "SYCL Level Zero",
+    "build_path": "/home/steve/src/llama.cpp-q4-b70/build-sycl-2026-bmg-g31"
+  },
+  "patch": {
+    "path": "/home/steve/llm-optimization-artifacts/patches/llama-cpp-sycl-q4-vdr-xor-negative-20260506.patch",
+    "sha256": "d11f5617a9f6c718d9ccd4d8ec4ebd2f7ccdc4a1260209f5e7b92305b92068d9"
+  },
+  "common_flags": {
+    "prompt_tokens": 0,
+    "output_tokens": 128,
+    "repetitions": 2,
+    "flash_attention": true,
+    "kv_cache_dtype": "f16",
+    "ubatch": 32,
+    "env": {
+      "GGML_SYCL_DISABLE_DNN": "1",
+      "GGML_SYCL_Q8_CACHE": "1",
+      "GGML_SYCL_FUSE_MMVQ2": "1",
+      "GGML_SYCL_ASYNC_CPY_TENSOR": "0"
+    }
+  },
+  "results": [
+    {
+      "variant": "default_vdr2",
+      "tok_s_out": 24.654646,
+      "stddev_tok_s": 0.011553,
+      "jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-q4-vdrdefault-single2-p0n128-r2-20260506T110504Z.jsonl"
+    },
+    {
+      "variant": "vdr1",
+      "tok_s_out": 24.516621,
+      "stddev_tok_s": 0.021193,
+      "jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-q4-vdr1-single2-p0n128-r2-20260506T110504Z.jsonl"
+    },
+    {
+      "variant": "vdr4",
+      "tok_s_out": 23.232102,
+      "stddev_tok_s": 0.017190,
+      "jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-q4-vdr4-single2-p0n128-r2-20260506T110504Z.jsonl"
+    },
+    {
+      "variant": "default_reduce",
+      "tok_s_out": 24.599359,
+      "stddev_tok_s": 0.028376,
+      "jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-q4-reduce-default-single2-p0n128-r2-20260506T111513Z.jsonl"
+    },
+    {
+      "variant": "xor_reduce",
+      "tok_s_out": 24.557468,
+      "stddev_tok_s": 0.015520,
+      "jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-q4-reduce-xor-single2-p0n128-r2-20260506T111513Z.jsonl"
+    }
+  ],
+  "conclusion": "No speed improvement. Keep default VDR=2 and sycl::reduce_over_group for reordered Q4_0 MMVQ."
+}
