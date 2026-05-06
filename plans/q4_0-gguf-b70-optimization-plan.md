@@ -1134,6 +1134,38 @@ Goal: improve quality-preserving Q4_0 performance without power-limit changes.
    - next source direction:
      - mine llm-scaler for BMG ESIMD scheduling and fusion patterns, not direct Q4_0 format compatibility;
      - continue Q4_0 work around deeper graph/kernel fusion and per-token launch/quantization reduction, especially RMSNorm/GEMV or multi-GEMV fusion, because communication flag sweeps are exhausted.
+60. 2026-05-06 Q4_0 graph-pattern probe:
+   - added diagnostic env `GGML_META_GRAPH_PATTERN_STATS`;
+     - unset: no behavior change;
+     - `1`: summary only, once per graph UID;
+     - `2`: summary plus repeated-MUL_MAT shared-activation examples;
+     - `3`: repeat every compute call, useful only for debugging rebuild churn.
+   - build:
+     - rebuilt `/home/steve/src/llama.cpp-q4-b70/build-sycl-2026-bmg-g31/bin/llama-bench`;
+     - patch artifact: `/home/steve/llm-optimization-artifacts/patches/llama-cpp-meta-graph-pattern-stats-current-20260506.patch`.
+   - validated run:
+     - log: `/home/steve/bench-results/qwen36-q4_0-gguf/meta-graph-pattern2-triple213-p512n1-r1-20260506T175517Z.log`;
+     - JSONL: `/home/steve/bench-results/qwen36-q4_0-gguf/meta-graph-pattern2-triple213-p512n1-r1-20260506T175517Z.jsonl`;
+     - command used the known 3x Q4 path, `-p 512 -n 1`, flash attention, f16 KV, tensor split `1/1/1`, selector `level_zero:2,1,3`.
+   - probe result per graph:
+     - `3656` nodes;
+     - `497` `MUL_MAT` nodes;
+     - `344` Q4_0 `MUL_MAT` nodes;
+     - `127-128` partial `MUL_MAT` nodes;
+     - `209` `RMS_NORM -> MUL` chains;
+     - `129` norm-fed matmul groups;
+     - `369` norm-fed matmul edges;
+     - `128` `ADD -> RMS_NORM -> MUL -> MUL_MAT*` groups;
+     - `128` repeated-activation groups covering `368` matmuls.
+   - examples:
+     - `attn_post_norm-N` feeds `ffn_gate.weight:q4_0` and `ffn_up.weight:q4_0` in every layer;
+     - many `attn_norm-N` activations feed multiple attention projections, sometimes including `attn_qkv.weight:q4_0`, `attn_gate.weight:q4_0`, and f32 SSM alpha/beta projections;
+     - Qwen3.6 layers alternate between combined QKV and separate Q/K/V shapes, so a fused path must tolerate both grouped and split attention projection layouts.
+   - conclusion:
+     - this confirms the next quality-preserving Q4 target is multi-GEMV / norm+GEMV fusion for same-activation matmuls;
+     - FFN gate/up fusion is the cleanest first integration target because it is a pair of Q4_0 projections sharing `attn_post_norm`;
+     - attention projection fusion is also promising but more shape/layout dependent;
+     - do not submit this to LocalMaxxing because it is diagnostic, not a throughput result.
 
 ## Success Criteria
 

@@ -26,6 +26,7 @@ Reproducibility notes, benchmark payloads, and local patches from the Intel Arc 
 - `notes/2026-05-05-negative-followups.md`: negative follow-up screens and backend bugs found after the current best results.
 - `notes/2026-05-06-fp8-mtp-block-fp8-clean.md`: clean-load but slow Qwen3.6 FP8 MTP hybrid follow-up.
 - `notes/2026-05-06-llm-scaler-source-mining.md`: llm-scaler ESIMD source-mining notes for the next Q4 kernel/fusion work.
+- `notes/2026-05-06-q4-graph-pattern-probe.md`: Q4_0 decode graph probe showing same-activation multi-GEMV fusion opportunities.
 - `scripts/bench-qwen36-q4_0-gguf-vulkan-matrix.sh`: Q4_0 GGUF Vulkan benchmark sweep harness.
 - `scripts/bench-qwen36-q4_0-gguf-sycl-matrix.sh`: Q4_0 GGUF SYCL benchmark sweep harness.
 - `scripts/bench-qwen36-b70-single-mtp.sh`: single-B70 vLLM INT4 MTP benchmark wrapper.
