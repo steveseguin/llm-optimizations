@@ -1,0 +1,46 @@
+{
+  "date": "2026-05-06",
+  "model": "unsloth/Qwen3.6-27B",
+  "quantization": "Q4_0",
+  "engine": "llama.cpp SYCL Level Zero",
+  "hardware": "4x Intel Arc Pro B70 32GB",
+  "baseline": {
+    "path": "single-root allreduce, GGML_SYCL_COMM_SYNC_AFTER=2",
+    "decodeTokS": 34.929313,
+    "jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-syncafter2-reducewait-fusemmvq2-quad2130-p512n512-r3-20260506T055829Z.jsonl"
+  },
+  "existingPairwise": {
+    "env": "GGML_SYCL_COMM_PAIRWISE4=1, GGML_SYCL_COMM_SYNC_AFTER=0",
+    "correctness": "fail",
+    "details": "Diverged at step 0 in two-run full-logit smoke test.",
+    "path": "/home/steve/bench-results/qwen36-q4_0-gguf/correctness/pairwise4-existing-20260506T061748Z"
+  },
+  "pairwiseMode2": {
+    "env": "GGML_SYCL_COMM_PAIRWISE4=1, GGML_SYCL_COMM_SYNC_AFTER=2",
+    "fence": "wait pair reductions and final/copy fanout",
+    "correctness": "pass",
+    "correctnessPath": "/home/steve/bench-results/qwen36-q4_0-gguf/correctness/pairwise4-syncafter2-20260506T062816Z",
+    "decodeTokS": 24.754713,
+    "promptTokS": 188.727364,
+    "jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-pairwise4-syncafter2-fusemmvq2-quad2130-p512n512-r3-20260506T063037Z.jsonl",
+    "log": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-pairwise4-syncafter2-fusemmvq2-quad2130-p512n512-r3-20260506T063037Z.log"
+  },
+  "pairwiseMode3": {
+    "env": "GGML_SYCL_COMM_PAIRWISE4=1, GGML_SYCL_COMM_SYNC_AFTER=3",
+    "fence": "wait pair reductions only",
+    "correctness": "fail",
+    "details": "Diverged by step 1.",
+    "path": "/home/steve/bench-results/qwen36-q4_0-gguf/correctness/pairwise4-syncafter3-20260506T064041Z"
+  },
+  "pairwiseMode4": {
+    "env": "GGML_SYCL_COMM_PAIRWISE4=1, GGML_SYCL_COMM_SYNC_AFTER=4",
+    "fence": "wait final/copy fanout only",
+    "correctness": "pass",
+    "correctnessPath": "/home/steve/bench-results/qwen36-q4_0-gguf/correctness/pairwise4-syncafter4-20260506T064041Z",
+    "decodeTokS": 25.314923,
+    "promptTokS": 186.811424,
+    "jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-pairwise4-syncafter4-fusemmvq2-quad2130-p512n512-r3-20260506T064503Z.jsonl",
+    "log": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-pairwise4-syncafter4-fusemmvq2-quad2130-p512n512-r3-20260506T064503Z.log"
+  },
+  "conclusion": "Pairwise4 can be made deterministic, but it is much slower than single-root. Use it as a diagnostic only; next try striped roots/tree collective."
+}
