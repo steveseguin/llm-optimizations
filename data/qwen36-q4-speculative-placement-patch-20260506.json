@@ -1,0 +1,88 @@
+{
+  "date": "2026-05-06",
+  "label": "qwen36-q4-speculative-placement-patch",
+  "engine": {
+    "name": "llama.cpp",
+    "backend": "SYCL Level Zero",
+    "commit": "db44417",
+    "build": "/home/steve/src/llama.cpp-q4-b70/build-sycl-2026-bmg-g31",
+    "patchedFile": "/home/steve/src/llama.cpp-q4-b70/examples/speculative/speculative.cpp",
+    "patchArtifact": "/home/steve/llm-optimization-artifacts/patches/llama-cpp-speculative-draft-single-device-splitmode-20260506.patch"
+  },
+  "targetModel": {
+    "localPath": "/home/steve/models/qwen3.6-27b-q4_0-gguf/Qwen3.6-27B-Q4_0.gguf",
+    "quantization": "Q4_0",
+    "placement": "3x B70 tensor parallel via SYCL0,SYCL1,SYCL2"
+  },
+  "draftModel": {
+    "repo": "llmware/qwen-3.5-4b-gguf",
+    "localPath": "/home/steve/models/qwen3.5-4b-gguf/Qwen3.5-4B-Q4_K_M.gguf",
+    "quantization": "Q4_K_M"
+  },
+  "patchBehavior": [
+    "Explicit --spec-draft-device none forces draft LLAMA_SPLIT_MODE_NONE and main_gpu=-1.",
+    "Exactly one explicit draft device with target tensor split forces draft LLAMA_SPLIT_MODE_NONE on that single draft device.",
+    "Multiple draft devices preserve tensor split behavior."
+  ],
+  "controls": {
+    "targetOnlyFourVisibleThreeSelected": {
+      "jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/targetonly-4visible-3selected-p0n16-r1-20260506T162205Z.jsonl",
+      "log": "/home/steve/bench-results/qwen36-q4_0-gguf/targetonly-4visible-3selected-p0n16-r1-20260506T162205Z.log",
+      "tokSOutTiny": 41.001202,
+      "status": "passed"
+    },
+    "draftStandaloneBenchAllVisibleDev3": {
+      "jsonl": "/home/steve/bench-results/qwen35-4b-gguf/sycl-standalone-4visible-dev3-p0n1-r1-20260506T164115Z.jsonl",
+      "log": "/home/steve/bench-results/qwen35-4b-gguf/sycl-standalone-4visible-dev3-p0n1-r1-20260506T164115Z.log",
+      "tokSOutTiny": 85.113793,
+      "status": "passed"
+    },
+    "draftStandaloneCliAllVisibleDev3": {
+      "log": "/home/steve/bench-results/qwen35-4b-gguf/cli-standalone-4visible-dev3-n1-20260506T164224Z.log",
+      "status": "timeout",
+      "timeoutSeconds": 120
+    }
+  },
+  "speculativeAttempts": [
+    {
+      "name": "cpu_draft_none",
+      "log": "/home/steve/bench-results/qwen36-q4_0-gguf/spec-cpudraft-none-4visible-target3x-n1-20260506T162839Z.log",
+      "placementValidated": "target Meta() on three B70s; draft CPU model, CPU KV, CPU compute",
+      "status": "timeout",
+      "timeoutSeconds": 180,
+      "failureSignal": "alloc: can't allocate 889986048 Bytes of memory on device/GPU"
+    },
+    {
+      "name": "draft_sycl3_q8_cache_on",
+      "log": "/home/steve/bench-results/qwen36-q4_0-gguf/spec-draftsycl3-patched-target3x-n1-20260506T163159Z.log",
+      "placementValidated": "target Meta() on three B70s; draft model/KV/compute on SYCL3",
+      "status": "timeout",
+      "timeoutSeconds": 180,
+      "failureSignal": "alloc: can't allocate 889986048 Bytes of memory on device/GPU"
+    },
+    {
+      "name": "draft_sycl3_q8_cache_off",
+      "log": "/home/steve/bench-results/qwen36-q4_0-gguf/spec-draftsycl3-patched-noq8-target3x-n1-20260506T163523Z.log",
+      "placementValidated": "target Meta() on three B70s; draft model/KV/compute on SYCL3",
+      "status": "timeout",
+      "timeoutSeconds": 180,
+      "failureSignal": "alloc: can't allocate 889986048 Bytes of memory on device/GPU"
+    },
+    {
+      "name": "draft_sycl3_q8_cache_off_c512",
+      "log": "/home/steve/bench-results/qwen36-q4_0-gguf/spec-draftsycl3-patched-noq8-c512-target3x-n1-20260506T163903Z.log",
+      "placementValidated": "target Meta() on three B70s; draft model/KV/compute on SYCL3",
+      "contextLength": 512,
+      "batchSize": 512,
+      "ubatch": 16,
+      "status": "timeout",
+      "timeoutSeconds": 120,
+      "failureSignal": "alloc: can't allocate 889986048 Bytes of memory on device/GPU"
+    }
+  ],
+  "localMaxxing": {
+    "submitted": false,
+    "reason": "Placement patch is useful, but speculative runs failed or timed out and are not valid benchmarks."
+  },
+  "conclusion": "Draft placement can be made correct with a small patch, but Qwen3.5 4B remains a failed draft path for Qwen3.6 27B on llama.cpp/SYCL because common-init speculative runs hang with repeated SYCL pool allocation failures."
+}

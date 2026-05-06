@@ -1070,6 +1070,23 @@ Goal: improve quality-preserving Q4_0 performance without power-limit changes.
      - do not use generic Qwen3.5 4B as a Qwen3.6 27B draft for speed claims;
      - prefer Qwen3.6-specific MTP/DFlash draft heads or vLLM FP8 speculative paths;
      - if returning to llama.cpp target+draft, first fix SYCL split-buffer active-device accounting so the target can use 3 B70s while the draft owns the fourth.
+57. 2026-05-06 Q4_0 speculative draft placement patch:
+   - patch: `/home/steve/llm-optimization-artifacts/patches/llama-cpp-speculative-draft-single-device-splitmode-20260506.patch`;
+   - patched `examples/speculative/speculative.cpp` so explicit `--spec-draft-device none` or a single draft device no longer inherits the target's `LLAMA_SPLIT_MODE_TENSOR`;
+   - placement fix validated:
+     - target stays on `Meta()` over `SYCL0,SYCL1,SYCL2`;
+     - draft `--spec-draft-device SYCL3` loads model/KV/compute on `SYCL3`;
+     - draft `--spec-draft-device none` loads CPU model/KV/compute instead of creating a four-device meta backend.
+   - remaining failure:
+     - CPU draft and `SYCL3` draft both timed out;
+     - repeated failure signal: `alloc: can't allocate 889986048 Bytes of memory on device/GPU`;
+     - disabling `GGML_SYCL_Q8_CACHE` and reducing context/batch to `-c 512 -b 512 -ub 16` did not change the allocation size;
+     - Qwen3.5 4B does run in `llama-bench` on `SYCL3`, but `llama-cli`/`llama-speculative` common-init paths hang or time out.
+   - decision:
+     - keep the patch as a reproducibility artifact;
+     - do not submit these failed speculative runs to LocalMaxxing;
+     - stop treating generic Qwen3.5 4B as a useful Qwen3.6 27B draft candidate;
+     - prefer Qwen3.6-specific MTP/DFlash or vLLM FP8 speculative paths.
 
 ## Success Criteria
 
