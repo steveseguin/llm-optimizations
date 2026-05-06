@@ -60,7 +60,121 @@
     "tensorSplitSweepTsv": "/home/steve/bench-results/qwen36-q4_0-gguf/tensorsplit-quad-sg2-short-p0n128-r2-20260506T135139Z.tsv",
     "assistRatioSweepTsv": "/home/steve/bench-results/qwen36-q4_0-gguf/tensorsplit-quad-sg2-assist-ratio-p0n128-r2-20260506T140456Z.tsv",
     "bestShortAssistSplit": "1/1/1/0.05",
-    "bestShortAssistTokSOut": 38.920367
+    "bestShortAssistTokSOut": 38.920367,
+    "fineAssistRatioSweep": {
+      "tsv": "/home/steve/bench-results/qwen36-q4_0-gguf/tensorsplit-quad-sg2-fine-assist-ratio-p0n128-r2-20260506T143835Z.tsv",
+      "results": [
+        {
+          "tensorSplit": "1/1/1/0.01",
+          "status": "error",
+          "error": "UR_RESULT_ERROR_OUT_OF_DEVICE_MEMORY during MUL_MAT"
+        },
+        {
+          "tensorSplit": "1/1/1/0.02",
+          "status": "error",
+          "error": "UR_RESULT_ERROR_OUT_OF_DEVICE_MEMORY during MUL_MAT"
+        },
+        {
+          "tensorSplit": "1/1/1/0.03",
+          "tokSOut": 38.822236
+        },
+        {
+          "tensorSplit": "1/1/1/0.04",
+          "tokSOut": 38.135548
+        },
+        {
+          "tensorSplit": "1/1/1/0.05",
+          "tokSOut": 38.270868
+        },
+        {
+          "tensorSplit": "1/1/1/0.06",
+          "tokSOut": 37.856266
+        },
+        {
+          "tensorSplit": "1/1/1/0.07",
+          "tokSOut": 38.485052
+        },
+        {
+          "tensorSplit": "1/1/1/0.08",
+          "tokSOut": 38.311132
+        },
+        {
+          "tensorSplit": "1/1/1/0.12",
+          "tokSOut": 37.762326
+        }
+      ],
+      "conclusion": "Fine ratio tuning did not beat the previous short 0.05 screen or the full validated 39.204149 tok/s run; 0.01 and 0.02 are unstable in this path."
+    },
+    "allreduceProbe": {
+      "jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-stats4-assist005-quad2130-p0n1-r1-20260506T145113Z.jsonl",
+      "log": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-stats4-assist005-quad2130-p0n1-r1-20260506T145113Z.log",
+      "instrumentedTokSOut": 24.699805,
+      "allreducesPerToken": 128,
+      "allreduceBytesEach": 20480,
+      "allreduceBytesPerToken": 2621440,
+      "warmTotalMsPerToken": 4.213,
+      "warmAvgUs": 32.913,
+      "coldTotalMsPerToken": 6.724,
+      "coldAvgUs": 52.528,
+      "conclusion": "Residual-add fusion is active for most reductions, but the model still does two allreduces per layer per generated token."
+    },
+    "fused2Probe": {
+      "jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-debug-fused2-triple213-p0n1-r1-20260506T144944Z.jsonl",
+      "log": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-debug-fused2-triple213-p0n1-r1-20260506T144944Z.log",
+      "fused2Calls": 480,
+      "plainReorderedMmvqCalls": 1584,
+      "conclusion": "Fused2 Q4 MMVQ is active in tensor split; communication and narrow-shard efficiency are higher-value targets than enabling fused2."
+    },
+    "communicationFlagSweep": {
+      "tsv": "/home/steve/bench-results/qwen36-q4_0-gguf/comm-flag-sweep-quad-assist005-p0n128-r2-20260506T145544Z.tsv",
+      "results": [
+        {
+          "variant": "base_sync2",
+          "tokSOut": 38.195956
+        },
+        {
+          "variant": "no_sync_after",
+          "tokSOut": 38.354083
+        },
+        {
+          "variant": "sync_after1_wait_all",
+          "tokSOut": 37.158215
+        },
+        {
+          "variant": "skip_root_ready",
+          "tokSOut": 37.971362
+        },
+        {
+          "variant": "rotate_root",
+          "tokSOut": 37.08746
+        },
+        {
+          "variant": "fuseadd_root_residual",
+          "tokSOut": 37.898128
+        },
+        {
+          "variant": "skiproot_fuseaddroot",
+          "tokSOut": 38.218925
+        },
+        {
+          "variant": "pairwise4",
+          "tokSOut": 28.15688
+        },
+        {
+          "variant": "striped4",
+          "tokSOut": 26.468293
+        },
+        {
+          "variant": "local_write",
+          "tokSOut": 37.208619
+        },
+        {
+          "variant": "no_fuseadd_smallf32",
+          "tokSOut": 28.999878
+        }
+      ],
+      "conclusion": "Existing communication flags did not materially beat the current single-kernel allreduce-add path; pairwise, striped, and no-fuseadd small-f32 are clearly worse."
+    }
   },
   "localMaxxing": {
     "status": "APPROVED",
