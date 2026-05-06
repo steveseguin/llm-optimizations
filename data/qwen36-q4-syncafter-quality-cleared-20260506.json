@@ -1,0 +1,111 @@
+{
+  "date": "2026-05-06",
+  "model": {
+    "hfId": "unsloth/Qwen3.6-27B-GGUF",
+    "name": "Qwen3.6-27B",
+    "file": "/home/steve/models/qwen3.6-27b-q4_0-gguf/Qwen3.6-27B-Q4_0.gguf",
+    "quantization": "Q4_0",
+    "params": 26895998464,
+    "context_length": 262144
+  },
+  "hardware": {
+    "gpu": "Intel Arc Pro B70 32GB",
+    "cpu": "AMD EPYC 9015 8-Core Processor",
+    "ram_gb": 16,
+    "os": "Ubuntu 24.04.4 LTS",
+    "kernel": "6.17.0-23-generic",
+    "level_zero_runtime": "1.15.37833+4"
+  },
+  "engine": {
+    "name": "llama.cpp",
+    "commit": "db44417",
+    "backend": "SYCL Level Zero",
+    "build": "/home/steve/src/llama.cpp-q4-b70/build-sycl-2026-bmg-g31"
+  },
+  "quality_cleared_results": [
+    {
+      "label": "2x_singlekernel_no_cpytensor_fusemmvq2",
+      "gpu_count": 2,
+      "selector": "level_zero:2,1",
+      "devices": "SYCL0/SYCL1",
+      "tensor_split": "1/1",
+      "prompt_tokens": 512,
+      "output_tokens": 512,
+      "prompt_tok_s": 158.558845,
+      "decode_tok_s": 40.933579,
+      "total_tok_s": 65.068909,
+      "jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-quality-cleared-2x-singlekernel-no-cpytensor-fusemmvq2-p512n512-r3-20260506T043717Z.jsonl",
+      "log": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-quality-cleared-2x-singlekernel-no-cpytensor-fusemmvq2-p512n512-r3-20260506T043717Z.log",
+      "correctness": {
+        "method": "full-logit hash repeat",
+        "greedy_decode_steps": 16,
+        "status": "pass",
+        "path": "/home/steve/bench-results/qwen36-q4_0-gguf/correctness/2x-quality-cleared-longcheck-20260506T043917Z"
+      }
+    },
+    {
+      "label": "3x_singlekernel_syncafter_fusemmvq2",
+      "gpu_count": 3,
+      "selector": "level_zero:2,1,3",
+      "devices": "SYCL0/SYCL1/SYCL2",
+      "tensor_split": "1/1/1",
+      "prompt_tokens": 512,
+      "output_tokens": 512,
+      "prompt_tok_s": 118.362712,
+      "decode_tok_s": 45.95413,
+      "total_tok_s": 66.202667,
+      "jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-quality-cleared-singlekernel-syncafter-fusemmvq2-triple213-p512n512-r3-20260506T051928Z.jsonl",
+      "log": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-quality-cleared-singlekernel-syncafter-fusemmvq2-triple213-p512n512-r3-20260506T051928Z.log",
+      "correctness": {
+        "method": "full-logit hash repeat",
+        "greedy_decode_steps": 16,
+        "status": "pass",
+        "path": "/home/steve/bench-results/qwen36-q4_0-gguf/correctness/syncafter-long-and-4x-20260506T051503Z"
+      }
+    },
+    {
+      "label": "4x_singlekernel_syncafter_fusemmvq2",
+      "gpu_count": 4,
+      "selector": "level_zero:2,1,3,0",
+      "devices": "SYCL0/SYCL1/SYCL2/SYCL3",
+      "tensor_split": "1/1/1/1",
+      "prompt_tokens": 512,
+      "output_tokens": 512,
+      "prompt_tok_s": 86.178129,
+      "decode_tok_s": 34.920977,
+      "total_tok_s": 49.700847,
+      "jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-quality-cleared-singlekernel-syncafter-fusemmvq2-quad2130-p512n512-r3-20260506T051928Z.jsonl",
+      "log": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-quality-cleared-singlekernel-syncafter-fusemmvq2-quad2130-p512n512-r3-20260506T051928Z.log",
+      "correctness": {
+        "method": "full-logit hash repeat",
+        "greedy_decode_steps": 4,
+        "status": "pass",
+        "path": "/home/steve/bench-results/qwen36-q4_0-gguf/correctness/syncafter-long-and-4x-20260506T051503Z"
+      }
+    }
+  ],
+  "env_flags": {
+    "GGML_SYCL_DISABLE_DNN": 1,
+    "GGML_SYCL_Q8_CACHE": 1,
+    "GGML_SYCL_ASYNC_CPY_TENSOR": 0,
+    "GGML_SYCL_ASYNC_PEER_COPY": 1,
+    "GGML_SYCL_COMM_ALLREDUCE": 1,
+    "GGML_SYCL_COMM_SINGLE_KERNEL": 1,
+    "GGML_SYCL_COMM_EVENT_BARRIER": 1,
+    "GGML_SYCL_COMM_SYNC_AFTER": 1,
+    "GGML_META_FUSE_ALLREDUCE_ADD": 1,
+    "GGML_SYCL_FUSE_MMVQ2": 1
+  },
+  "negative_findings": [
+    "GGML_SYCL_ASYNC_CPY_TENSOR=1 caused nondeterministic full-logit hashes on 2x tensor split even without custom allreduce.",
+    "Generic custom allreduce without single-kernel mode remains nondeterministic because the tree path mutates tensors while peer queues can copy them.",
+    "Experimental GGML_SYCL_COMM_STAGED_ROOT_COPY=1 failed repeatability on 2x, 3x, and 4x.",
+    "4x tensor split with sync-after is repeatable in the short check but slower than 3x."
+  ],
+  "localmaxxing": {
+    "submission_status": "pending_retry",
+    "last_attempt_utc": "2026-05-06T05:27Z",
+    "last_error": "502 Bad Gateway",
+    "target_result": "3x_singlekernel_syncafter_fusemmvq2"
+  }
+}
