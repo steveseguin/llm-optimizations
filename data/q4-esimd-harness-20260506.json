@@ -1,0 +1,131 @@
+{
+  "date_utc": "2026-05-06",
+  "title": "Standalone Q4_0 x Q8_1 ESIMD GEMV harness",
+  "hardware": {
+    "gpu_name": "Intel Arc Pro B70",
+    "gpu_count_used": 1,
+    "os": "Ubuntu 24.04.4 LTS",
+    "kernel": "6.17.0-23-generic"
+  },
+  "source": {
+    "path": "/home/steve/llm-optimization-artifacts/tools/q4_0_gemv_esimd_bench.cpp",
+    "binary": "/home/steve/llm-optimization-artifacts/tools/q4_0_gemv_esimd_bench",
+    "build_command": "source /opt/intel/oneapi/setvars.sh && icpx -std=c++17 -O3 -fsycl -ffast-math -fsycl-device-code-split=per_kernel -fsycl-targets=spir64_gen -Xs \"-device bmg\" tools/q4_0_gemv_esimd_bench.cpp -o tools/q4_0_gemv_esimd_bench"
+  },
+  "layout": {
+    "q4_qs": "[N, K/2] uint8",
+    "q4_d": "[N, K/32] half",
+    "q8_qs": "[K] int8",
+    "q8_d": "[K/32] half",
+    "q8_s": "[K/32] half",
+    "output": "[N] float",
+    "formula": "d4 * (d8 * dot(q4_unsigned, q8_qs) - 8 * q8_sum)"
+  },
+  "results": [
+    {
+      "shape": "N=17408 K=5120",
+      "meaning": "FFN gate/up full tensor",
+      "best_ks": 2,
+      "best_us": 125.134858,
+      "approx_gbps": 401.250560,
+      "max_abs": 0.000023,
+      "all_ks_us": {
+        "1": 148.276525,
+        "2": 125.134858,
+        "4": 140.434025,
+        "8": 146.228283
+      }
+    },
+    {
+      "shape": "N=5120 K=17408",
+      "meaning": "FFN down full tensor",
+      "best_ks": 2,
+      "best_us": 121.849692,
+      "approx_gbps": 411.778670,
+      "max_abs": 0.000057,
+      "all_ks_us": {
+        "1": 145.757867,
+        "2": 121.849692,
+        "4": 132.072033,
+        "8": 134.210942
+      }
+    },
+    {
+      "shape": "N=1024 K=5120",
+      "meaning": "attn k/v full tensor",
+      "best_ks": 2,
+      "best_us": 10.132800,
+      "approx_gbps": 292.019580,
+      "max_abs": 0.000015,
+      "all_ks_us": {
+        "1": 36.130060,
+        "2": 10.132800,
+        "4": 11.968105,
+        "8": 13.546405
+      }
+    },
+    {
+      "shape": "N=256 K=5120",
+      "meaning": "attn k/v 4-way shard",
+      "best_ks": 4,
+      "best_us": 4.363105,
+      "approx_gbps": 170.535433,
+      "max_abs": 0.000011,
+      "all_ks_us": {
+        "1": 5.747500,
+        "2": 4.580850,
+        "4": 4.363105,
+        "8": 5.042500
+      }
+    },
+    {
+      "shape": "N=4352 K=5120",
+      "meaning": "FFN gate/up 4-way shard",
+      "best_ks": 4,
+      "best_us": 31.106260,
+      "approx_gbps": 403.678488,
+      "max_abs": 0.000023,
+      "all_ks_us": {
+        "1": 75.200975,
+        "2": 32.384760,
+        "4": 31.106260,
+        "8": 33.262760
+      }
+    },
+    {
+      "shape": "N=5120 K=4352",
+      "meaning": "FFN down 4-way shard",
+      "best_ks": 1,
+      "best_us": 29.260755,
+      "approx_gbps": 429.214352,
+      "max_abs": 0.000008,
+      "all_ks_us": {
+        "1": 29.260755,
+        "2": 39.253260
+      },
+      "skipped_ks": [
+        4,
+        8
+      ],
+      "skip_reason": "K / ks was not a multiple of 128."
+    },
+    {
+      "shape": "N=5120 K=1536",
+      "meaning": "attn output shard",
+      "best_ks": 1,
+      "best_us": 14.215855,
+      "approx_gbps": 312.741513,
+      "max_abs": 0.000004,
+      "all_ks_us": {
+        "1": 14.215855,
+        "2": 15.072255,
+        "4": 16.735355
+      },
+      "skipped_ks": [
+        8
+      ],
+      "skip_reason": "K / ks was not a multiple of 128."
+    }
+  ],
+  "conclusion": "Correctness is good, but the first ESIMD kernel is not fast enough to wire into llama.cpp yet. Use it as a baseline for further kernel optimization."
+}
