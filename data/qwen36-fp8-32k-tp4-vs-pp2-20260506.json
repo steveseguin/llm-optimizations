@@ -1,0 +1,135 @@
+{
+  "date_utc": "2026-05-06",
+  "title": "Qwen3.6 27B FP8 32k context TP4 vs TP2/PP2 follow-up",
+  "hardware": {
+    "gpu_name": "Intel Arc Pro B70",
+    "gpu_count": 4,
+    "vram_gb_each": 32,
+    "os": "Ubuntu 24.04.4 LTS",
+    "kernel": "6.17.0-23-generic",
+    "cpu": "AMD EPYC 9015 8-Core Processor",
+    "ram_gb": 16
+  },
+  "model": {
+    "hf_id": "vrfai/Qwen3.6-27B-FP8",
+    "local_path": "/home/steve/models/qwen3.6-27b-fp8-vrfai",
+    "quantization": "FP8",
+    "vllm_quantization": "compressed-tensors"
+  },
+  "post_reboot_q4_sanity": {
+    "model": "/home/steve/models/qwen3.6-27b-q4_0-gguf/Qwen3.6-27B-Q4_0.gguf",
+    "topology": {
+      "tensor_parallel": 3,
+      "pipeline_parallel": 1,
+      "selector": "level_zero:2,1,3",
+      "llama_devices": "SYCL0/SYCL1/SYCL2",
+      "tensor_split": "1/1/1"
+    },
+    "prompt_tokens": 512,
+    "output_tokens": 512,
+    "repetitions": 3,
+    "tok_s_out": 45.638154,
+    "log": "/home/steve/bench-results/qwen36-q4_0-gguf/postreboot-triple213-q4-syncafter2-fusemmvq2-p512n512-r3-20260506T180324Z.log",
+    "jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/postreboot-triple213-q4-syncafter2-fusemmvq2-p512n512-r3-20260506T180324Z.jsonl",
+    "localmaxxing": "not_submitted_near_duplicate_of_better_46.194_result"
+  },
+  "fp8_tp2_pp2_32k_no_spec": {
+    "status": "stable_but_slow",
+    "topology": {
+      "tensor_parallel": 2,
+      "pipeline_parallel": 2,
+      "selector": "level_zero:0,1,2,3"
+    },
+    "prompt_tokens": 2048,
+    "output_tokens": 256,
+    "max_model_len": 32768,
+    "gpu_mem_util": 0.9,
+    "latencies_s": [
+      9.715682073001517,
+      9.706556885997998
+    ],
+    "avg_latency_s": 9.711119479499757,
+    "tok_s_out": 26.361533347459872,
+    "tok_s_total": 237.25380012713885,
+    "reported_kv_cache_tokens": 1056196,
+    "reported_32768_context_concurrency": 32.23,
+    "log": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp2-pp2-in2048-out256-bs1-20260506T180545Z.log",
+    "json": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp2-pp2-in2048-out256-bs1-20260506T180545Z.json"
+  },
+  "fp8_tp2_pp2_32k_xpu_graph": {
+    "status": "negative",
+    "finding": "VLLM_XPU_ENABLE_XPU_GRAPH=1 still disables cudagraph mode because XPU graph does not support communication capture.",
+    "prompt_tokens": 2048,
+    "output_tokens": 256,
+    "max_model_len": 32768,
+    "latencies_s": [
+      10.00703039200016
+    ],
+    "avg_latency_s": 10.00703039200016,
+    "tok_s_out": 25.582014840751558,
+    "tok_s_total": 230.23813356676402,
+    "log": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp2-pp2-in2048-out256-bs1-20260506T181000Z.log",
+    "json": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp2-pp2-in2048-out256-bs1-20260506T181000Z.json"
+  },
+  "fp8_tp4_32k_no_spec": {
+    "status": "validated_best_32k_shape",
+    "topology": {
+      "tensor_parallel": 4,
+      "pipeline_parallel": 1,
+      "selector": "level_zero:0,1,2,3"
+    },
+    "prompt_tokens": 2048,
+    "output_tokens": 256,
+    "max_model_len": 32768,
+    "gpu_mem_util": 0.9,
+    "latencies_s": [
+      5.927915399995982,
+      5.980092564001097
+    ],
+    "avg_latency_s": 5.9540039819985395,
+    "tok_s_out": 42.996276249393816,
+    "tok_s_total": 386.96648624454434,
+    "reported_kv_cache_tokens": 1133163,
+    "reported_32768_context_concurrency": 34.58,
+    "log": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp4-pp1-in2048-out256-bs1-20260506T181404Z.log",
+    "json": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp4-pp1-in2048-out256-bs1-20260506T181404Z.json",
+    "localmaxxing": {
+      "submitted": true,
+      "id": "cmoudx2qr00c3ld01xxq8hiu0",
+      "status": "APPROVED",
+      "submitted_tok_s_out": 42.996276249393816,
+      "submitted_tok_s_total": 386.96648624454434,
+      "api_note": "The API rejected backend=xpu; XPU/Level Zero was recorded in engineFlags.extraFlags instead."
+    }
+  },
+  "fp8_tp4_32k_ngram": {
+    "status": "negative_for_this_shape",
+    "speculative_config": {
+      "method": "ngram",
+      "num_speculative_tokens": 4,
+      "prompt_lookup_min": 2,
+      "prompt_lookup_max": 4
+    },
+    "prompt_tokens": 2048,
+    "output_tokens": 256,
+    "max_model_len": 32768,
+    "latencies_s": [
+      6.085304924999946,
+      6.127747491991613,
+      6.927987832008512
+    ],
+    "avg_latency_s": 6.38034674966669,
+    "tok_s_out": 40.123211173965345,
+    "tok_s_total": 361.1089005656881,
+    "reported_kv_cache_tokens": 841839,
+    "reported_32768_context_concurrency": 25.69,
+    "log": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp4-pp1-in2048-out256-bs1-20260506T181733Z.log",
+    "json": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp4-pp1-in2048-out256-bs1-20260506T181733Z.json",
+    "interpretation": "CPU n-gram disables async scheduling and was slower on this 2048-token random benchmark prompt; keep it for repeated prompts where acceptance is known to be useful."
+  },
+  "pcie_reporting": {
+    "lspci_capability_observation": "All four B70 endpoints report LnkCap Speed 2.5GT/s Width x1 and LnkCap2 only 2.5GT/s under sudo lspci -vvv, despite 32GB BARs and normal XPU operation.",
+    "interpretation": "This may be immature B70 firmware/driver reporting, but it matches oneCCL warnings that topology is PCIe rather than fabric. Treat as a possible communication bottleneck signal until independently verified."
+  },
+  "conclusion": "For Qwen3.6 27B FP8, TP4/PP1 is both faster and reports more 32k-context KV capacity than TP2/PP2 on this four-B70 host. PP2 remains a fallback for larger models or future pipeline-parallel work, not the preferred 27B single-session speed path."
+}

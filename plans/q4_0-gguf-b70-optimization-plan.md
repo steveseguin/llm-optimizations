@@ -1166,6 +1166,45 @@ Goal: improve quality-preserving Q4_0 performance without power-limit changes.
      - FFN gate/up fusion is the cleanest first integration target because it is a pair of Q4_0 projections sharing `attn_post_norm`;
      - attention projection fusion is also promising but more shape/layout dependent;
      - do not submit this to LocalMaxxing because it is diagnostic, not a throughput result.
+61. 2026-05-06 post-reboot Q4 sanity and FP8 32k-context topology follow-up:
+   - Q4_0 post-reboot sanity:
+     - three-B70 path, selector `level_zero:2,1,3`, tensor split `1/1/1`;
+     - `512` prompt / `512` output / `3` reps;
+     - result: `45.638154 tok/s`;
+     - log: `/home/steve/bench-results/qwen36-q4_0-gguf/postreboot-triple213-q4-syncafter2-fusemmvq2-p512n512-r3-20260506T180324Z.log`;
+     - this is close to the submitted `46.194319 tok/s` best, so it was not resubmitted.
+   - FP8 TP2/PP2 32k-context validation:
+     - model: `/home/steve/models/qwen3.6-27b-fp8-vrfai`;
+     - TP2/PP2, `max_model_len=32768`, `2048` prompt / `256` output;
+     - result: `26.361533 tok/s`;
+     - reported KV cache: `1,056,196` tokens, max `32.23x` concurrency at 32,768 context;
+     - stable but much slower than TP4 for batch-1 decode.
+   - FP8 TP2/PP2 with `VLLM_XPU_ENABLE_XPU_GRAPH=1`:
+     - result: `25.582015 tok/s`;
+     - log says XPU graph disables cudagraph mode because communication op capture is unsupported;
+     - decision: do not spend more runs on XPU graph for TP/PP communication paths.
+   - FP8 TP4 32k-context validation:
+     - TP4/PP1, `max_model_len=32768`, `2048` prompt / `256` output;
+     - result: `42.996276 tok/s`, `386.966486 total tok/s`;
+     - reported KV cache: `1,133,163` tokens, max `34.58x` concurrency at 32,768 context;
+     - this is faster and has more reported 32k KV capacity than TP2/PP2 for Qwen3.6 27B.
+   - FP8 TP4 32k-context with CPU n-gram:
+     - spec config: n-gram, `num_speculative_tokens=4`, lookup min/max `2/4`;
+     - result: `40.123211 tok/s`;
+     - slower than no-spec because n-gram disables async scheduling and had poor value on the random 2048-token bench prompt.
+   - LocalMaxxing:
+     - submitted the clean TP4 32k no-spec result;
+     - ID: `cmoudx2qr00c3ld01xxq8hiu0`;
+     - status: `APPROVED`;
+     - API note: `backend=xpu` is rejected by current LocalMaxxing validation, so XPU/Level Zero was recorded in `engineFlags.extraFlags`.
+   - PCIe reporting observation:
+     - sudo `lspci -vvv` reports every B70 endpoint with `LnkCap Speed 2.5GT/s, Width x1` and `LnkCap2` only `2.5GT/s`;
+     - this is suspicious for B70 and may be immature device/firmware reporting, but it agrees with oneCCL warnings that topology is PCIe rather than fabric;
+     - keep treating PCIe/allreduce overhead as a likely reason 4x Q4_0 equal split underperforms.
+   - decision:
+     - for Qwen3.6 27B FP8, prefer TP4/PP1 over TP2/PP2 for single-session speed and 32k context;
+     - keep PP2 as a fallback for larger models or future pipeline-parallel experiments, not as the primary 27B path;
+     - keep Q4_0 optimization focused on deeper llama.cpp same-activation multi-GEMV / norm+GEMV fusion.
 
 ## Success Criteria
 
@@ -1173,7 +1212,7 @@ Goal: improve quality-preserving Q4_0 performance without power-limit changes.
 - Strong success: Q4_0 GGUF single B70 `>=29 tok/s`.
 - FP8 investigation success: official `Qwen/Qwen3.6-27B-FP8` reaches or beats the current Q4_0 TP3 result while preserving output quality.
 - Static FP8 current best: `vrfai/Qwen3.6-27B-FP8` on four B70s with patched vLLM/XPU FlashAttention2 plus n-gram speculative decode reaches `49.581893 tok/s` on 512 prompt / 512 output. This is ahead of the Q4_0 TP3 validation while preserving more fidelity than INT4 paths.
-- Static FP8 full-context status: TP4 with patched vLLM/XPU FlashAttention2 succeeds at Qwen3.6's configured `262,144` token context and reports `1,206,355` GPU KV-cache tokens. PP2 x TP2 also fits but is slower for a single sequence.
+- Static FP8 32k-context status: TP4 with patched vLLM/XPU FlashAttention2 succeeds at `max_model_len=32768` and reports `1,133,163` GPU KV-cache tokens with `42.996276 tok/s` at 2048 prompt / 256 output. TP2/PP2 also fits but is slower (`26.361533 tok/s`) and reports slightly less 32k KV capacity.
 - Current dual-card milestone reached: Q4_0 GGUF single session `37.690 tok/s`, quality preserving, software-only.
 - Current improved multi-card milestone: Q4_0 GGUF single session `44.181 tok/s` on three B70s for 512 prompt / 512 output with `GGML_SYCL_Q8_CACHE=1`, async copy, single-kernel allreduce, `GGML_SYCL_COMM_EVENT_BARRIER=1`, and `GGML_META_FUSE_ALLREDUCE_ADD=1`. This is quality preserving and software-only.
 - Current four-card Q4_0 status: assist split `1/1/1/0.05` reaches `39.204149 tok/s`, improving the equal-split four-card result by `12.24%` but still trailing the best three-card result, so quad Q4_0 remains a kernel/scheduling investigation rather than the production path.

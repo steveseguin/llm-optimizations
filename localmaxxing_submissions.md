@@ -113,7 +113,10 @@ Model: `vrfai/Qwen3.6-27B-FP8`, static compressed-tensors FP8.
 | --- | --- | ---: | ---: | ---: | ---: | ---: |
 | `vllm-qwen36-vrfai-fp8-tp4-ngram-cpu-p512-n512` | `cmotql1v60013qy01016jcs7r` | 4 | 512 | 512 | 49.582 | 99.164 |
 | `vllm-qwen36-vrfai-fp8-tp4-ngram-longcontext-p2048-n512` | `cmottw16x002wqy01jvbluobl` | 4 | 2048 | 512 | 43.688 | 218.442 |
+| `vllm-qwen36-vrfai-fp8-tp4-nospec-32k-p2048-n256` | `cmoudx2qr00c3ld01xxq8hiu0` | 4 | 2048 | 256 | 42.996 | 386.966 |
 
 Note: `cmotql1v60013qy01016jcs7r` is the current best submitted static FP8 result. It uses vLLM TP4/PP1 with CPU n-gram speculative decoding. The target model remains FP8 and speculation is verified, so this does not change final-output model quality in the way an INT4 target would.
 
 Note: `cmottw16x002wqy01jvbluobl` is the long-context FP8 validation. It is slower than the 512/512 best but shows the static FP8 TP4 path works at a 2048-token prompt window with high total throughput.
+
+Note: `cmoudx2qr00c3ld01xxq8hiu0` is the clean 32k-context FP8 validation. It uses no speculative decoding and records XPU/Level Zero in `engineFlags.extraFlags` because the LocalMaxxing backend enum currently rejects `xpu`.
