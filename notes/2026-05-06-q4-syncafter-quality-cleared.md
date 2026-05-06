@@ -84,4 +84,17 @@ Stable fallback without custom allreduce:
 
 ## LocalMaxxing status
 
-Tried to submit the 3x 45.954 tok/s quality-cleared result to LocalMaxxing, but the API returned `502 Bad Gateway` for both POST and public leaderboard GET. Payload should be retried when the service is healthy.
+LocalMaxxing recovered after the earlier `502 Bad Gateway` outage. The detailed payload first failed validation because the API wants the base model ID rather than the GGUF distribution repo:
+
+- Rejected `hfId`: `unsloth/Qwen3.6-27B-GGUF`
+- Accepted base `hfId`: `unsloth/Qwen3.6-27B`
+
+The corrected detailed payload returned `500 Internal Server Error`, but a compact required-field payload succeeded:
+
+- LocalMaxxing ID: `cmotmnnm6000aqu01uzb9wk12`
+- Recorded model: `unsloth/Qwen3.6-27B`
+- Recorded quantization: `Q4_0`
+- Recorded hardware: 3x `Intel Arc Pro B70`, 32 GB per card
+- Recorded metrics: `45.95413 tok/s` output, `66.202667 tok/s` total
+
+Limitation: the accepted row currently lacks command flags, notes, and the measured 512/512 context fields because the detailed payload hit a server-side 500. See `/home/steve/llm-optimization-artifacts/data/localmaxxing-submission-qwen36-q4-3x-20260506.json` for the submission audit trail.
