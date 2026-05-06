@@ -1,0 +1,127 @@
+diff --git a/ggml/src/ggml-sycl/mmvq.cpp b/ggml/src/ggml-sycl/mmvq.cpp
+--- a/ggml/src/ggml-sycl/mmvq.cpp
++++ b/ggml/src/ggml-sycl/mmvq.cpp
+@@
+ #include "common.hpp"
+ #include "quants.hpp"
+ #include "vecdotq.hpp"
+ 
++#include <cstdlib>
++
+@@
+-static void reorder_mul_mat_vec_q4_0_q8_1_sycl(const void * vx, const void * vy, float * dst, const int ncols,
+-                                                    const int nrows, dpct::queue_ptr stream) {
+-    GGML_ASSERT(ncols % QK4_0 == 0);
++static int ggml_sycl_reorder_mmvq_subgroups_runtime() {
++    static const int subgroups = []() {
++        const char * env = std::getenv("GGML_SYCL_REORDER_MMVQ_SUBGROUPS_RUNTIME");
++        return env ? std::atoi(env) : 0;
++    }();
++    return subgroups;
++}
++
++template <size_t num_subgroups>
++static void reorder_mul_mat_vec_q4_0_q8_1_sycl_t(const void * vx, const void * vy, float * dst, const int ncols,
++                                                 const int nrows, dpct::queue_ptr stream) {
+     // Round up to a whole number of subgroup-sized workgroups; out-of-range rows are skipped inside the kernel.
+-    constexpr size_t num_subgroups = GGML_SYCL_REORDER_MMVQ_SUBGROUPS;
+     static_assert(num_subgroups > 0, "GGML_SYCL_REORDER_MMVQ_SUBGROUPS must be positive");
+     const int        block_num_y   = ceil_div(nrows, GGML_SYCL_MMV_Y * (int) num_subgroups) * (int) num_subgroups;
+ 
+@@
+     });
+ }
+ 
++static void reorder_mul_mat_vec_q4_0_q8_1_sycl(const void * vx, const void * vy, float * dst, const int ncols,
++                                               const int nrows, dpct::queue_ptr stream) {
++    GGML_ASSERT(ncols % QK4_0 == 0);
++    switch (ggml_sycl_reorder_mmvq_subgroups_runtime()) {
++        case 1:
++            reorder_mul_mat_vec_q4_0_q8_1_sycl_t<1>(vx, vy, dst, ncols, nrows, stream);
++            break;
++        case 2:
++            reorder_mul_mat_vec_q4_0_q8_1_sycl_t<2>(vx, vy, dst, ncols, nrows, stream);
++            break;
++        case 4:
++            reorder_mul_mat_vec_q4_0_q8_1_sycl_t<4>(vx, vy, dst, ncols, nrows, stream);
++            break;
++        case 8:
++            reorder_mul_mat_vec_q4_0_q8_1_sycl_t<8>(vx, vy, dst, ncols, nrows, stream);
++            break;
++        case 16:
++            reorder_mul_mat_vec_q4_0_q8_1_sycl_t<16>(vx, vy, dst, ncols, nrows, stream);
++            break;
++        default:
++            reorder_mul_mat_vec_q4_0_q8_1_sycl_t<GGML_SYCL_REORDER_MMVQ_SUBGROUPS>(vx, vy, dst, ncols, nrows, stream);
++            break;
++    }
++}
++
++template <size_t num_subgroups>
++static void reorder_mul_mat_vec_q4_0_q8_1_fused2_sycl_t(
++        const void * vx0,
++        const void * vx1,
++        const void * vy,
++        float * dst0,
++        float * dst1,
++        const int ncols,
++        const int nrows,
++        dpct::queue_ptr stream) {
++    static_assert(num_subgroups > 0, "GGML_SYCL_REORDER_MMVQ_SUBGROUPS must be positive");
++    const int block_num_y = ceil_div(nrows, GGML_SYCL_MMV_Y * (int) num_subgroups) * (int) num_subgroups;
++
++    const sycl::range<3> global_size(1, GGML_SYCL_MMV_Y, (block_num_y * WARP_SIZE));
++    const sycl::range<3> workgroup_size(1, GGML_SYCL_MMV_Y, num_subgroups * WARP_SIZE);
++
++    stream->submit([&](sycl::handler & cgh) {
++        cgh.parallel_for(sycl::nd_range<3>(global_size, workgroup_size),
++                         [=](sycl::nd_item<3> nd_item) [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
++                             mul_mat_vec_q_reorder_fused2<reorder_vec_dot_q_sycl<GGML_TYPE_Q4_0>>(
++                                     vx0, vx1, vy, dst0, dst1, ncols, nrows, nd_item);
++                         });
++    });
++}
++
+ static void reorder_mul_mat_vec_q4_0_q8_1_fused2_sycl(
+         const void * vx0,
+         const void * vx1,
+@@
+         const int nrows,
+         dpct::queue_ptr stream) {
+     GGML_ASSERT(ncols % QK4_0 == 0);
+-    constexpr size_t num_subgroups = GGML_SYCL_REORDER_MMVQ_SUBGROUPS;
+-    static_assert(num_subgroups > 0, "GGML_SYCL_REORDER_MMVQ_SUBGROUPS must be positive");
+-    const int        block_num_y   = ceil_div(nrows, GGML_SYCL_MMV_Y * (int) num_subgroups) * (int) num_subgroups;
+-
+-    const sycl::range<3> global_size(1, GGML_SYCL_MMV_Y, (block_num_y * WARP_SIZE));
+-    const sycl::range<3> workgroup_size(1, GGML_SYCL_MMV_Y, num_subgroups * WARP_SIZE);
+-
+-    stream->submit([&](sycl::handler & cgh) {
+-        cgh.parallel_for(sycl::nd_range<3>(global_size, workgroup_size),
+-                         [=](sycl::nd_item<3> nd_item) [[sycl::reqd_sub_group_size(WARP_SIZE)]] {
+-                             mul_mat_vec_q_reorder_fused2<reorder_vec_dot_q_sycl<GGML_TYPE_Q4_0>>(
+-                                     vx0, vx1, vy, dst0, dst1, ncols, nrows, nd_item);
+-                         });
+-    });
++    switch (ggml_sycl_reorder_mmvq_subgroups_runtime()) {
++        case 1:
++            reorder_mul_mat_vec_q4_0_q8_1_fused2_sycl_t<1>(vx0, vx1, vy, dst0, dst1, ncols, nrows, stream);
++            break;
++        case 2:
++            reorder_mul_mat_vec_q4_0_q8_1_fused2_sycl_t<2>(vx0, vx1, vy, dst0, dst1, ncols, nrows, stream);
++            break;
++        case 4:
++            reorder_mul_mat_vec_q4_0_q8_1_fused2_sycl_t<4>(vx0, vx1, vy, dst0, dst1, ncols, nrows, stream);
++            break;
++        case 8:
++            reorder_mul_mat_vec_q4_0_q8_1_fused2_sycl_t<8>(vx0, vx1, vy, dst0, dst1, ncols, nrows, stream);
++            break;
++        case 16:
++            reorder_mul_mat_vec_q4_0_q8_1_fused2_sycl_t<16>(vx0, vx1, vy, dst0, dst1, ncols, nrows, stream);
++            break;
++        default:
++            reorder_mul_mat_vec_q4_0_q8_1_fused2_sycl_t<GGML_SYCL_REORDER_MMVQ_SUBGROUPS>(
++                    vx0, vx1, vy, dst0, dst1, ncols, nrows, stream);
++            break;
++    }
+ }
