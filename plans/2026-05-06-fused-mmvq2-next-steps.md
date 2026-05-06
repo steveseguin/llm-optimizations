@@ -7,7 +7,7 @@
 - Engine: llama.cpp SYCL/Level Zero build with Q8 cache, scheduler async tensor copy disabled, peer async copy enabled, single-kernel allreduce, event barrier, post-allreduce sync, meta fused allreduce-add, and gated adjacent Q4_0 MMVQ2 fusion.
 - Result: `45.954130 tok/s` decode, `118.362712 tok/s` prompt, `66.202667 tok/s` computed total at 512 prompt / 512 generate / 3 repeats.
 - Quality: full-logit deterministic repeat passed for 16 greedy decode steps.
-- LocalMaxxing: pending retry; API returned `502 Bad Gateway` on 2026-05-06.
+- LocalMaxxing: compact required-field submission succeeded after the API recovered. ID `cmotmnnm6000aqu01uzb9wk12`. Detailed payload with notes/flags returned `500 Internal Server Error`, so the public row currently lacks full launch metadata.
 - Benchmark files:
   - `/home/steve/bench-results/qwen36-q4_0-gguf/sycl-quality-cleared-singlekernel-syncafter-fusemmvq2-triple213-p512n512-r3-20260506T051928Z.jsonl`
   - `/home/steve/bench-results/qwen36-q4_0-gguf/sycl-quality-cleared-singlekernel-syncafter-fusemmvq2-triple213-p512n512-r3-20260506T051928Z.log`
@@ -42,7 +42,7 @@
 
 ## Next steps
 
-1. Retry the pending LocalMaxxing 3x submission once the API stops returning 502.
+1. Retry a compact-but-detailed LocalMaxxing payload after the five-minute POST window, or ask for an edit endpoint, so the public row gets command flags/context/notes.
 2. Clean up `GGML_SYCL_COMM_SYNC_AFTER=1` from a diagnostic wait-all-streams into a narrower correctness fence, ideally only on peer destinations that consume root-written allreduce output.
 3. Gate or rewrite the generic custom allreduce path so it cannot silently use the in-place race.
 4. Keep `GGML_SYCL_ASYNC_CPY_TENSOR=0` in all recommended tensor-split recipes until the scheduler copy API can propagate a correct destination event.
