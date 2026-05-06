@@ -20,9 +20,20 @@ Keep three-card Q4_0 tensor split as the best quality-preserving GGUF path for n
 ## Next Software Work
 
 1. Investigate why narrow four-way Q4_0 reordered MMVQ shards lose efficiency.
-2. Prioritize output-projection plus allreduce/residual epilogue fusion over more simple allreduce copy scheduling.
+2. Keep the current single-kernel allreduce-add path for validated runs; the follow-up communication sweep did not find a better existing flag combination.
 3. Use FP8/vLLM TP4 as the main all-four-card speed path while Q4_0 four-way kernel work continues.
-4. Keep finer assist ratios such as `0.02`, `0.03`, `0.07`, and `0.12` as a low-cost follow-up, but only after higher-value kernel work or if a quick smoke window is available.
+4. Build and test isolated MMV_Y / row-grouping variants before changing the known-good binary.
+
+## Follow-Up Probes
+
+- Fine assist sweep: `/home/steve/bench-results/qwen36-q4_0-gguf/tensorsplit-quad-sg2-fine-assist-ratio-p0n128-r2-20260506T143835Z.tsv`
+- Result: ratios `0.03` through `0.12` stayed below the validated `39.204149 tok/s`; ratios `0.01` and `0.02` failed with Level Zero out-of-device-memory during `MUL_MAT`.
+- Allreduce stats: `/home/steve/bench-results/qwen36-q4_0-gguf/sycl-stats4-assist005-quad2130-p0n1-r1-20260506T145113Z.log`
+- Result: `128` allreduces per generated token, `20,480` bytes each, warm total `4.213 ms/token`.
+- Fused2 debug: `/home/steve/bench-results/qwen36-q4_0-gguf/sycl-debug-fused2-triple213-p0n1-r1-20260506T144944Z.log`
+- Result: fused2 is already active in tensor split, so the next Q4 source work is not simple fused2 enablement.
+- Communication flags: `/home/steve/bench-results/qwen36-q4_0-gguf/comm-flag-sweep-quad-assist005-p0n128-r2-20260506T145544Z.tsv`
+- Result: no existing communication flag materially beat baseline; pairwise, striped, and no-fuseadd small-f32 were clearly slower.
 
 ## Artifacts
 
