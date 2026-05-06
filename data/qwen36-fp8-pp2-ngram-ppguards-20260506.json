@@ -1,0 +1,159 @@
+{
+  "date_utc": "2026-05-06",
+  "title": "Qwen3.6 27B FP8 vLLM XPU PP2 n-gram guard diagnostics",
+  "hardware": {
+    "gpu_name": "Intel Arc Pro B70",
+    "gpu_count": 4,
+    "vram_gb_each": 32,
+    "os": "Ubuntu 24.04.4 LTS",
+    "kernel": "6.17.0-23-generic"
+  },
+  "model": {
+    "hf_id": "Qwen/Qwen3.6-27B",
+    "local_path": "/home/steve/models/qwen3.6-27b-fp8-vrfai",
+    "quantization": "FP8",
+    "vllm_quantization": "compressed-tensors"
+  },
+  "environment": {
+    "venv": "/home/steve/.venvs/vllm-xpu-managed",
+    "wrapper": "/home/steve/bench-vllm-qwen36-fp8.sh",
+    "important_runtime_note": "Do not source /opt/intel/oneapi/setvars.sh for vLLM runs; keep the venv lib directory first in LD_LIBRARY_PATH to avoid XCCL segfaults.",
+    "ld_library_path_prefix": "/home/steve/.venvs/vllm-xpu-managed/lib",
+    "ccl_atl_transport": "ofi",
+    "oneapi_device_selector": "level_zero:0,1,2,3"
+  },
+  "patch": {
+    "local_path": "/home/steve/llm-optimization-artifacts/patches/vllm-pp2-ngram-ppguards-active-20260506.patch",
+    "sha256": "52b088392f2100fa5e0c6352a49693566300ba75affcb9ec7c9b83da8de10692",
+    "patched_locations": [
+      "/home/steve/src/vllm",
+      "/home/steve/.venvs/vllm-xpu-managed/lib/python3.12/site-packages/vllm"
+    ],
+    "changed_files": [
+      "vllm/v1/worker/gpu_model_runner.py",
+      "vllm/v1/core/sched/scheduler.py"
+    ],
+    "summary": [
+      "Added an empty sampled-token guard for non-last pipeline-parallel ranks.",
+      "Added a scheduler recovery guard for negative scheduled-token deltas observed after speculative trimming.",
+      "Added a GPU n-gram buffer ownership guard because only the last PP rank allocates token_ids_gpu_tensor.",
+      "Added temporary trace logging behind VLLM_XPU_TRACE_NGRAM_PP=1."
+    ]
+  },
+  "runs": [
+    {
+      "name": "cpu_ngram_before_patch",
+      "configuration": {
+        "tp": 2,
+        "pp": 2,
+        "input_tokens": 512,
+        "output_tokens": 128,
+        "batch_size": 1,
+        "max_model_len": 1024,
+        "gpu_mem_util": 0.8,
+        "speculative_config": {
+          "method": "ngram",
+          "num_speculative_tokens": 4,
+          "prompt_lookup_min": 2,
+          "prompt_lookup_max": 4
+        }
+      },
+      "result": "failed",
+      "failure": "IndexError: list index out of range at req_state.output_token_ids.append(new_token_ids[-1]) on a non-last PP rank. After the empty-token guard, this exposed num_scheduled_tokens=-3 / total_num_scheduled_tokens=-3."
+    },
+    {
+      "name": "cpu_ngram_after_patch",
+      "configuration": {
+        "tp": 2,
+        "pp": 2,
+        "input_tokens": 512,
+        "output_tokens": 128,
+        "batch_size": 1,
+        "max_model_len": 1024,
+        "gpu_mem_util": 0.8,
+        "speculative_config": {
+          "method": "ngram",
+          "num_speculative_tokens": 4,
+          "prompt_lookup_min": 2,
+          "prompt_lookup_max": 4
+        },
+        "trace": "VLLM_XPU_TRACE_NGRAM_PP=1"
+      },
+      "logs": {
+        "log": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp2-pp2-in512-out128-bs1-20260506T075800Z.log",
+        "json": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp2-pp2-in512-out128-bs1-20260506T075800Z.json"
+      },
+      "metrics": {
+        "avg_latency_s": 7.302738496000529,
+        "output_tokens_per_second": 17.527671307154353,
+        "total_tokens_per_second": 87.63835653577176
+      },
+      "trace_findings": {
+        "spec_lens_empty_lines": 880,
+        "effective_speculation": false,
+        "interpretation": "The guard makes the run complete, but CPU n-gram is not actually drafting in this PP2 path."
+      },
+      "localmaxxing_submission": "not_submitted",
+      "localmaxxing_reason": "Diagnostic run with trace logging and no effective speculative drafting; not useful as a leaderboard result."
+    },
+    {
+      "name": "gpu_ngram_before_buffer_guard",
+      "configuration": {
+        "tp": 2,
+        "pp": 2,
+        "input_tokens": 512,
+        "output_tokens": 64,
+        "batch_size": 1,
+        "max_model_len": 1024,
+        "gpu_mem_util": 0.8,
+        "speculative_config": {
+          "method": "ngram_gpu",
+          "num_speculative_tokens": 4,
+          "prompt_lookup_min": 2,
+          "prompt_lookup_max": 4
+        },
+        "trace": "VLLM_XPU_TRACE_NGRAM_PP=1"
+      },
+      "logs": {
+        "log": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp2-pp2-in512-out64-bs1-20260506T080042Z.log"
+      },
+      "result": "failed",
+      "failure": "AttributeError: 'XPUModelRunner' object has no attribute 'token_ids_gpu_tensor' on PP0. Only the last PP rank owns the GPU n-gram token buffers."
+    },
+    {
+      "name": "gpu_ngram_after_buffer_guard",
+      "configuration": {
+        "tp": 2,
+        "pp": 2,
+        "input_tokens": 512,
+        "output_tokens": 64,
+        "batch_size": 1,
+        "max_model_len": 1024,
+        "gpu_mem_util": 0.8,
+        "speculative_config": {
+          "method": "ngram_gpu",
+          "num_speculative_tokens": 4,
+          "prompt_lookup_min": 2,
+          "prompt_lookup_max": 4
+        },
+        "trace": "VLLM_XPU_TRACE_NGRAM_PP=1"
+      },
+      "logs": {
+        "log": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp2-pp2-in512-out64-bs1-20260506T080725Z.log"
+      },
+      "result": "stalled_and_killed",
+      "trace_findings": {
+        "valid_counts_zero_lines": 14,
+        "repeated_trim_pattern": "total=5->1 scheduled=5->1 spec_lens=4->{} valid_counts=0",
+        "shared_memory_warning": "No available shared memory broadcast block found in 60 seconds"
+      },
+      "interpretation": "The buffer ownership guard fixes the immediate attribute error, but ngram_gpu drafts are all invalid and the PP2 engine stalls."
+    }
+  ],
+  "current_best_fp8_speed_path": {
+    "configuration": "TP=4 PP=1, vLLM XPU compressed-tensors, CPU n-gram speculative decoding, 512 prompt / 512 output",
+    "output_tokens_per_second": 49.581893,
+    "localmaxxing_id": "cmotql1v60013qy01016jcs7r"
+  },
+  "conclusion": "Keep PP2 as a memory-capacity path for long context or larger models. For single-session speed on Qwen3.6 27B FP8, TP4 remains the faster path until PP speculative scheduling is fixed."
+}
