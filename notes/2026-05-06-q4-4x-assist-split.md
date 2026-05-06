@@ -138,6 +138,23 @@ Existing allreduce-path variants on the four-card assist split:
 
 No existing communication flag meaningfully beat the current single-kernel allreduce-add path. The tiny `sync_after=0` lift is within short-run noise and should not replace the validated command without a longer run. Pairwise, striped, and non-fused small-f32 paths are clearly worse for this 20 KB per-layer reduction shape.
 
+## Narrow-Shard Follow-Ups
+
+Additional diagnostics are captured in:
+
+- Note: `/home/steve/llm-optimization-artifacts/notes/2026-05-06-q4-narrow-shard-followups.md`
+- Data: `/home/steve/llm-optimization-artifacts/data/qwen36-q4-narrow-shard-followups-20260506.json`
+- Patch: `/home/steve/llm-optimization-artifacts/patches/llama-cpp-sycl-split-skip-last-below-rows-focused-20260506.patch`
+
+Key results:
+
+- `GGML_SYCL_MMV_Y=2` was neutral on 3x and did not help 4x assist: `38.181852 tok/s`.
+- MUL_MAT stage timing shows 4x assist adds `282` quantization calls and `538` matmul kernel launches versus 3x for essentially the same total matmul byte volume.
+- Explicit `-ts 1/1/1/0` aborts at `ggml-backend.cpp:120: GGML_ASSERT(buffer) failed`; trailing-zero split is currently invalid.
+- The env-gated `GGML_SYCL_SPLIT_SKIP_LAST_BELOW_ROWS` patch is safe when unset and passes a 3x sanity run at `44.778557 tok/s`, but threshold sweeps topped out at `38.153344 tok/s`, below the validated `39.204149 tok/s` 4x assist run.
+
+Decision: keep the skip-last patch only as a diagnostic tool and leave the env unset for production. The fourth-card Q4_0 issue is not solved by simple row-threshold pruning.
+
 ## Interpretation
 
 The fourth card is not bad; prior topology sweeps showed all pairs and triples are healthy. The current four-way regression is a software scheduling/kernel-shape problem. Equal four-way row shards appear too narrow for the current reordered Q4_0 MMVQ path, and the added communication/synchronization overhead outweighs the reduced work per card.

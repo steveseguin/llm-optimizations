@@ -1,0 +1,78 @@
+diff --git a/ggml/src/ggml-sycl/ggml-sycl.cpp b/ggml/src/ggml-sycl/ggml-sycl.cpp
+--- a/ggml/src/ggml-sycl/ggml-sycl.cpp
++++ b/ggml/src/ggml-sycl/ggml-sycl.cpp
+@@ -827,16 +827,50 @@ static int64_t get_row_rounding(ggml_type type, const std::array<float, GGML_SYC
+ }
+ 
++static int64_t ggml_sycl_split_skip_last_below_rows() {
++    static const int64_t min_rows = []() {
++        const char * env = getenv("GGML_SYCL_SPLIT_SKIP_LAST_BELOW_ROWS");
++        return env ? atoll(env) : 0;
++    }();
++    return min_rows;
++}
++
+ static void get_row_split(int64_t * row_low, int64_t * row_high, const ggml_tensor * tensor, const std::array<float, GGML_SYCL_MAX_DEVICES> & tensor_split, int id) {
+     const int64_t nrows = ggml_nrows(tensor);
+     const int64_t rounding = get_row_rounding(tensor->type, tensor_split);
++    const int device_count = ggml_sycl_info().device_count;
++
++    const int64_t skip_last_below_rows = ggml_sycl_split_skip_last_below_rows();
++    if (skip_last_below_rows > 0 && device_count > 1 && nrows < skip_last_below_rows) {
++        const int last = device_count - 1;
++        const float last_start = tensor_split[last];
++
++        if (last_start > 0.0f && last_start < 1.0f) {
++            if (id >= last) {
++                *row_low = nrows;
++                *row_high = nrows;
++                return;
++            }
++
++            const float low_frac = (id == 0 ? 0.0f : tensor_split[id] / last_start);
++            const float high_frac = tensor_split[id + 1] / last_start;
++
++            *row_low = nrows * low_frac;
++            *row_low -= *row_low % rounding;
++            *row_high = nrows * high_frac;
++            if (*row_high < nrows) {
++                *row_high -= *row_high % rounding;
++            }
++            return;
++        }
++    }
+ 
+     *row_low = id == 0 ? 0 : nrows*tensor_split[id];
+     *row_low -= *row_low % rounding;
+-    if (id == ggml_sycl_info().device_count - 1) {
++    if (id == device_count - 1) {
+         *row_high = nrows;
+     } else {
+         *row_high = nrows*tensor_split[id + 1];
+         *row_high -= *row_high % rounding;
+     }
+ }
+ 
+@@ -2671,21 +2705,7 @@ static void ggml_sycl_op_mul_mat(
+         // for multi GPU, get the row boundaries from tensor split
+         // and round to mul_mat_q tile sizes
+         if (split) {
+-            const int64_t rounding = get_row_rounding(src0->type, tensor_split);
+-
+-            if (i != 0) {
+-                dev[i].row_low  = ne01*tensor_split[i];
+-                if (dev[i].row_low < ne01) {
+-                    dev[i].row_low -= dev[i].row_low % rounding;
+-                }
+-            }
+-
+-            if (i != ggml_sycl_info().device_count - 1) {
+-                dev[i].row_high  = ne01*tensor_split[i + 1];
+-                if (dev[i].row_high < ne01) {
+-                    dev[i].row_high -= dev[i].row_high % rounding;
+-                }
+-            }
++            get_row_split(&dev[i].row_low, &dev[i].row_high, src0, tensor_split, i);
+         }
+     }
+ 

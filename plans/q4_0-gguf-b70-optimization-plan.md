@@ -471,15 +471,592 @@ Goal: improve quality-preserving Q4_0 performance without power-limit changes.
      - vLLM warns of possible accuracy drop without proper scaling;
      - keep auto/BF16 KV for quality-preserving speed runs.
    - decision: keep PP2 x TP2 as a capacity fallback for larger models, but optimize Qwen3.6 27B FP8 on TP4.
+23. Q4_0 rotate-root allreduce diagnostic:
+   - added env-gated `GGML_SYCL_COMM_ROTATE_ROOT=1` for the single-kernel allreduce path;
+   - default behavior remains unchanged when the env var is unset;
+   - rebuild note: final linking needs oneAPI environment sourced with `source /opt/intel/oneapi/setvars.sh --force`;
+   - 4x B70 short smoke, 512 prompt / 32 output:
+     - rotate off: `30.494 tok/s`;
+     - rotate on: `30.729 tok/s`;
+   - 3x B70 selector `2,1,3`, 512 prompt / 128 output:
+     - rotate off: `42.573 tok/s`;
+     - rotate on: `41.359 tok/s`;
+   - 4x B70 selector `0,1,2,3`, 512 prompt / 128 output:
+     - rotate off: `32.165 tok/s`;
+     - rotate on: `31.754 tok/s`;
+   - decision: root rotation is stable but not a speed path. Keep it diagnostic-only and do not submit it as an improvement. The four-card problem is still the count and cost of 128 small reductions/token.
+   - allreduce trace interpretation: reduction tensors are direct `MUL_MAT` outputs (`linear_attn_out` / `attn_output` and `ffn_out`), not cheap metadata-only view/reshape boundaries, so the next useful Q4_0 implementation work is fused matmul/allreduce epilogues, reduce-scatter/all-gather-style decomposition, or a lower-overhead tiny reduction primitive.
+24. MiniMax M2.7 source diagnosis follow-up:
+   - source review confirms `LLAMA_SPLIT_MODE_TENSOR` is intentionally unsupported for `minimax-m2`;
+   - row split reaches the intended SYCL split-buffer path and fails first on `blk.12.ffn_down_exps.weight`, type `iq4_xs`, rows `[196608, 393216)`, allocation `160432128` bytes;
+   - the failed allocation matches the expected row-slice size for the expert tensor, so the failure is in split-buffer allocation/capacity behavior rather than bad range math;
+   - even after allocation is fixed, `GGML_OP_MUL_MAT_ID` with SYCL split buffers is not implemented and is likely to assert in execution;
+   - four-B70 row-split `-ngl 11`, `-p 0 -n 1` confirmation timed out after 240 seconds with empty output, so no MiniMax performance number is valid yet;
+   - next viable patches:
+     - low-risk diagnostic: keep `MUL_MAT_ID` expert tensors off SYCL split buffers until split execution is implemented;
+     - medium-risk diagnostic: add host-USM fallback for failed split-buffer tensor allocations;
+     - real speed path: implement expert-aligned split `MUL_MAT_ID`, where selected experts run only on the owning B70 and outputs are assembled correctly.
+25. vLLM/XPU speculative decode follow-up:
+   - fixed the local FP8 benchmark wrapper so the static FP8 VRFAI checkpoint can be run with `QUANTIZATION=compressed-tensors` instead of the wrapper always forcing `--quantization fp8`;
+   - TP4 MTP smoke reaches target/draft model resolution and XCCL rank initialization, then hangs before useful generation; a short `strace` sample showed rank 1 spinning in `sched_yield`, so the next MTP work is startup/synchronization diagnosis rather than decode-kernel tuning;
+   - TP4 n-gram speculative decode originally failed in the XPU Gated DeltaNet custom op because `non_spec_state_indices_tensor` was not contiguous;
+   - patched source and active venv `_xpu_ops.py` to pass contiguous `non_spec_state_indices_tensor` and `non_spec_query_start_loc` into `_xpu_C.gdn_attention`;
+   - mirrored the XPU Gated DeltaNet speculative fallback in source so speculative sequence masks can route through the generic `_forward_core` path instead of the fused XPU op that asserts on speculative masks;
+   - rerun result: n-gram speculative decode now completes a cold TP4 `32/8` smoke, `avg_latency=6.131081808 s`;
+   - controlled n-gram screen, TP4 static FP8, `512/256`: `42.245 tok/s` output versus about `39.264 tok/s` same-shape TP4 FP8 FA2 baseline;
+   - controlled n-gram validation, TP4 static FP8, `512/512`: `42.489 tok/s` output versus `41.503 tok/s` same-shape TP4 FP8 FA2 baseline;
+   - LocalMaxxing submission for `512/512`: `cmorr43b30004jj04h4hhb6v1`;
+   - `num_speculative_tokens=4` validation, TP4 static FP8, `512/512`: `46.067 tok/s` output;
+   - LocalMaxxing submission for `num_speculative_tokens=4`: `cmorre1hq000fi30421gxpv3j`;
+   - `num_speculative_tokens=6` stalled during initialization/profile with CPU-hot workers and `No available shared memory broadcast block found in 60 seconds`, then was terminated;
+   - `num_speculative_tokens=5` also stalled before useful output, with rank 0 CPU-hot and the other workers mostly idle;
+   - lookup min/max `2/7` with `4` draft tokens looked good on a two-iteration screen (`49.133 tok/s`) but validated lower at `45.285 tok/s`;
+   - decision: n-gram speculative decode is now a real quality-preserving software speed path for the static FP8 checkpoint, but current best remains `4` draft tokens with lookup min/max `2/5`.
+26. MTP speculative decode next boundary:
+   - read-only review points to startup/draft TP synchronization rather than the already-patched n-gram GDN metadata issue;
+   - primary files/functions to instrument next:
+     - `vllm/v1/worker/xpu_worker.py`, `XPUWorker.init_device`, especially distributed init and the XPU all-reduce warmup;
+     - `vllm/v1/worker/gpu_model_runner.py`, speculative setup and drafter creation;
+     - `vllm/v1/spec_decode/draft_model.py`, draft TP mismatch handling;
+     - `vllm/model_executor/models/qwen3_5_mtp.py`, `Qwen3_5MultiTokenPredictor` TP collectives;
+     - `vllm/v1/worker/xpu_model_runner.py`, CUDA compatibility wrapper for XPU events/streams;
+   - low-risk diagnostics: TP1 MTP compatibility smoke, `--enforce-eager`, MTP JSON `enforce_eager`, and `disable_padded_drafter_batch`;
+   - do not run heavy MTP benchmarks until the TP1 or eager smoke proves the startup path is not deadlocking.
+27. Q4_0 allreduce next boundary:
+   - read-only review confirmed the current 4-GPU bottleneck is many tiny reductions: `128` reductions/token, each `20480` bytes, contiguous F32 direct `MUL_MAT` outputs;
+   - best first patch boundary is an env-gated small-F32 allreduce fast path inside `ggml_backend_sycl_comm_allreduce_tensor()` for `nbytes == 20480`, `type == GGML_TYPE_F32`, and `n_backends in {2,3}` before changing meta graph semantics;
+   - larger fused MMVQ/allreduce epilogue remains the likely ceiling, but it crosses `ggml_sycl_op_mul_mat()`, `ggml_sycl_op_mul_mat_vec_q()`, and meta backend scheduling, so quantify the small-reduction overhead floor first.
+28. Q4_0 small-F32 allreduce diagnostic result:
+   - added env-gated `GGML_SYCL_COMM_SMALL_F32=1` for contiguous F32 `20480` byte allreduce tensors on `2` or `3` SYCL backends;
+   - implementation used one fixed `256` work-item kernel and dependency barriers on non-root queues;
+   - 3x B70 selector `2,1,3`, `512/128` A/B:
+     - control: `42.773 tok/s`;
+     - small-F32 diagnostic: `34.985 tok/s`;
+   - decision: this specific small-kernel shape is not useful. It underutilizes the GPU despite the tiny tensor size. If we continue this route, test only the barrier/event change while keeping full-range parallelism, or move to the larger fused MMVQ/DMMV allreduce epilogue.
+29. MiniMax M2.7 row-split `-ncmoe` staircase:
+   - four-GPU row split with `-ncmoe 13`, `26`, `38`, and `50` all failed before generation, but the failure moved predictably later as more expert layers were forced to host:
+     - `-ncmoe 13`: first failed GPU expert allocation at `blk.25.ffn_gate_exps.weight`, `129761280` bytes on device `1`;
+     - `-ncmoe 26`: first failed GPU expert allocation at `blk.37.ffn_up_exps.weight`, `129761280` bytes on device `0`;
+     - `-ncmoe 38`: first failed GPU expert allocation at `blk.49.ffn_gate_exps.weight`, `129761280` bytes on device `1`;
+     - `-ncmoe 50`: first failed GPU expert allocation at `blk.60.ffn_up_exps.weight`, `129761280` bytes on device `0`;
+   - interpretation: each B70 is only absorbing about 12 to 13 GPU-resident expert layers in the current SYCL row-split allocation path before even a small split expert slice fails;
+   - `-ncmoe 62` remains a proof that shard loading and context construction can work, but it is CPU/file-backed for all experts and is not a useful performance path on this low-RAM host;
+   - next action: stop treating MiniMax as a flag-tuning problem. The required code work is split expert allocation plus `GGML_OP_MUL_MAT_ID` execution on SYCL split buffers, or an expert-aligned alternative that keeps selected experts on the owning B70.
+30. Q4_0 event-barrier allreduce diagnostic:
+   - added env-gated `GGML_SYCL_COMM_EVENT_BARRIER=1` for the existing experimental single-kernel allreduce path;
+   - change: non-root queues use `ext_oneapi_submit_barrier({reduce})` after the root allreduce kernel instead of submitting a tiny dependent `single_task`;
+   - 3x B70 selector `2,1,3`, `512/128` A/B:
+     - event barrier off: `41.983 tok/s`;
+     - event barrier on: `43.331 tok/s`;
+   - 3x B70 selector `2,1,3`, `512/512`, `3` repeats:
+     - samples: `43.9488`, `43.4813`, `43.385 tok/s`;
+     - average: `43.605 tok/s`;
+     - LocalMaxxing: `cmortp5vn000el404dj3zqv0u`;
+   - interpretation: replacing marker tasks with event barriers is a real quality-preserving synchronization win on the current TP3 path. It does not change math, model weights, KV dtype, sampling, or power limits.
+   - 2x follow-up, selector `0,3`, `512/256`: event barrier off `40.457 tok/s`, event barrier on `40.331 tok/s`; no improvement;
+   - 4x follow-up, selector `0,1,2,3`, `512/128`: event barrier off `31.910 tok/s`, event barrier on `32.427 tok/s`; slight improvement but still far below 2x/3x;
+   - next action: stop changing allreduce launch markers for 4x. The remaining 4x bottleneck is reduction frequency/fanout, so move to fused matmul/allreduce epilogues or reduce-scatter-style graph changes.
+31. 2026-05-05 follow-up screens:
+   - Q4_0 `GGML_SYCL_COMM_SMALL_F32=1` is confirmed negative in the current implementation:
+     - 4x selector `0,1,2,3`, `512/128`, event barrier on: `31.763 tok/s`, below the prior `32.427 tok/s`;
+     - 3x selector `2,1,3`, `512/128`, event barrier on: `34.874 tok/s`, far below the 3x event-barrier path without small-F32;
+     - decision: keep small-F32 disabled. The fixed 256-work-item tiny reduction underutilizes B70 and is not worth more tuning in this shape.
+   - FP8 TP2/PP2:
+     - no-spec warm-cache `64/64`: `27.795 tok/s`;
+     - PP2+n-gram `512/128` hits a vLLM/XPU bug: `XPUModelRunner` has no `drafter`, then workers hang;
+     - decision: PP2 is a capacity fallback, not a Qwen3.6 27B single-stream speed path.
+   - FP8 TP4 oneCCL topology override:
+     - `CCL_TOPO_FABRIC_VERTEX_CONNECTION_CHECK=0`, n-gram `512/256`: `40.049 tok/s`;
+     - default topology same shape remains better at `42.245 tok/s`;
+     - decision: leave oneCCL topology recognition enabled.
+   - MiniMax `MUL_MAT_ID` guard:
+     - capability masking moves the failure from split expert slices to monolithic SYCL buffer allocation (`26.877 GB` at `-ncmoe 13`, `20.158 GB` at `-ncmoe 50`);
+     - decision: masking is diagnostic only. The real implementation target is split-buffer `GGML_OP_MUL_MAT_ID` or an expert-owned execution plan, not fallback placement.
+32. Next implementation targets:
+   - Q4_0:
+     - design a fused `MUL_MAT` output-projection plus small allreduce path for the direct `linear_attn_out` / `attn_output` 20 KB F32 outputs;
+     - alternatively prototype a reduce-scatter/all-gather-like meta scheduling path that avoids writing a fully mirrored 20 KB tensor on every B70 for every reduction;
+     - use 3x event-barrier `43.605 tok/s` as the regression guard and 4x event-barrier `32.427 tok/s` as the main target to beat.
+   - FP8:
+     - keep TP4/default oneCCL/n-gram4 lookup `2/5` as current best;
+     - investigate the PP2+n-gram `drafter` attribute bug only if PP2 becomes necessary for a larger model.
+   - MiniMax:
+     - add loader-placement diagnostics for `blk.*.ffn_*_exps.weight` buffer type choices;
+     - implement or prototype split-buffer `MUL_MAT_ID` handling before more `-ncmoe` sweeps.
+33. MiniMax split `MUL_MAT_ID` token-generation prototype:
+   - added env-gated `GGML_SYCL_MUL_MAT_ID_SPLIT=1` in the SYCL backend;
+   - first version targets token generation only (`ne12 == 1`) and maps selected expert IDs to split-buffer row shards across the four B70s;
+   - patch artifact: `/home/steve/llm-optimization-artifacts/patches/llama-cpp-sycl-minimax-split-mulmatid-tg.patch`;
+   - `-ncmoe 50` no longer falls back to a 20 GB monolithic SYCL3 expert allocation, confirming the capability/placement blocker was removed;
+   - `-ncmoe 60` loaded the model, constructed context, assigned KV over all four B70s, enabled fused Gated Delta Net paths, and reserved a `3975` node / `122` split graph;
+   - status: first one-token decode did not complete; after more than eight minutes, `strace` showed the main thread spinning in `sched_yield()` with an empty JSONL result;
+   - decision: this is a real implementation lead, not a usable runtime path yet. Next MiniMax step is instrumentation around the first split `MUL_MAT_ID` call plus batched expert-shard execution/copy-path cleanup, not more flag sweeps.
+34. Runtime recovery and corrected Q4 screen:
+   - MiniMax stall produced an `xe` coredump/reset on `0000:03:00.0`; the first post-MiniMax Q4 run produced the same `sched_yield()` spin and an `xe` schedule-disable failure/reset on `0000:83:00.0`;
+   - with no active compute processes, debugfs GT resets restored runtime health and a tiny single-B70 Q4 smoke succeeded;
+   - corrected DNN-off validation:
+     - 3x selector `2,1,3`, `512/128`: `42.170 tok/s` decode;
+     - 4x selector `0,1,2,3`, `512/128`: `32.477 tok/s` decode;
+   - decision: the 4x Q4 regression is confirmed under the correct DNN-off stack. Do not spend more time on basic selector/flag sweeps until a fusion/reduced-collective implementation exists.
+35. FP8 TP4 validation blocker:
+   - best unsubmitted candidate remains static FP8 TP4 n-gram, `num_speculative_tokens=4`, lookup min/max `2/4`, `512/512`, two measured iterations at `50.193 tok/s`;
+   - attempted a `3` iteration validation after the GPU reset, but vLLM failed before benchmark JSON with a segfault in XCCL communicator initialization, entering oneCCL `coll_init` and SYCL/UR Level Zero `urProgramBuildExp`;
+   - standalone XCCL allreduce now segfaults even at `2` ranks after stale `/dev/shm` cleanup, NEO compiler cache removal, topology override, MPI transport attempt, and GT resets;
+   - decision: do not submit the `50.193 tok/s` candidate yet and do not run more TP vLLM benchmarks in this boot session. Reboot or driver reload is needed before the next FP8 validation.
+36. 2026-05-05 follow-up implementation screens:
+   - MiniMax split `MUL_MAT_ID` host-bounce copy path was added behind `GGML_SYCL_MUL_MAT_ID_SPLIT_HOST_BOUNCE=1`, but a four-B70 `-ncmoe 60`, one-token attempt still timed out and triggered new `xe` CCS/BCS engine resets. Next MiniMax work needs a synthetic split-expert harness or flushed per-stage heartbeat instrumentation before another full-model decode attempt.
+   - Q4_0 `GGML_SYCL_COMM_SKIP_ROOT_READY=1` was neutral on 4x B70: same-build control `32.720377 tok/s`, skip-root `32.776781 tok/s` for 512 prompt / 128 output. Keep it diagnostic-only.
+   - standalone two-rank XCCL remains unhealthy after these screens, with both ranks segfaulting before measured allreduce rows. FP8 TP validation stays paused until reboot or driver reload.
+   - artifacts:
+     - `/home/steve/llm-optimization-artifacts/notes/2026-05-05-followups-minimax-q4-xccl.md`;
+     - `/home/steve/llm-optimization-artifacts/data/followups-minimax-q4-xccl-20260505.json`;
+     - `/home/steve/llm-optimization-artifacts/patches/llama-cpp-sycl-followups-minimax-hostbounce-q4-skiprootready-20260505.patch`;
+     - `/home/steve/llm-optimization-artifacts/patches/vllm-xpu-qwen36-fp8-fa2-ngram-language-only-20260505.patch`.
+37. 2026-05-05 Q4_0 fused allreduce + residual add:
+   - added a new backend proc, `ggml_backend_comm_allreduce_add_tensor`, plus a SYCL implementation for the existing single-kernel allreduce path;
+   - added Meta graph gate `GGML_META_FUSE_ALLREDUCE_ADD=1` to detect immediate `ADD(partial, mirrored)` / `ADD(mirrored, partial)` patterns and skip the separate residual ADD subgraph when the backend fused path accepts the tensors;
+   - correctness guard: the fused kernel computes `sum(partial shards) + mirrored_residual`, so the residual is not allreduced and the result is mathematically equivalent to the baseline allreduce followed by ADD;
+   - dual-card one-token diagnostics:
+     - `GGML_META_FUSE_ALLREDUCE_ADD_LIMIT=1` routed exactly one reduction through `path=backend+add`;
+     - all-site mode routed `79` of `128` per-token reductions through `path=backend+add`;
+   - 3x selector `2,1,3`, Qwen3.6 27B Q4_0, 512/128 screen with the fast historical command shape: `44.016108 tok/s`;
+   - 3x selector `2,1,3`, 512/512, `3` repeats validation:
+     - prompt: `135.665459 tok/s`;
+     - decode samples: `43.9985`, `44.0192`, `43.9953 tok/s`;
+     - average decode: `44.004344 tok/s`;
+     - total throughput: `66.453788 tok/s`;
+     - validation JSONL: `/home/steve/bench-results/qwen36-q4_0-gguf/sycl-fuseadd-validate-triple213-p512n512-r3-20260505T025706Z.jsonl`;
+   - LocalMaxxing accepted reduced payload `cmos1jmsv000iih04iifehc8d`;
+   - artifacts:
+     - note: `/home/steve/llm-optimization-artifacts/notes/2026-05-05-q4-fused-allreduce-add.md`;
+     - data: `/home/steve/llm-optimization-artifacts/data/qwen36-q4-fused-allreduce-add-20260505.json`;
+     - focused patch: `/home/steve/llm-optimization-artifacts/patches/llama-cpp-sycl-meta-fused-allreduce-add-focused-20260505.patch`;
+   - measurement caveat: forcing `-b 512` now lowers 3x controls to about `30.7-30.9 tok/s`; leaving `-b` unset reports `n_batch=2048` and matches the healthy `42+ tok/s` control path. Keep command shape consistent for future comparisons.
+   - follow-up 4x selector `0,1,2,3`, no explicit `-b`, 512/128:
+     - control: `32.383337 tok/s`;
+     - fused-add: `33.219955 tok/s`;
+     - conclusion: fused-add helps slightly on 4x but does not solve the major negative scaling.
+   - follow-up 2x selector `0,3`, explicit `-b 512`, 512/256:
+     - control: `40.278630 tok/s`;
+     - fused-add: `40.265194 tok/s`;
+     - conclusion: fused-add is neutral on the best dual-card command shape.
+   - next action: prototype a 4x collective variant that avoids the current root-kernel remote-write fanout, then investigate whether the remaining 49 non-fused reductions can be safely matched or require a lower-level matmul/allreduce epilogue.
+38. 2026-05-05 Q4_0 4x collective negative prototypes:
+   - added env-gated `GGML_SYCL_COMM_LOCAL_WRITE=1`:
+     - ordinary in-place allreduce gathers all peer partials into per-device temporary buffers, then each GPU writes only its local mirrored output;
+     - fused-add sites use local per-device kernels directly because the output tensor is separate from the partial tensor.
+   - 4x selector `0,1,2,3`, Qwen3.6 27B Q4_0, 512/128:
+     - root fused-add baseline from item 37: `33.219955 tok/s`;
+     - `GGML_SYCL_COMM_LOCAL_WRITE=1`: `30.681785 tok/s`;
+     - conclusion: per-device temp gather removes root remote writes but adds too many tiny copies/events for decode. It is not a useful 4x path.
+   - narrowed `GGML_SYCL_COMM_LOCAL_WRITE=2` to fused-add sites only, leaving ordinary allreduces on the root single-kernel path:
+     - result: `32.365769 tok/s`;
+     - conclusion: four local fused-add kernels per fused site are still slower than one root fused kernel.
+   - added env-gated `GGML_SYCL_COMM_FUSEADD_ROOT_RESIDUAL=1`:
+     - uses the root residual for all outputs at fused-add sites because the residual tensor is mirrored by the Meta split state;
+     - result: `33.074515 tok/s`;
+   - conclusion: remote residual reads are not the main 4x bottleneck.
+   - decision: keep these as diagnostic-only env gates. The remaining 4x speed work likely needs fewer reductions or a true matmul/reduction epilogue, not alternate tiny-copy or tiny-kernel collective topologies.
+39. 2026-05-05 FP8/XCCL recovery and validation:
+   - standalone XCCL 2-rank gate recovered without a reboot:
+     - selector `level_zero:0,1`, `CCL_ZE_IPC_EXCHANGE=sockets`;
+     - completed allreduce rows through 256 MiB, with 64-256 MiB payload around `41.5-41.8 GB/s`;
+     - log: `/home/steve/bench-results/qwen36-fp8-vllm/xccl-standalone-2rank-post-q4-localwrite-20260505T035142Z.log`.
+   - revalidated the prior unsubmitted static FP8 TP4 n-gram candidate:
+     - model: `vrfai/Qwen3.6-27B-FP8`;
+     - TP4, FlashAttention2, compressed-tensors FP8, 512 prompt / 512 output, 3 measured iterations;
+     - n-gram `num_speculative_tokens=4`, lookup min/max `2/4`;
+     - with forced `CCL_ZE_IPC_EXCHANGE=sockets` and `CCL_TOPO_P2P_ACCESS=1`: `43.342333 tok/s`, so the earlier `50.193 tok/s` two-iteration screen did not reproduce under that CCL environment;
+     - with closer-to-original CCL env (`CCL_ATL_TRANSPORT=ofi`, default IPC/topology): `47.674832 tok/s` output, `95.349664 tok/s` total;
+     - latencies: `10.523862531`, `11.585105772`, `10.109288830` seconds;
+     - JSON: `/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp4-pp1-in512-out512-bs1-20260505T035653Z.json`;
+     - LocalMaxxing accepted: `cmos3pnqo000kkz04o4aiup22`.
+   - adjacent lookup max `5` under the same recovered/default CCL env was slower:
+     - `42.159878 tok/s` output, `84.319756 tok/s` total;
+     - JSON: `/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp4-pp1-in512-out512-bs1-20260505T040134Z.json`.
+   - decision: current validated FP8 best is lookup min/max `2/4` with default IPC/topology, not forced sockets and not lookup max `5`.
+40. 2026-05-05 FP8 n-gram sweep around the validated TP4 best:
+   - objective: test whether the `47.675 tok/s` static FP8 TP4 result was improved by changing speculative depth or lookup width while keeping the same CCL environment.
+   - common configuration:
+     - model: `vrfai/Qwen3.6-27B-FP8`;
+     - vLLM/XPU `0.20.1`, FlashAttention2, compressed-tensors FP8;
+     - selector `level_zero:0,1,2,3`, TP4/PP1;
+     - `CCL_ATL_TRANSPORT=ofi`, default IPC/topology recognition;
+     - 512 prompt / 512 output, 3 measured iterations after 1 warmup.
+   - results:
+     - n-gram `num_speculative_tokens=3`, lookup min/max `2/4`: `40.697016 tok/s`;
+     - n-gram `num_speculative_tokens=4`, lookup min/max `2/3`: `43.130893 tok/s`;
+     - n-gram `num_speculative_tokens=5`, lookup min/max `2/4`: `44.163969 tok/s`.
+   - conclusion:
+     - none beat the validated `47.674832 tok/s` n-gram `4`, lookup `2/4` run;
+     - current FP8 next work should move to other levers, such as PP2 x TP2 drafter bugfix, real draft-model speculative decode, CCL/oneCCL env work, or vLLM XPU graph/communication constraints.
+   - LocalMaxxing: not submitted because these are negative boundary runs.
+41. 2026-05-05 vLLM PP2 x TP2 n-gram speculative unblock:
+   - root cause:
+     - `GPUModelRunner.__init__` only constructs `self.drafter` on the last pipeline-parallel rank;
+     - `_build_attention_metadata()` dereferenced `self.drafter` on every PP rank whenever `speculative_config` was present;
+     - PP0 ranks therefore crashed with `AttributeError: 'XPUModelRunner' object has no attribute 'drafter'`.
+   - patch:
+     - changed the metadata path to use `drafter = getattr(self, "drafter", None)`;
+     - only Eagle/DFlash drafters need the `kv_cache_gid` branch; n-gram and non-drafter PP ranks can use the normal common metadata path;
+     - applied to both `/home/steve/src/vllm/vllm/v1/worker/gpu_model_runner.py` and the active venv copy.
+   - smoke result:
+     - PP2 x TP2, 4x B70, static FP8, n-gram `4`, lookup `2/4`, 32 prompt / 8 output, 1 measured iteration;
+     - completed successfully after the patch;
+     - avg latency `0.32795706900651567 s`, output `24.393437 tok/s`;
+     - JSON: `/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp2-pp2-in32-out8-bs1-20260505T043249Z.json`.
+   - larger run status:
+     - PP2 x TP2, 512 prompt / 256 output, n-gram `4`, lookup `2/4`;
+     - failed during model load/memory accounting with `UR_RESULT_ERROR_DEVICE_LOST`, followed by oneCCL broken-pipe cleanup;
+     - log: `/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp2-pp2-in512-out256-bs1-20260505T043606Z.log`.
+   - conclusion:
+     - the vLLM drafter bug is fixed, but PP2 x TP2 remains a stability/runtime track rather than a speed track;
+     - do not submit PP2 x TP2 results to LocalMaxxing until a full 512-token-class run completes.
+42. 2026-05-05 vLLM PP2 x TP2 stability follow-up:
+   - PP2 x TP2 non-speculative static FP8 now completes at 512 prompt / 128 output with lowered memory pressure:
+     - `GPU_MEM_UTIL=0.80`, `MAX_MODEL_LEN=1024`, 2 measured iterations after 1 warmup;
+     - avg latency `4.723338066491124 s`;
+     - output `27.099479 tok/s`, total `135.497394 tok/s`;
+     - JSON: `/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp2-pp2-in512-out128-bs1-20260505T044235Z.json`.
+   - PP2 x TP2 n-gram remains broken after the `self.drafter` patch:
+     - n-gram `4`, lookup `2/4`, 512/128: scheduler emitted `num_scheduled_tokens=-3`, `total_num_scheduled_tokens=-3`;
+     - n-gram `2`, lookup `2/4`, 512/128: scheduler emitted `num_scheduled_tokens=-1`, `total_num_scheduled_tokens=-1`.
+   - rejected patch attempt:
+     - changing the running-request schedule guard from `num_new_tokens == 0` to `num_new_tokens <= 0` prevents the negative-token assert but then leads to XPU `vectorized gather kernel index out of bounds`;
+     - this suggests stale `-1` speculative placeholders still reach gather/sample code, so the true fix needs placeholder/spec-token cleanup, not just skipping negative scheduler work;
+     - the guard was reverted.
+   - LocalMaxxing: not submitted; PP2 non-spec is valid but not a useful speed result, and PP2+n-gram is a negative/runtime finding.
+   - next action: leave PP2+n-gram quarantined until we can patch scheduler/output cleanup correctly; continue with validated TP4 FP8 and Q4 kernel/collective work.
+
+43. 2026-05-05 Q4 allreduce-to-reshape experiment:
+   - objective: remove the remaining slow plain allreduce cases that feed immediate `RESHAPE` nodes, especially the 48 `linear_attn_out-* -> RESHAPE` paths found in the previous partial probe.
+   - patch:
+     - added a backend proc hook `ggml_backend_comm_allreduce_to_tensor`;
+     - added Meta backend detection for `PARTIAL` f32 tensors whose only consumer is a same-size mirrored `RESHAPE`;
+     - added `GGML_META_FUSE_ALLREDUCE_RESHAPE=1` and optional `GGML_META_FUSE_ALLREDUCE_RESHAPE_LIMIT`;
+     - added a SYCL single-kernel implementation that reduces partials and writes the mirrored reshaped output tensors directly.
+   - one-token trace:
+     - 4x B70, selector `level_zero:0,1,2,3`, 5120-element f32 allreduces;
+     - `backend+reshape` selected for 48 reshape paths per token;
+     - only final `attn_output-63` remained plain because its next consumer is `GET_ROWS`, not `RESHAPE`;
+     - JSON: `/home/steve/bench-results/qwen36-q4_0-gguf/sycl-reshape-fuse-probe-quad0123-p0n1-20260505T052621Z.jsonl`;
+     - log: `/home/steve/bench-results/qwen36-q4_0-gguf/sycl-reshape-fuse-probe-quad0123-p0n1-20260505T052621Z.log`.
+   - 4x B70 512/128 screen:
+     - same-build fused-add control: `33.497463 tok/s`;
+     - fused-add plus fused-reshape: `33.743952 tok/s`;
+     - result is a marginal `+0.74%` screen, below the threshold for a meaningful quad-GPU improvement.
+   - 3x B70 selector `2,1,3` validation:
+     - fused-add plus fused-reshape, 512 prompt / 512 output, 3 reps: `43.734996 tok/s`;
+     - prior fused-add-only validation remains better at `44.004344 tok/s`;
+     - prompt throughput stayed effectively unchanged at `135.667935 tok/s`.
+   - conclusion:
+     - the graph recognition and backend handoff work;
+     - this direct-to-reshape implementation is not a validated speed win and should remain experimental/env-gated;
+     - do not submit to LocalMaxxing as an improved result.
+44. 2026-05-05 MiniMax M2.7 large-model smoke blocker:
+   - objective: after Qwen 27B showed useful 3x/4x B70 behavior, test the already-downloaded MiniMax M2.7 UD-IQ4_XS model as a larger four-GPU target.
+   - command shape:
+     - 4x B70, `ONEAPI_DEVICE_SELECTOR=level_zero:0,1,2,3`;
+     - `llama-bench -dev SYCL0,SYCL1,SYCL2,SYCL3 -sm row -ts 1/1/1/1 -ngl 99 -ncmoe 60 -fa 1 -ub 32 -ctk f16 -ctv f16 -p 0 -n 1 -r 1`;
+     - MiniMax split/MoE debugging envs enabled, including `GGML_SYCL_MUL_MAT_ID_SPLIT=1` and host-bounce staging.
+   - scheduler trace:
+     - split 0 CPU `GET_ROWS` completes;
+     - split 1 starts on `SYCL0` with 44 nodes, first `norm-0/RMS_NORM`;
+     - input copies complete, then execution hangs or device-loses inside the first SYCL graph compute.
+   - SYCL op trace:
+     - `ggml_sycl_rms_norm` and following elementwise `MUL` complete;
+     - the first failing operation is the dense attention projection `blk.0.attn_q.weight` `q8_0` `[3072,6144]` x `attn_norm-0` f32 `[3072,1]`;
+     - default reordered MMVQ completes `quantize_row_q8_1_sycl` and then does not complete the q8_0 matvec;
+     - forced DMMV completes `to_fp16_sycl` and then segfaults.
+   - conclusion:
+     - this is not yet a MiniMax `MUL_MAT_ID`/MoE split problem;
+     - immediate blocker is the SYCL `q8_0 x vector` matvec path on the first dense attention projection;
+     - next MiniMax work should build a targeted q8_0 matvec repro, add q8_0 kernel tracing, or add an env-gated fallback to reach the MoE path.
+   - artifacts:
+     - note: `/home/steve/llm-optimization-artifacts/notes/2026-05-05-minimax-q8-attn-matvec-blocker.md`;
+     - data: `/home/steve/llm-optimization-artifacts/data/minimax-m27-q8-attn-matvec-blocker-20260505.json`;
+     - scheduler trace patch: `/home/steve/llm-optimization-artifacts/patches/llama-cpp-scheduler-compute-trace-20260505.patch`.
+   - LocalMaxxing: not submitted because no valid benchmark metric exists.
+45. 2026-05-05 xe recovery blocker after device-lost:
+   - trigger:
+     - MiniMax q8_0 experiments produced Level Zero device-lost failures and a forced-DMMV segmentation fault;
+     - subsequent Qwen multi-device runs failed below llama.cpp, including oneMKL GEMM `UR_RESULT_ERROR_DEVICE_LOST`.
+   - recovery attempt:
+     - PCI function reset was attempted for all four B70 VGA functions;
+     - `sycl-ls` then aborted in NEO DRM initialization at `drm_neo.cpp:445`;
+     - `xe` unbind/rebind deadlocked while binding `0000:83:00.0`.
+   - current state:
+     - only one B70 is visible to Level Zero;
+     - `0000:83:00.0` is stuck in uninterruptible kernel sleep during bind;
+     - `0000:a3:00.0` and `0000:e3:00.0` are unbound.
+   - kernel stack:
+     - `intel_edp_init_connector`;
+     - `intel_dp_init_connector`;
+     - `intel_setup_outputs`;
+     - `xe_display_init_early`;
+     - `xe_device_probe`.
+   - recommendation:
+     - reboot required;
+     - before continuing benchmarks, load `xe` with `options xe disable_display=1 probe_display=0`;
+     - this is appropriate for the ASPEED-console, headless-B70 compute setup and targets the observed display-probe deadlock.
+   - post-reboot validation:
+     - `sycl-ls` must show four Level Zero GPUs;
+     - `/home/steve/sycl-peer-read-test` must pass with `ONEAPI_DEVICE_SELECTOR=level_zero:0,1,2,3`;
+     - retry Qwen Q4 3-card `p16/n8` before full screens.
+   - LocalMaxxing: not submitted because this is not a benchmark.
+46. 2026-05-05 post-reboot GuC 70.49.4 Q4_0 validation:
+   - system recovery:
+     - `xe` is loaded headless with `disable_display=1` and `probe_display=0`;
+     - all four B70s enumerate through Level Zero;
+     - `/home/steve/sycl-peer-read-test` passes across all four GPUs;
+     - kernel logs confirm BMG GuC `70.49.4` on all four B70s.
+   - fresh DNN build:
+     - built current source with `GGML_SYCL_DNN=ON` and `GGML_SYCL_DEVICE_ARCH=intel_gpu_bmg_g31` at `/home/steve/src/llama.cpp-q4-b70/build-sycl-2026-bmg-g31-aot-dnn-current`;
+     - 2x and 3x tiny prompt/decode smokes survive without reset;
+     - DNN is a stability/debug fallback, not the current speed path.
+   - validated fast path:
+     - Qwen3.6 27B Q4_0 GGUF, 3x B70 selector `2,1,3`;
+     - exact fast env includes Q8 cache, async copy, single-kernel allreduce, event barrier, and `GGML_META_FUSE_ALLREDUCE_ADD=1`;
+     - 512 prompt / 512 output, 3 repeats: prompt `135.705541 tok/s`, decode `44.180797 tok/s`, total `66.659637 tok/s`;
+     - JSONL: `/home/steve/bench-results/qwen36-q4_0-gguf/sycl-guc70494-nondnn-build-triple213-exactfast-p512n512-r3-20260505T121540Z.jsonl`;
+     - LocalMaxxing: `cmoslhw0i0008jj04h59bb96n`.
+   - decision:
+     - current Q4_0 reference is still reproducible post-reboot and post-GuC update;
+     - continue optimizing from this non-DNN SYCL path for Q4_0 speed work;
+     - use DNN only to isolate prompt-side oneMKL GEMM stability issues.
+47. 2026-05-06 FP8 TP2/2x2 layout check:
+   - target:
+     - determine whether Qwen3.6 27B FP8 can run as two independent 2-card tensor-parallel groups on the four B70s.
+   - static compressed-tensors FP8:
+     - `/home/steve/models/qwen3.6-27b-fp8-vrfai`, `TP=2`, `PP=1`, selector `level_zero:0,1`;
+     - fails to load from XPU OOM during model parameter allocation, including with lower `GPU_MEM_UTIL` and `UR_L0_ENABLE_RELAXED_ALLOCATION_LIMITS=1`.
+   - dynamic FP8 HF shard set:
+     - `/home/steve/models/qwen3.6-27b-fp8-hf`, `TP=2`, `PP=1`;
+     - current exact block-FP8 fallback fails while materializing BF16 weights in `XPUBF16Fp8BlockScaledMMLinearKernel.process_weights_after_loading`.
+   - opt-in local requant path:
+     - `VLLM_XPU_BLOCK_FP8_REQUANT=1` selects `XPURequantFp8BlockScaledMMLinearKernel`;
+     - this loads TP2/PP1, but it requantizes 128x128 block-FP8 weights into XPU W8A16 FP8 format and is therefore a quality-risk experiment;
+     - 512/128 no-spec smoke: `9.098410 tok/s`;
+     - 512/512 n-gram 4 lookup `2/4`: `24.498929 tok/s`;
+     - decision: do not treat as a speed path or submit to LocalMaxxing.
+   - artifacts:
+     - note: `/home/steve/llm-optimization-artifacts/notes/2026-05-06-fp8-tp2-requant-negative.md`;
+     - data: `/home/steve/llm-optimization-artifacts/data/qwen36-fp8-tp2-requant-negative-20260506.json`;
+     - env registration patch: `/home/steve/llm-optimization-artifacts/patches/vllm-xpu-block-fp8-requant-env-20260506.patch`.
+   - next:
+     - keep 2x2 serving on hold until native block-scaled FP8 GEMM exists or requant passes quality checks and becomes much faster;
+     - continue with TP4 FP8 and Q4_0 GGUF paths for single-session speed.
+48. 2026-05-06 Q4_0 reordered MMVQ VDR/reduction screen:
+   - target:
+     - test two quality-preserving kernel scheduling knobs in the hot Q4_0 reordered MMVQ decode path;
+     - keep the Q4_0 model and dequant math unchanged.
+   - source controls added:
+     - `GGML_SYCL_REORDER_MMVQ_Q4_VDR=1|4` to test lane/block work grouping against the default VDR=2;
+     - `GGML_SYCL_REORDER_MMVQ_XOR_REDUCE=1` to test explicit XOR subgroup reduction against `sycl::reduce_over_group`;
+     - default runtime remains unchanged.
+   - single-card screen:
+     - Qwen3.6 27B Q4_0 GGUF, `ONEAPI_DEVICE_SELECTOR=level_zero:2`;
+     - `-p 0 -n 128 -r 2`, `-fa 1`, `-ub 32`, f16 KV cache, Q8 cache, fused MMVQ2;
+     - default VDR=2: `24.654646 tok/s`;
+     - VDR=1: `24.516621 tok/s`;
+     - VDR=4: `23.232102 tok/s`;
+     - default reduction: `24.599359 tok/s`;
+     - XOR reduction: `24.557468 tok/s`.
+   - conclusion:
+     - this is not a useful optimization path;
+     - VDR=2 and `sycl::reduce_over_group` remain the best tested choices;
+     - next Q4 kernel work should focus on a deeper ESIMD/XMX Q4_0 x Q8_1 matvec path or on graph/communication fusion rather than this lane grouping.
+   - artifacts:
+     - note: `/home/steve/llm-optimization-artifacts/notes/2026-05-06-q4-vdr-xor-negative.md`;
+     - data: `/home/steve/llm-optimization-artifacts/data/q4-vdr-xor-negative-20260506.json`;
+     - patch: `/home/steve/llm-optimization-artifacts/patches/llama-cpp-sycl-q4-vdr-xor-negative-20260506.patch`.
+   - LocalMaxxing: not submitted because this is a negative microbenchmark, not an improved model run.
+49. 2026-05-06 Q4_0 pair/triple/quad topology screen:
+   - target:
+     - explain whether the four-card Q4_0 regression is caused by a bad GPU, a bad pair, root ordering, or the 4-way tensor-parallel/allreduce path itself.
+   - setup:
+     - Qwen3.6 27B Q4_0 GGUF;
+     - llama.cpp SYCL AOT BMG G31 build, tensor split mode;
+     - `-p 512 -n 128 -r 2`, `-fa 1`, `-ub 32`, f16 KV cache, Q8 cache, fused MMVQ2, fused allreduce+add, single-kernel allreduce, event barrier, and `GGML_SYCL_COMM_SYNC_AFTER=2`.
+   - ordered two-card sweep:
+     - all 12 ordered pairs landed tightly between `40.687815` and `40.747873 tok/s`;
+     - no pair or root ordering stood out as bad;
+     - summary: `/home/steve/bench-results/qwen36-q4_0-gguf/sycl-pair-order-sweep-devslash-p512n128-r2-20260506T113813Z.jsonl`.
+   - triple/quad sweep:
+     - `2,1,3`: `45.195064 tok/s`;
+     - `0,1,2`: `45.415802 tok/s`;
+     - `0,1,3`: `45.140951 tok/s`;
+     - `0,2,3`: `46.037050 tok/s`;
+     - `2,1,3,0`: `34.550830 tok/s`;
+     - `0,1,2,3`: `34.722804 tok/s`;
+     - summary: `/home/steve/bench-results/qwen36-q4_0-gguf/sycl-triple-quad-order-sweep-p512n128-r2-20260506T115036Z.jsonl`.
+   - conclusion:
+     - the 4-card regression is not a bad B70, a bad pair, or a simple root-ordering problem;
+     - every ordered pair is healthy and every tested triple is healthy, including triples with device 0;
+     - next 4x Q4_0 work should target the 4-way allreduce/scheduling implementation or reduce the number of per-token collectives.
+   - artifacts:
+     - note: `/home/steve/llm-optimization-artifacts/notes/2026-05-06-q4-topology-4way-bottleneck.md`;
+     - data: `/home/steve/llm-optimization-artifacts/data/q4-topology-4way-bottleneck-20260506.json`.
+   - LocalMaxxing: not submitted because this is a diagnostic topology screen, and the already submitted 3-card and 4-card full 512/512 runs are better leaderboard-quality records.
+50. 2026-05-06 Q4_0 graph-consumer and vec4 allreduce follow-up:
+   - combined allreduce consumer fusion:
+     - tested `GGML_META_FUSE_ALLREDUCE_RESHAPE=1` and `GGML_META_FUSE_ALLREDUCE_GET_ROWS=1` with the existing fused allreduce+add path;
+     - 4x short `p512/n128/r2`: off `33.987384 tok/s`, on `34.874597 tok/s`;
+     - 4x full `p512/n512/r3` with the extra fusions: `34.842877 tok/s`, which does not beat the existing 4x best `34.929313 tok/s`;
+     - decision: keep available for diagnostics, but not a best path.
+   - temporary vec4 allreduce experiment:
+     - tested `GGML_SYCL_COMM_VEC4_F32=1`, vectorizing the small F32 reduction loops with `sycl::vec<float, 4>`;
+     - 3x short control `45.482621 tok/s`, vec4 `45.313034 tok/s`;
+     - 4x short control `34.890219 tok/s`, vec4 `34.198055 tok/s`;
+     - result is negative, especially on 4x.
+   - cleanup:
+     - removed the temporary `GGML_SYCL_COMM_VEC4_F32` source gate and vector branches;
+     - rebuilt `llama-bench` and `llama-cli`;
+     - post-revert 3x smoke on selector `2,1,3` returned `45.668525 tok/s` for `p512/n128/r1`.
+   - conclusion:
+     - simple scalar/vector formatting of the tiny F32 allreduce is not the 4x bottleneck;
+     - the useful Q4 path is still deeper graph/communication work: true output-projection plus allreduce epilogue, or reducing the count of per-token collectives.
+   - artifacts:
+     - note: `/home/steve/llm-optimization-artifacts/notes/2026-05-06-q4-combofuse-vec4-negative.md`;
+     - data: `/home/steve/llm-optimization-artifacts/data/q4-combofuse-vec4-negative-20260506.json`.
+   - LocalMaxxing: not submitted because this is neutral/negative diagnostic data, not a new best model benchmark.
+51. 2026-05-06 FP8 PP2 GDN speculative fallback:
+   - objective:
+     - continue the 2x2 FP8 layout investigation by fixing the concrete PP2 n-gram failure instead of treating PP as generally broken.
+   - deterministic benchmark controls added:
+     - `VLLM_BENCH_LATENCY_PROMPT_SEED=<int>`;
+     - `VLLM_BENCH_LATENCY_PROMPT_MODE=repeat`;
+     - `VLLM_BENCH_LATENCY_REPEAT_PERIOD=<int>`.
+   - wrapper/source hygiene:
+     - `/home/steve/bench-vllm-qwen36-fp8.sh` now imports `/home/steve/src/vllm` through `PYTHONPATH` when present;
+     - this avoids mixing copied source files into the installed venv package.
+   - source finding:
+     - PP handoff is working: last PP rank can propose draft tokens and PP0 receives scheduled speculative work;
+     - the failing forced-repeat trace scheduled `spec_lens={'0-a172e5cc': 4}` on PP0;
+     - the immediate crash was the explicit XPU GDN assertion in `_gdn_attention_core_xpu_impl`: `attn_metadata.spec_sequence_masks is None`;
+     - this is a GDN XPU custom-op speculative support gap, not the earlier PP ownership bug.
+   - patch:
+     - added a generic GDN fallback in `_gdn_attention_core_xpu_impl()` for speculative metadata;
+     - when `spec_sequence_masks` is present, it reconstructs `mixed_qkv`, `z`, `b`, and `a` from the projected XPU tensors and calls `self._forward_core(...)`;
+     - non-speculative GDN still uses the native `_xpu_C.gdn_attention` path.
+   - validation status:
+     - `--enforce-eager` completed but did not schedule draft tokens in that sample, so it was not a real validation;
+     - the patched non-eager retry failed during model load with `UR_RESULT_ERROR_OUT_OF_DEVICE_MEMORY`, followed by `UR_RESULT_ERROR_DEVICE_LOST`;
+     - post-reboot forced-repeat retry completed with real PP speculation: PP1 proposed `draft_lens=[4]`, PP0 scheduled `spec_lens` with 4 draft tokens, and the old GDN `spec_sequence_masks` assertion did not fire;
+     - the successful validation was short and slow: 32 output tokens at `8.723851 tok/s`, so it is not a speed path;
+     - the next longer PP2 load failed before inference with `UR_RESULT_ERROR_DEVICE_LOST` during embedding weight copy, confirming repeated vLLM FP8 load/unload remains unstable;
+     - post-failure sanity checks showed all four B70s still enumerate and small Torch XPU allocations work on every device;
+     - a post-failure Q4_0 llama.cpp 3-card sanity run also completed at `45.104294 tok/s` for `p512/n128/r1`;
+     - do not submit these runs to LocalMaxxing.
+   - artifacts:
+     - note: `/home/steve/llm-optimization-artifacts/notes/2026-05-06-vllm-pp2-gdn-spec-fallback.md`;
+     - data: `/home/steve/llm-optimization-artifacts/data/qwen36-fp8-pp2-gdn-spec-fallback-20260506.json`;
+     - patch: `/home/steve/llm-optimization-artifacts/patches/vllm-xpu-gdn-spec-fallback-and-deterministic-bench-20260506.patch`.
+   - next:
+     - keep the GDN fallback patch, but stop treating PP2 as a near-term speed path until the repeated-load `DEVICE_LOST` issue is solved;
+     - if returning to PP2, use one long-lived server/process or add a safer unload/reset path instead of repeated `bench latency` process loads;
+     - continue Q4_0 GGUF and TP4 FP8 as the active speed paths while PP2 GDN speculation remains experimental.
+52. 2026-05-06 Q4_0 four-card assist split:
+   - target:
+     - recover useful four-card Q4_0 performance after reboot without changing model quality or GPU power limits.
+   - finding:
+     - equal four-card tensor split remains inefficient;
+     - a fourth-card assist split is materially better, confirming the fourth B70 is healthy but equal four-way row shards are too narrow for the current reordered Q4_0 MMVQ and communication path.
+   - validated run:
+     - selector `level_zero:2,1,3,0`;
+     - devices `SYCL0/SYCL1/SYCL2/SYCL3`;
+     - tensor split `1/1/1/0.05`;
+     - `GGML_SYCL_REORDER_MMVQ_SUBGROUPS_RUNTIME=2`;
+     - `-p 512 -n 512 -r 3`, Q4_0 weights, f16 KV cache, flash attention enabled, speculative decoding disabled;
+     - prompt `80.906412 tok/s`;
+     - decode `39.204149 tok/s`;
+     - total `52.815789 tok/s`;
+     - JSONL: `/home/steve/bench-results/qwen36-q4_0-gguf/sycl-sg2-assist005-quad2130-p512n512-r3-20260506T141453Z.jsonl`.
+   - comparison:
+     - previous full four-card equal split: `34.929313 tok/s`;
+     - assist split gain: `+4.274836 tok/s`, `+12.24%`;
+     - best current three-card Q4_0 result remains faster at `46.194319 tok/s`.
+   - LocalMaxxing:
+     - accepted ID `cmou581wv002dld0197mffpco`;
+     - first payload with backend `sycl-level-zero` returned HTTP 400, accepted retry omitted the backend enum and preserved SYCL/Level Zero details in notes.
+   - artifacts:
+     - note: `/home/steve/llm-optimization-artifacts/notes/2026-05-06-q4-4x-assist-split.md`;
+     - data: `/home/steve/llm-optimization-artifacts/data/qwen36-q4-4x-assist-split-20260506.json`;
+     - plan addendum: `/home/steve/llm-optimization-artifacts/plans/2026-05-06-q4-4x-assist-split-addendum.md`.
+   - next:
+     - do not treat four-card Q4_0 as the production path until it beats three-card;
+     - focus Q4_0 work on narrow-shard reordered MMVQ efficiency and output-projection/allreduce/residual epilogue fusion;
+     - keep FP8/vLLM TP4 as the current stronger all-four-card speed track.
+53. 2026-05-06 Q4_0 four-card follow-up probes:
+   - fine assist-ratio sweep:
+     - TSV: `/home/steve/bench-results/qwen36-q4_0-gguf/tensorsplit-quad-sg2-fine-assist-ratio-p0n128-r2-20260506T143835Z.tsv`;
+     - `1/1/1/0.01` and `1/1/1/0.02` failed with Level Zero `UR_RESULT_ERROR_OUT_OF_DEVICE_MEMORY` during `MUL_MAT`;
+     - surviving ratios from `0.03` through `0.12` landed in the `37.762326` to `38.822236 tok/s` range;
+     - conclusion: further ratio tuning does not recover the missing four-card scaling.
+   - Q4 fused2 status:
+     - debug trace `/home/steve/bench-results/qwen36-q4_0-gguf/sycl-debug-fused2-triple213-p0n1-r1-20260506T144944Z.log`;
+     - counted `480` fused2 calls and `1,584` plain reordered MMVQ calls under debug;
+     - conclusion: fused2 is already active under tensor split, so do not spend time on a pure enablement patch.
+   - allreduce stats:
+     - stats log `/home/steve/bench-results/qwen36-q4_0-gguf/sycl-stats4-assist005-quad2130-p0n1-r1-20260506T145113Z.log`;
+     - four-card assist split does `128` reductions per generated token, each `20,480` bytes;
+     - warm allreduce time is `4.213 ms/token`, `32.913 us` average;
+     - first/cold allreduce time is `6.724 ms/token`, `52.528 us` average;
+     - most reductions use the `backend+add` fused residual path, but the collective count is unchanged at two per layer.
+   - next:
+     - run a focused communication-flag sweep around `skip_root_ready`, root rotation, local-write, pairwise, striped, and small-f32 paths;
+     - if none beats the current single-kernel path, the next source patch should try a lower-latency 20 KB allreduce-add specialization for four B70s or graph-level collective-count reduction.
+54. 2026-05-06 Q4_0 four-card communication flag sweep:
+   - TSV: `/home/steve/bench-results/qwen36-q4_0-gguf/comm-flag-sweep-quad-assist005-p0n128-r2-20260506T145544Z.tsv`;
+   - baseline `sync_after=2`: `38.195956 tok/s`;
+   - best short variant was `sync_after=0`: `38.354083 tok/s`, which is too small to treat as a validated improvement;
+   - `skiproot_fuseaddroot`: `38.218925 tok/s`;
+   - `skip_root_ready`: `37.971362 tok/s`;
+   - `fuseadd_root_residual`: `37.898128 tok/s`;
+   - `local_write`: `37.208619 tok/s`;
+   - `rotate_root`: `37.087460 tok/s`;
+   - clearly bad paths:
+     - `pairwise4`: `28.156880 tok/s`;
+     - `striped4`: `26.468293 tok/s`;
+     - `no_fuseadd_smallf32`: `28.999878 tok/s`.
+   - conclusion:
+     - existing communication toggles do not explain the missing four-card scaling;
+     - keep validated command on the current single-kernel allreduce-add path;
+     - next Q4_0 source work should inspect MMVQ row-shard efficiency and collect per-stage timing for 3x vs 4x before patching.
+55. 2026-05-06 Q4_0 narrow-shard follow-ups:
+   - MMV_Y=2 build:
+     - 3x default `MMV_Y=1`: `44.321101 tok/s`;
+     - 3x `MMV_Y=2`: `44.366675 tok/s`;
+     - 4x assist `MMV_Y=2`: `38.181852 tok/s`;
+     - decision: do not promote `MMV_Y=2`.
+   - MUL_MAT stage instrumentation:
+     - 3x: `1206` quantize calls and `2982` matmul kernel calls;
+     - 4x assist: `1488` quantize calls and `3520` matmul kernel calls;
+     - total matmul byte volume is essentially unchanged at about `30.18 GB`;
+     - conclusion: the fourth assist shard adds launch and quantization overhead without enough useful Q4 work.
+   - Explicit trailing-zero split:
+     - `-ts 1/1/1/0` aborts at `ggml-backend.cpp:120: GGML_ASSERT(buffer) failed`;
+     - treat zero-width trailing split as a llama.cpp/SYCL bug, not a valid optimization.
+   - Experimental skip-last patch:
+     - patch: `/home/steve/llm-optimization-artifacts/patches/llama-cpp-sycl-split-skip-last-below-rows-focused-20260506.patch`;
+     - env: `GGML_SYCL_SPLIT_SKIP_LAST_BELOW_ROWS`;
+     - patched default 3x sanity: `44.778557 tok/s`;
+     - best threshold screen was `6144` rows at `38.153344 tok/s`, below the validated `39.204149 tok/s` 4x assist run;
+     - decision: safe diagnostic only; keep env unset for production.
+   - next:
+     - stop simple split-ratio and communication-flag sweeps for 4x Q4_0 unless a profiler identifies a narrower cause;
+     - focus on reducing the number of per-token collectives or fusing output projection/allreduce/residual work;
+     - consider using the fourth B70 for speculative draft work or a second session while 3x remains the main Q4_0 speed path.
 
 ## Success Criteria
 
 - First accepted improvement: Q4_0 GGUF single B70 `>=27 tok/s` with a reproducible command and no quality-changing flags.
 - Strong success: Q4_0 GGUF single B70 `>=29 tok/s`.
 - FP8 investigation success: official `Qwen/Qwen3.6-27B-FP8` reaches or beats the current Q4_0 TP3 result while preserving output quality.
-- Static FP8 current best: `vrfai/Qwen3.6-27B-FP8` on four B70s with patched vLLM/XPU FlashAttention2 reaches `41.503 tok/s` on 512 prompt / 512 output. This is effectively tied with the Q4_0 TP3 validation while preserving more fidelity than INT4 paths.
+- Static FP8 current best: `vrfai/Qwen3.6-27B-FP8` on four B70s with patched vLLM/XPU FlashAttention2 plus n-gram speculative decode reaches `49.581893 tok/s` on 512 prompt / 512 output. This is ahead of the Q4_0 TP3 validation while preserving more fidelity than INT4 paths.
 - Static FP8 full-context status: TP4 with patched vLLM/XPU FlashAttention2 succeeds at Qwen3.6's configured `262,144` token context and reports `1,206,355` GPU KV-cache tokens. PP2 x TP2 also fits but is slower for a single sequence.
 - Current dual-card milestone reached: Q4_0 GGUF single session `37.690 tok/s`, quality preserving, software-only.
-- Current improved multi-card milestone: Q4_0 GGUF single session `42.432 tok/s` on three B70s for 512 prompt / 256 output with `GGML_SYCL_Q8_CACHE=1`; longer 512-output validation is `41.659 tok/s`. This is quality preserving and software-only.
+- Current improved multi-card milestone: Q4_0 GGUF single session `44.181 tok/s` on three B70s for 512 prompt / 512 output with `GGML_SYCL_Q8_CACHE=1`, async copy, single-kernel allreduce, `GGML_SYCL_COMM_EVENT_BARRIER=1`, and `GGML_META_FUSE_ALLREDUCE_ADD=1`. This is quality preserving and software-only.
+- Current four-card Q4_0 status: assist split `1/1/1/0.05` reaches `39.204149 tok/s`, improving the equal-split four-card result by `12.24%` but still trailing the best three-card result, so quad Q4_0 remains a kernel/scheduling investigation rather than the production path.
 - Dual-card success: Q4_0 GGUF single session `>=48 tok/s` first, then `>=52 tok/s`, without switching away from Q4_0.
 - Four-card success: Q4_0 GGUF single session must exceed dual-card by a meaningful margin before treating quad tensor split as viable.
