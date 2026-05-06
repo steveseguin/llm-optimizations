@@ -1,5 +1,5 @@
 {
-  "hfId": "unsloth/Qwen3.6-27B-GGUF",
+  "hfId": "unsloth/Qwen3.6-27B",
   "modelRevision": "main",
   "hardware": {
     "hwClass": "DISCRETE_GPU",
