@@ -1,0 +1,419 @@
+diff --git a/vllm/_xpu_ops.py b/vllm/_xpu_ops.py
+index 0b39a4000..039d12c58 100644
+--- a/vllm/_xpu_ops.py
++++ b/vllm/_xpu_ops.py
+@@ -114,13 +114,49 @@ def _gdn_attention_core_xpu_impl(
+     attn_metadata = attn_metadata_raw[self.prefix]
+     assert isinstance(attn_metadata, GDNAttentionMetadata)
+ 
+-    # TODO: xpu does not support speculative decoding yet
+-    assert attn_metadata.spec_sequence_masks is None  # type: ignore[attr-defined]
++    if attn_metadata.spec_sequence_masks is not None:  # type: ignore[attr-defined]
++        if self.gqa_interleaved_layout:
++            from einops import rearrange
++
++            query, key, value, z_generic, b, a = self.fix_query_key_value_ordering(
++                projected_states_qkvz, projected_states_ba
++            )
++            query, key, value = map(
++                lambda x: rearrange(x, "l p d -> l (p d)"), (query, key, value)
++            )
++            mixed_qkv = torch.cat((query, key, value), dim=-1)
++        else:
++            qkv_size = (self.key_dim * 2 + self.value_dim) // self.tp_size
++            z_size = self.value_dim // self.tp_size
++            mixed_qkv, z_generic = projected_states_qkvz.split(
++                [qkv_size, z_size], dim=-1
++            )
++            z_generic = z_generic.reshape(z_generic.size(0), -1, self.head_v_dim)
++            b, a = projected_states_ba.chunk(2, dim=-1)
++            b = b.contiguous()
++            a = a.contiguous()
++
++        z.copy_(z_generic)
++        self._forward_core(
++            mixed_qkv=mixed_qkv,
++            b=b,
++            a=a,
++            core_attn_out=core_attn_out,
++        )
++        return
+ 
+     conv_weights = self.conv1d.weight.view(
+         self.conv1d.weight.size(0), self.conv1d.weight.size(2)
+     )
+ 
++    non_spec_state_indices_tensor = attn_metadata.non_spec_state_indices_tensor  # type: ignore[attr-defined]
++    if non_spec_state_indices_tensor is not None:
++        non_spec_state_indices_tensor = non_spec_state_indices_tensor.contiguous()
++
++    non_spec_query_start_loc = attn_metadata.non_spec_query_start_loc  # type: ignore[attr-defined]
++    if non_spec_query_start_loc is not None:
++        non_spec_query_start_loc = non_spec_query_start_loc.contiguous()
++
+     torch.ops._xpu_C.gdn_attention(
+         core_attn_out,
+         z,
+@@ -140,8 +176,8 @@ def _gdn_attention_core_xpu_impl(
+         num_prefills=attn_metadata.num_prefills,  # type: ignore[attr-defined]
+         num_decodes=attn_metadata.num_decodes,  # type: ignore[attr-defined]
+         has_initial_state=attn_metadata.has_initial_state,  # type: ignore[attr-defined]
+-        non_spec_query_start_loc=attn_metadata.non_spec_query_start_loc,  # type: ignore[attr-defined]
+-        non_spec_state_indices_tensor=attn_metadata.non_spec_state_indices_tensor,  # type: ignore[attr-defined]
++        non_spec_query_start_loc=non_spec_query_start_loc,
++        non_spec_state_indices_tensor=non_spec_state_indices_tensor,
+         num_actual_tokens=attn_metadata.num_actual_tokens,  # type: ignore[attr-defined]
+         tp_size=self.tp_size,
+         reorder_input=not self.gqa_interleaved_layout,
+diff --git a/vllm/benchmarks/latency.py b/vllm/benchmarks/latency.py
+index 66afbec1b..d41b8f01e 100644
+--- a/vllm/benchmarks/latency.py
++++ b/vllm/benchmarks/latency.py
+@@ -100,9 +100,24 @@ def main(args: argparse.Namespace):
+         max_tokens=args.output_len,
+         detokenize=not args.disable_detokenize,
+     )
+-    dummy_prompt_token_ids = np.random.randint(
+-        10000, size=(args.batch_size, args.input_len)
+-    )
++    prompt_mode = os.environ.get("VLLM_BENCH_LATENCY_PROMPT_MODE", "random")
++    prompt_seed = os.environ.get("VLLM_BENCH_LATENCY_PROMPT_SEED")
++    if prompt_mode == "repeat":
++        repeat_period = int(os.environ.get("VLLM_BENCH_LATENCY_REPEAT_PERIOD", "16"))
++        if repeat_period <= 0:
++            raise ValueError("VLLM_BENCH_LATENCY_REPEAT_PERIOD must be positive")
++        base = 1000 + np.arange(repeat_period, dtype=np.int64)
++        row = np.resize(base, args.input_len)
++        dummy_prompt_token_ids = np.tile(row, (args.batch_size, 1))
++    elif prompt_seed is not None:
++        rng = np.random.default_rng(int(prompt_seed))
++        dummy_prompt_token_ids = rng.integers(
++            10000, size=(args.batch_size, args.input_len)
++        )
++    else:
++        dummy_prompt_token_ids = np.random.randint(
++            10000, size=(args.batch_size, args.input_len)
++        )
+     dummy_prompts: list[PromptType] = [
+         {"prompt_token_ids": batch} for batch in dummy_prompt_token_ids.tolist()
+     ]
+diff --git a/vllm/model_executor/layers/mamba/gdn_linear_attn.py b/vllm/model_executor/layers/mamba/gdn_linear_attn.py
+index a621ab962..0da1c027f 100644
+--- a/vllm/model_executor/layers/mamba/gdn_linear_attn.py
++++ b/vllm/model_executor/layers/mamba/gdn_linear_attn.py
+@@ -623,15 +623,51 @@ class GatedDeltaNetAttention(PluggableLayer, MambaBase):
+             dtype=hidden_states.dtype,
+             device=hidden_states.device,
+         )
+-        z = torch.empty_like(core_attn_out)
++        forward_context = get_forward_context()
++        attn_metadata_raw = forward_context.attn_metadata
++        use_generic_spec_core = False
++        if isinstance(attn_metadata_raw, dict):
++            attn_metadata = attn_metadata_raw.get(self.prefix)
++            use_generic_spec_core = (
++                isinstance(attn_metadata, GDNAttentionMetadata)
++                and attn_metadata.spec_sequence_masks is not None
++            )
+ 
+-        torch.ops.vllm.gdn_attention_core_xpu(
+-            core_attn_out,
+-            z,
+-            projected_states_qkvz,
+-            projected_states_ba,
+-            self.prefix,
+-        )
++        if use_generic_spec_core:
++            if self.gqa_interleaved_layout:
++                query, key, value, z, b, a = self.fix_query_key_value_ordering(
++                    projected_states_qkvz, projected_states_ba
++                )
++                query, key, value = map(
++                    lambda x: rearrange(x, "l p d -> l (p d)"), (query, key, value)
++                )
++                mixed_qkv = torch.cat((query, key, value), dim=-1)
++            else:
++                qkv_size = (self.key_dim * 2 + self.value_dim) // self.tp_size
++                z_size = self.value_dim // self.tp_size
++                mixed_qkv, z = projected_states_qkvz.split(
++                    [qkv_size, z_size], dim=-1
++                )
++                z = z.reshape(z.size(0), -1, self.head_v_dim)
++                b, a = projected_states_ba.chunk(2, dim=-1)
++                b = b.contiguous()
++                a = a.contiguous()
++
++            self._forward_core(
++                mixed_qkv=mixed_qkv,
++                b=b,
++                a=a,
++                core_attn_out=core_attn_out,
++            )
++        else:
++            z = torch.empty_like(core_attn_out)
++            torch.ops.vllm.gdn_attention_core_xpu(
++                core_attn_out,
++                z,
++                projected_states_qkvz,
++                projected_states_ba,
++                self.prefix,
++            )
+ 
+         # ============================================================
+         # Part 3: Output Projection
+diff --git a/vllm/v1/worker/gpu_model_runner.py b/vllm/v1/worker/gpu_model_runner.py
+index bcab2ca2d..cc614181a 100644
+--- a/vllm/v1/worker/gpu_model_runner.py
++++ b/vllm/v1/worker/gpu_model_runner.py
+@@ -4,6 +4,7 @@
+ import functools
+ import gc
+ import itertools
++import os
+ import threading
+ import time
+ from collections import defaultdict
+@@ -1123,7 +1124,10 @@ class GPUModelRunner(
+             self.speculative_config is not None
+             and self.speculative_config.use_ngram_gpu()
+         )
+-        if is_ngram_gpu:
++        has_ngram_gpu_buffers = is_ngram_gpu and hasattr(
++            self, "token_ids_gpu_tensor"
++        )
++        if has_ngram_gpu_buffers:
+             ngram_gpu_new_reqs: list[CachedRequestState] = []
+ 
+         reqs_to_add: list[CachedRequestState] = []
+@@ -1193,7 +1197,7 @@ class GPUModelRunner(
+ 
+             reqs_to_add.append(req_state)
+             # Track new requests for ngram_gpu full tensor copy
+-            if is_ngram_gpu:
++            if has_ngram_gpu_buffers:
+                 ngram_gpu_new_reqs.append(req_state)
+ 
+         # Update the states of the running/resumed requests.
+@@ -1208,6 +1212,9 @@ class GPUModelRunner(
+             self.speculative_config is not None
+             and self.speculative_config.use_ngram_gpu()
+         ):
++            trace_ngram_pp = os.environ.get("VLLM_XPU_TRACE_NGRAM_PP")
++            original_total = scheduler_output.total_num_scheduled_tokens
++            original_num_scheduled = scheduler_output.num_scheduled_tokens.copy()
+             for req_id, toks in scheduled_spec_tokens.items():
+                 original_num_spec_per_req[req_id] = len(toks)
+             update_scheduler_for_invalid_drafts(
+@@ -1216,6 +1223,34 @@ class GPUModelRunner(
+                 scheduler_output,
+                 self.input_batch.req_id_to_index,
+             )
++            if trace_ngram_pp:
++                valid_counts: dict[str, int] = {}
++                if self._num_valid_draft_tokens_cpu is not None:
++                    for req_id in req_data.req_ids:
++                        req_index = self.input_batch.req_id_to_index.get(req_id)
++                        if req_index is not None:
++                            valid_counts[req_id] = int(
++                                self._num_valid_draft_tokens_cpu[req_index].item()
++                            )
++                logger.warning(
++                    "XPU ngram trim pp_rank=%s first=%s last=%s "
++                    "total=%s->%s scheduled=%s->%s spec_lens=%s->%s "
++                    "valid_counts=%s cached_req_ids=%s",
++                    get_pp_group().rank_in_group,
++                    get_pp_group().is_first_rank,
++                    get_pp_group().is_last_rank,
++                    original_total,
++                    scheduler_output.total_num_scheduled_tokens,
++                    original_num_scheduled,
++                    scheduler_output.num_scheduled_tokens,
++                    original_num_spec_per_req,
++                    {
++                        req_id: len(toks)
++                        for req_id, toks in scheduled_spec_tokens.items()
++                    },
++                    valid_counts,
++                    req_data.req_ids,
++                )
+         if self.use_async_spec_decode:
+             self.prev_num_draft_tokens.np.fill(0)
+ 
+@@ -1264,7 +1299,7 @@ class GPUModelRunner(
+                             optimistic_num_accepted
+                         )
+ 
+-                    if is_ngram_gpu and optimistic_num_accepted > 0:
++                    if has_ngram_gpu_buffers and optimistic_num_accepted > 0:
+                         self.input_batch.num_tokens_no_spec[req_index] += (
+                             optimistic_num_accepted
+                         )
+@@ -1286,13 +1321,32 @@ class GPUModelRunner(
+                     num_new_tokens = (
+                         num_computed_tokens + len(new_token_ids) - req_state.num_tokens
+                     )
+-                    if num_new_tokens == 1:
+-                        # Avoid slicing list in most common case.
+-                        req_state.output_token_ids.append(new_token_ids[-1])
+-                    elif num_new_tokens > 0:
+-                        req_state.output_token_ids.extend(
+-                            new_token_ids[-num_new_tokens:]
+-                        )
++                    if num_new_tokens > 0:
++                        if os.environ.get("VLLM_XPU_TRACE_NGRAM_PP") and (
++                            num_new_tokens > len(new_token_ids)
++                        ):
++                            logger.warning(
++                                "XPU PP state update has fewer token ids than "
++                                "computed delta pp_rank=%s req_id=%s "
++                                "num_new_tokens=%s new_token_ids=%s "
++                                "num_computed_tokens=%s req_state_num_tokens=%s "
++                                "scheduled=%s spec_lens=%s",
++                                get_pp_group().rank_in_group,
++                                req_id,
++                                num_new_tokens,
++                                new_token_ids,
++                                num_computed_tokens,
++                                req_state.num_tokens,
++                                scheduler_output.num_scheduled_tokens,
++                                {
++                                    spec_req_id: len(toks)
++                                    for spec_req_id, toks in scheduled_spec_tokens.items()
++                                },
++                            )
++                        if new_token_ids:
++                            req_state.output_token_ids.extend(
++                                new_token_ids[-num_new_tokens:]
++                            )
+             elif num_output_tokens < len(req_state.output_token_ids):
+                 # Some output tokens were discarded due to a sync-KV-load
+                 # failure, or output_token_ids was inflated by the optimistic
+@@ -1331,7 +1385,7 @@ class GPUModelRunner(
+ 
+                 reqs_to_add.append(req_state)
+                 # Track resumed requests for ngram_gpu full tensor copy
+-                if is_ngram_gpu:
++                if has_ngram_gpu_buffers:
+                     ngram_gpu_new_reqs.append(req_state)
+                 continue
+ 
+@@ -1373,7 +1427,7 @@ class GPUModelRunner(
+         self.input_batch.refresh_metadata()
+ 
+         # Incrementally update ngram_gpu tensors after batch is stable
+-        if is_ngram_gpu:
++        if has_ngram_gpu_buffers:
+             update_ngram_gpu_tensors_incremental(
+                 self.input_batch,
+                 self.token_ids_gpu_tensor,
+@@ -1410,7 +1464,7 @@ class GPUModelRunner(
+                     self.input_batch.num_computed_tokens_cpu[cur_req_index] -= (
+                         correction
+                     )
+-                    if is_ngram_gpu and correction > 0:
++                    if has_ngram_gpu_buffers and correction > 0:
+                         self.input_batch.num_tokens_no_spec[cur_req_index] -= correction
+                         self.num_tokens_no_spec_gpu[cur_req_index] -= correction
+ 
+@@ -2310,8 +2364,9 @@ class GPUModelRunner(
+                 cm.slot_mapping = slot_mappings[kv_cache_gid]
+ 
+             if self.speculative_config and spec_decode_common_attn_metadata is None:
+-                if isinstance(self.drafter, (EagleProposer, DFlashProposer)):
+-                    if self.drafter.kv_cache_gid == kv_cache_gid:
++                drafter = getattr(self, "drafter", None)
++                if isinstance(drafter, (EagleProposer, DFlashProposer)):
++                    if drafter.kv_cache_gid == kv_cache_gid:
+                         spec_decode_common_attn_metadata = cm
+                 else:
+                     spec_decode_common_attn_metadata = cm
+@@ -3869,6 +3924,23 @@ class GPUModelRunner(
+         ):
+             # Update persistent batch states.
+             deferred_state_corrections_fn = self._update_states(scheduler_output)
++            if os.environ.get("VLLM_XPU_TRACE_NGRAM_PP"):
++                logger.warning(
++                    "XPU ngram post-update pp_rank=%s first=%s last=%s "
++                    "pre_update_total=%s post_update_total=%s scheduled=%s "
++                    "spec_lens=%s req_ids=%s",
++                    get_pp_group().rank_in_group,
++                    get_pp_group().is_first_rank,
++                    get_pp_group().is_last_rank,
++                    num_scheduled_tokens,
++                    scheduler_output.total_num_scheduled_tokens,
++                    scheduler_output.num_scheduled_tokens,
++                    {
++                        req_id: len(toks)
++                        for req_id, toks in scheduler_output.scheduled_spec_decode_tokens.items()
++                    },
++                    self.input_batch.req_ids,
++                )
+ 
+             if has_ec_transfer() and not get_ec_transfer().is_consumer:
+                 with self.maybe_get_ec_connector_output(
+@@ -4253,6 +4325,36 @@ class GPUModelRunner(
+                     spec_decode_common_attn_metadata,
+                     slot_mappings,
+                 )
++                if os.environ.get("VLLM_XPU_TRACE_NGRAM_PP"):
++                    if torch.is_tensor(self._draft_token_ids):
++                        draft_summary = {
++                            "shape": tuple(self._draft_token_ids.shape),
++                            "dtype": str(self._draft_token_ids.dtype),
++                        }
++                    else:
++                        draft_summary = [
++                            len(toks) for toks in self._draft_token_ids[:4]
++                        ]
++                    if torch.is_tensor(sampled_token_ids):
++                        sampled_summary = {
++                            "shape": tuple(sampled_token_ids.shape),
++                            "dtype": str(sampled_token_ids.dtype),
++                        }
++                    else:
++                        sampled_summary = [
++                            len(toks) for toks in sampled_token_ids[:4]
++                        ]
++                    logger.warning(
++                        "XPU ngram proposed pp_rank=%s first=%s last=%s "
++                        "method=%s sampled=%s draft=%s req_ids=%s",
++                        get_pp_group().rank_in_group,
++                        get_pp_group().is_first_rank,
++                        get_pp_group().is_last_rank,
++                        spec_config.method,
++                        sampled_summary,
++                        draft_summary,
++                        self.input_batch.req_ids,
++                    )
+                 self._copy_draft_token_ids_to_cpu(scheduler_output)
+ 
+         spec_config = self.speculative_config
+@@ -4459,8 +4561,28 @@ class GPUModelRunner(
+ 
+     def take_draft_token_ids(self) -> DraftTokenIds | None:
+         if not self.num_spec_tokens or not self._draft_token_req_ids:
++            if os.environ.get("VLLM_XPU_TRACE_NGRAM_PP"):
++                logger.warning(
++                    "XPU ngram take_draft none pp_rank=%s first=%s last=%s "
++                    "num_spec_tokens=%s has_req_ids=%s",
++                    get_pp_group().rank_in_group,
++                    get_pp_group().is_first_rank,
++                    get_pp_group().is_last_rank,
++                    self.num_spec_tokens,
++                    bool(self._draft_token_req_ids),
++                )
+             return None
+         draft_token_ids, req_ids = self._get_draft_token_ids_cpu()
++        if os.environ.get("VLLM_XPU_TRACE_NGRAM_PP"):
++            logger.warning(
++                "XPU ngram take_draft pp_rank=%s first=%s last=%s "
++                "req_ids=%s draft_lens=%s",
++                get_pp_group().rank_in_group,
++                get_pp_group().is_first_rank,
++                get_pp_group().is_last_rank,
++                req_ids,
++                [len(toks) for toks in draft_token_ids[:4]],
++            )
+         return DraftTokenIds(req_ids, draft_token_ids)
+ 
+     def _copy_draft_token_ids_to_cpu(
