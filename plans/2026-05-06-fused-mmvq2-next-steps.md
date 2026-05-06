@@ -34,6 +34,8 @@
 - The 4x striped-root branch also fails as a performance path: no-wait striped roots are nondeterministic, while waited striped roots pass a 16-token repeat but decode at only `21.297448 tok/s`.
 - FP8/vLLM post-reboot rerun with corrected venv library ordering produced a new validated TP4+n-gram result: `49.581893 tok/s` output, `99.163787 tok/s` total at 512/512. LocalMaxxing ID: `cmotql1v60013qy01016jcs7r`.
 - FP8 PP2 x TP2 at 512/512 is stable without speculation but slow at `27.479016 tok/s`, so the 2x2 layout needs speculative decode fixed before it can compete.
+- FP8 PP2 x TP2 with CPU n-gram now survives the non-last-PP empty-token crash after guards, but the trace shows `spec_lens={}` throughout; it is effectively not drafting and only reaches `17.527671 tok/s` for the 512/128 diagnostic run.
+- FP8 PP2 x TP2 with `ngram_gpu` now gets past the missing `token_ids_gpu_tensor` crash on PP0, but every draft trims from four tokens to zero valid tokens and the engine stalls on shared-memory broadcast.
 - Multi-GPU PPL remains a noisy oracle and should not be used for pass/fail quality on these tensor-split paths.
 
 ## Correctness findings
@@ -57,3 +59,6 @@
 8. Keep FP8/vLLM TP4 and Q4_0 GGUF tracks separate in notes and submissions, because they trade different quantization and runtime behavior.
 9. Revisit Qwen3.6 27B FP8 on vLLM/XPU and OpenVINO/IR as a 2x2-style candidate: two-card tensor/pipeline parallelism per session could use the 64GB pair cleanly and avoid the Q4_0 GGUF 4-card collective bottleneck.
 10. For torch/vLLM runs, keep `/home/steve/.venvs/vllm-xpu-managed/lib` first in `LD_LIBRARY_PATH`; sourcing oneAPI `setvars.sh` before vLLM caused XCCL barrier/allreduce segfaults.
+11. Do not spend more time on PP2 speculation without first instrumenting why CPU n-gram never schedules draft tokens under PP and why GPU n-gram valid counts are always zero. Treat PP2 as a memory-capacity path, not the speed path, until that is fixed.
+12. Next high-value FP8 tests: rerun clean TP4 CPU n-gram after the PP guard patches to confirm no regression; then test longer-context TP4 and TP4 `ngram_gpu` only if it does not inherit the PP stall.
+13. Next high-value Q4 tests: keep 3x `GGML_SYCL_COMM_SYNC_AFTER=2` as the best validated GGUF path, then work on fused Q4_0/Q8_1 ESIMD and deeper FFN fusion rather than additional 4x collective topologies.
