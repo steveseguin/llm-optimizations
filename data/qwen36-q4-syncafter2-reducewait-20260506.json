@@ -54,6 +54,13 @@
       "jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-syncafter2-reducewait-fusemmvq2-quad2130-p512n512-r3-20260506T055829Z.jsonl",
       "log": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-syncafter2-reducewait-fusemmvq2-quad2130-p512n512-r3-20260506T055829Z.log"
     },
+    "localmaxxing": {
+      "id": "cmotpxzii000pqy019v46swqn",
+      "tokSOut": 34.929313,
+      "tokSTotal": 49.748,
+      "status": "submitted_as_scaling_datapoint",
+      "engineFlagsStatus": "Submitted without backend or engineFlags because LocalMaxxing rejects sycl-level-zero backend and returns 500 when engineFlags is present. Response still reports quantization as null despite posting Q4_0."
+    },
     "rootSweepP512N256R2": [
       {"selector": "level_zero:0,1,2,3", "decodeTokS": 34.280733},
       {"selector": "level_zero:1,0,2,3", "decodeTokS": 34.745079},
