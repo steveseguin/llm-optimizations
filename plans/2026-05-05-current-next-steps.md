@@ -89,10 +89,26 @@ This note supersedes the stale portions of `plans/q4_0-gguf-b70-optimization-pla
   - note: `notes/2026-05-06-q4-getrows-fusion-neutral.md`;
   - data: `data/qwen36-q4-getrows-fusion-20260506.json`;
   - patch: `patches/llama-cpp-sycl-meta-getrows-fusion-current-20260506.patch.gz.b64`.
+- Q4_0 4x pairwise fused-ADD collective:
+  - implemented `GGML_SYCL_COMM_PAIRWISE4=1` for `ggml_backend_sycl_comm_allreduce_add_tensor`, so the gate reaches the main Q4_0 fused residual-add path rather than only the older plain allreduce path;
+  - pairwise4 event-barrier run, `p512/n128/r2`: prompt `262.072535 tok/s`, decode `32.707823 tok/s`;
+  - same-build gate-off control, `p512/n128/r2`: prompt `102.228619 tok/s`, decode `33.600765 tok/s`;
+  - pairwise4 no-barrier run, `p512/n128/r2`: prompt `262.576268 tok/s`, decode `33.009874 tok/s`;
+  - post-test 3x health check, selector `2,1,3`, `p512/n128/r1`: prompt `133.490826 tok/s`, decode `45.046330 tok/s`;
+  - conclusion: negative for decode; the fourth-card issue is not fixed by a simple pairwise tree schedule for these tiny reductions;
+  - note: `notes/2026-05-06-q4-pairwise4-fusedadd-negative.md`;
+  - data: `data/qwen36-q4-pairwise4-fusedadd-20260506.json`;
+  - patch: `patches/llama-cpp-sycl-meta-pairwise4-fusedadd-current-20260506.patch.gz.b64`.
+- llm-scaler inspection:
+  - useful references: ESIMD INT4 GEMV, fused residual-add/RMSNorm/GEMV, two-GEMV sharing one input, QKV split/norm/RoPE, and MTP/speculative decode scaffolding;
+  - important negative evidence: its optimized Arc row-parallel `o_proj`/`down_proj` paths still call tensor-parallel allreduce afterward, so there is no ready-made fused row-parallel allreduce epilogue to port;
+  - reduce-scatter/all-gather appears more useful for MoE/EP than dense single-token TP unless llama.cpp keeps the activation sharded across following ops;
+  - testing fp16 allreduce buffers is now a concrete follow-up, but it needs output-quality/error checks because current Q4_0 results are quality-preserving f32 reductions.
 
 ## Interpretation
 
 - Q4_0 4x scaling is not fixed by root selection, root-copy, local-write, or residual-read avoidance. The next useful work must reduce the number of tiny reductions or fuse communication into a lower-level matmul/reduction epilogue.
+- A 4x pairwise tree for the fused-add collective also does not fix decode scaling; it likely adds kernel/event overhead while leaving the per-token count of 20 KiB reductions unchanged.
 - FP8 TP4 is now the fastest validated single-session Qwen3.6 27B mode on this host, but adjacent n-gram flags are exhausted enough for now. Further FP8 work should target backend/runtime behavior rather than speculative flag sweeps.
 - MiniMax M2.7 is currently blocked earlier than MoE/expert placement. The immediate issue is the SYCL `q8_0 x vector` dense attention matvec path on block 0.
 - The runtime recovered after reboot. Clean 4x no longer wedges the runtime, but it remains slower than 3x. Avoid FLR/PCI reset for B70 recovery.
@@ -112,6 +128,9 @@ This note supersedes the stale portions of `plans/q4_0-gguf-b70-optimization-pla
    - tune the 20KB f32 allreduce fast path only after the remaining graph-level fusions are exhausted;
    - prototype fewer reductions or a fused row-parallel output kernel only where mathematically safe;
    - investigate whether the row-parallel output projection can produce the mirrored post-allreduce output directly, eliminating the separate small collective rather than moving it later;
+   - add a diagnostic "skip allreduce" timing gate to isolate local Q4_0 GEMV time from collective time, following the llm-scaler `SKIP_ALL_REDUCE` measurement idea;
+   - prototype an fp16 allreduce-buffer mode only behind an explicit quality-risk gate, and validate numerical impact before treating it as a speed result;
+   - study llm-scaler ESIMD INT4 GEMV for possible local matvec speedups, but do not expect it to remove the communication bottleneck by itself;
    - keep local-write/root-residual env gates diagnostic-only.
 3. FP8 vLLM/XPU:
    - keep the PP2 x TP2 `self.drafter` getattr patch;
