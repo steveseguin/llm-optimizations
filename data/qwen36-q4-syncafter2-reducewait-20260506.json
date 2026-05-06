@@ -27,6 +27,12 @@
       "decodeTokS": 46.194319,
       "jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-syncafter2-reducewait-fusemmvq2-triple213-p512n512-r3-20260506T055402Z.jsonl",
       "log": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-syncafter2-reducewait-fusemmvq2-triple213-p512n512-r3-20260506T055402Z.log"
+    },
+    "localmaxxing": {
+      "id": "cmotnyi25001jqu01fccla8cf",
+      "tokSOut": 46.194319,
+      "tokSTotal": 66.4,
+      "engineFlagsStatus": "POST with engineFlags.commandSnippet returned 500; accepted row omits engineFlags and carries flags in notes."
     }
   },
   "fourGpu": {
