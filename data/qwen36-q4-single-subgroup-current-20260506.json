@@ -1,0 +1,76 @@
+{
+  "date": "2026-05-06",
+  "model": {
+    "hfId": "unsloth/Qwen3.6-27B",
+    "localPath": "/home/steve/models/qwen3.6-27b-q4_0-gguf/Qwen3.6-27B-Q4_0.gguf",
+    "quantization": "Q4_0"
+  },
+  "hardware": {
+    "gpuName": "Intel Arc Pro B70 32GB",
+    "gpuCount": 1,
+    "device": "SYCL2",
+    "os": "Ubuntu 24.04.4 LTS"
+  },
+  "engine": {
+    "name": "llama.cpp",
+    "backend": "sycl",
+    "buildDir": "/home/steve/src/llama.cpp-q4-b70/build-sycl-2026-bmg-g31"
+  },
+  "commandShape": "-dev SYCL2 -ngl 99 -sm none -fa 1 -ub 128 -ctk f16 -ctv f16 -t 8 -p 0 -n 256 -r 2 --poll 50 -o jsonl",
+  "commonEnv": {
+    "GGML_SYCL_Q8_CACHE": "1",
+    "GGML_SYCL_DISABLE_DNN": "1",
+    "GGML_SYCL_ASYNC_CPY_TENSOR": "0",
+    "GGML_SYCL_FUSE_MMVQ2": "1",
+    "GGML_SYCL_FUSE_MMVQ2_SWIGLU": "1",
+    "GGML_SYCL_FUSE_RMS_NORM_MUL": "1"
+  },
+  "runs": [
+    {
+      "subgroupsRuntime": "default",
+      "tokSOut": 24.930018,
+      "jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/single-subgroup-current-20260506/single-sgdefault-p0n256-r2-20260506T225012Z.jsonl",
+      "log": "/home/steve/bench-results/qwen36-q4_0-gguf/single-subgroup-current-20260506/single-sgdefault-p0n256-r2-20260506T225012Z.log"
+    },
+    {
+      "subgroupsRuntime": "1",
+      "tokSOut": 24.894307,
+      "jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/single-subgroup-current-20260506/single-sg1-p0n256-r2-20260506T225012Z.jsonl",
+      "log": "/home/steve/bench-results/qwen36-q4_0-gguf/single-subgroup-current-20260506/single-sg1-p0n256-r2-20260506T225012Z.log"
+    },
+    {
+      "subgroupsRuntime": "2",
+      "tokSOut": 24.88619,
+      "jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/single-subgroup-current-20260506/single-sg2-p0n256-r2-20260506T225012Z.jsonl",
+      "log": "/home/steve/bench-results/qwen36-q4_0-gguf/single-subgroup-current-20260506/single-sg2-p0n256-r2-20260506T225012Z.log"
+    },
+    {
+      "subgroupsRuntime": "4",
+      "tokSOut": 24.874003,
+      "jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/single-subgroup-current-20260506/single-sg4-p0n256-r2-20260506T225012Z.jsonl",
+      "log": "/home/steve/bench-results/qwen36-q4_0-gguf/single-subgroup-current-20260506/single-sg4-p0n256-r2-20260506T225012Z.log"
+    },
+    {
+      "subgroupsRuntime": "8",
+      "tokSOut": 24.876417,
+      "jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/single-subgroup-current-20260506/single-sg8-p0n256-r2-20260506T225012Z.jsonl",
+      "log": "/home/steve/bench-results/qwen36-q4_0-gguf/single-subgroup-current-20260506/single-sg8-p0n256-r2-20260506T225012Z.log"
+    },
+    {
+      "subgroupsRuntime": "16",
+      "tokSOut": 24.893128,
+      "jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/single-subgroup-current-20260506/single-sg16-p0n256-r2-20260506T225012Z.jsonl",
+      "log": "/home/steve/bench-results/qwen36-q4_0-gguf/single-subgroup-current-20260506/single-sg16-p0n256-r2-20260506T225012Z.log"
+    }
+  ],
+  "quality": {
+    "weights": "same Q4_0 GGUF",
+    "kvCache": "f16/f16",
+    "speculativeDecode": false,
+    "samplingChange": false,
+    "powerLimitChange": false,
+    "localMaxxingSubmitted": false,
+    "localMaxxingReason": "Negative runtime tuning screen; no performance improvement."
+  },
+  "conclusion": "Default subgroup behavior remains best. Do not use GGML_SYCL_REORDER_MMVQ_SUBGROUPS_RUNTIME for the current single-B70 recipe."
+}

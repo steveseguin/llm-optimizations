@@ -1381,6 +1381,24 @@ Goal: improve quality-preserving Q4_0 performance without power-limit changes.
      - note: `/home/steve/llm-optimizations/notes/2026-05-06-q4-projection-epilogue-diagnostic.md`;
      - data: `/home/steve/llm-optimizations/data/qwen36-q4-projection-epilogue-diagnostic-20260506.json`;
      - patch: `/home/steve/llm-optimizations/patches/llama-cpp-sycl-meta-mulmat-add-diagnostic-current-20260506.patch.gz.b64`.
+68. 2026-05-06 current-stack single-B70 subgroup runtime screen:
+   - tested `GGML_SYCL_REORDER_MMVQ_SUBGROUPS_RUNTIME` after the Q8 cache, fused MMVQ2, fused MMVQ2+SwiGLU, and RMS_NORM+MUL stack;
+   - command shape: `SYCL2`, `-sm none`, `-fa 1`, `-ub 128`, `-ctk f16`, `-ctv f16`, `p0/n256/r2`;
+   - results:
+     - default: `24.930018 tok/s`;
+     - `1`: `24.894307 tok/s`;
+     - `16`: `24.893128 tok/s`;
+     - `2`: `24.886190 tok/s`;
+     - `8`: `24.876417 tok/s`;
+     - `4`: `24.874003 tok/s`;
+   - decision:
+     - default remains best;
+     - do not set `GGML_SYCL_REORDER_MMVQ_SUBGROUPS_RUNTIME` in the current single-B70 recipe;
+     - this closes another simple MMVQ runtime tuning branch; reaching the Windows `>=27 tok/s` single-B70 target likely requires deeper Q4_0 matvec work rather than runtime subgroup count changes;
+   - artifacts:
+     - note: `/home/steve/llm-optimizations/notes/2026-05-06-q4-single-subgroup-current-negative.md`;
+     - data: `/home/steve/llm-optimizations/data/qwen36-q4-single-subgroup-current-20260506.json`;
+     - TSV: `/home/steve/bench-results/qwen36-q4_0-gguf/single-subgroup-current-20260506/single-subgroup-current-p0n256-r2-20260506T225012Z.tsv`.
 
 ## Success Criteria
 

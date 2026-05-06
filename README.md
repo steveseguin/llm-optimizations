@@ -34,6 +34,7 @@ Reproducibility notes, benchmark payloads, and local patches from the Intel Arc 
 - `notes/2026-05-06-q4-rmsnormmul.md`: opt-in RMS_NORM+scale-MUL fusion and current best Q4_0 GGUF validation.
 - `notes/2026-05-06-q4-getrows-fusion-neutral.md`: opt-in allreduce+GET_ROWS fusion; initially neutral, later a small current-stack win.
 - `notes/2026-05-06-q4-projection-epilogue-diagnostic.md`: diagnostic `MUL_MAT+allreduce+ADD` scheduler hook; path works with Q8 disabled but regresses short decode, so it stays off.
+- `notes/2026-05-06-q4-single-subgroup-current-negative.md`: current-stack single-B70 subgroup runtime sweep; default remains best.
 - `notes/2026-05-06-q4-allreduce-max-bytes.md`: opt-in larger fused allreduce ceiling probe; useful diagnostic but not a speed win.
 - `notes/2026-05-06-fp8-pp2-postreboot-validation.md`: post-reboot FP8 PP2xTP2 XCCL/load/speculative plumbing validation.
 - `data/qwen36-fp8-32k-tp4-vs-pp2-20260506.json`: post-reboot Q4 sanity plus FP8 32k-context TP4 vs TP2/PP2 validation.
@@ -42,6 +43,7 @@ Reproducibility notes, benchmark payloads, and local patches from the Intel Arc 
 - `data/qwen36-q4-rmsnormmul-20260506.json`: structured RMS_NORM+scale-MUL correctness, performance, failed 4x diagnostic, and LocalMaxxing record.
 - `data/qwen36-q4-getrows-fusion-20260506.json`: structured allreduce+GET_ROWS A/B data, correctness check, and LocalMaxxing record.
 - `data/qwen36-q4-projection-epilogue-diagnostic-20260506.json`: structured Q8 guard, path smoke, and negative A/B for the projection epilogue scheduler hook.
+- `data/qwen36-q4-single-subgroup-current-20260506.json`: structured current-stack single-B70 subgroup runtime sweep.
 - `data/qwen36-q4-allreduce-max-bytes-20260506.json`: structured Q4_0 larger allreduce-fusion ceiling probe.
 - `data/qwen36-fp8-pp2-postreboot-validation-20260506.json`: structured FP8 PP2xTP2 post-reboot validation data.
 - `scripts/bench-qwen36-q4_0-gguf-vulkan-matrix.sh`: Q4_0 GGUF Vulkan benchmark sweep harness.
