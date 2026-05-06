@@ -37,6 +37,7 @@
 - FP8 PP2 x TP2 with CPU n-gram now survives the non-last-PP empty-token crash after guards, but the trace shows `spec_lens={}` throughout; it is effectively not drafting and only reaches `17.527671 tok/s` for the 512/128 diagnostic run.
 - FP8 PP2 x TP2 with `ngram_gpu` now gets past the missing `token_ids_gpu_tensor` crash on PP0, but every draft trims from four tokens to zero valid tokens and the engine stalls on shared-memory broadcast.
 - FP8 TP4 post-patch sweep confirms no deterministic TP4 regression: depth-4 n-gram reran at `48.198021 tok/s`, depth 5 at `48.298516 tok/s`, depth 3 at `43.023391 tok/s`, and depth 6 at `41.724557 tok/s`. The earlier submitted depth-4 `49.581893 tok/s` run remains the best row.
+- FP8 TP4 `ngram_gpu` is not worth pursuing for this prompt shape yet: it runs without the PP2 buffer crash but only reaches `43.450599 tok/s` because draft acceptance stays around `3.5-4.9%` in the measured windows.
 - Multi-GPU PPL remains a noisy oracle and should not be used for pass/fail quality on these tensor-split paths.
 
 ## Correctness findings
@@ -61,5 +62,5 @@
 9. Revisit Qwen3.6 27B FP8 on vLLM/XPU and OpenVINO/IR as a 2x2-style candidate: two-card tensor/pipeline parallelism per session could use the 64GB pair cleanly and avoid the Q4_0 GGUF 4-card collective bottleneck.
 10. For torch/vLLM runs, keep `/home/steve/.venvs/vllm-xpu-managed/lib` first in `LD_LIBRARY_PATH`; sourcing oneAPI `setvars.sh` before vLLM caused XCCL barrier/allreduce segfaults.
 11. Do not spend more time on PP2 speculation without first instrumenting why CPU n-gram never schedules draft tokens under PP and why GPU n-gram valid counts are always zero. Treat PP2 as a memory-capacity path, not the speed path, until that is fixed.
-12. Next high-value FP8 tests: keep TP4 CPU n-gram at 4 or 5 draft tokens; test longer context and `ngram_gpu` only if it can be isolated to TP4 without the PP stall.
+12. Next high-value FP8 tests: keep TP4 CPU n-gram at 4 or 5 draft tokens; test longer context. Deprioritize `ngram_gpu` unless acceptance can be improved.
 13. Next high-value Q4 tests: keep 3x `GGML_SYCL_COMM_SYNC_AFTER=2` as the best validated GGUF path, then work on fused Q4_0/Q8_1 ESIMD and deeper FFN fusion rather than additional 4x collective topologies.
