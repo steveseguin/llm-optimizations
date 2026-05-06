@@ -32,6 +32,8 @@
 - `GGML_SYCL_COMM_SYNC_AFTER=2` (`reduce.wait()`) is quality-cleared on 3x and improves decode slightly to `46.194319 tok/s`; it does not improve 4x, which remains `34.929313 tok/s`.
 - The 4x pairwise/tree branch can be made deterministic, but its best waited decode result was only `25.314923 tok/s`.
 - The 4x striped-root branch also fails as a performance path: no-wait striped roots are nondeterministic, while waited striped roots pass a 16-token repeat but decode at only `21.297448 tok/s`.
+- FP8/vLLM post-reboot rerun with corrected venv library ordering produced a new validated TP4+n-gram result: `49.581893 tok/s` output, `99.163787 tok/s` total at 512/512. LocalMaxxing ID: `cmotql1v60013qy01016jcs7r`.
+- FP8 PP2 x TP2 at 512/512 is stable without speculation but slow at `27.479016 tok/s`, so the 2x2 layout needs speculative decode fixed before it can compete.
 - Multi-GPU PPL remains a noisy oracle and should not be used for pass/fail quality on these tensor-split paths.
 
 ## Correctness findings
@@ -54,3 +56,4 @@
 7. Investigate deeper FFN fusion around `ffn_gate + ffn_up + swiglu`, because it may remove another graph node and reduce memory traffic.
 8. Keep FP8/vLLM TP4 and Q4_0 GGUF tracks separate in notes and submissions, because they trade different quantization and runtime behavior.
 9. Revisit Qwen3.6 27B FP8 on vLLM/XPU and OpenVINO/IR as a 2x2-style candidate: two-card tensor/pipeline parallelism per session could use the 64GB pair cleanly and avoid the Q4_0 GGUF 4-card collective bottleneck.
+10. For torch/vLLM runs, keep `/home/steve/.venvs/vllm-xpu-managed/lib` first in `LD_LIBRARY_PATH`; sourcing oneAPI `setvars.sh` before vLLM caused XCCL barrier/allreduce segfaults.
