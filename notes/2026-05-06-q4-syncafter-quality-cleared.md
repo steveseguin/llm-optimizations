@@ -89,12 +89,14 @@ LocalMaxxing recovered after the earlier `502 Bad Gateway` outage. The detailed 
 - Rejected `hfId`: `unsloth/Qwen3.6-27B-GGUF`
 - Accepted base `hfId`: `unsloth/Qwen3.6-27B`
 
-The corrected detailed payload returned `500 Internal Server Error`, but a compact required-field payload succeeded:
+The corrected detailed payload returned `500 Internal Server Error`, but a payload with accurate context fields and notes, while omitting `engineFlags`, succeeded:
 
-- LocalMaxxing ID: `cmotmnnm6000aqu01uzb9wk12`
+- LocalMaxxing ID: `cmotnobsj0017qu01icxnv6ek`
 - Recorded model: `unsloth/Qwen3.6-27B`
 - Recorded quantization: `Q4_0`
 - Recorded hardware: 3x `Intel Arc Pro B70`, 32 GB per card
 - Recorded metrics: `45.95413 tok/s` output, `66.202667 tok/s` total
+- Recorded context fields: 512 prompt, 512 output, 512 context length
+- Recorded notes: includes the quality-cleared status and key flags
 
-Limitation: the accepted row currently lacks command flags, notes, and the measured 512/512 context fields because the detailed payload hit a server-side 500. See `/home/steve/llm-optimization-artifacts/data/localmaxxing-submission-qwen36-q4-3x-20260506.json` for the submission audit trail.
+Limitation: the accepted row still lacks structured `engineFlags` because including that object hit a server-side 500. See `/home/steve/llm-optimization-artifacts/data/localmaxxing-submission-qwen36-q4-3x-20260506.json` for the submission audit trail.
