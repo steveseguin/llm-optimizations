@@ -19,6 +19,14 @@ namespace esimd = sycl::ext::intel::esimd;
 static constexpr int QK4_0 = 32;
 static constexpr int QK8_1 = 32;
 
+#ifndef Q4_ESIMD_BIAS_IN_ACC
+#define Q4_ESIMD_BIAS_IN_ACC 0
+#endif
+
+#ifndef Q4_ESIMD_BLOCK_LOAD_SCALES
+#define Q4_ESIMD_BLOCK_LOAD_SCALES 0
+#endif
+
 struct options {
     int n = 17408;
     int k = 5120;
@@ -186,15 +194,28 @@ struct q4_0_q8_1_esimd_kernel {
         for (int kk = 0; kk < k; kk += 128) {
             esimd::simd<int8_t, 128> xv = esimd::block_load<int8_t, 128>(q8 + kk);
             esimd::simd<uint8_t, 64> raw = esimd::block_load<uint8_t, 64>(row_qs + kk / 2);
+#if Q4_ESIMD_BLOCK_LOAD_SCALES
+            const int block0 = kk / QK4_0;
+            const esimd::simd<float, 4> d4v =
+                esimd::convert<float>(esimd::block_load<sycl::half, 4>(row_d + block0));
+            const esimd::simd<float, 8> q8v =
+                esimd::convert<float>(esimd::block_load<sycl::half, 8>(q8_ds + (size_t) block0 * 2));
+#endif
 
 #pragma unroll
             for (int blk = 0; blk < 4; ++blk) {
                 const int qoff = blk * 16;
                 const int xoff = blk * 32;
                 const int block = kk / QK4_0 + blk;
+#if Q4_ESIMD_BLOCK_LOAD_SCALES
+                const float d4 = (float) d4v[blk];
+                const float d8 = (float) q8v[blk * 2 + 0];
+                const float s8 = (float) q8v[blk * 2 + 1];
+#else
                 const float d4 = (float) row_d[block];
                 const float d8 = (float) q8_ds[(size_t) block * 2 + 0];
                 const float s8 = (float) q8_ds[(size_t) block * 2 + 1];
+#endif
                 const float scale = d4 * d8;
 
                 const esimd::simd<uint16_t, 16> packed =
@@ -207,7 +228,11 @@ struct q4_0_q8_1_esimd_kernel {
                     esimd::convert<float>(xv.template select<16, 1>(xoff + 16).read());
 
                 acc.template select<16, 1>(blk * 16) += (w_lo * x_lo + w_hi * x_hi) * scale;
+#if Q4_ESIMD_BIAS_IN_ACC
+                acc[blk * 16] += -8.0f * d4 * s8;
+#else
                 bias += -8.0f * d4 * s8;
+#endif
             }
         }
 
@@ -252,34 +277,64 @@ struct q4_0_q8_1_esimd_fused2_kernel {
             esimd::simd<int8_t, 128> xv = esimd::block_load<int8_t, 128>(q8 + kk);
             esimd::simd<uint8_t, 64> raw0 = esimd::block_load<uint8_t, 64>(row_qs0 + kk / 2);
             esimd::simd<uint8_t, 64> raw1 = esimd::block_load<uint8_t, 64>(row_qs1 + kk / 2);
+#if Q4_ESIMD_BLOCK_LOAD_SCALES
+            const int block0 = kk / QK4_0;
+            const esimd::simd<float, 4> d4v0 =
+                esimd::convert<float>(esimd::block_load<sycl::half, 4>(row_d0 + block0));
+            const esimd::simd<float, 4> d4v1 =
+                esimd::convert<float>(esimd::block_load<sycl::half, 4>(row_d1 + block0));
+            const esimd::simd<float, 8> q8v =
+                esimd::convert<float>(esimd::block_load<sycl::half, 8>(q8_ds + (size_t) block0 * 2));
+#endif
 
 #pragma unroll
             for (int blk = 0; blk < 4; ++blk) {
                 const int qoff = blk * 16;
                 const int xoff = blk * 32;
                 const int block = kk / QK4_0 + blk;
+#if Q4_ESIMD_BLOCK_LOAD_SCALES
+                const float d8 = (float) q8v[blk * 2 + 0];
+                const float s8 = (float) q8v[blk * 2 + 1];
+#else
                 const float d8 = (float) q8_ds[(size_t) block * 2 + 0];
                 const float s8 = (float) q8_ds[(size_t) block * 2 + 1];
+#endif
                 const esimd::simd<float, 16> x_lo =
                     esimd::convert<float>(xv.template select<16, 1>(xoff).read());
                 const esimd::simd<float, 16> x_hi =
                     esimd::convert<float>(xv.template select<16, 1>(xoff + 16).read());
 
+#if Q4_ESIMD_BLOCK_LOAD_SCALES
+                const float d4_0 = (float) d4v0[blk];
+#else
                 const float d4_0 = (float) row_d0[block];
+#endif
                 const esimd::simd<uint16_t, 16> packed0 =
                     esimd::convert<uint16_t>(raw0.template select<16, 1>(qoff).read());
                 const esimd::simd<float, 16> w0_lo = esimd::convert<float>(packed0 & 0x000f);
                 const esimd::simd<float, 16> w0_hi = esimd::convert<float>((packed0 >> 4) & 0x000f);
                 acc0.template select<16, 1>(blk * 16) += (w0_lo * x_lo + w0_hi * x_hi) * (d4_0 * d8);
+#if Q4_ESIMD_BIAS_IN_ACC
+                acc0[blk * 16] += -8.0f * d4_0 * s8;
+#else
                 bias0 += -8.0f * d4_0 * s8;
+#endif
 
+#if Q4_ESIMD_BLOCK_LOAD_SCALES
+                const float d4_1 = (float) d4v1[blk];
+#else
                 const float d4_1 = (float) row_d1[block];
+#endif
                 const esimd::simd<uint16_t, 16> packed1 =
                     esimd::convert<uint16_t>(raw1.template select<16, 1>(qoff).read());
                 const esimd::simd<float, 16> w1_lo = esimd::convert<float>(packed1 & 0x000f);
                 const esimd::simd<float, 16> w1_hi = esimd::convert<float>((packed1 >> 4) & 0x000f);
                 acc1.template select<16, 1>(blk * 16) += (w1_lo * x_lo + w1_hi * x_hi) * (d4_1 * d8);
+#if Q4_ESIMD_BIAS_IN_ACC
+                acc1[blk * 16] += -8.0f * d4_1 * s8;
+#else
                 bias1 += -8.0f * d4_1 * s8;
+#endif
             }
         }
 

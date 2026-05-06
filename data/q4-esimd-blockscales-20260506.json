@@ -1,0 +1,54 @@
+{
+  "date": "2026-05-06",
+  "title": "Q4_0 x Q8_1 ESIMD block-loaded scale metadata",
+  "hardware": {
+    "gpuName": "Intel Arc Pro B70 32GB",
+    "gpuCountUsed": 1,
+    "selector": "level_zero:2",
+    "os": "Ubuntu 24.04.4 LTS"
+  },
+  "source": {
+    "path": "/home/steve/llm-optimizations-publish/prototypes/q4_0_esimd_probe/bench_q4_0_q8_1_esimd.cpp",
+    "baselineBinary": "/home/steve/llm-optimization-artifacts/tools/q4_0_gemv_esimd_bench_baseline_20260506",
+    "blockScalesBinary": "/home/steve/llm-optimization-artifacts/tools/q4_0_gemv_esimd_bench_blockscales_20260506",
+    "blockScalesBiasAccBinary": "/home/steve/llm-optimization-artifacts/tools/q4_0_gemv_esimd_bench_blockscales_biasacc_20260506",
+    "bmgG31Binary": "/home/steve/llm-optimization-artifacts/tools/q4_0_gemv_esimd_bench_bmgg31_20260506"
+  },
+  "change": {
+    "macro": "Q4_ESIMD_BLOCK_LOAD_SCALES=1",
+    "description": "Load four Q4_0 row scales and eight Q8_1 scale/sum metadata values per 128-column tile with ESIMD block_load instead of scalar loads in the inner block loop.",
+    "mathChanged": false
+  },
+  "mainResults": [
+    {"shape": "N=17408 K=5120", "mode": "single", "baselineUs": 127.916, "blockScalesUs": 100.104, "speedupPct": 21.743644},
+    {"shape": "N=17408 K=5120", "mode": "fused2", "baselineUs": 191.145, "blockScalesUs": 177.708, "speedupPct": 7.029742},
+    {"shape": "N=4352 K=5120", "mode": "single", "baselineUs": 46.042, "blockScalesUs": 28.021, "speedupPct": 39.140784},
+    {"shape": "N=4352 K=5120", "mode": "fused2", "baselineUs": 55.625, "blockScalesUs": 44.375, "speedupPct": 20.224719},
+    {"shape": "N=5120 K=17408", "mode": "single", "baselineUs": 140.313, "blockScalesUs": 109.375, "speedupPct": 22.04926},
+    {"shape": "N=5120 K=1536", "mode": "single", "baselineUs": 16.355, "blockScalesUs": 10.73, "speedupPct": 34.393152},
+    {"shape": "N=1024 K=5120", "mode": "single", "baselineUs": 11.667, "blockScalesUs": 10.104, "speedupPct": 13.39676},
+    {"shape": "N=256 K=5120", "mode": "single", "baselineUs": 11.98, "blockScalesUs": 10.209, "speedupPct": 14.782972}
+  ],
+  "sideScreens": {
+    "biasInAccumulator": {
+      "macro": "Q4_ESIMD_BIAS_IN_ACC=1",
+      "result": "mostly neutral or slower; keep disabled by default",
+      "tsv": "/home/steve/bench-results/qwen36-q4_0-gguf/esimd-blockscales-20260506/esimd-blockscales-biasacc-matrix-20260506T230258Z.tsv"
+    },
+    "directBmgG31Target": {
+      "target": "intel_gpu_bmg_g31",
+      "result": "not a general win versus spir64_gen -Xs \"-device bmg\"",
+      "tsv": "/home/steve/bench-results/qwen36-q4_0-gguf/esimd-bmg-target-20260506/esimd-bmg-target-20260506T230103Z.tsv"
+    }
+  },
+  "artifacts": {
+    "mainTsv": "/home/steve/bench-results/qwen36-q4_0-gguf/esimd-blockscales-20260506/esimd-blockscales-matrix-20260506T230220Z.tsv",
+    "biasTsv": "/home/steve/bench-results/qwen36-q4_0-gguf/esimd-blockscales-20260506/esimd-blockscales-biasacc-matrix-20260506T230258Z.tsv",
+    "bmgTargetTsv": "/home/steve/bench-results/qwen36-q4_0-gguf/esimd-bmg-target-20260506/esimd-bmg-target-20260506T230103Z.tsv"
+  },
+  "localMaxxing": {
+    "submitted": false,
+    "reason": "Standalone kernel harness result, not end-to-end model inference."
+  },
+  "conclusion": "Block-loaded scale metadata is a strong standalone ESIMD kernel win and should be ported into the next llama.cpp-compatible experimental MMVQ path."
+}

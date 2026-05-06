@@ -28,6 +28,7 @@ Reproducibility notes, benchmark payloads, and local patches from the Intel Arc 
 - `notes/2026-05-05-negative-followups.md`: negative follow-up screens and backend bugs found after the current best results.
 - `notes/2026-05-06-fp8-mtp-block-fp8-clean.md`: clean-load but slow Qwen3.6 FP8 MTP hybrid follow-up.
 - `notes/2026-05-06-llm-scaler-source-mining.md`: llm-scaler ESIMD source-mining notes for the next Q4 kernel/fusion work.
+- `notes/2026-05-06-q4-esimd-blockscales.md`: ESIMD harness block-loaded scale metadata win; positive standalone kernel direction.
 - `notes/2026-05-06-q4-graph-pattern-probe.md`: Q4_0 decode graph probe showing same-activation multi-GEMV fusion opportunities.
 - `notes/2026-05-06-q4-active-device-row-split.md`: focused active-device row-split patch and row-split safety failure.
 - `notes/2026-05-06-q4-fused-mmvq2-swiglu.md`: opt-in Q4_0 gate/up matvec plus SwiGLU fusion and validation.
@@ -38,6 +39,7 @@ Reproducibility notes, benchmark payloads, and local patches from the Intel Arc 
 - `notes/2026-05-06-q4-allreduce-max-bytes.md`: opt-in larger fused allreduce ceiling probe; useful diagnostic but not a speed win.
 - `notes/2026-05-06-fp8-pp2-postreboot-validation.md`: post-reboot FP8 PP2xTP2 XCCL/load/speculative plumbing validation.
 - `data/qwen36-fp8-32k-tp4-vs-pp2-20260506.json`: post-reboot Q4 sanity plus FP8 32k-context TP4 vs TP2/PP2 validation.
+- `data/q4-esimd-blockscales-20260506.json`: structured ESIMD block-loaded scale metadata screen.
 - `data/q4-active-device-row-split-20260506.json`: structured active-device row-split patch validation and negative row-split smoke.
 - `data/qwen36-q4-fused-mmvq2-swiglu-20260506.json`: structured fused MMVQ2+SwiGLU correctness, performance, and LocalMaxxing record.
 - `data/qwen36-q4-rmsnormmul-20260506.json`: structured RMS_NORM+scale-MUL correctness, performance, failed 4x diagnostic, and LocalMaxxing record.

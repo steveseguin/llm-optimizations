@@ -1399,6 +1399,28 @@ Goal: improve quality-preserving Q4_0 performance without power-limit changes.
      - note: `/home/steve/llm-optimizations/notes/2026-05-06-q4-single-subgroup-current-negative.md`;
      - data: `/home/steve/llm-optimizations/data/qwen36-q4-single-subgroup-current-20260506.json`;
      - TSV: `/home/steve/bench-results/qwen36-q4_0-gguf/single-subgroup-current-20260506/single-subgroup-current-p0n256-r2-20260506T225012Z.tsv`.
+69. 2026-05-06 ESIMD block-loaded scale metadata:
+   - added standalone harness macro `Q4_ESIMD_BLOCK_LOAD_SCALES=1`;
+   - instead of scalar-loading four Q4 scales plus eight Q8 scale/sum values inside each 128-column tile, the kernel block-loads those small metadata vectors once and indexes them in the unrolled block loop;
+   - main harness results:
+     - `N=17408 K=5120` single: `127.916 us -> 100.104 us`, `+21.74%`;
+     - `N=17408 K=5120` fused2: `191.145 us -> 177.708 us`, `+7.03%`;
+     - `N=4352 K=5120` single: `46.042 us -> 28.021 us`, `+39.14%`;
+     - `N=4352 K=5120` fused2: `55.625 us -> 44.375 us`, `+20.23%`;
+     - `N=5120 K=17408` single: `140.313 us -> 109.375 us`, `+22.05%`;
+     - `N=5120 K=1536` single: `16.355 us -> 10.730 us`, `+34.39%`;
+   - side screens:
+     - `Q4_ESIMD_BIAS_IN_ACC=1` remains mostly neutral or slower, so keep it off;
+     - direct `-fsycl-targets=intel_gpu_bmg_g31` was not a general win versus `spir64_gen -Xs "-device bmg"`;
+   - decision:
+     - treat block-loaded scale metadata as the first strong ESIMD harness win from this pass;
+     - do not submit to LocalMaxxing because this is a standalone kernel harness, not end-to-end inference;
+     - next work should port this pattern to a llama.cpp-compatible experimental MMVQ path or add an exact-layout microbenchmark against the current reordered MMVQ;
+   - artifacts:
+     - note: `/home/steve/llm-optimizations/notes/2026-05-06-q4-esimd-blockscales.md`;
+     - data: `/home/steve/llm-optimizations/data/q4-esimd-blockscales-20260506.json`;
+     - prototype source: `/home/steve/llm-optimizations/prototypes/q4_0_esimd_probe/bench_q4_0_q8_1_esimd.cpp`;
+     - TSV: `/home/steve/bench-results/qwen36-q4_0-gguf/esimd-blockscales-20260506/esimd-blockscales-matrix-20260506T230220Z.tsv`.
 
 ## Success Criteria
 
