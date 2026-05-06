@@ -1,0 +1,103 @@
+{
+  "date": "2026-05-06",
+  "model": {
+    "hfId": "unsloth/Qwen3.6-27B",
+    "localPath": "/home/steve/models/qwen3.6-27b-q4_0-gguf/Qwen3.6-27B-Q4_0.gguf",
+    "quantization": "Q4_0"
+  },
+  "hardware": {
+    "gpuName": "Intel Arc Pro B70 32GB",
+    "gpuCount": 3,
+    "devices": "SYCL2/SYCL1/SYCL3",
+    "splitMode": "tensor",
+    "tensorSplit": "1/1/1",
+    "os": "Ubuntu 24.04.4 LTS"
+  },
+  "engine": {
+    "name": "llama.cpp",
+    "backend": "sycl",
+    "buildDir": "/home/steve/src/llama.cpp-q4-b70/build-sycl-2026-bmg-g31"
+  },
+  "patch": {
+    "envGate": "GGML_META_FUSE_MUL_MAT_ALLREDUCE_ADD=1",
+    "description": "Diagnostic scheduling helper for Q4_0 MUL_MAT plus existing fused allreduce+ADD",
+    "q8CacheGuard": "Meta planner disables this fusion when GGML_SYCL_Q8_CACHE is nonzero; SYCL helper also declines.",
+    "patchFileGzipBase64": "/home/steve/llm-optimization-artifacts/patches/llama-cpp-sycl-meta-mulmat-add-diagnostic-current-20260506.patch.gz.b64",
+    "repoPatchFileGzipBase64": "patches/llama-cpp-sycl-meta-mulmat-add-diagnostic-current-20260506.patch.gz.b64"
+  },
+  "runs": [
+    {
+      "name": "q8-on-initial-fallback-bug",
+      "promptTokens": 0,
+      "outputTokens": 1,
+      "q8Cache": true,
+      "mulMatAllreduceAddGate": true,
+      "tokSOut": 18.242078,
+      "result": "aborted after writing JSON because meta fallback computed skipped MUL_MAT through aux path with Q8 cache active",
+      "failure": "GGML_ASSERT(pool_size == 0) failed",
+      "jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/proj-epilogue-20260506/q8-on-fallback-p0n1-20260506T223155Z.jsonl",
+      "log": "/home/steve/bench-results/qwen36-q4_0-gguf/proj-epilogue-20260506/q8-on-fallback-p0n1-20260506T223155Z.log"
+    },
+    {
+      "name": "q8-on-planner-guard",
+      "promptTokens": 0,
+      "outputTokens": 1,
+      "q8Cache": true,
+      "mulMatAllreduceAddGate": true,
+      "tokSOut": 25.618491,
+      "backendMulMatAddPathCount": 0,
+      "backendGetRowsPathCount": 2,
+      "assertions": 0,
+      "result": "normal guarded schedule, no abort",
+      "jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/proj-epilogue-20260506/q8-on-planner-guard-p0n1-20260506T224039Z.jsonl",
+      "log": "/home/steve/bench-results/qwen36-q4_0-gguf/proj-epilogue-20260506/q8-on-planner-guard-p0n1-20260506T224039Z.log"
+    },
+    {
+      "name": "q8-off-path-smoke",
+      "promptTokens": 0,
+      "outputTokens": 1,
+      "q8Cache": false,
+      "mulMatAllreduceAddGate": true,
+      "tokSOut": 42.87994,
+      "backendMulMatAddPathCount": 142,
+      "backendGetRowsPathCount": 2,
+      "assertions": 0,
+      "jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/proj-epilogue-20260506/q8-off-mulmat-add-p0n1-20260506T224200Z.jsonl",
+      "log": "/home/steve/bench-results/qwen36-q4_0-gguf/proj-epilogue-20260506/q8-off-mulmat-add-p0n1-20260506T224200Z.log"
+    },
+    {
+      "name": "q8-off-short-decode-control",
+      "promptTokens": 0,
+      "outputTokens": 128,
+      "q8Cache": false,
+      "mulMatAllreduceAddGate": false,
+      "tokSOut": 48.239722,
+      "assertions": 0,
+      "jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/proj-epilogue-20260506/q8-off-no-mulmat-add-p0n128-r3-20260506T224315Z.jsonl",
+      "log": "/home/steve/bench-results/qwen36-q4_0-gguf/proj-epilogue-20260506/q8-off-no-mulmat-add-p0n128-r3-20260506T224315Z.log"
+    },
+    {
+      "name": "q8-off-short-decode-hook",
+      "promptTokens": 0,
+      "outputTokens": 128,
+      "q8Cache": false,
+      "mulMatAllreduceAddGate": true,
+      "tokSOut": 47.700182,
+      "deltaVsControlTokSOut": -0.53954,
+      "deltaVsControlPct": -1.11845,
+      "assertions": 0,
+      "jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/proj-epilogue-20260506/q8-off-mulmat-add-p0n128-r3-20260506T224437Z.jsonl",
+      "log": "/home/steve/bench-results/qwen36-q4_0-gguf/proj-epilogue-20260506/q8-off-mulmat-add-p0n128-r3-20260506T224437Z.log"
+    }
+  ],
+  "quality": {
+    "weights": "same Q4_0 GGUF",
+    "kvCache": "f16/f16",
+    "speculativeDecode": false,
+    "samplingChange": false,
+    "powerLimitChange": false,
+    "localMaxxingSubmitted": false,
+    "localMaxxingReason": "Diagnostic-only path; requires Q8 cache disabled and regressed short decode throughput."
+  },
+  "conclusion": "The path is useful for source-level exploration but not a performance improvement. Keep it disabled in the current best recipe and pursue a lower-level MMVQ/reduction/residual epilogue or same-activation projection grouping instead."
+}

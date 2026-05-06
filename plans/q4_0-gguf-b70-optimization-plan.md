@@ -1357,6 +1357,30 @@ Goal: improve quality-preserving Q4_0 performance without power-limit changes.
      - keep `GGML_META_FUSE_ALLREDUCE_GET_ROWS=1` in the current TP3 best recipe;
      - this is a narrow final-logits win, not the larger low-level projection epilogue we still need for a step-change;
      - next Q4_0 work remains projection GEMV plus allreduce/residual epilogue or same-activation multi-GEMV fusion.
+67. 2026-05-06 projection epilogue scheduler diagnostic:
+   - implemented an off-by-default `GGML_META_FUSE_MUL_MAT_ALLREDUCE_ADD=1` path that recognizes Q4_0 `MUL_MAT` partials followed by fused allreduce+ADD and routes them through a new SYCL backend helper;
+   - first Q8-on smoke found a correctness/lifetime bug in the fallback shape:
+     - meta had already removed the `MUL_MAT` from the normal backend graph before helper decline;
+     - fallback then computed the skipped `MUL_MAT` through the aux-node path while `GGML_SYCL_Q8_CACHE=1`;
+     - the run wrote a JSON result but aborted at teardown with `GGML_ASSERT(pool_size == 0) failed`;
+   - fixed by adding a planner-level guard:
+     - when `GGML_SYCL_Q8_CACHE` is nonzero, meta does not form this fusion at all;
+     - SYCL helper also declines if Q8 cache is active;
+   - validation:
+     - Q8-on guarded `p0/n1`: no abort, zero `backend+mulmat+add` paths, GET_ROWS path remains active;
+     - Q8-off `p0/n1`: 142 `backend+mulmat+add` path entries, 2 GET_ROWS entries, no assertions;
+   - Q8-off short decode A/B, `p0/n128`:
+     - gate off: `48.239722 tok/s`;
+     - gate on: `47.700182 tok/s`;
+     - delta: `-0.539540 tok/s` (`-1.12%`);
+   - decision:
+     - keep `GGML_META_FUSE_MUL_MAT_ALLREDUCE_ADD=0` in the current best recipe;
+     - do not submit to LocalMaxxing because this was diagnostic-only, required Q8 disabled, and regressed short decode;
+     - preserve the patch because it maps the correct graph boundary and proves the helper dispatch path, but next work should be lower-level: fuse MMVQ/reduction/residual epilogue or group same-activation projections before the collective;
+   - artifacts:
+     - note: `/home/steve/llm-optimizations/notes/2026-05-06-q4-projection-epilogue-diagnostic.md`;
+     - data: `/home/steve/llm-optimizations/data/qwen36-q4-projection-epilogue-diagnostic-20260506.json`;
+     - patch: `/home/steve/llm-optimizations/patches/llama-cpp-sycl-meta-mulmat-add-diagnostic-current-20260506.patch.gz.b64`.
 
 ## Success Criteria
 
