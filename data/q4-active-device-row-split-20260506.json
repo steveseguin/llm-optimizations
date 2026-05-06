@@ -1,0 +1,54 @@
+{
+  "date": "2026-05-06",
+  "host": {
+    "os": "Ubuntu 24.04.4 LTS",
+    "kernel": "6.17.0-23-generic",
+    "gpu": "Intel Arc Pro B70 / BMG-G31",
+    "gpu_count": 4,
+    "vram_gb_each": 32
+  },
+  "source": {
+    "llama_cpp_path": "/home/steve/src/llama.cpp-q4-b70",
+    "build_path": "/home/steve/src/llama.cpp-q4-b70/build-sycl-2026-bmg-g31",
+    "base_build_commit_reported_by_llama_bench": "db44417",
+    "patch": "/home/steve/llm-optimizations/patches/llama-cpp-active-device-row-split-current-20260506.patch",
+    "patch_note": "Patch artifact is the current src/llama-model.cpp diff and includes the already-active Qwen recurrent split-state context; the new row-split accounting hunk starts at make_backend_reg_tensor_split."
+  },
+  "change": {
+    "file": "src/llama-model.cpp",
+    "summary": "Map selected llama.cpp row-split devices to physical backend-registry split slots and zero unselected devices before calling ggml_backend_split_buffer_type.",
+    "motivation": "SYCL split-buffer APIs interpret tensor_split in physical device order, while llama.cpp params.tensor_split is selected-device order."
+  },
+  "build": {
+    "command": "source /opt/intel/oneapi/setvars.sh >/dev/null 2>&1 && cmake --build /home/steve/src/llama.cpp-q4-b70/build-sycl-2026-bmg-g31 --target llama-bench llama-cli -j 8",
+    "status": "passed"
+  },
+  "sanity_tensor_split": {
+    "model": "/home/steve/models/qwen3.6-27b-q4_0-gguf/Qwen3.6-27B-Q4_0.gguf",
+    "devices": "SYCL2/SYCL1/SYCL3",
+    "split_mode": "tensor",
+    "tensor_split": "1/1/1",
+    "prompt_tokens": 128,
+    "output_tokens": 128,
+    "decode_tok_s": 45.065268,
+    "prefill_tok_s": 106.106708,
+    "log": "/home/steve/bench-results/qwen36-q4_0-gguf/sanity-tensor3-after-active-split-20260506T183355Z.log",
+    "jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/sanity-tensor3-after-active-split-20260506T183355Z.jsonl",
+    "submitted_to_localmaxxing": false
+  },
+  "row_split_smoke": {
+    "model": "/home/steve/models/qwen3.5-4b-gguf/Qwen3.5-4B-Q4_K_M.gguf",
+    "devices": "SYCL2/SYCL3",
+    "split_mode": "row",
+    "tensor_split": "1/1",
+    "prompt_tokens": 32,
+    "output_tokens": 8,
+    "status": "failed",
+    "failure": "UR_RESULT_ERROR_DEVICE_LOST in oneapi::mkl::blas::column_major::gemm from ggml_sycl_op_mul_mat_sycl",
+    "kernel_observation": "xe 0000:a3:00.0 GT0 reset at 2026-05-06 14:32:41 America/Toronto",
+    "log": "/home/steve/bench-results/active-split/qwen35-4b-row-sycl23-smoke-20260506T183238Z.log",
+    "jsonl": "/home/steve/bench-results/active-split/qwen35-4b-row-sycl23-smoke-20260506T183238Z.jsonl",
+    "submitted_to_localmaxxing": false
+  },
+  "conclusion": "The active-device accounting patch is built and tensor-split Q4 remains healthy. Row split is still not safe enough for benchmark work because the existing SYCL split matmul path can reset a B70."
+}
