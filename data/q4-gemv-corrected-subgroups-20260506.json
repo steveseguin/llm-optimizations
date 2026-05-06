@@ -1,0 +1,52 @@
+{
+  "date": "2026-05-06",
+  "model": "Qwen3.6-27B Q4_0 GGUF",
+  "hardware": "Intel Arc Pro B70 32GB",
+  "harness": "/home/steve/llm-optimization-artifacts/tools/q4_0_gemv_esimd_bench.cpp",
+  "correction": {
+    "old_q4_reference": "lo -> q8[2*j], hi -> q8[2*j+1]",
+    "correct_q4_reference": "lo -> q8[j], hi -> q8[16+j]",
+    "impact": "previous ESIMD correctness and timing notes should be treated as superseded by this corrected run"
+  },
+  "logs": {
+    "corrected_initial": "/home/steve/bench-results/qwen36-q4_0-gguf/q4-gemv-harness-corrected-20260506T092241Z.log",
+    "corrected_cont": "/home/steve/bench-results/qwen36-q4_0-gguf/q4-gemv-harness-corrected-cont-20260506T092317Z.log",
+    "subgroup_sweep": "/home/steve/bench-results/qwen36-q4_0-gguf/q4-sgdp4a-subgroups-sweep-20260506T092334Z.log",
+    "subgroup_sweep_warp16": "/home/steve/bench-results/qwen36-q4_0-gguf/q4-sgdp4a-warp16-subgroups-sweep-20260506T095107Z.log",
+    "warmed_crosscheck": "/home/steve/bench-results/qwen36-q4_0-gguf/q4-gemv-harness-warmed-crosscheck-20260506T094809Z.log"
+  },
+  "subgroup_sweep_warp32_best_us": [
+    {"n": 17408, "k": 5120, "mode": "sgdp4a", "best_subgroups": 4, "avg_us": 88.440758, "approx_gbps": 567.729551},
+    {"n": 5120, "k": 17408, "mode": "sgdp4a", "best_subgroups": 2, "avg_us": 86.964667, "approx_gbps": 576.959654},
+    {"n": 4352, "k": 5120, "mode": "sgdp4a", "best_subgroups": 16, "avg_us": 25.888717, "approx_gbps": 485.034780},
+    {"n": 5120, "k": 4352, "mode": "sgdp4a", "best_subgroups": 4, "avg_us": 26.139550, "approx_gbps": 480.464889},
+    {"n": 5120, "k": 1536, "mode": "sgdp4a", "best_subgroups": 8, "avg_us": 10.429267, "approx_gbps": 426.289608}
+  ],
+  "subgroup_sweep_warp16_best_us": [
+    {"n": 17408, "k": 5120, "mode": "sgdp4a", "best_subgroups": 4, "avg_us": 90.872058, "approx_gbps": 552.539834},
+    {"n": 5120, "k": 17408, "mode": "sgdp4a", "best_subgroups": 2, "avg_us": 90.435475, "approx_gbps": 554.816614},
+    {"n": 4352, "k": 5120, "mode": "sgdp4a", "best_subgroups": 1, "avg_us": 22.460742, "approx_gbps": 559.061147},
+    {"n": 5120, "k": 4352, "mode": "sgdp4a", "best_subgroups": 16, "avg_us": 26.813025, "approx_gbps": 468.396833},
+    {"n": 5120, "k": 1536, "mode": "sgdp4a", "best_subgroups": 2, "avg_us": 7.929633, "approx_gbps": 560.667538}
+  ],
+  "warmed_crosscheck_us": [
+    {"n": 17408, "k": 5120, "mode": "sgdp4a", "subgroups": 16, "avg_us": 101.664355, "approx_gbps": 493.884331},
+    {"n": 17408, "k": 5120, "mode": "sgdp4a", "subgroups": 4, "avg_us": 86.616580, "approx_gbps": 579.686152},
+    {"n": 17408, "k": 5120, "mode": "esimd", "ks": 1, "avg_us": 128.440435, "approx_gbps": 390.923871},
+    {"n": 17408, "k": 5120, "mode": "sgdp4a", "subgroups": 16, "avg_us": 92.088430, "approx_gbps": 545.241481},
+    {"n": 17408, "k": 5120, "mode": "sgdp4a", "subgroups": 4, "avg_us": 92.344330, "approx_gbps": 543.730535},
+    {"n": 17408, "k": 5120, "mode": "esimd", "ks": 1, "avg_us": 144.448370, "approx_gbps": 347.601236}
+  ],
+  "llama_sg4_build": {
+    "build_dir": "/home/steve/src/llama.cpp-q4-b70/build-sycl-2026-bmg-g31-sg4",
+    "compile_define": "GGML_SYCL_REORDER_MMVQ_SUBGROUPS=4",
+    "single_card_tok_s": 24.659991,
+    "single_card_jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-subgroups4-sg4-single-p512n512-r3-20260506T093926Z.jsonl",
+    "correctness_dir": "/home/steve/bench-results/qwen36-q4_0-gguf/correctness/sg4-subgroups-20260506T093748Z",
+    "multi_gpu_status": "failed_before_generation",
+    "multi_gpu_error": "ggml_backend.cpp:120: GGML_ASSERT(buffer) failed in ggml_backend_meta_buffer_type_alloc_buffer during context reserve",
+    "multi_gpu_log": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-subgroups4-sg4-triple213-p512n512-r3-20260506T094515Z.log",
+    "default_slash_smoke_jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-default-devslash-triple213-smoke-20260506T094636Z.jsonl"
+  },
+  "decision": "Do not integrate the current ESIMD float kernel. Keep the default llama.cpp Q4 path and pursue packed integer/XMX kernel work or deeper FFN fusion."
+}
