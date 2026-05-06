@@ -1,0 +1,53 @@
+{
+  "date": "2026-05-06",
+  "model": "Qwen3.6 27B Q4_0 GGUF",
+  "localPath": "/home/steve/models/qwen3.6-27b-q4_0-gguf/Qwen3.6-27B-Q4_0.gguf",
+  "engine": "llama.cpp SYCL Level Zero",
+  "patch": {
+    "env": "GGML_META_FUSE_ALLREDUCE_MAX_BYTES",
+    "defaultBytes": 65536,
+    "testBytes": [
+      1048576,
+      16777216
+    ],
+    "file": "/home/steve/src/llama.cpp-q4-b70/ggml/src/ggml-backend-meta.cpp"
+  },
+  "graphProbeP32N1": {
+    "defaultLog": "/home/steve/bench-results/qwen36-q4_0-gguf/next-fusion-probes-20260506/meta-allreduce-stats4-tp3-rmsmul-p32n1-20260506T211134Z.log",
+    "raisedLog": "/home/steve/bench-results/qwen36-q4_0-gguf/next-fusion-probes-20260506/meta-allreduce-max1m-stats4-tp3-rmsmul-p32n1-20260506T212110Z.log",
+    "raisedCounts": {
+      "prompt": {
+        "linear_attn_out": {"total": 48, "fusedAdd": 48, "viaReshape": 48},
+        "attn_output": {"total": 16, "fusedAdd": 15, "viaReshape": 0},
+        "ffn_out": {"total": 63, "fusedAdd": 63, "viaReshape": 0}
+      },
+      "decode": {
+        "linear_attn_out": {"total": 48, "fusedAdd": 48, "viaReshape": 48},
+        "attn_output": {"total": 16, "fusedAdd": 15, "viaReshape": 0},
+        "ffn_out": {"total": 65, "fusedAdd": 65, "viaReshape": 0}
+      }
+    },
+    "miss": "final-layer attn_output -> GET_ROWS branch"
+  },
+  "benchmarks": {
+    "prompt512Default": {
+      "tokS": 195.625197,
+      "jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/next-fusion-probes-20260506/default-tp3-rmsmul-p512n1-20260506T212233Z.jsonl"
+    },
+    "prompt512Max16M": {
+      "tokS": 196.233518,
+      "jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/next-fusion-probes-20260506/max16m-tp3-rmsmul-p512n1-20260506T212338Z.jsonl"
+    },
+    "full512Max16M": {
+      "promptTokS": 188.183896,
+      "decodeTokS": 49.346817,
+      "jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/next-fusion-probes-20260506/max16m-tp3-rmsmul-p512n512-r2-20260506T212502Z.jsonl"
+    },
+    "priorBestRmsNormMul": {
+      "promptTokS": 206.347938,
+      "decodeTokS": 49.366188,
+      "localMaxxingId": "cmoujcois00esld01c5s6bwht"
+    }
+  },
+  "conclusion": "The max-byte knob works but is not a speed win for the validated 512/512 TP3 path. Keep it opt-in for diagnostics and possible long-prefill experiments."
+}

@@ -1312,6 +1312,32 @@ Goal: improve quality-preserving Q4_0 performance without power-limit changes.
      - keep `GGML_SYCL_FUSE_RMS_NORM_MUL=1` in the Q4_0 best stack;
      - current quality-preserving Q4_0 GGUF best is now 3x B70 at `49.366188 tok/s`;
      - next source-level target should be fused output-projection plus allreduce/residual epilogues or a broader same-activation GEMV group, because single-B70 is still short of the Windows Q4_0 target and 4x remains bottlenecked by narrow shards/collectives.
+65. 2026-05-06 fused allreduce max-byte and FP8 PP2 post-reboot checks:
+   - added `GGML_META_FUSE_ALLREDUCE_MAX_BYTES` as an opt-in ceiling for existing meta fused allreduce paths;
+   - default behavior remains `64 KiB`;
+   - graph probe with `GGML_META_ALLREDUCE_STATS=4` showed:
+     - default ceiling fuses nearly all decode-sized projection residuals but no prompt-sized projection residuals;
+     - `GGML_META_FUSE_ALLREDUCE_MAX_BYTES=1048576` fuses prompt `linear_attn_out`, `attn_output`, and `ffn_out` residual patterns in the `p32/n1` probe;
+     - recurring miss is final-layer `attn_output -> GET_ROWS`;
+   - performance:
+     - prompt-only `p512/n1` default: `195.625197 tok/s`;
+     - prompt-only `p512/n1` with `GGML_META_FUSE_ALLREDUCE_MAX_BYTES=16777216`: `196.233518 tok/s`;
+     - full `p512/n512` with `GGML_META_FUSE_ALLREDUCE_MAX_BYTES=16777216`: prompt `188.183896 tok/s`, decode `49.346817 tok/s`;
+     - conclusion: knob works but is not a validated speed improvement, so do not submit to LocalMaxxing;
+   - source implication:
+     - existing fused allreduce+ADD already covers the normal decode projection residual boundary;
+     - next Q4_0 speed work should go below the meta boundary toward a projection GEMV plus reduction/residual epilogue, or target final-layer `GET_ROWS` if it becomes measurable;
+   - FP8 post-reboot validation:
+     - 4-rank XCCL gate passed on `level_zero:0,1,2,3`;
+     - short PP2xTP2 non-spec FP8 load/generate passed at `512/32`, average latency `22.95836220899946 s`;
+     - short PP2xTP2 CPU n-gram run completed at average latency `20.274570381006924 s` with no old GDN assertion or device-lost failure;
+     - logs still show zero effective draft tokens (`draft=[0]`, `draft_lens=[0]`, `spec_lens={}`), so PP2 speculation remains a plumbing path, not a speed path;
+   - artifacts:
+     - `/home/steve/llm-optimizations/notes/2026-05-06-q4-allreduce-max-bytes.md`;
+     - `/home/steve/llm-optimizations/notes/2026-05-06-fp8-pp2-postreboot-validation.md`;
+     - `/home/steve/llm-optimizations/data/qwen36-q4-allreduce-max-bytes-20260506.json`;
+     - `/home/steve/llm-optimizations/data/qwen36-fp8-pp2-postreboot-validation-20260506.json`;
+     - `/home/steve/llm-optimizations/patches/llama-cpp-meta-allreduce-max-bytes-20260506.patch`.
 
 ## Success Criteria
 

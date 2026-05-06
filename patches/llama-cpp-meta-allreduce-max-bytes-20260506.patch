@@ -1,0 +1,23 @@
+diff --git a/ggml/src/ggml-backend-meta.cpp b/ggml/src/ggml-backend-meta.cpp
+--- a/ggml/src/ggml-backend-meta.cpp
++++ b/ggml/src/ggml-backend-meta.cpp
+@@
++#include <cstdlib>
+@@
+     const char * fuse_add_limit_env = getenv("GGML_META_FUSE_ALLREDUCE_ADD_LIMIT");
+     const int fuse_allreduce_add_limit = fuse_add_limit_env ? atoi(fuse_add_limit_env) : cgraph->n_nodes;
++    const char * fuse_allreduce_max_bytes_env = getenv("GGML_META_FUSE_ALLREDUCE_MAX_BYTES");
++    const size_t fuse_allreduce_max_bytes = fuse_allreduce_max_bytes_env ?
++        strtoull(fuse_allreduce_max_bytes_env, nullptr, 10) : 64*1024;
+@@
+-                            ggml_nbytes(node) <= 64*1024 &&
++                            ggml_nbytes(node) <= fuse_allreduce_max_bytes &&
+@@
+-                            ggml_nbytes(node) <= 64*1024 &&
++                            ggml_nbytes(node) <= fuse_allreduce_max_bytes &&
+@@
+-                            ggml_nbytes(node) <= 64*1024 &&
++                            ggml_nbytes(node) <= fuse_allreduce_max_bytes &&
+@@
+-                            ggml_nbytes(node) <= 64*1024 &&
++                            ggml_nbytes(node) <= fuse_allreduce_max_bytes &&

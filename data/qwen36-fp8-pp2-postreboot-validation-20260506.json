@@ -1,0 +1,55 @@
+{
+  "date": "2026-05-06",
+  "model": "vrfai/Qwen3.6-27B-FP8",
+  "localPath": "/home/steve/models/qwen3.6-27b-fp8-vrfai",
+  "engine": "vllm XPU",
+  "runtimeRules": {
+    "doNotSourceOneApiSetvars": true,
+    "ldLibraryPathPrefix": "/home/steve/.venvs/vllm-xpu-managed/lib",
+    "pythonPath": "/home/steve/src/vllm",
+    "cclAtlTransport": "ofi"
+  },
+  "xcclGate": {
+    "status": "passed",
+    "selector": "level_zero:0,1,2,3",
+    "log": "/home/steve/bench-results/qwen36-fp8-vllm/xccl-4rank-pp2tp2-gate-20260506T212704Z.log",
+    "evidence": "all four ranks printed init ok, barrier ok, and allreduce ok 4.0"
+  },
+  "pp2Tp2NoSpecShort": {
+    "status": "passed",
+    "tensorParallel": 2,
+    "pipelineParallel": 2,
+    "inputTokens": 512,
+    "outputTokens": 32,
+    "maxModelLen": 1024,
+    "gpuMemUtil": 0.8,
+    "avgLatencySec": 22.95836220899946,
+    "computedOutputTokS": 1.3938276480129885,
+    "computedTotalTokS": 23.695070016220807,
+    "json": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp2-pp2-in512-out32-bs1-20260506T212722Z.json",
+    "log": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp2-pp2-in512-out32-bs1-20260506T212722Z.log"
+  },
+  "pp2Tp2CpuNgramShort": {
+    "status": "passed_but_no_effective_speculation",
+    "tensorParallel": 2,
+    "pipelineParallel": 2,
+    "inputTokens": 512,
+    "outputTokens": 32,
+    "maxModelLen": 1024,
+    "gpuMemUtil": 0.8,
+    "speculativeConfig": {
+      "method": "ngram",
+      "numSpeculativeTokens": 4,
+      "promptLookupMin": 2,
+      "promptLookupMax": 4
+    },
+    "avgLatencySec": 20.274570381006924,
+    "computedOutputTokS": 1.5783318412496363,
+    "computedTotalTokS": 26.831641301243817,
+    "traceLines": 335,
+    "draftFinding": "logs repeatedly show draft=[0], draft_lens=[0], and spec_lens={}",
+    "json": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp2-pp2-in512-out32-bs1-20260506T213059Z.json",
+    "log": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp2-pp2-in512-out32-bs1-20260506T213059Z.log"
+  },
+  "conclusion": "Post-reboot XCCL and PP2xTP2 load/generate are healthy. PP2 CPU n-gram no longer hits the old assertion in this short run, but it still drafts zero tokens, so TP4/PP1 remains the FP8 speed path."
+}
