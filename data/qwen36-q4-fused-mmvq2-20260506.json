@@ -22,7 +22,7 @@
       "GGML_SYCL_FUSE_MMVQ2",
       "GGML_SYCL_FUSE_MMVQ2_PROBE"
     ],
-    "qualityPreserving": true,
+    "qualityPreserving": "single-card PPL matched; 3-card forced non-conversation generation matched; 3-card PPL harness is nondeterministic even with fusion disabled, so multi-GPU quality is not fully cleared",
     "powerLimitChanges": false
   },
   "localmaxxing": {
@@ -98,6 +98,40 @@
       "outputTokens": 128,
       "repetitions": 2,
       "fusedTokSOut": 34.842442
+    }
+  },
+  "correctness": {
+    "singleB70Ppl": {
+      "selector": "level_zero:2",
+      "batchSize": 1,
+      "ubatchSize": 1,
+      "contextLength": 64,
+      "chunks": 1,
+      "controlPpl": "2.0500 +/- 0.56981",
+      "fusedPpl": "2.0500 +/- 0.56981",
+      "basePath": "/home/steve/bench-results/qwen36-q4_0-gguf/correctness/fusemmvq2-ppl-single2-20260506T031402Z"
+    },
+    "tripleB70Generation": {
+      "selector": "level_zero:2,1,3",
+      "temperature": 0,
+      "mode": "forced non-conversation completion",
+      "controlSha256": "5f8395bd9f2bbccb6fa030b2fc173e52ed7035621d7cb20ebc24589fe9dbcbcf",
+      "fusedSha256": "5f8395bd9f2bbccb6fa030b2fc173e52ed7035621d7cb20ebc24589fe9dbcbcf",
+      "diffLines": 0,
+      "basePath": "/home/steve/bench-results/qwen36-q4_0-gguf/correctness/fusemmvq2-nocnv-3x-20260506T030459Z"
+    },
+    "tripleB70PplCaution": {
+      "fusedComparison": {
+        "controlPpl": "2.1800 +/- 0.70030",
+        "fusedPpl": "2.2064 +/- 0.69888",
+        "basePath": "/home/steve/bench-results/qwen36-q4_0-gguf/correctness/fusemmvq2-ppl-3x-20260506T031125Z"
+      },
+      "controlRepeat": {
+        "firstPpl": "2.1587 +/- 0.69054",
+        "secondPpl": "2.3188 +/- 0.78117",
+        "basePath": "/home/steve/bench-results/qwen36-q4_0-gguf/correctness/ppl-3x-off-repeat-20260506T031519Z"
+      },
+      "interpretation": "3-card PPL is not currently a stable correctness oracle because the fusion-disabled baseline varies materially across repeat runs."
     }
   },
   "artifacts": {
