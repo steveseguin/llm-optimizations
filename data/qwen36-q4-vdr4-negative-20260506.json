@@ -1,0 +1,76 @@
+{
+  "date": "2026-05-06",
+  "model": {
+    "hfId": "unsloth/Qwen3.6-27B",
+    "localPath": "/home/steve/models/qwen3.6-27b-q4_0-gguf/Qwen3.6-27B-Q4_0.gguf",
+    "quantization": "Q4_0"
+  },
+  "hardware": {
+    "gpuName": "Intel Arc Pro B70 32GB",
+    "gpuCount": 1,
+    "device": "SYCL2",
+    "os": "Ubuntu 24.04.4 LTS"
+  },
+  "engine": {
+    "name": "llama.cpp",
+    "backend": "SYCL Level Zero",
+    "buildDir": "/home/steve/src/llama.cpp-q4-b70/build-sycl-2026-bmg-g31"
+  },
+  "experiment": {
+    "envGate": "GGML_SYCL_REORDER_Q4_0_VDR4=1",
+    "description": "Runtime-gated one-lane-per-Q4_0-block reordered MMVQ variant. Default VDR2 path remains unchanged."
+  },
+  "commonEnv": {
+    "GGML_SYCL_Q8_CACHE": "1",
+    "GGML_SYCL_DISABLE_DNN": "1",
+    "GGML_SYCL_ASYNC_CPY_TENSOR": "0",
+    "GGML_SYCL_FUSE_MMVQ2": "1",
+    "GGML_SYCL_FUSE_MMVQ2_SWIGLU": "1",
+    "GGML_SYCL_FUSE_RMS_NORM_MUL": "1"
+  },
+  "commandShape": "-dev SYCL2 -ngl 99 -sm none -fa 1 -ub 128 -ctk f16 -ctv f16 -t 8 -p 0 -n {1,128} -r {1,2} --poll 50 -o jsonl",
+  "runs": [
+    {
+      "name": "vdr2-p0n1",
+      "vdr4": false,
+      "tokSOut": 24.814015,
+      "jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/vdr4-20260506/vdr2-p0n1-20260506T232332Z.jsonl",
+      "log": "/home/steve/bench-results/qwen36-q4_0-gguf/vdr4-20260506/vdr2-p0n1-20260506T232332Z.log"
+    },
+    {
+      "name": "vdr4-p0n1",
+      "vdr4": true,
+      "tokSOut": 23.318414,
+      "jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/vdr4-20260506/vdr4-p0n1-20260506T232332Z.jsonl",
+      "log": "/home/steve/bench-results/qwen36-q4_0-gguf/vdr4-20260506/vdr4-p0n1-20260506T232332Z.log"
+    },
+    {
+      "name": "vdr2-p0n128-r2",
+      "vdr4": false,
+      "tokSOut": 25.016114,
+      "jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/vdr4-20260506/vdr2-p0n128-r2-20260506T232453Z.jsonl",
+      "log": "/home/steve/bench-results/qwen36-q4_0-gguf/vdr4-20260506/vdr2-p0n128-r2-20260506T232453Z.log"
+    },
+    {
+      "name": "vdr4-p0n128-r2",
+      "vdr4": true,
+      "tokSOut": 23.543413,
+      "jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/vdr4-20260506/vdr4-p0n128-r2-20260506T232453Z.jsonl",
+      "log": "/home/steve/bench-results/qwen36-q4_0-gguf/vdr4-20260506/vdr4-p0n128-r2-20260506T232453Z.log"
+    }
+  ],
+  "quality": {
+    "weights": "same Q4_0 GGUF",
+    "kvCache": "f16/f16",
+    "speculativeDecode": false,
+    "samplingChange": false,
+    "powerLimitChange": false,
+    "localMaxxingSubmitted": false,
+    "localMaxxingReason": "Negative software path screen; not a useful leaderboard result."
+  },
+  "artifacts": {
+    "patch": "patches/llama-cpp-sycl-q4-vdr4-experiment-current-20260506.patch.gz.b64",
+    "note": "notes/2026-05-06-q4-vdr4-negative.md"
+  },
+  "conclusion": "VDR4 regressed both one-token and short decode. Keep GGML_SYCL_REORDER_Q4_0_VDR4 disabled; pursue a direct ESIMD/layout-aware MMVQ path instead."
+}

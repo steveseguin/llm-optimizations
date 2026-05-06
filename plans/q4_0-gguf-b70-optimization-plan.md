@@ -1421,6 +1421,28 @@ Goal: improve quality-preserving Q4_0 performance without power-limit changes.
      - data: `/home/steve/llm-optimizations/data/q4-esimd-blockscales-20260506.json`;
      - prototype source: `/home/steve/llm-optimizations/prototypes/q4_0_esimd_probe/bench_q4_0_q8_1_esimd.cpp`;
      - TSV: `/home/steve/bench-results/qwen36-q4_0-gguf/esimd-blockscales-20260506/esimd-blockscales-matrix-20260506T230220Z.tsv`.
+70. 2026-05-06 Q4_0 reordered MMVQ VDR4 screen:
+   - implemented a runtime-gated `GGML_SYCL_REORDER_Q4_0_VDR4=1` path for the active reordered Q4_0 MMVQ kernels;
+   - hypothesis:
+     - current VDR2 uses two lanes per Q4_0 block, so both lanes load the same Q4 scale and Q8 scale/sum metadata;
+     - VDR4 uses one lane per Q4_0 block and should remove that duplicated metadata load;
+   - implementation:
+     - added `reorder_vec_dot_q4_0_sycl_vdr<4>`;
+     - made generic reordered MMVQ kernels use the vec-dot functor's `vdr_mmvq`;
+     - wired VDR4 dispatch for single, fused2, and fused2+SwiGLU Q4_0 reordered MMVQ;
+   - validation on single B70 `SYCL2`, current stack, `-sm none`, `-fa 1`, `-ub 128`, `-ctk f16`, `-ctv f16`:
+     - `p0/n1/r1`, VDR2: `24.814015 tok/s`;
+     - `p0/n1/r1`, VDR4: `23.318414 tok/s`;
+     - `p0/n128/r2`, VDR2: `25.016114 tok/s`;
+     - `p0/n128/r2`, VDR4: `23.543413 tok/s`;
+   - decision:
+     - VDR4 is a clear regression; keep `GGML_SYCL_REORDER_Q4_0_VDR4=0`;
+     - this suggests the ESIMD block-scale win does not transfer through a simple VDR/scheduling change in the subgroup kernel;
+     - next work should be a direct ESIMD/layout-aware reordered Q4_0 MMVQ path or an exact-layout microbenchmark against llama.cpp's reordered tensor layout;
+   - artifacts:
+     - note: `/home/steve/llm-optimizations/notes/2026-05-06-q4-vdr4-negative.md`;
+     - data: `/home/steve/llm-optimizations/data/qwen36-q4-vdr4-negative-20260506.json`;
+     - patch: `/home/steve/llm-optimizations/patches/llama-cpp-sycl-q4-vdr4-experiment-current-20260506.patch.gz.b64`.
 
 ## Success Criteria
 

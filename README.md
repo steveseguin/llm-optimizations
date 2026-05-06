@@ -36,6 +36,7 @@ Reproducibility notes, benchmark payloads, and local patches from the Intel Arc 
 - `notes/2026-05-06-q4-getrows-fusion-neutral.md`: opt-in allreduce+GET_ROWS fusion; initially neutral, later a small current-stack win.
 - `notes/2026-05-06-q4-projection-epilogue-diagnostic.md`: diagnostic `MUL_MAT+allreduce+ADD` scheduler hook; path works with Q8 disabled but regresses short decode, so it stays off.
 - `notes/2026-05-06-q4-single-subgroup-current-negative.md`: current-stack single-B70 subgroup runtime sweep; default remains best.
+- `notes/2026-05-06-q4-vdr4-negative.md`: runtime-gated one-lane-per-Q4_0-block reordered MMVQ screen; regressed short decode, so keep it off.
 - `notes/2026-05-06-q4-allreduce-max-bytes.md`: opt-in larger fused allreduce ceiling probe; useful diagnostic but not a speed win.
 - `notes/2026-05-06-fp8-pp2-postreboot-validation.md`: post-reboot FP8 PP2xTP2 XCCL/load/speculative plumbing validation.
 - `data/qwen36-fp8-32k-tp4-vs-pp2-20260506.json`: post-reboot Q4 sanity plus FP8 32k-context TP4 vs TP2/PP2 validation.
@@ -46,6 +47,7 @@ Reproducibility notes, benchmark payloads, and local patches from the Intel Arc 
 - `data/qwen36-q4-getrows-fusion-20260506.json`: structured allreduce+GET_ROWS A/B data, correctness check, and LocalMaxxing record.
 - `data/qwen36-q4-projection-epilogue-diagnostic-20260506.json`: structured Q8 guard, path smoke, and negative A/B for the projection epilogue scheduler hook.
 - `data/qwen36-q4-single-subgroup-current-20260506.json`: structured current-stack single-B70 subgroup runtime sweep.
+- `data/qwen36-q4-vdr4-negative-20260506.json`: structured Q4_0 reordered MMVQ VDR4 negative screen.
 - `data/qwen36-q4-allreduce-max-bytes-20260506.json`: structured Q4_0 larger allreduce-fusion ceiling probe.
 - `data/qwen36-fp8-pp2-postreboot-validation-20260506.json`: structured FP8 PP2xTP2 post-reboot validation data.
 - `scripts/bench-qwen36-q4_0-gguf-vulkan-matrix.sh`: Q4_0 GGUF Vulkan benchmark sweep harness.
@@ -66,6 +68,7 @@ Reproducibility notes, benchmark payloads, and local patches from the Intel Arc 
 - `patches/llama-cpp-sycl-fused-mmvq2-swiglu-current-20260506.patch.gz.b64`: current SYCL source diff containing the fused MMVQ2+SwiGLU path.
 - `patches/llama-cpp-sycl-rmsnormmul-current-20260506.patch.gz.b64`: current SYCL source diff containing the RMS_NORM+scale-MUL path and allocator diagnostics.
 - `patches/llama-cpp-sycl-meta-mulmat-add-diagnostic-current-20260506.patch.gz.b64`: current llama.cpp diff containing the diagnostic `MUL_MAT+allreduce+ADD` scheduler hook.
+- `patches/llama-cpp-sycl-q4-vdr4-experiment-current-20260506.patch.gz.b64`: current llama.cpp diff containing the runtime-gated Q4_0 reordered MMVQ VDR4 experiment.
 - `patches/llama-cpp-meta-allreduce-max-bytes-20260506.patch`: focused opt-in max-byte knob for fused meta allreduce diagnostics.
 - `patches/vllm-xpu-mtp-fallback.patch`: vLLM 0.20.1 XPU speculative/MTP fallback patch.
 - `patches/vllm-xpu-force-graph-with-comm-experiment.patch`: failed TP2 graph-capture experiment knob retained as a negative result.
