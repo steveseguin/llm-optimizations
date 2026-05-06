@@ -1,0 +1,109 @@
+{
+  "date_utc": "2026-05-06",
+  "title": "Qwen3.6 27B FP8 vLLM XPU PP2 GDN speculative fallback diagnostics",
+  "hardware": {
+    "gpu_name": "Intel Arc Pro B70",
+    "gpu_count": 4,
+    "vram_gb_each": 32,
+    "os": "Ubuntu 24.04.4 LTS",
+    "kernel": "6.17.0-23-generic"
+  },
+  "model": {
+    "hf_id": "Qwen/Qwen3.6-27B",
+    "static_fp8_local_path": "/home/steve/models/qwen3.6-27b-fp8-vrfai",
+    "quantization": "compressed-tensors FP8"
+  },
+  "wrapper": {
+    "path": "/home/steve/bench-vllm-qwen36-fp8.sh",
+    "source_import": "PYTHONPATH=/home/steve/src/vllm",
+    "venv": "/home/steve/.venvs/vllm-xpu-managed"
+  },
+  "patch": {
+    "path": "/home/steve/llm-optimization-artifacts/patches/vllm-xpu-gdn-spec-fallback-and-deterministic-bench-20260506.patch",
+    "sha256": "c8e01513d26b090e45065db83f16107f984e0e47ad41ea645c1a467f5fdde8b4",
+    "files": [
+      "vllm/_xpu_ops.py",
+      "vllm/model_executor/layers/mamba/gdn_linear_attn.py",
+      "vllm/benchmarks/latency.py",
+      "vllm/v1/worker/gpu_model_runner.py"
+    ]
+  },
+  "runs": [
+    {
+      "name": "forced_repeat_pp2_pre_fallback",
+      "topology": {
+        "tp": 2,
+        "pp": 2,
+        "selector": "level_zero:0,1,2,3"
+      },
+      "tokens": {
+        "prompt": 512,
+        "output": 32,
+        "max_model_len": 1024
+      },
+      "speculative_config": {
+        "method": "ngram",
+        "num_speculative_tokens": 4,
+        "prompt_lookup_min": 2,
+        "prompt_lookup_max": 4
+      },
+      "prompt_control": {
+        "VLLM_BENCH_LATENCY_PROMPT_MODE": "repeat",
+        "VLLM_BENCH_LATENCY_REPEAT_PERIOD": 16
+      },
+      "log": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp2-pp2-in512-out32-bs1-20260506T130708Z.log",
+      "result": "failed",
+      "finding": "PP1 proposed draft_lens=[4], PP0 scheduled spec_lens with 4 draft tokens, then _gdn_attention_core_xpu_impl asserted that spec_sequence_masks must be None."
+    },
+    {
+      "name": "forced_repeat_pp2_enforce_eager",
+      "topology": {
+        "tp": 2,
+        "pp": 2,
+        "selector": "level_zero:0,1,2,3"
+      },
+      "tokens": {
+        "prompt": 512,
+        "output": 32,
+        "max_model_len": 1024
+      },
+      "extra_args": "--enforce-eager",
+      "log": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp2-pp2-in512-out32-bs1-20260506T131446Z.log",
+      "json": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp2-pp2-in512-out32-bs1-20260506T131446Z.json",
+      "result": "completed_without_effective_speculation",
+      "metrics": {
+        "avg_latency_s": 4.284157789996243,
+        "computed_output_tok_s": 7.469379413317095,
+        "computed_total_tok_s": 126.97945002639061
+      },
+      "localmaxxing": "not_submitted"
+    },
+    {
+      "name": "forced_repeat_pp2_after_fallback_patch",
+      "topology": {
+        "tp": 2,
+        "pp": 2,
+        "selector": "level_zero:0,1,2,3"
+      },
+      "tokens": {
+        "prompt": 512,
+        "output": 32,
+        "max_model_len": 1024
+      },
+      "log": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp2-pp2-in512-out32-bs1-20260506T131803Z.log",
+      "result": "failed_before_inference",
+      "failure": "UR_RESULT_ERROR_OUT_OF_DEVICE_MEMORY during weight load, followed by UR_RESULT_ERROR_DEVICE_LOST during empty_cache.",
+      "post_failure_sanity": {
+        "sycl_ls": "enumerated four B70s",
+        "torch_xpu_small_alloc": "succeeded on all four devices",
+        "llama_cpp_q4_sanity": {
+          "jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-post-vllm-device-lost-sanity-triple213-p512n128-r1-20260506T132352Z.jsonl",
+          "prompt_tok_s": 116.03568,
+          "decode_tok_s": 45.104294
+        }
+      },
+      "localmaxxing": "not_submitted"
+    }
+  ],
+  "conclusion": "The PP2 GDN speculative blocker is the XPU custom op assertion on spec_sequence_masks. A generic-core fallback has been patched and compiled, but still needs clean validation after the Level Zero load-time device-lost episode."
+}
