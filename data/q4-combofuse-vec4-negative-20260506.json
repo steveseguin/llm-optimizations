@@ -1,0 +1,129 @@
+{
+  "date": "2026-05-06",
+  "model": {
+    "hfId": "Qwen/Qwen3.6-27B",
+    "localPath": "/home/steve/models/qwen3.6-27b-q4_0-gguf/Qwen3.6-27B-Q4_0.gguf",
+    "quantization": "Q4_0"
+  },
+  "engine": {
+    "name": "llama.cpp",
+    "repo": "/home/steve/src/llama.cpp-q4-b70",
+    "baseCommit": "db44417b027cff147f7de85e7da22bc6a3a804fb",
+    "build": "/home/steve/src/llama.cpp-q4-b70/build-sycl-2026-bmg-g31",
+    "backend": "SYCL Level Zero AOT bmg_g31"
+  },
+  "hardware": {
+    "gpuName": "Intel Arc Pro B70",
+    "gpuCount": 4,
+    "vramGbPerGpu": 32,
+    "os": "Ubuntu 24.04.4 LTS",
+    "kernel": "6.17.0-23-generic"
+  },
+  "baseEnv": {
+    "GGML_SYCL_DISABLE_DNN": "1",
+    "GGML_SYCL_Q8_CACHE": "1",
+    "GGML_SYCL_ASYNC_CPY_TENSOR": "0",
+    "GGML_SYCL_ASYNC_PEER_COPY": "1",
+    "GGML_SYCL_COMM_ALLREDUCE": "1",
+    "GGML_SYCL_COMM_SINGLE_KERNEL": "1",
+    "GGML_SYCL_COMM_EVENT_BARRIER": "1",
+    "GGML_SYCL_COMM_SYNC_AFTER": "2",
+    "GGML_META_FUSE_ALLREDUCE_ADD": "1",
+    "GGML_SYCL_FUSE_MMVQ2": "1"
+  },
+  "runs": [
+    {
+      "name": "combined_fusion_off_quad0123_short",
+      "extraEnv": {},
+      "devices": "SYCL0/SYCL1/SYCL2/SYCL3",
+      "promptTokens": 512,
+      "outputTokens": 128,
+      "repeats": 2,
+      "tokSOut": 33.987384,
+      "jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-combofuse-off-quad0123-p512n128-r2-20260506T120408Z.jsonl"
+    },
+    {
+      "name": "combined_fusion_on_quad0123_short",
+      "extraEnv": {
+        "GGML_META_FUSE_ALLREDUCE_RESHAPE": "1",
+        "GGML_META_FUSE_ALLREDUCE_GET_ROWS": "1"
+      },
+      "devices": "SYCL0/SYCL1/SYCL2/SYCL3",
+      "promptTokens": 512,
+      "outputTokens": 128,
+      "repeats": 2,
+      "tokSOut": 34.874597,
+      "jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-combofuse-on-quad0123-p512n128-r2-20260506T120408Z.jsonl"
+    },
+    {
+      "name": "combined_fusion_on_quad0123_full",
+      "extraEnv": {
+        "GGML_META_FUSE_ALLREDUCE_RESHAPE": "1",
+        "GGML_META_FUSE_ALLREDUCE_GET_ROWS": "1"
+      },
+      "devices": "SYCL0/SYCL1/SYCL2/SYCL3",
+      "promptTokens": 512,
+      "outputTokens": 512,
+      "repeats": 3,
+      "tokSPrompt": 86.274676,
+      "tokSOut": 34.842877,
+      "jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-combofuse-on-quad0123-p512n512-r3-20260506T120734Z.jsonl"
+    },
+    {
+      "name": "vec4_off_triple_short",
+      "extraEnv": {},
+      "devices": "SYCL0/SYCL1/SYCL2",
+      "promptTokens": 512,
+      "outputTokens": 128,
+      "repeats": 2,
+      "tokSOut": 45.482621,
+      "jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-vec4-off-triple213-p512n128-r2-20260506T122210Z.jsonl"
+    },
+    {
+      "name": "vec4_on_triple_short",
+      "extraEnv": {
+        "GGML_SYCL_COMM_VEC4_F32": "1"
+      },
+      "devices": "SYCL0/SYCL1/SYCL2",
+      "promptTokens": 512,
+      "outputTokens": 128,
+      "repeats": 2,
+      "tokSOut": 45.313034,
+      "jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-vec4-on-triple213-p512n128-r2-20260506T122210Z.jsonl"
+    },
+    {
+      "name": "vec4_off_quad_short",
+      "extraEnv": {},
+      "devices": "SYCL0/SYCL1/SYCL2/SYCL3",
+      "promptTokens": 512,
+      "outputTokens": 128,
+      "repeats": 2,
+      "tokSOut": 34.890219,
+      "jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-vec4-off-quad2130-p512n128-r2-20260506T122210Z.jsonl"
+    },
+    {
+      "name": "vec4_on_quad_short",
+      "extraEnv": {
+        "GGML_SYCL_COMM_VEC4_F32": "1"
+      },
+      "devices": "SYCL0/SYCL1/SYCL2/SYCL3",
+      "promptTokens": 512,
+      "outputTokens": 128,
+      "repeats": 2,
+      "tokSOut": 34.198055,
+      "jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-vec4-on-quad2130-p512n128-r2-20260506T122210Z.jsonl"
+    },
+    {
+      "name": "post_revert_smoke_triple213",
+      "extraEnv": {},
+      "devices": "SYCL2/SYCL1/SYCL3",
+      "promptTokens": 512,
+      "outputTokens": 128,
+      "repeats": 1,
+      "tokSPrompt": 112.767126,
+      "tokSOut": 45.668525,
+      "jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-smoke-after-vec4-revert-triple213-p512n128-r1-20260506T123929Z.jsonl"
+    }
+  ],
+  "conclusion": "Combined graph-consumer fusion is neutral on the full 4-card run. Vec4 F32 allreduce regresses 3-card slightly and 4-card clearly, so the temporary source gate was removed. The next Q4 direction should be true output-projection/allreduce epilogue work or reducing the number of per-token collectives."
+}
