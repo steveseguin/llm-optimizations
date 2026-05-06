@@ -1,0 +1,82 @@
+{
+  "date": "2026-05-06",
+  "model": {
+    "hfId": "Qwen/Qwen3.6-27B",
+    "localPath": "/home/steve/models/qwen3.6-27b-q4_0-gguf/Qwen3.6-27B-Q4_0.gguf",
+    "quantization": "Q4_0"
+  },
+  "hardware": {
+    "gpuName": "Intel Arc Pro B70 32GB",
+    "gpuCount": 4,
+    "vramGbPerGpu": 32,
+    "os": "Ubuntu 24.04.4 LTS",
+    "kernel": "6.17.0-23-generic"
+  },
+  "engine": {
+    "name": "llama.cpp",
+    "backend": "SYCL/Level Zero",
+    "repo": "/home/steve/src/llama.cpp-q4-b70",
+    "binary": "/home/steve/src/llama.cpp-q4-b70/build-sycl-2026-bmg-g31/bin/llama-bench"
+  },
+  "commonEnv": {
+    "ONEAPI_DEVICE_SELECTOR": "level_zero:0,1,2,3",
+    "GGML_SYCL_DISABLE_DNN": "1",
+    "GGML_SYCL_Q8_CACHE": "1",
+    "GGML_SYCL_ASYNC_CPY_TENSOR": "1",
+    "GGML_SYCL_COMM_ALLREDUCE": "1",
+    "GGML_SYCL_COMM_SINGLE_KERNEL": "1",
+    "GGML_META_FUSE_ALLREDUCE_ADD": "1"
+  },
+  "commonFlags": "-dev SYCL0/SYCL1/SYCL2/SYCL3 -ngl 99 -sm tensor -ts 1/1/1/1 -fa 1 -ub 32 -ctk f16 -ctv f16 -t 8 -p 512 -n 128 -r 2 --poll 50 -o jsonl",
+  "runs": [
+    {
+      "name": "pairwise4_fusedadd_event_barrier",
+      "extraEnv": {
+        "GGML_SYCL_COMM_PAIRWISE4": "1",
+        "GGML_SYCL_COMM_EVENT_BARRIER": "1"
+      },
+      "promptTokS": 262.072535,
+      "decodeTokS": 32.707823,
+      "promptTokens": 512,
+      "outputTokens": 128,
+      "jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-k617023-pairwise4-fuseadd-quad0123-p512n128-r2-20260506T004230Z.jsonl",
+      "log": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-k617023-pairwise4-fuseadd-quad0123-p512n128-r2-20260506T004230Z.log"
+    },
+    {
+      "name": "same_build_gateoff_control",
+      "extraEnv": {
+        "GGML_SYCL_COMM_EVENT_BARRIER": "1"
+      },
+      "promptTokS": 102.228619,
+      "decodeTokS": 33.600765,
+      "promptTokens": 512,
+      "outputTokens": 128,
+      "jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-k617023-pairwise4-control-gateoff-quad0123-p512n128-r2-20260506T004410Z.jsonl",
+      "log": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-k617023-pairwise4-control-gateoff-quad0123-p512n128-r2-20260506T004410Z.log"
+    },
+    {
+      "name": "pairwise4_fusedadd_no_event_barrier",
+      "extraEnv": {
+        "GGML_SYCL_COMM_PAIRWISE4": "1"
+      },
+      "promptTokS": 262.576268,
+      "decodeTokS": 33.009874,
+      "promptTokens": 512,
+      "outputTokens": 128,
+      "jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-k617023-pairwise4-fuseadd-nobarrier-quad0123-p512n128-r2-20260506T004551Z.jsonl",
+      "log": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-k617023-pairwise4-fuseadd-nobarrier-quad0123-p512n128-r2-20260506T004551Z.log"
+    },
+    {
+      "name": "post_test_3x_health_check",
+      "selector": "level_zero:2,1,3",
+      "flags": "-dev SYCL0/SYCL1/SYCL2 -ngl 99 -sm tensor -ts 1/1/1 -fa 1 -ub 32 -ctk f16 -ctv f16 -t 8 -p 512 -n 128 -r 1 --poll 50 -o jsonl",
+      "promptTokS": 133.490826,
+      "decodeTokS": 45.046330,
+      "promptTokens": 512,
+      "outputTokens": 128,
+      "jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-k617023-health-triple213-after-pairwise4-p512n128-r1-20260506T004735Z.jsonl",
+      "log": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-k617023-health-triple213-after-pairwise4-p512n128-r1-20260506T004735Z.log"
+    }
+  ],
+  "conclusion": "Negative for decode. Keep GGML_SYCL_COMM_PAIRWISE4 diagnostic-only for fused-add Q4_0; do not submit to LocalMaxxing as an improvement."
+}
