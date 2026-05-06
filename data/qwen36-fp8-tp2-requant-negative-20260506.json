@@ -1,0 +1,103 @@
+{
+  "date_utc": "2026-05-06",
+  "title": "Qwen3.6 27B FP8 TP2 two-card group negative/requant check",
+  "hardware": {
+    "gpu_name": "Intel Arc Pro B70",
+    "gpu_count": 2,
+    "vram_gb_each": 32,
+    "os": "Ubuntu 24.04.4 LTS",
+    "kernel": "6.17.0-23-generic"
+  },
+  "engine": {
+    "name": "vllm",
+    "version": "0.20.1+xpu-local",
+    "backend": "xpu",
+    "venv": "/home/steve/.venvs/vllm-xpu-managed",
+    "wrapper": "/home/steve/bench-vllm-qwen36-fp8.sh"
+  },
+  "common_environment": {
+    "oneapi_device_selector": "level_zero:0,1",
+    "ccl_atl_transport": "ofi",
+    "ld_library_path_prefix": "/home/steve/.venvs/vllm-xpu-managed/lib",
+    "do_not_source_oneapi_setvars_for_vllm": true
+  },
+  "runs": [
+    {
+      "name": "compressed_tensors_tp2_pp1_default",
+      "model_path": "/home/steve/models/qwen3.6-27b-fp8-vrfai",
+      "quantization": "compressed-tensors",
+      "tp": 2,
+      "pp": 1,
+      "input_tokens": 512,
+      "output_tokens": 128,
+      "max_model_len": 1024,
+      "result": "failed_oom",
+      "logs": [
+        "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp2-pp1-in512-out128-bs1-20260506T103027Z.log",
+        "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp2-pp1-in512-out128-bs1-20260506T103146Z.log"
+      ]
+    },
+    {
+      "name": "dynamic_fp8_tp2_pp1_default_block_fallback",
+      "model_path": "/home/steve/models/qwen3.6-27b-fp8-hf",
+      "quantization": "fp8",
+      "tp": 2,
+      "pp": 1,
+      "result": "failed_oom",
+      "failure_point": "XPUBF16Fp8BlockScaledMMLinearKernel.process_weights_after_loading weight.to(torch.bfloat16) * expanded_scale",
+      "logs": [
+        "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-fp8-tp2-pp1-in512-out128-bs1-20260506T103227Z.log",
+        "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-fp8-tp2-pp1-in512-out512-bs1-20260506T103518Z.log"
+      ]
+    },
+    {
+      "name": "dynamic_fp8_tp2_pp1_requant_no_spec_smoke",
+      "model_path": "/home/steve/models/qwen3.6-27b-fp8-hf",
+      "quantization": "fp8",
+      "tp": 2,
+      "pp": 1,
+      "vllm_xpu_block_fp8_requant": true,
+      "quality_risk": "Requantizes 128x128 block-FP8 weights into XPU W8A16 FP8 format; not bit-equivalent to checkpoint.",
+      "input_tokens": 512,
+      "output_tokens": 128,
+      "max_model_len": 768,
+      "avg_latency_s": 14.068391455002711,
+      "tok_s_out": 9.098410462162914,
+      "tok_s_total": 45.492052310814564,
+      "json": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-fp8-tp2-pp1-in512-out128-bs1-20260506T103808Z.json",
+      "log": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-fp8-tp2-pp1-in512-out128-bs1-20260506T103808Z.log"
+    },
+    {
+      "name": "dynamic_fp8_tp2_pp1_requant_ngram",
+      "model_path": "/home/steve/models/qwen3.6-27b-fp8-hf",
+      "quantization": "fp8",
+      "tp": 2,
+      "pp": 1,
+      "vllm_xpu_block_fp8_requant": true,
+      "quality_risk": "Requantizes 128x128 block-FP8 weights into XPU W8A16 FP8 format; not bit-equivalent to checkpoint.",
+      "speculative": {
+        "method": "ngram",
+        "num_speculative_tokens": 4,
+        "prompt_lookup_min": 2,
+        "prompt_lookup_max": 4
+      },
+      "input_tokens": 512,
+      "output_tokens": 512,
+      "max_model_len": 1024,
+      "latencies_s": [
+        16.257932843000162,
+        25.539812173999962
+      ],
+      "avg_latency_s": 20.898872508500062,
+      "tok_s_out": 24.498929298303416,
+      "tok_s_total": 48.99785859660683,
+      "json": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-fp8-tp2-pp1-in512-out512-bs1-20260506T103946Z.json",
+      "log": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-fp8-tp2-pp1-in512-out512-bs1-20260506T103946Z.log"
+    }
+  ],
+  "conclusion": "TP2/PP1 FP8 is not a useful 2x2 performance path yet. The only successful TP2 path uses a quality-risk requantization and reaches 24.498929 tok/s, below the Q4_0 single-card baseline and far below TP4 FP8.",
+  "localmaxxing": {
+    "submitted": false,
+    "reason": "Negative/diagnostic result and quality-risk requantization; not a recommended benchmark."
+  }
+}
