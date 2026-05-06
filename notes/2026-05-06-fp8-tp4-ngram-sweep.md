@@ -21,11 +21,13 @@ All runs used:
 | ngram | 3 | 2..4 | 43.023391 | Worse. |
 | ngram | 5 | 2..5 | 48.298516 | Tied with depth 4, not a new best. |
 | ngram | 6 | 2..6 | 41.724557 | Worse; low acceptance. |
+| ngram_gpu | 4 | 2..4 | 43.450599 | Worse; drafts fast but accepts very little. |
 
 ## Findings
 
 - The first post-patch TP4 n-gram confirmation hung during CCL initialization before all four ranks emitted topology warnings. A retry completed normally, and a no-spec TP4 run also completed, so this looks like a transient CCL init hang rather than a deterministic vLLM patch regression.
 - `ngram` depth 4 and 5 are the viable range for this prompt shape. Depth 3 leaves performance on the table; depth 6 drafts too aggressively and acceptance collapses.
+- TP4 `ngram_gpu` does not inherit the PP2 buffer crash, but acceptance is poor. The final three logged windows showed only `3.5%`, `4.9%`, and `4.0%` average draft acceptance, so it underperforms CPU n-gram.
 - The previous submitted best remains `49.581893 tok/s` with depth 4. The new depth 4/5 reruns are valid but lower, so they were documented rather than submitted to LocalMaxxing.
 
 ## Files
@@ -34,4 +36,5 @@ All runs used:
 - Depth 3: `/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp4-pp1-in512-out512-bs1-20260506T083723Z.json`
 - Depth 5: `/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp4-pp1-in512-out512-bs1-20260506T084006Z.json`
 - Depth 6: `/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp4-pp1-in512-out512-bs1-20260506T084247Z.json`
+- ngram_gpu depth 4: `/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp4-pp1-in512-out512-bs1-20260506T084944Z.json`
 - No-spec smoke: `/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp4-pp1-in512-out128-bs1-20260506T082913Z.json`
