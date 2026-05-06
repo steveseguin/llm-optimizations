@@ -1,0 +1,60 @@
+{
+  "date": "2026-05-06",
+  "model": "unsloth/Qwen3.6-27B",
+  "quantization": "Q4_0",
+  "engine": "llama.cpp SYCL Level Zero",
+  "codeChange": {
+    "file": "/home/steve/src/llama.cpp-q4-b70/ggml/src/ggml-sycl/ggml-sycl.cpp",
+    "env": "GGML_SYCL_COMM_SYNC_AFTER",
+    "mode1": "wait_all_streams() after single-kernel allreduce",
+    "mode2": "reduce.wait() after single-kernel allreduce"
+  },
+  "threeGpu": {
+    "selector": "level_zero:2,1,3",
+    "devices": "SYCL0/SYCL1/SYCL2",
+    "tensorSplit": "1/1/1",
+    "syncAfterMode": 2,
+    "correctness": {
+      "status": "pass",
+      "steps": 16,
+      "path": "/home/steve/bench-results/qwen36-q4_0-gguf/correctness/syncafter2-reducewait-20260506T055151Z"
+    },
+    "benchmark": {
+      "promptTokens": 512,
+      "outputTokens": 512,
+      "repeats": 3,
+      "promptTokS": 118.722431,
+      "decodeTokS": 46.194319,
+      "jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-syncafter2-reducewait-fusemmvq2-triple213-p512n512-r3-20260506T055402Z.jsonl",
+      "log": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-syncafter2-reducewait-fusemmvq2-triple213-p512n512-r3-20260506T055402Z.log"
+    }
+  },
+  "fourGpu": {
+    "selector": "level_zero:2,1,3,0",
+    "devices": "SYCL0/SYCL1/SYCL2/SYCL3",
+    "tensorSplit": "1/1/1/1",
+    "syncAfterMode": 2,
+    "correctness": {
+      "status": "pass",
+      "steps": 8,
+      "path": "/home/steve/bench-results/qwen36-q4_0-gguf/correctness/syncafter2-reducewait-quad-20260506T055606Z"
+    },
+    "benchmark": {
+      "promptTokens": 512,
+      "outputTokens": 512,
+      "repeats": 3,
+      "promptTokS": 86.547242,
+      "decodeTokS": 34.929313,
+      "jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-syncafter2-reducewait-fusemmvq2-quad2130-p512n512-r3-20260506T055829Z.jsonl",
+      "log": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-syncafter2-reducewait-fusemmvq2-quad2130-p512n512-r3-20260506T055829Z.log"
+    },
+    "rootSweepP512N256R2": [
+      {"selector": "level_zero:0,1,2,3", "decodeTokS": 34.280733},
+      {"selector": "level_zero:1,0,2,3", "decodeTokS": 34.745079},
+      {"selector": "level_zero:2,1,3,0", "decodeTokS": 34.797031},
+      {"selector": "level_zero:3,2,1,0", "decodeTokS": 35.068186}
+    ],
+    "rootSweepSummary": "/home/steve/bench-results/qwen36-q4_0-gguf/root-sweep-syncafter2-quad-p512n256-r2-20260506T060109Z.jsonl"
+  },
+  "conclusion": "reduce.wait() is a small 3x improvement and preserves correctness, but 4x remains bottlenecked by the single-root collective design."
+}
