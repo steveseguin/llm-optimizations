@@ -8,7 +8,7 @@ This note supersedes the stale portions of `plans/q4_0-gguf-b70-optimization-pla
 
 - Qwen3.6 27B Q4_0 GGUF, llama.cpp/SYCL, 3x B70 selector `2,1,3`: reshape-through-ADD fusion validation `44.812806 tok/s` decode, quality-preserving, software-only.
 - Qwen3.6 27B static FP8, `vrfai/Qwen3.6-27B-FP8`, patched vLLM/XPU TP4 + FlashAttention2 + n-gram speculative decode: `47.674832 tok/s` decode, `95.349664 tok/s` total.
-- Current FP8 best LocalMaxxing id: `cmos3pnqo0004kz04o4aiup22`.
+- Current FP8 best LocalMaxxing id: `cmos3pnqo000kkz04o4aiup22`.
 
 ## Recent Negative Results
 
