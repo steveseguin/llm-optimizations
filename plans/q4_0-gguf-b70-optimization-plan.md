@@ -1338,6 +1338,25 @@ Goal: improve quality-preserving Q4_0 performance without power-limit changes.
      - `/home/steve/llm-optimizations/data/qwen36-q4-allreduce-max-bytes-20260506.json`;
      - `/home/steve/llm-optimizations/data/qwen36-fp8-pp2-postreboot-validation-20260506.json`;
      - `/home/steve/llm-optimizations/patches/llama-cpp-meta-allreduce-max-bytes-20260506.patch`.
+66. 2026-05-06 current-stack allreduce + GET_ROWS recheck:
+   - rechecked the existing off-by-default `GGML_META_FUSE_ALLREDUCE_GET_ROWS=1` hook after the Q8 cache, fused MMVQ2, fused MMVQ2+SwiGLU, RMS_NORM+MUL, event-barrier, and sync-after-2 stack was in place;
+   - decode-only A/B:
+     - gate off, `p0/n512/r3`: `48.628094 tok/s`;
+     - gate on, `p0/n512/r3`: `49.043584 tok/s`;
+   - full `512/512/r5` A/B:
+     - gate off: prompt `196.860926 tok/s`, decode `48.827917 tok/s`, stddev `0.072730`;
+     - gate on: prompt `197.252755 tok/s`, decode `49.403656 tok/s`, stddev `0.361676`;
+     - computed total for the submitted run: `79.016858 tok/s`;
+   - correctness:
+     - `llama-completion -no-cnv`, greedy decode, same prompt and seed;
+     - baseline and GET_ROWS stdout SHA256 both `2039492ece1be609e945c074396527ae6e0bcaddd2cf82cce6fd847355711214`;
+     - same Q4_0 weights, same f16 KV, no speculative decoding, no sampling change, no power changes;
+   - LocalMaxxing:
+     - accepted ID `cmoultsa900h0ld011f0r2hcs`;
+   - decision:
+     - keep `GGML_META_FUSE_ALLREDUCE_GET_ROWS=1` in the current TP3 best recipe;
+     - this is a narrow final-logits win, not the larger low-level projection epilogue we still need for a step-change;
+     - next Q4_0 work remains projection GEMV plus allreduce/residual epilogue or same-activation multi-GEMV fusion.
 
 ## Success Criteria
 
@@ -1347,7 +1366,7 @@ Goal: improve quality-preserving Q4_0 performance without power-limit changes.
 - Static FP8 current best: `vrfai/Qwen3.6-27B-FP8` on four B70s with patched vLLM/XPU FlashAttention2 plus n-gram speculative decode reaches `49.581893 tok/s` on 512 prompt / 512 output. This is ahead of the Q4_0 TP3 validation while preserving more fidelity than INT4 paths.
 - Static FP8 32k-context status: TP4 with patched vLLM/XPU FlashAttention2 succeeds at `max_model_len=32768` and reports `1,133,163` GPU KV-cache tokens with `42.996276 tok/s` at 2048 prompt / 256 output. TP2/PP2 also fits but is slower (`26.361533 tok/s`) and reports slightly less 32k KV capacity.
 - Current dual-card milestone reached: Q4_0 GGUF single session `42.106013 tok/s` on two B70s for 512 prompt / 512 output with the current fused stack, quality preserving, software-only.
-- Current improved multi-card milestone: Q4_0 GGUF single session `49.366188 tok/s` on three B70s for 512 prompt / 512 output with Q8 activation cache, fused MMVQ2, fused MMVQ2+SwiGLU, fused RMS_NORM+scale-MUL, single-kernel allreduce, fused allreduce+ADD, `GGML_SYCL_COMM_SYNC_AFTER=2`, and `-ub 128`. This is quality preserving and software-only.
+- Current improved multi-card milestone: Q4_0 GGUF single session `49.403656 tok/s` on three B70s for 512 prompt / 512 output with Q8 activation cache, fused MMVQ2, fused MMVQ2+SwiGLU, fused RMS_NORM+scale-MUL, fused allreduce+GET_ROWS, single-kernel allreduce, fused allreduce+ADD, `GGML_SYCL_COMM_SYNC_AFTER=2`, and `-ub 128`. This is quality preserving and software-only.
 - Current four-card Q4_0 status: assist split `1/1/1/0.05` reaches `39.204149 tok/s`, improving the equal-split four-card result by `12.24%` but still trailing the best three-card result, so quad Q4_0 remains a kernel/scheduling investigation rather than the production path. The RMS_NORM+MUL rerun of that assist split failed with Level Zero OOM during `MUL_MAT`.
 - Dual-card success: Q4_0 GGUF single session `>=48 tok/s` first, then `>=52 tok/s`, without switching away from Q4_0.
 - Four-card success: Q4_0 GGUF single session must exceed dual-card by a meaningful margin before treating quad tensor split as viable.

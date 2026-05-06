@@ -1,7 +1,7 @@
 {
   "date": "2026-05-06",
   "model": {
-    "hfId": "z-lab/Qwen3.6-27B-DFlash",
+    "hfId": "unsloth/Qwen3.6-27B",
     "localPath": "/home/steve/models/qwen3.6-27b-q4_0-gguf/Qwen3.6-27B-Q4_0.gguf",
     "quantization": "Q4_0"
   },
@@ -90,7 +90,60 @@
       "jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-k617023-postreboot-reshapeadd-triple213-p512n512-r3-20260505T233641Z.jsonl",
       "log": "/home/steve/bench-results/qwen36-q4_0-gguf/sycl-k617023-postreboot-reshapeadd-triple213-p512n512-r3-20260505T233641Z.log",
       "localmaxxingId": "cmot9sgsi000lib042rqd6c62"
+    },
+    {
+      "name": "current-stack-getrows-off-decode-only",
+      "promptTokens": 0,
+      "outputTokens": 512,
+      "repetitions": 3,
+      "tokSOut": 48.628094,
+      "jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/next-fusion-probes-20260506/getrows-off-tp3-rmsmul-p0n512-r3-20260506T213804Z.jsonl",
+      "log": "/home/steve/bench-results/qwen36-q4_0-gguf/next-fusion-probes-20260506/getrows-off-tp3-rmsmul-p0n512-r3-20260506T213804Z.log"
+    },
+    {
+      "name": "current-stack-getrows-on-decode-only",
+      "promptTokens": 0,
+      "outputTokens": 512,
+      "repetitions": 3,
+      "tokSOut": 49.043584,
+      "jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/next-fusion-probes-20260506/getrows-on-tp3-rmsmul-p0n512-r3-20260506T213933Z.jsonl",
+      "log": "/home/steve/bench-results/qwen36-q4_0-gguf/next-fusion-probes-20260506/getrows-on-tp3-rmsmul-p0n512-r3-20260506T213933Z.log"
+    },
+    {
+      "name": "current-stack-getrows-on-full-validation-r5",
+      "promptTokens": 512,
+      "outputTokens": 512,
+      "repetitions": 5,
+      "tokSPrompt": 197.252755,
+      "tokSOut": 49.403656,
+      "tokSTotalComputed": 79.016858,
+      "stddevTokSOut": 0.361676,
+      "samplesTokSOut": [49.98, 49.3727, 49.4262, 49.2388, 49.0006],
+      "jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/next-fusion-probes-20260506/getrows-on-tp3-rmsmul-p512n512-r5-20260506T214555Z.jsonl",
+      "log": "/home/steve/bench-results/qwen36-q4_0-gguf/next-fusion-probes-20260506/getrows-on-tp3-rmsmul-p512n512-r5-20260506T214555Z.log",
+      "localmaxxingId": "cmoultsa900h0ld011f0r2hcs",
+      "localmaxxingResponse": "/home/steve/bench-results/localmaxxing-qwen36-q4-getrows-3x-min-20260506T220352Z.json"
+    },
+    {
+      "name": "current-stack-getrows-off-full-control-r5",
+      "promptTokens": 512,
+      "outputTokens": 512,
+      "repetitions": 5,
+      "tokSPrompt": 196.860926,
+      "tokSOut": 48.827917,
+      "stddevTokSOut": 0.07273,
+      "samplesTokSOut": [48.9259, 48.7428, 48.8062, 48.8759, 48.7888],
+      "jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/next-fusion-probes-20260506/getrows-off-tp3-rmsmul-p512n512-r5-20260506T214819Z.jsonl",
+      "log": "/home/steve/bench-results/qwen36-q4_0-gguf/next-fusion-probes-20260506/getrows-off-tp3-rmsmul-p512n512-r5-20260506T214819Z.log"
     }
   ],
-  "conclusion": "GET_ROWS fusion captures the remaining plain decode allreduce site, but it is neutral at best and should remain off by default. Continue toward lower-level row-parallel epilogues or fewer repeated small reductions."
+  "correctness": {
+    "method": "llama-completion -no-cnv greedy decode, same prompt and seed, current fused stack with GET_ROWS off vs on",
+    "baselineSha256": "2039492ece1be609e945c074396527ae6e0bcaddd2cf82cce6fd847355711214",
+    "getRowsSha256": "2039492ece1be609e945c074396527ae6e0bcaddd2cf82cce6fd847355711214",
+    "outputsIdentical": true,
+    "outputText": "333333333333333",
+    "artifactDir": "/home/steve/bench-results/qwen36-q4_0-gguf/correctness/getrows-20260506T220108Z-completion-nocnv2"
+  },
+  "conclusion": "GET_ROWS fusion was neutral on the early stack but is a small reproducible current-stack win. Keep GGML_META_FUSE_ALLREDUCE_GET_ROWS=1 in the TP3 best Q4_0 recipe, while continuing deeper work on projection GEMV plus allreduce/residual epilogues."
 }

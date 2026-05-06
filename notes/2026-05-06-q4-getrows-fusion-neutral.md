@@ -51,7 +51,7 @@ Artifacts:
 - `/home/steve/bench-results/qwen36-q4_0-gguf/sycl-k617023-getrows-fuse-probe-triple213-p0n1-20260506T000738Z.log`
 - `/home/steve/bench-results/qwen36-q4_0-gguf/sycl-k617023-getrows-fuse-probe-triple213-p0n1-20260506T000738Z.jsonl`
 
-## Timing results
+## Timing results, early stack
 
 Short screen, gate on:
 
@@ -80,10 +80,65 @@ Reference high-water mark before this patch:
 
 - post-reboot reshape-through-ADD 3x control: `45.624065 tok/s` decode, computed total `68.259384 tok/s`.
 
+## Current-stack recheck
+
+After the later Q8 cache, fused MMVQ2, fused MMVQ2+SwiGLU, RMS_NORM+MUL, event-barrier, and sync-after-2 stack was in place, the same GET_ROWS hook became measurable.
+
+Configuration:
+
+```bash
+GGML_SYCL_DISABLE_DNN=1 \
+GGML_SYCL_Q8_CACHE=1 \
+GGML_SYCL_ASYNC_CPY_TENSOR=0 \
+GGML_SYCL_ASYNC_PEER_COPY=1 \
+GGML_SYCL_COMM_ALLREDUCE=1 \
+GGML_SYCL_COMM_SINGLE_KERNEL=1 \
+GGML_SYCL_COMM_EVENT_BARRIER=1 \
+GGML_SYCL_COMM_SYNC_AFTER=2 \
+GGML_META_FUSE_ALLREDUCE_ADD=1 \
+GGML_SYCL_FUSE_MMVQ2=1 \
+GGML_SYCL_FUSE_MMVQ2_SWIGLU=1 \
+GGML_SYCL_FUSE_RMS_NORM_MUL=1 \
+GGML_META_FUSE_ALLREDUCE_GET_ROWS=1 \
+llama-bench -m Qwen3.6-27B-Q4_0.gguf \
+  -dev SYCL2/SYCL1/SYCL3 -ngl 99 -sm tensor -ts 1/1/1 \
+  -fa 1 -ub 128 -ctk f16 -ctv f16 -t 8 -p 512 -n 512 -r 5 --poll 50
+```
+
+Five-repeat full validation, gate on:
+
+- prompt: `197.252755 tok/s`;
+- decode: `49.403656 tok/s`;
+- computed total submitted to LocalMaxxing: `79.016858 tok/s`;
+- JSONL: `/home/steve/bench-results/qwen36-q4_0-gguf/next-fusion-probes-20260506/getrows-on-tp3-rmsmul-p512n512-r5-20260506T214555Z.jsonl`.
+
+Five-repeat same-build control, gate off:
+
+- prompt: `196.860926 tok/s`;
+- decode: `48.827917 tok/s`;
+- JSONL: `/home/steve/bench-results/qwen36-q4_0-gguf/next-fusion-probes-20260506/getrows-off-tp3-rmsmul-p512n512-r5-20260506T214819Z.jsonl`.
+
+Short decode-only A/B:
+
+- off, `p0/n512/r3`: `48.628094 tok/s`;
+- on, `p0/n512/r3`: `49.043584 tok/s`.
+
+Correctness:
+
+- `llama-completion`, `-no-cnv`, greedy decode, same prompt and seed;
+- baseline and GET_ROWS stdout SHA256 both `2039492ece1be609e945c074396527ae6e0bcaddd2cf82cce6fd847355711214`;
+- stdout was identical (`333333333333333`) for this short deterministic probe;
+- this is quality-preserving for the tested path: same Q4_0 weights, same f16 KV, no speculative decoding, no sampling change, no power changes.
+
+LocalMaxxing:
+
+- ID: `cmoultsa900h0ld011f0r2hcs`;
+- accepted on 2026-05-06 with `49.403656 tok/s` output.
+
 ## Interpretation
 
-The fusion is correct enough to capture the target site and run full validation, but it is neutral at best. The full run with the gate enabled was only `+0.034604 tok/s` over the same-build gate-off control and still below the current best `45.624065 tok/s` result.
+The early isolated test was neutral, but after the later fused decode stack landed, GET_ROWS became a small reproducible win: about `+0.576 tok/s` over the same-build five-repeat gate-off control and a new Q4_0 GGUF high-water mark at `49.403656 tok/s`.
 
-Do not enable `GGML_META_FUSE_ALLREDUCE_GET_ROWS` for the default fast Q4_0 recipe yet. The useful lesson is that the remaining standalone `GET_ROWS` handoff is not a meaningful performance lever by itself; next Q4_0 work should target a lower-level fused row-parallel output epilogue or reduce the count/cost of the repeated 20 KiB reductions.
+Keep `GGML_META_FUSE_ALLREDUCE_GET_ROWS=1` in the current best TP3 Q4_0 recipe. It is still a narrow final-logits optimization, not the broader lower-level projection epilogue we need for a large jump. Next Q4_0 work should still target fused row-parallel projection plus allreduce/residual epilogues or same-activation multi-GEMV groups.
 
-LocalMaxxing: not submitted. This is a neutral/negative implementation learning, not a leaderboard-quality improvement.
+The result is leaderboard-worthy because it was validated against a same-build control and does not change quality-affecting settings.

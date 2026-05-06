@@ -6,7 +6,7 @@ Reproducibility notes, benchmark payloads, and local patches from the Intel Arc 
 
 - Host: Ubuntu 24.04.4 LTS, kernel 6.17.0-23-generic.
 - GPUs: 4x Intel Arc Pro B70 / BMG-G31, 32 GB VRAM each.
-- Original quality-preserving target remains Qwen3.6 27B `Q4_0` GGUF on llama.cpp. Current best quality-preserving GGUF result is 49.366 tok/s on three B70s at 512 prompt / 512 output, using SYCL tensor split, `-ub 128`, Q8 activation cache, fused MMVQ2, fused MMVQ2+SwiGLU, fused RMS_NORM+scale-MUL, single-kernel allreduce, fused allreduce+ADD, and `GGML_SYCL_COMM_SYNC_AFTER=2`.
+- Original quality-preserving target remains Qwen3.6 27B `Q4_0` GGUF on llama.cpp. Current best quality-preserving GGUF result is 49.404 tok/s on three B70s at 512 prompt / 512 output, using SYCL tensor split, `-ub 128`, Q8 activation cache, fused MMVQ2, fused MMVQ2+SwiGLU, fused RMS_NORM+scale-MUL, fused allreduce+GET_ROWS, single-kernel allreduce, fused allreduce+ADD, and `GGML_SYCL_COMM_SYNC_AFTER=2`.
 - Current four-card Q4_0 result is 39.204 tok/s with an assist split (`-ts 1/1/1/0.05`), which improves equal 4x but still trails 3x. Equal four-card split remains a negative scaling diagnostic at 34.929 tok/s.
 - Best static FP8 result so far: vLLM/XPU, `vrfai/Qwen3.6-27B-FP8`, local XPU patches, 4x B70 TP4, CPU n-gram speculative decode, 49.582 output tok/s at 512 prompt / 512 output. This preserves target-model quality through verified speculative decoding and is ahead of the current Q4_0 TP3 validation.
 - Static FP8 TP4 is also the preferred 32k-context Qwen3.6 27B layout: TP4/PP1 at `max_model_len=32768` reaches 42.996 tok/s for 2048 prompt / 256 output and reports 1,133,163 GPU KV-cache tokens. TP2/PP2 fits but is much slower for batch-1 decode at 26.362 tok/s.
@@ -32,12 +32,14 @@ Reproducibility notes, benchmark payloads, and local patches from the Intel Arc 
 - `notes/2026-05-06-q4-active-device-row-split.md`: focused active-device row-split patch and row-split safety failure.
 - `notes/2026-05-06-q4-fused-mmvq2-swiglu.md`: opt-in Q4_0 gate/up matvec plus SwiGLU fusion and validation.
 - `notes/2026-05-06-q4-rmsnormmul.md`: opt-in RMS_NORM+scale-MUL fusion and current best Q4_0 GGUF validation.
+- `notes/2026-05-06-q4-getrows-fusion-neutral.md`: opt-in allreduce+GET_ROWS fusion; initially neutral, later a small current-stack win.
 - `notes/2026-05-06-q4-allreduce-max-bytes.md`: opt-in larger fused allreduce ceiling probe; useful diagnostic but not a speed win.
 - `notes/2026-05-06-fp8-pp2-postreboot-validation.md`: post-reboot FP8 PP2xTP2 XCCL/load/speculative plumbing validation.
 - `data/qwen36-fp8-32k-tp4-vs-pp2-20260506.json`: post-reboot Q4 sanity plus FP8 32k-context TP4 vs TP2/PP2 validation.
 - `data/q4-active-device-row-split-20260506.json`: structured active-device row-split patch validation and negative row-split smoke.
 - `data/qwen36-q4-fused-mmvq2-swiglu-20260506.json`: structured fused MMVQ2+SwiGLU correctness, performance, and LocalMaxxing record.
 - `data/qwen36-q4-rmsnormmul-20260506.json`: structured RMS_NORM+scale-MUL correctness, performance, failed 4x diagnostic, and LocalMaxxing record.
+- `data/qwen36-q4-getrows-fusion-20260506.json`: structured allreduce+GET_ROWS A/B data, correctness check, and LocalMaxxing record.
 - `data/qwen36-q4-allreduce-max-bytes-20260506.json`: structured Q4_0 larger allreduce-fusion ceiling probe.
 - `data/qwen36-fp8-pp2-postreboot-validation-20260506.json`: structured FP8 PP2xTP2 post-reboot validation data.
 - `scripts/bench-qwen36-q4_0-gguf-vulkan-matrix.sh`: Q4_0 GGUF Vulkan benchmark sweep harness.
