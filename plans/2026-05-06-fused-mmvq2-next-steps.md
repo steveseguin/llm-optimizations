@@ -38,6 +38,7 @@
 - FP8 PP2 x TP2 with `ngram_gpu` now gets past the missing `token_ids_gpu_tensor` crash on PP0, but every draft trims from four tokens to zero valid tokens and the engine stalls on shared-memory broadcast.
 - FP8 TP4 post-patch sweep confirms no deterministic TP4 regression: depth-4 n-gram reran at `48.198021 tok/s`, depth 5 at `48.298516 tok/s`, depth 3 at `43.023391 tok/s`, and depth 6 at `41.724557 tok/s`. The earlier submitted depth-4 `49.581893 tok/s` run remains the best row.
 - FP8 TP4 `ngram_gpu` is not worth pursuing for this prompt shape yet: it runs without the PP2 buffer crash but only reaches `43.450599 tok/s` because draft acceptance stays around `3.5-4.9%` in the measured windows.
+- FP8 TP4 longer-context 2048/512 run is stable at `43.688466 tok/s` output and `218.442329 tok/s` total with `MAX_MODEL_LEN=4096`; submitted to LocalMaxxing as `cmottw16x002wqy01jvbluobl`.
 - Multi-GPU PPL remains a noisy oracle and should not be used for pass/fail quality on these tensor-split paths.
 
 ## Correctness findings
