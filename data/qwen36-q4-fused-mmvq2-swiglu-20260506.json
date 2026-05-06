@@ -1,0 +1,113 @@
+{
+  "date": "2026-05-06",
+  "model": {
+    "hfId": "unsloth/Qwen3.6-27B",
+    "localFile": "/home/steve/models/qwen3.6-27b-q4_0-gguf/Qwen3.6-27B-Q4_0.gguf",
+    "quantization": "Q4_0",
+    "params": 26895998464
+  },
+  "hardware": {
+    "gpu": "Intel Arc Pro B70 32GB",
+    "gpuCountAvailable": 4,
+    "cpu": "AMD EPYC 9015 8-Core Processor",
+    "ramGb": 16,
+    "os": "Ubuntu 24.04.4 LTS"
+  },
+  "source": {
+    "llamaCppTree": "/home/steve/src/llama.cpp-q4-b70",
+    "buildDir": "/home/steve/src/llama.cpp-q4-b70/build-sycl-2026-bmg-g31",
+    "buildCommit": "db44417",
+    "patchArtifact": "patches/llama-cpp-sycl-fused-mmvq2-swiglu-current-20260506.patch.gz.b64",
+    "envGate": "GGML_SYCL_FUSE_MMVQ2_SWIGLU=1"
+  },
+  "implementation": {
+    "summary": "Added an opt-in SYCL Q4_0 fused two-matvec plus split SwiGLU path for FFN gate/up projections. The path directly writes silu(gate) * up to the GLU output tensor and falls back to the existing fused MMVQ2 path when graph shape or tensor layout checks fail.",
+    "filesTouched": [
+      "ggml/src/ggml-sycl/mmvq.hpp",
+      "ggml/src/ggml-sycl/mmvq.cpp",
+      "ggml/src/ggml-sycl/ggml-sycl.cpp"
+    ],
+    "safetyChecks": [
+      "Q4_0 gate/up weights only",
+      "same F32 activation input",
+      "split GGML_OP_GLU with GGML_GLU_OP_SWIGLU",
+      "contiguous non-split SYCL buffers",
+      "disabled when explicit op or matmul stats are enabled"
+    ]
+  },
+  "correctness": {
+    "method": "llama-completion greedy decode, 8 generated tokens, same prompt and seed, baseline fused MMVQ2 vs fused MMVQ2+SwiGLU",
+    "baselineSha256": "a7514e8196ec963459785822b3fcf25b1743096a4bdd5ec746225a7c9a29be19",
+    "swigluSha256": "a7514e8196ec963459785822b3fcf25b1743096a4bdd5ec746225a7c9a29be19",
+    "stdoutBytes": 51,
+    "baselineOutput": "/home/steve/bench-results/qwen36-q4_0-gguf/fuse-swiglu-20260506/correctness-completion/baseline.txt",
+    "swigluOutput": "/home/steve/bench-results/qwen36-q4_0-gguf/fuse-swiglu-20260506/correctness-completion/swiglu.txt"
+  },
+  "results": [
+    {
+      "label": "single-b70-baseline-fused-mmvq2",
+      "gpus": 1,
+      "devices": "SYCL2",
+      "promptTokens": 512,
+      "outputTokens": 512,
+      "decodeTokS": 24.567164,
+      "prefillTokS": 504.266963,
+      "log": "/home/steve/bench-results/qwen36-q4_0-gguf/fuse-swiglu-20260506/single-sycl2-p512n512/baseline-20260506T192113Z.log",
+      "json": "/home/steve/bench-results/qwen36-q4_0-gguf/fuse-swiglu-20260506/single-sycl2-p512n512/baseline-20260506T192113Z.jsonl"
+    },
+    {
+      "label": "single-b70-fused-mmvq2-swiglu",
+      "gpus": 1,
+      "devices": "SYCL2",
+      "promptTokens": 512,
+      "outputTokens": 512,
+      "decodeTokS": 24.657839,
+      "prefillTokS": 521.304432,
+      "deltaVsBaselinePct": 0.369,
+      "log": "/home/steve/bench-results/qwen36-q4_0-gguf/fuse-swiglu-20260506/single-sycl2-p512n512/swiglu-20260506T192229Z.log",
+      "json": "/home/steve/bench-results/qwen36-q4_0-gguf/fuse-swiglu-20260506/single-sycl2-p512n512/swiglu-20260506T192229Z.jsonl"
+    },
+    {
+      "label": "tp3-baseline-fused-mmvq2-ub128",
+      "gpus": 3,
+      "devices": "SYCL2/SYCL1/SYCL3",
+      "splitMode": "tensor",
+      "tensorSplit": "1/1/1",
+      "promptTokens": 512,
+      "outputTokens": 512,
+      "ubatch": 128,
+      "decodeTokS": 45.74556,
+      "prefillTokS": 189.188394,
+      "log": "/home/steve/bench-results/qwen36-q4_0-gguf/fuse-swiglu-20260506/tensor3-smoke/baseline-p512n512-r1-ub128-20260506T193032Z.log",
+      "json": "/home/steve/bench-results/qwen36-q4_0-gguf/fuse-swiglu-20260506/tensor3-smoke/baseline-p512n512-r1-ub128-20260506T193032Z.jsonl"
+    },
+    {
+      "label": "tp3-fused-mmvq2-swiglu-ub128",
+      "gpus": 3,
+      "devices": "SYCL2/SYCL1/SYCL3",
+      "splitMode": "tensor",
+      "tensorSplit": "1/1/1",
+      "promptTokens": 512,
+      "outputTokens": 512,
+      "ubatch": 128,
+      "decodeTokS": 46.804859,
+      "decodeStddevTokS": 0.165474,
+      "prefillTokS": 191.41707,
+      "prefillStddevTokS": 3.552326,
+      "totalTokS": 75.217668,
+      "deltaVsUb128BaselinePct": 2.315,
+      "localMaxxingId": "cmougm58m00dpld012rbm9rbs",
+      "log": "/home/steve/bench-results/qwen36-q4_0-gguf/fuse-swiglu-20260506/tensor3-smoke/swiglu-p512n512-r2-ub128-20260506T193351Z.log",
+      "json": "/home/steve/bench-results/qwen36-q4_0-gguf/fuse-swiglu-20260506/tensor3-smoke/swiglu-p512n512-r2-ub128-20260506T193351Z.jsonl"
+    }
+  ],
+  "diagnostics": [
+    {
+      "label": "tp3-default-ub512-p512n512",
+      "outcome": "failed",
+      "reason": "GGML_ASSERT(buffer) failed while reserving meta compute buffers before graph execution",
+      "mitigation": "Use -ub 128 for the 512 prompt / 512 output tensor-split benchmark until the meta-buffer sizing path is fixed.",
+      "log": "/home/steve/bench-results/qwen36-q4_0-gguf/fuse-swiglu-20260506/tensor3-smoke/baseline-p512n512-r1-20260506T192835Z.log"
+    }
+  ]
+}
