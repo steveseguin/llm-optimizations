@@ -116,6 +116,36 @@
       "total_tokens_per_second": 83.44911304907096
     },
     {
+      "name": "tp4_ngram_gpu_depth4",
+      "speculative_config": {
+        "method": "ngram_gpu",
+        "num_speculative_tokens": 4,
+        "prompt_lookup_min": 2,
+        "prompt_lookup_max": 4
+      },
+      "json": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp4-pp1-in512-out512-bs1-20260506T084944Z.json",
+      "log": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp4-pp1-in512-out512-bs1-20260506T084944Z.log",
+      "json_sha256": "769ba01de94067254bcc842b781949af011ed8ef0f9800669b20ccd457f23f52",
+      "avg_latency_s": 11.783496966333283,
+      "latencies_s": [
+        12.583893279996119,
+        10.496804980008164,
+        12.269792638995568
+      ],
+      "output_tokens_per_second": 43.450598872545136,
+      "total_tokens_per_second": 86.90119774509027,
+      "acceptance_summary": {
+        "last_three_avg_draft_acceptance_pct": [
+          3.5,
+          4.9,
+          4.0
+        ],
+        "interpretation": "GPU n-gram drafts very quickly but accepts too few tokens to beat CPU n-gram."
+      },
+      "localmaxxing_submission": "not_submitted",
+      "localmaxxing_reason": "Valid negative tuning result, lower than existing submitted TP4 CPU ngram result."
+    },
+    {
       "name": "tp4_no_spec_smoke",
       "configuration_note": "512 prompt / 128 output smoke run to verify TP4/XCCL without speculative decoding.",
       "json": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp4-pp1-in512-out128-bs1-20260506T082913Z.json",
@@ -142,6 +172,6 @@
         "prompt_lookup_max": 4
       }
     },
-    "current_sweep_takeaway": "Depth 4 and depth 5 are the viable range for this prompt shape. Depth 3 underperforms and depth 6 acceptance collapses."
+    "current_sweep_takeaway": "Depth 4 and depth 5 CPU n-gram are the viable range for this prompt shape. Depth 3 underperforms, depth 6 acceptance collapses, and TP4 ngram_gpu is slower because acceptance remains very low."
   }
 }
