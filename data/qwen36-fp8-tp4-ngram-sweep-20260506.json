@@ -1,0 +1,147 @@
+{
+  "date_utc": "2026-05-06",
+  "title": "Qwen3.6 27B FP8 vLLM XPU TP4 n-gram sweep",
+  "hardware": {
+    "gpu_name": "Intel Arc Pro B70",
+    "gpu_count": 4,
+    "vram_gb_each": 32,
+    "os": "Ubuntu 24.04.4 LTS",
+    "kernel": "6.17.0-23-generic"
+  },
+  "model": {
+    "hf_id": "Qwen/Qwen3.6-27B",
+    "local_path": "/home/steve/models/qwen3.6-27b-fp8-vrfai",
+    "quantization": "FP8",
+    "vllm_quantization": "compressed-tensors"
+  },
+  "common_configuration": {
+    "engine": "vllm",
+    "engine_version": "0.20.1",
+    "backend": "xpu",
+    "tensor_parallel": 4,
+    "pipeline_parallel": 1,
+    "input_tokens": 512,
+    "output_tokens": 512,
+    "batch_size": 1,
+    "max_model_len": 1024,
+    "gpu_mem_util": 0.8,
+    "kv_cache_dtype": "auto",
+    "oneapi_device_selector": "level_zero:0,1,2,3",
+    "ccl_atl_transport": "ofi",
+    "ld_library_path_prefix": "/home/steve/.venvs/vllm-xpu-managed/lib"
+  },
+  "runs": [
+    {
+      "name": "tp4_ngram_depth4_post_patch_confirmation",
+      "speculative_config": {
+        "method": "ngram",
+        "num_speculative_tokens": 4,
+        "prompt_lookup_min": 2,
+        "prompt_lookup_max": 4
+      },
+      "json": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp4-pp1-in512-out512-bs1-20260506T083428Z.json",
+      "log": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp4-pp1-in512-out512-bs1-20260506T083428Z.log",
+      "json_sha256": "2b2cc220b0ee5bcb70fa811a4a9a8f4d252fc44e40a850f3b38c1981863015fb",
+      "avg_latency_s": 10.622842769662384,
+      "latencies_s": [
+        9.151958834991092,
+        11.809891447002883,
+        10.906678026993177
+      ],
+      "output_tokens_per_second": 48.198021104314286,
+      "total_tokens_per_second": 96.39604220862857,
+      "localmaxxing_submission": "not_submitted",
+      "localmaxxing_reason": "Valid but lower than existing submitted TP4 ngram result."
+    },
+    {
+      "name": "tp4_ngram_depth3",
+      "speculative_config": {
+        "method": "ngram",
+        "num_speculative_tokens": 3,
+        "prompt_lookup_min": 2,
+        "prompt_lookup_max": 4
+      },
+      "json": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp4-pp1-in512-out512-bs1-20260506T083723Z.json",
+      "log": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp4-pp1-in512-out512-bs1-20260506T083723Z.log",
+      "json_sha256": "293c141caf93ac054fe1556eccd9dcb29c6865472d421b0dea054773137eeed1",
+      "avg_latency_s": 11.900503039335794,
+      "latencies_s": [
+        11.386196944004041,
+        12.490468208998209,
+        11.82484396500513
+      ],
+      "output_tokens_per_second": 43.02339139006484,
+      "total_tokens_per_second": 86.04678278012967
+    },
+    {
+      "name": "tp4_ngram_depth5",
+      "speculative_config": {
+        "method": "ngram",
+        "num_speculative_tokens": 5,
+        "prompt_lookup_min": 2,
+        "prompt_lookup_max": 5
+      },
+      "json": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp4-pp1-in512-out512-bs1-20260506T084006Z.json",
+      "log": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp4-pp1-in512-out512-bs1-20260506T084006Z.log",
+      "json_sha256": "f00b1fcd6bfd89c657805e67a4556612b614008223366dbd24875b246e204dfd",
+      "avg_latency_s": 10.600739751331275,
+      "latencies_s": [
+        8.549263538996456,
+        11.374052708997624,
+        11.878903005999746
+      ],
+      "output_tokens_per_second": 48.298516142300485,
+      "total_tokens_per_second": 96.59703228460097,
+      "localmaxxing_submission": "not_submitted",
+      "localmaxxing_reason": "Valid but lower than existing submitted TP4 ngram result."
+    },
+    {
+      "name": "tp4_ngram_depth6",
+      "speculative_config": {
+        "method": "ngram",
+        "num_speculative_tokens": 6,
+        "prompt_lookup_min": 2,
+        "prompt_lookup_max": 6
+      },
+      "json": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp4-pp1-in512-out512-bs1-20260506T084247Z.json",
+      "log": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp4-pp1-in512-out512-bs1-20260506T084247Z.log",
+      "json_sha256": "2a35fd8118d2ce16e346adee1ea95ffbacc727e10a19eaec9a38f26f0d97c7e4",
+      "avg_latency_s": 12.270951272997385,
+      "latencies_s": [
+        12.83560422899609,
+        11.984035802001017,
+        11.993213787995046
+      ],
+      "output_tokens_per_second": 41.72455652453548,
+      "total_tokens_per_second": 83.44911304907096
+    },
+    {
+      "name": "tp4_no_spec_smoke",
+      "configuration_note": "512 prompt / 128 output smoke run to verify TP4/XCCL without speculative decoding.",
+      "json": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp4-pp1-in512-out128-bs1-20260506T082913Z.json",
+      "log": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp4-pp1-in512-out128-bs1-20260506T082913Z.log",
+      "avg_latency_s": 12.452889760999824,
+      "output_tokens_per_second": 10.278738706968452,
+      "total_tokens_per_second": 51.39369353484226
+    }
+  ],
+  "transient_issue": {
+    "name": "tp4_ngram_depth4_first_post_patch_attempt",
+    "log": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp4-pp1-in512-out512-bs1-20260506T082054Z.log",
+    "result": "killed_after_stall",
+    "finding": "The run stopped before all four ranks emitted oneCCL topology warnings. Later ngram and no-spec runs completed, so this appears to be transient CCL initialization rather than a deterministic patch regression."
+  },
+  "conclusion": {
+    "best_submitted_run": {
+      "output_tokens_per_second": 49.581893,
+      "localmaxxing_id": "cmotql1v60013qy01016jcs7r",
+      "speculative_config": {
+        "method": "ngram",
+        "num_speculative_tokens": 4,
+        "prompt_lookup_min": 2,
+        "prompt_lookup_max": 4
+      }
+    },
+    "current_sweep_takeaway": "Depth 4 and depth 5 are the viable range for this prompt shape. Depth 3 underperforms and depth 6 acceptance collapses."
+  }
+}
