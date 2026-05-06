@@ -91,6 +91,15 @@ The accurate context/notes row for the 3x quality-cleared mode `1` result was ac
 
 The earlier minimal row `cmotmnnm6000aqu01uzb9wk12` also exists but lacks context and notes. The full `engineFlags` payload still returns `500 Internal Server Error`; the next LocalMaxxing retry should isolate which `engineFlags` key causes the server error.
 
+Update: the mode `2` result was also accepted without `engineFlags`:
+
+- ID: `cmotnyi25001jqu01fccla8cf`
+- Metrics: `46.194319 tok/s` output, `66.4 tok/s` total
+- Context fields: 512 prompt, 512 output, 512 context length
+- Notes include the key launch flags.
+
+Submitting the same mode `2` result with `engineFlags: { commandSnippet: ... }` returned `500 Internal Server Error`, so the current LocalMaxxing API issue is triggered by the `engineFlags` object path even when only `commandSnippet` is present.
+
 ## Next work
 
 The 4x path needs a different collective, not just a narrower completion wait. Most promising next experiments:
