@@ -1,0 +1,46 @@
+{
+  "submittedAtUtc": "2026-05-06T05:39:20.527Z",
+  "localmaxxingId": "cmotmnnm6000aqu01uzb9wk12",
+  "hfId": "unsloth/Qwen3.6-27B",
+  "quantization": "Q4_0",
+  "engineName": "llama.cpp",
+  "hardware": {
+    "hwClass": "DISCRETE_GPU",
+    "gpuName": "Intel Arc Pro B70",
+    "gpuCount": 3,
+    "vramGb": 32,
+    "os": "Ubuntu 24.04.4 LTS"
+  },
+  "metrics": {
+    "tokSOut": 45.95413,
+    "tokSTotal": 66.202667,
+    "promptTokensMeasured": 512,
+    "outputTokensMeasured": 512,
+    "contextLengthMeasured": 512
+  },
+  "localmaxxingRecordedFields": {
+    "promptTokens": 0,
+    "outputTokens": 0,
+    "contextLength": 2048,
+    "notes": null,
+    "engineFlags": {
+      "commandSnippet": "",
+      "tensorParallel": null,
+      "gpuLayers": null,
+      "splitMode": null,
+      "kvCacheDtype": null,
+      "flashAttn": null,
+      "extraFlags": null
+    }
+  },
+  "apiNotes": [
+    "Initial POST failed with 400 because LocalMaxxing rejects GGUF distribution repositories and requested base hfId unsloth/Qwen3.6-27B.",
+    "Full detailed payload with the corrected hfId returned 500 Internal Server Error.",
+    "A compact required-field payload succeeded and created the listed benchmark ID.",
+    "Need retry a compact-but-detailed payload after the 5 minute POST rate window, or ask LocalMaxxing for an edit endpoint, because the accepted row currently lacks flags/context/notes."
+  ],
+  "localPayloads": {
+    "detailedPayload": "/home/steve/llm-optimization-artifacts/data/localmaxxing-pending-qwen36-q4-3x-20260506.json",
+    "submitResponse": "/tmp/localmaxxing-submit-qwen36-q4-3x-minrequired2-20260506.json"
+  }
+}
