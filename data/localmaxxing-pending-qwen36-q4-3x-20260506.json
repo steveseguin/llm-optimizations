@@ -1,0 +1,35 @@
+{
+  "hfId": "unsloth/Qwen3.6-27B-GGUF",
+  "modelRevision": "main",
+  "hardware": {
+    "hwClass": "DISCRETE_GPU",
+    "gpuName": "Intel Arc Pro B70 32GB",
+    "gpuCount": 3,
+    "vramGb": 32,
+    "cpu": "AMD EPYC 9015 8-Core Processor",
+    "ramGb": 16,
+    "os": "Ubuntu 24.04.4 LTS"
+  },
+  "engineName": "llama.cpp",
+  "engineVersion": "db44417-local-sycl-b70",
+  "quantization": "Q4_0",
+  "promptTokens": 512,
+  "outputTokens": 512,
+  "contextLength": 512,
+  "batchSize": 1,
+  "tokSOut": 45.95413,
+  "tokSTotal": 66.202667,
+  "notes": "Quality-cleared Qwen3.6-27B Q4_0 GGUF on 3x Arc Pro B70. Full-logit deterministic repeat passed for 16 greedy decode steps. Key correctness fix: GGML_SYCL_ASYNC_CPY_TENSOR=0 and custom single-kernel allreduce with GGML_SYCL_COMM_SYNC_AFTER=1. No power-limit/overclock changes.",
+  "engineFlags": {
+    "commandSnippet": "ONEAPI_DEVICE_SELECTOR=level_zero:2,1,3 GGML_SYCL_DISABLE_DNN=1 GGML_SYCL_Q8_CACHE=1 GGML_SYCL_ASYNC_CPY_TENSOR=0 GGML_SYCL_ASYNC_PEER_COPY=1 GGML_SYCL_COMM_ALLREDUCE=1 GGML_SYCL_COMM_SINGLE_KERNEL=1 GGML_SYCL_COMM_EVENT_BARRIER=1 GGML_SYCL_COMM_SYNC_AFTER=1 GGML_META_FUSE_ALLREDUCE_ADD=1 GGML_SYCL_FUSE_MMVQ2=1 llama-bench -m Qwen3.6-27B-Q4_0.gguf -dev SYCL0/SYCL1/SYCL2 -ngl 99 -sm tensor -ts 1/1/1 -fa 1 -ub 32 -ctk f16 -ctv f16 -t 8 -p 512 -n 512 -r 3 --poll 50 -o jsonl",
+    "tensorParallel": 3,
+    "gpuLayers": 99,
+    "splitMode": "tensor",
+    "kvCacheDtype": "f16",
+    "flashAttn": true,
+    "contextLength": 512,
+    "attentionBackend": "llama.cpp SYCL flash_attn",
+    "specDecoding": false,
+    "extraFlags": "Level Zero SYCL. DISABLE_DNN=1,Q8_CACHE=1,ASYNC_CPY_TENSOR=0,ASYNC_PEER_COPY=1,COMM_ALLREDUCE=1,COMM_SINGLE_KERNEL=1,COMM_SYNC_AFTER=1,META_FUSE_ALLREDUCE_ADD=1,FUSE_MMVQ2=1."
+  }
+}
