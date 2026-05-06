@@ -7,7 +7,7 @@
 - Engine: llama.cpp SYCL/Level Zero build with Q8 cache, scheduler async tensor copy disabled, peer async copy enabled, single-kernel allreduce, event barrier, post-allreduce sync, meta fused allreduce-add, and gated adjacent Q4_0 MMVQ2 fusion.
 - Result: `45.954130 tok/s` decode, `118.362712 tok/s` prompt, `66.202667 tok/s` computed total at 512 prompt / 512 generate / 3 repeats.
 - Quality: full-logit deterministic repeat passed for 16 greedy decode steps.
-- LocalMaxxing: compact required-field submission succeeded after the API recovered. ID `cmotmnnm6000aqu01uzb9wk12`. Detailed payload with notes/flags returned `500 Internal Server Error`, so the public row currently lacks full launch metadata.
+- LocalMaxxing: context/notes submission succeeded after the API recovered. ID `cmotnobsj0017qu01icxnv6ek`. Detailed payload with structured `engineFlags` returned `500 Internal Server Error`, so the public row currently lacks structured launch flags.
 - Benchmark files:
   - `/home/steve/bench-results/qwen36-q4_0-gguf/sycl-quality-cleared-singlekernel-syncafter-fusemmvq2-triple213-p512n512-r3-20260506T051928Z.jsonl`
   - `/home/steve/bench-results/qwen36-q4_0-gguf/sycl-quality-cleared-singlekernel-syncafter-fusemmvq2-triple213-p512n512-r3-20260506T051928Z.log`
@@ -29,6 +29,7 @@
 - The best 2x path is `40.933579 tok/s` decode and passed a 16-step full-logit repeat.
 - The best 3x path is `45.954130 tok/s` decode and passed a 16-step full-logit repeat.
 - 4x with sync-after is repeatable in a 4-step full-logit smoke test but only reaches `34.920977 tok/s`, so it is not a throughput win.
+- `GGML_SYCL_COMM_SYNC_AFTER=2` (`reduce.wait()`) is quality-cleared on 3x and improves decode slightly to `46.194319 tok/s`; it does not improve 4x, which remains `34.929313 tok/s`.
 - Multi-GPU PPL remains a noisy oracle and should not be used for pass/fail quality on these tensor-split paths.
 
 ## Correctness findings
@@ -42,11 +43,11 @@
 
 ## Next steps
 
-1. Retry a compact-but-detailed LocalMaxxing payload after the five-minute POST window, or ask for an edit endpoint, so the public row gets command flags/context/notes.
-2. Clean up `GGML_SYCL_COMM_SYNC_AFTER=1` from a diagnostic wait-all-streams into a narrower correctness fence, ideally only on peer destinations that consume root-written allreduce output.
-3. Gate or rewrite the generic custom allreduce path so it cannot silently use the in-place race.
-4. Keep `GGML_SYCL_ASYNC_CPY_TENSOR=0` in all recommended tensor-split recipes until the scheduler copy API can propagate a correct destination event.
-5. Port the exact Q4_0/Q8_1 ESIMD fused2 prototype into llama.cpp behind a second opt-in gate, then re-run single, 2x, 3x, and 4x benchmarks.
-6. Investigate deeper FFN fusion around `ffn_gate + ffn_up + swiglu`, because it may remove another graph node and reduce memory traffic.
-7. Continue 4x work by reducing collective overhead; current 4x is repeatable but slower than 3x.
+1. Retry LocalMaxxing with a minimal `engineFlags` object after the five-minute POST window to isolate which structured flag causes the API 500.
+2. Promote `GGML_SYCL_COMM_SYNC_AFTER=2` as the preferred 3x mode after one longer correctness run, while keeping mode `1` as the conservative fallback.
+3. Replace the 4x single-root allreduce with a pairwise/tree collective; root-order sweep showed only `34.28` to `35.07 tok/s`, so root choice is not the main cause.
+4. Gate or rewrite the generic custom allreduce path so it cannot silently use the in-place race.
+5. Keep `GGML_SYCL_ASYNC_CPY_TENSOR=0` in all recommended tensor-split recipes until the scheduler copy API can propagate a correct destination event.
+6. Port the exact Q4_0/Q8_1 ESIMD fused2 prototype into llama.cpp behind a second opt-in gate, then re-run single, 2x, 3x, and 4x benchmarks.
+7. Investigate deeper FFN fusion around `ffn_gate + ffn_up + swiglu`, because it may remove another graph node and reduce memory traffic.
 8. Keep FP8/vLLM TP4 and Q4_0 GGUF tracks separate in notes and submissions, because they trade different quantization and runtime behavior.
