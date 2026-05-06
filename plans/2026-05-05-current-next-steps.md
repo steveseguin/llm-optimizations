@@ -8,7 +8,7 @@ This note supersedes the stale portions of `plans/q4_0-gguf-b70-optimization-pla
 
 - Qwen3.6 27B Q4_0 GGUF, llama.cpp/SYCL, 3x B70 selector `2,1,3`: reshape-through-ADD fusion validation `44.812806 tok/s` decode, quality-preserving, software-only.
 - Qwen3.6 27B static FP8, `vrfai/Qwen3.6-27B-FP8`, patched vLLM/XPU TP4 + FlashAttention2 + n-gram speculative decode: `47.674832 tok/s` decode, `95.349664 tok/s` total.
-- Current FP8 best LocalMaxxing id: `cmos3pnqo000kkz04o4aiup22`.
+- Current FP8 best LocalMaxxing id: `cmos3pnqo0004kz04o4aiup22`.
 
 ## Recent Negative Results
 
@@ -80,6 +80,15 @@ This note supersedes the stale portions of `plans/q4_0-gguf-b70-optimization-pla
   - clean 4x Q4_0 reshape-through-ADD, `p512/n512/r1`: prompt `102.210613 tok/s`, decode `34.375523 tok/s`, computed total `51.448022 tok/s`;
   - LocalMaxxing diagnostic negative-scaling result: `cmota1fpx0001l404wepbjtb7`;
   - immediate 3x health after clean 4x run remained good at `45.043267 tok/s` for `p512/n128`.
+- Q4_0 allreduce + GET_ROWS fusion:
+  - implemented `GGML_META_FUSE_ALLREDUCE_GET_ROWS=1` with SYCL proc `ggml_backend_comm_allreduce_get_rows_tensor`;
+  - trace captured the intended `attn_output-63 -> GET_ROWS` site and replaced the remaining plain decode path with `backend+getrows`;
+  - full validation, gate on, `p512/n512/r3`: prompt `135.626208 tok/s`, decode `45.375471 tok/s`, computed total `68.000508 tok/s`;
+  - same-build gate-off control, `p512/n512/r3`: prompt `135.671512 tok/s`, decode `45.340867 tok/s`, computed total `67.967329 tok/s`;
+  - conclusion: neutral at best and below the current `45.624065 tok/s` high-water mark; keep off by default and do not submit to LocalMaxxing as an improvement;
+  - note: `notes/2026-05-06-q4-getrows-fusion-neutral.md`;
+  - data: `data/qwen36-q4-getrows-fusion-20260506.json`;
+  - patch: `patches/llama-cpp-sycl-meta-getrows-fusion-current-20260506.patch.gz.b64`.
 
 ## Interpretation
 
@@ -98,10 +107,11 @@ This note supersedes the stale portions of `plans/q4_0-gguf-b70-optimization-pla
    - do not use PCI function reset as a recovery method on this driver stack.
 2. Q4_0 llama.cpp/SYCL:
    - use the post-reboot reshape-through-ADD 3x `45.624065 tok/s` run as the current control;
-   - inspect the final remaining plain allreduce, `attn_output-63 -> GET_ROWS`, and determine whether it can be fused safely;
+   - treat `attn_output-63 -> GET_ROWS` as inspected: a safe fused helper is possible, but timing is neutral and it should stay off by default;
    - stop spending time on 4x root/order/local-write sweeps unless a new collective implementation changes the tradeoff;
    - tune the 20KB f32 allreduce fast path only after the remaining graph-level fusions are exhausted;
    - prototype fewer reductions or a fused row-parallel output kernel only where mathematically safe;
+   - investigate whether the row-parallel output projection can produce the mirrored post-allreduce output directly, eliminating the separate small collective rather than moving it later;
    - keep local-write/root-residual env gates diagnostic-only.
 3. FP8 vLLM/XPU:
    - keep the PP2 x TP2 `self.drafter` getattr patch;
