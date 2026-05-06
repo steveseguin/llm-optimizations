@@ -1,0 +1,24 @@
+{
+  "date": "2026-05-06",
+  "repo": "/home/steve/src/llm-scaler",
+  "commit": "e0b0703",
+  "tag": "vllm-0.14.0-b8.2.1",
+  "commit_subject": "Update moe int4 prefill and decode (#384)",
+  "reviewed_files": [
+    "vllm/custom-esimd-kernels-vllm/csrc/xpu/esimd_kernels/int4_GEMV.h",
+    "vllm/custom-esimd-kernels-vllm/csrc/xpu/esimd_kernels/norm_gemv_int4.h",
+    "vllm/custom-esimd-kernels-vllm/csrc/xpu/esimd_kernels/resadd_norm_gemv_int4.h"
+  ],
+  "useful_ideas": [
+    "BMG ESIMD decode GEMV",
+    "K_SPLIT for small-N/high-K decode",
+    "SLM reduction for split-K GEMV",
+    "fused multi-GEMV dispatch to save launch overhead",
+    "fused residual add plus RMSNorm plus INT4 GEMV"
+  ],
+  "caveats": [
+    "llm-scaler INT4 GEMV uses group size 128 and scale shape [N, K/128]",
+    "llama.cpp GGUF Q4_0 uses block size 32, so the kernel is not drop-in compatible"
+  ],
+  "plan_impact": "Use llm-scaler as a BMG ESIMD and graph fusion reference. Continue Q4_0 work on fewer launches, less repeated quantization, and deeper projection/norm fusion rather than more communication flag sweeps."
+}

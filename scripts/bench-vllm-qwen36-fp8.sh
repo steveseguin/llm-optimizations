@@ -3,10 +3,11 @@ set -euo pipefail
 
 MODEL_DIR="${MODEL_DIR:-/home/steve/models/qwen3.6-27b-fp8-hf}"
 VENV="${VENV:-/home/steve/.venvs/vllm-xpu-managed}"
+VLLM_SOURCE="${VLLM_SOURCE:-/home/steve/src/vllm}"
 OUTDIR="${OUTDIR:-/home/steve/bench-results/qwen36-fp8-vllm}"
 TP="${TP:-1}"
 PP="${PP:-1}"
-SELECTOR="${ONEAPI_DEVICE_SELECTOR:-level_zero:0}"
+SELECTOR="${ONEAPI_DEVICE_SELECTOR:-}"
 INPUT_LEN="${INPUT_LEN:-512}"
 OUTPUT_LEN="${OUTPUT_LEN:-128}"
 BATCH_SIZE="${BATCH_SIZE:-1}"
@@ -26,10 +27,17 @@ qtag="${qtag//[^[:alnum:]_.-]/_}"
 json="$OUTDIR/vllm-qwen36-fp8-${qtag}-tp${TP}-pp${PP}-in${INPUT_LEN}-out${OUTPUT_LEN}-bs${BATCH_SIZE}-${stamp}.json"
 log="${json%.json}.log"
 
-export ONEAPI_DEVICE_SELECTOR="$SELECTOR"
+if [[ -n "$SELECTOR" ]]; then
+  export ONEAPI_DEVICE_SELECTOR="$SELECTOR"
+else
+  unset ONEAPI_DEVICE_SELECTOR
+fi
 export VLLM_NO_USAGE_STATS=1
 export LD_LIBRARY_PATH="$VENV/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 export CCL_ATL_TRANSPORT="${CCL_ATL_TRANSPORT:-ofi}"
+if [[ -d "$VLLM_SOURCE/vllm" ]]; then
+  export PYTHONPATH="$VLLM_SOURCE${PYTHONPATH:+:$PYTHONPATH}"
+fi
 
 quant_args=()
 if [[ -n "$QUANTIZATION" && "$QUANTIZATION" != "none" && "$QUANTIZATION" != "auto" ]]; then

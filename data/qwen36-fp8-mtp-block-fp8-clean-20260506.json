@@ -1,0 +1,73 @@
+{
+  "date": "2026-05-06",
+  "system": {
+    "gpu": "Intel Arc Pro B70 32GB",
+    "gpu_count": 4,
+    "os": "Ubuntu 24.04.4 LTS",
+    "kernel": "6.17.0-23-generic"
+  },
+  "models": {
+    "static_fp8_compressed": "/home/steve/models/qwen3.6-27b-fp8-vrfai",
+    "dynamic_fp8_mtp_source": "/home/steve/models/qwen3.6-27b-fp8-hf/mtp.safetensors",
+    "hybrid_static_plus_mtp": "/home/steve/models/qwen3.6-27b-fp8-vrfai-mtp-hybrid"
+  },
+  "patches": [
+    "/home/steve/llm-optimization-artifacts/patches/vllm-qwen35-mtp-force-block-fp8-clean-20260506.patch",
+    "/home/steve/llm-optimization-artifacts/patches/bench-vllm-qwen36-fp8-selector-unset-20260506.patch"
+  ],
+  "env": {
+    "VLLM_QWEN35_MTP_FORCE_FP8_BLOCK": "1",
+    "VLLM_XPU_BLOCK_FP8_REQUANT": "1",
+    "CCL_ATL_TRANSPORT": "ofi",
+    "ONEAPI_DEVICE_SELECTOR": "unset"
+  },
+  "validation": {
+    "selected_kernel": "XPURequantFp8BlockScaledMMLinearKernel for Fp8LinearMethod",
+    "missing_weight_scale_inv_warnings": false,
+    "bogus_packed_names": false,
+    "py_compile": [
+      "vllm/envs.py",
+      "vllm/model_executor/models/qwen3_5_mtp.py"
+    ]
+  },
+  "runs": [
+    {
+      "name": "hybrid-mtp-block-fp8-eager-clean",
+      "json": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp4-pp1-in32-out8-bs1-20260506T171546Z.json",
+      "log": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp4-pp1-in32-out8-bs1-20260506T171546Z.log",
+      "quantization": "compressed-tensors",
+      "tensor_parallel": 4,
+      "pipeline_parallel": 1,
+      "input_tokens": 32,
+      "output_tokens": 8,
+      "avg_latency_s": 3.383753568006796,
+      "tok_s_out": 2.364238364058057,
+      "speculative_config": {
+        "method": "qwen3_next_mtp",
+        "num_speculative_tokens": 1,
+        "enforce_eager": true,
+        "disable_padded_drafter_batch": true
+      }
+    },
+    {
+      "name": "hybrid-mtp-block-fp8-compiled-clean",
+      "json": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp4-pp1-in32-out32-bs1-20260506T171822Z.json",
+      "log": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp4-pp1-in32-out32-bs1-20260506T171822Z.log",
+      "quantization": "compressed-tensors",
+      "tensor_parallel": 4,
+      "pipeline_parallel": 1,
+      "input_tokens": 32,
+      "output_tokens": 32,
+      "avg_latency_s": 17.346884511993267,
+      "tok_s_out": 1.8447116528547753,
+      "speculative_config": {
+        "method": "mtp",
+        "num_speculative_tokens": 1
+      }
+    }
+  ],
+  "localmaxxing": {
+    "submitted": false,
+    "reason": "Clean loader diagnostic, but slower than validated non-spec static FP8 and CPU n-gram speculative baselines."
+  }
+}

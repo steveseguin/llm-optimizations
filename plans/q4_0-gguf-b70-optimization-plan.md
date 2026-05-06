@@ -1107,6 +1107,33 @@ Goal: improve quality-preserving Q4_0 performance without power-limit changes.
      - do not submit these MTP smokes to LocalMaxxing;
      - keep MTP as a source/debug track, but do not run longer MTP speed claims until packed scale loading is clean;
      - validated non-spec static FP8 TP4 and Q4_0 TP3 remain the useful performance baselines.
+59. 2026-05-06 FP8 MTP block-FP8 clean-load follow-up and llm-scaler source mining:
+   - fixed the vLLM TP wrapper so TP4 workers see all four B70s:
+     - previous wrapper defaulted `ONEAPI_DEVICE_SELECTOR=level_zero:0`;
+     - vLLM/XPU workers then saw `device_count=1`, causing TP4 placement/index failures;
+     - wrapper now defaults selector to empty and unsets `ONEAPI_DEVICE_SELECTOR` unless the caller explicitly sets one.
+   - patched Qwen3.5 MTP handling for the hybrid model:
+     - env: `VLLM_QWEN35_MTP_FORCE_FP8_BLOCK=1`;
+     - target model stays static compressed-tensors FP8;
+     - MTP drafter layers get a local block-FP8 `Fp8Config` with dynamic activations and `weight_block_size=[128,128]`;
+     - `mtp.fc` is ignored and remains BF16;
+     - `VLLM_QWEN35_MTP_FORCE_FP8_BLOCK` is registered in `vllm/envs.py`.
+   - corrected MTP load status:
+     - logs now select `XPURequantFp8BlockScaledMMLinearKernel for Fp8LinearMethod`;
+     - no missing `weight_scale_inv` warnings;
+     - no bogus `qkqkv_proj` or `gate_gate_up_proj` names.
+   - corrected MTP performance remains poor:
+     - eager smoke, 32 prompt / 8 output: `2.364238 tok/s`;
+     - compiled/async smoke, 32 prompt / 32 output: `1.844712 tok/s`;
+     - both are far below non-spec static FP8 TP4 baselines, so do not submit to LocalMaxxing.
+   - llm-scaler review:
+     - local clone `/home/steve/src/llm-scaler` is at `e0b0703`, tag `vllm-0.14.0-b8.2.1`;
+     - high-value reference files are `custom-esimd-kernels-vllm/csrc/xpu/esimd_kernels/int4_GEMV.h` and `resadd_norm_gemv_int4.h`;
+     - useful ideas: ESIMD decode GEMV for BMG, `K_SPLIT` for small-N/high-K decode, fused multi-GEMV dispatch to save launch overhead, and fused residual-add + RMSNorm + INT4 GEMV;
+     - caveat: its "GGML q4_0" path uses a group-size-128 layout with scale shape `[N, K/128]`, while llama.cpp GGUF `Q4_0` uses block size 32, so it is not a drop-in kernel.
+   - next source direction:
+     - mine llm-scaler for BMG ESIMD scheduling and fusion patterns, not direct Q4_0 format compatibility;
+     - continue Q4_0 work around deeper graph/kernel fusion and per-token launch/quantization reduction, especially RMSNorm/GEMV or multi-GEMV fusion, because communication flag sweeps are exhausted.
 
 ## Success Criteria
 
