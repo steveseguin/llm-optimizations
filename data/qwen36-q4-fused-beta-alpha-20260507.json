@@ -1,0 +1,74 @@
+{
+  "date": "2026-05-07",
+  "model": {
+    "base": "/home/steve/models/qwen3.6-27b-q4_0-gguf/Qwen3.6-27B-Q4_0.gguf",
+    "fused_beta_alpha": "/home/steve/models/qwen3.6-27b-q4_0-fused-ba-gguf/Qwen3.6-27B-Q4_0-fused-ba.gguf",
+    "architecture": "qwen35",
+    "quantization": "Q4_0",
+    "fused_tensors_added": 48
+  },
+  "hardware": {
+    "gpu": "Intel Arc Pro B70 / BMG-G31",
+    "gpu_count_used": 3,
+    "gpu_count_installed": 4,
+    "vram_gb_each": 32
+  },
+  "command_shape": {
+    "devices": "SYCL2/SYCL1/SYCL3",
+    "split_mode": "tensor",
+    "tensor_split": "1/1/1",
+    "ubatch": 128,
+    "poll": 25,
+    "kv_cache": "f16",
+    "flash_attention": true,
+    "flags": [
+      "GGML_SYCL_FORCE_MMVQ_Q4_1=0",
+      "GGML_SYCL_DISABLE_DNN=1",
+      "GGML_SYCL_Q8_CACHE=1",
+      "GGML_SYCL_ASYNC_CPY_TENSOR=0",
+      "GGML_SYCL_ASYNC_PEER_COPY=1",
+      "GGML_SYCL_COMM_ALLREDUCE=1",
+      "GGML_SYCL_COMM_SINGLE_KERNEL=1",
+      "GGML_SYCL_COMM_EVENT_BARRIER=1",
+      "GGML_SYCL_COMM_SYNC_AFTER=2",
+      "GGML_SYCL_COMM_FUSEADD_ROOT_RESIDUAL=1",
+      "GGML_META_FUSE_ALLREDUCE_ADD=1",
+      "GGML_META_FUSE_ALLREDUCE_GET_ROWS=1",
+      "GGML_SYCL_FUSE_MMVQ2=1",
+      "GGML_SYCL_FUSE_MMVQ2_SWIGLU=1",
+      "GGML_SYCL_FUSE_RMS_NORM_MUL=1",
+      "GGML_SYCL_SMALL_F32_MMV=0"
+    ]
+  },
+  "results": {
+    "short_decode_p0_n128_r3": {
+      "original_tok_s": 48.726023,
+      "fused_tok_s": 50.414495,
+      "artifact": "/home/steve/bench-results/qwen36-q4_0-gguf/tp3-refresh-20260507/fused-ba-model/fused-ba-layout2-ab-p0n128-r3-20260507T053025Z.tsv"
+    },
+    "full_p512_n512_r3": {
+      "original_prompt_tok_s": 195.046919,
+      "original_decode_tok_s": 50.914445,
+      "original_total_tok_s": 80.75012651047875,
+      "fused_prompt_tok_s": 200.681918,
+      "fused_decode_tok_s": 51.338431,
+      "fused_total_tok_s": 81.7608168631705,
+      "artifact": "/home/steve/bench-results/qwen36-q4_0-gguf/tp3-refresh-20260507/fused-ba-model/fused-ba-layout2-ab-p512n512-r3-20260507T054539Z.tsv"
+    }
+  },
+  "quality": {
+    "status": "not_cleared",
+    "logit_probe": {
+      "artifact": "/home/steve/bench-results/qwen36-q4_0-gguf/correctness/fused-ba-logit-probe-20260507T052727Z",
+      "step0_same_top_token": true,
+      "step0_top_token": 271,
+      "full_logit_hash_match": false
+    },
+    "completion_byte_compare": "unusable: original repeated runs differed",
+    "perplexity": "timeout: original did not finish 4 chunks of 512 context within 600 seconds"
+  },
+  "localmaxxing": {
+    "submitted": false,
+    "reason": "speed-positive but not quality-cleared"
+  }
+}
