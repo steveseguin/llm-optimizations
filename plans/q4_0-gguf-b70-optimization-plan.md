@@ -1520,6 +1520,29 @@ Goal: improve quality-preserving Q4_0 performance without power-limit changes.
      - keep the prior submitted FP8 best (`49.581893 tok/s`, TP4 n-gram default topology) as the headline static FP8 result;
      - do not use PP2xTP2 for single-session speed unless a later vLLM pipeline scheduler or communication change materially improves it;
      - keep default oneCCL topology recognition for speculative runs; the override is only worth revisiting for no-spec or microbench work.
+76. 2026-05-07 Q4_0 four-card assist refresh after guard fix:
+   - reran the best known four-card assist split on the current Q8-cache/allreduce+ADD guard-fixed stack;
+   - command shape:
+     - devices `SYCL2/SYCL1/SYCL3/SYCL0`;
+     - tensor split `1/1/1/0.05`;
+     - `-ub 128`, f16 KV, flash attention;
+     - `GGML_SYCL_Q8_CACHE=1`;
+     - fused MMVQ2, fused MMVQ2+SwiGLU, fused RMS_NORM+MUL, fused allreduce+ADD, fused final allreduce+GET_ROWS, single-kernel allreduce, event barriers, `GGML_SYCL_COMM_SYNC_AFTER=2`;
+     - `GGML_SYCL_REORDER_MMVQ_SUBGROUPS_RUNTIME=2`;
+   - validation:
+     - short decode screen `p0/n128/r2`: `42.782880 tok/s`;
+     - full run `p512/n512/r3`: prompt `117.882824 tok/s`, decode `44.087560 tok/s`, computed total `64.174276 tok/s`;
+   - comparison:
+     - `+12.46%` over the older 4x assist result (`39.204149 tok/s`);
+     - `+26.22%` over equal four-card split (`34.929313 tok/s`);
+     - still `-11.03%` behind the current TP3 best (`49.552666 tok/s`);
+   - LocalMaxxing:
+     - detailed annotated payload returned HTTP 500;
+     - reduced core-metric payload was accepted as ID `cmoute8kg00mbld017ye0dfbz`;
+   - decision:
+     - this is the new best submitted four-card Q4_0 result;
+     - it proves the guard fix and current fused stack make the four-card assist layout viable again;
+     - four-card Q4_0 is still not the production speed path until it beats TP3, so next 4x work should target communication/launch reduction rather than more equal sharding.
 
 ## Success Criteria
 
@@ -1531,6 +1554,6 @@ Goal: improve quality-preserving Q4_0 performance without power-limit changes.
 - Static FP8 post-reboot refresh: TP4/PP1 remains preferred for speed (`45.864956 tok/s` no-spec, `48.082178 tok/s` n-gram on this repeat), while PP2xTP2 fits 32K context but only reaches `27.722318 tok/s` at 512/512. A oneCCL topology override gives a tiny no-spec gain (`46.386137 tok/s`) but hurts n-gram speculation (`44.438715 tok/s`).
 - Current dual-card milestone reached: Q4_0 GGUF single session `42.106013 tok/s` on two B70s for 512 prompt / 512 output with the current fused stack, quality preserving, software-only.
 - Current improved multi-card milestone: Q4_0 GGUF single session `49.552666 tok/s` on three B70s for 512 prompt / 512 output with Q8 activation cache, fused MMVQ2, fused MMVQ2+SwiGLU, fused RMS_NORM+scale-MUL, fused allreduce+ADD, fused final allreduce+GET_ROWS, single-kernel allreduce, `GGML_SYCL_COMM_SYNC_AFTER=2`, and `-ub 128`. This is quality preserving and software-only. The earlier five-repeat validation remains `49.403656 tok/s`; the 2026-05-07 guard-fix refresh was a three-repeat run.
-- Current four-card Q4_0 status: assist split `1/1/1/0.05` reaches `39.204149 tok/s`, improving the equal-split four-card result by `12.24%` but still trailing the best three-card result, so quad Q4_0 remains a kernel/scheduling investigation rather than the production path. The RMS_NORM+MUL rerun of that assist split failed with Level Zero OOM during `MUL_MAT`.
+- Current four-card Q4_0 status: assist split `1/1/1/0.05` reaches `44.087560 tok/s` after the guard-fix refresh, improving the older assist result by `12.46%` and the equal-split four-card result by `26.22%`, but still trailing the best three-card result by `11.03%`. Quad Q4_0 remains a kernel/scheduling investigation rather than the production path.
 - Dual-card success: Q4_0 GGUF single session `>=48 tok/s` first, then `>=52 tok/s`, without switching away from Q4_0.
 - Four-card success: Q4_0 GGUF single session must exceed dual-card by a meaningful margin before treating quad tensor split as viable.

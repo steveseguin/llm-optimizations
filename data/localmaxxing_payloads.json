@@ -1277,5 +1277,40 @@
       "tokSOut": 27.722317582905,
       "createdAt": "2026-05-07T01:27:41.110Z"
     }
+  },
+  {
+    "label": "llamacpp-qwen36-27b-q4_0-sycl-tp4-assist005-guardfix-p512-n512",
+    "submittedAt": "2026-05-07T01:35:44.609Z",
+    "payload": {
+      "hfId": "unsloth/Qwen3.6-27B",
+      "hardware": {
+        "hwClass": "DISCRETE_GPU",
+        "gpuName": "Intel Arc Pro B70 32GB",
+        "gpuCount": 4,
+        "vramGb": 32,
+        "cpu": "AMD EPYC 9015",
+        "ramGb": 16,
+        "os": "Ubuntu 24.04 LTS"
+      },
+      "engineName": "llama.cpp",
+      "engineVersion": "db44417-local-sycl-q4-b70",
+      "quantization": "Q4_0",
+      "promptTokens": 512,
+      "outputTokens": 512,
+      "contextLength": 1024,
+      "batchSize": 1,
+      "tokSOut": 44.08756,
+      "tokSTotal": 64.17427615741703,
+      "notes": "Q4_0 GGUF, 4x B70 assist split 1/1/1/0.05 after guard fix. Quality-preserving stack: f16 KV, flash attention, Q8 activation cache, fused MMVQ2, SwiGLU, RMS_NORM+MUL, allreduce+ADD, final GET_ROWS, single-kernel allreduce. No speculative decode or power changes. Full flags/artifacts in steveseguin/llm-optimizations."
+    },
+    "httpStatus": 201,
+    "response": {
+      "id": "cmoute8kg00mbld017ye0dfbz",
+      "status": "APPROVED",
+      "tokSOut": 44.08756,
+      "createdAt": "2026-05-07T01:35:44.609Z"
+    },
+    "detailedPayloadHttpStatus": 500,
+    "detailedPayloadResponse": "Internal server error"
   }
 ]

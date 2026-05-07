@@ -1,0 +1,91 @@
+{
+  "date": "2026-05-07",
+  "model": {
+    "hfId": "unsloth/Qwen3.6-27B",
+    "localPath": "/home/steve/models/qwen3.6-27b-q4_0-gguf/Qwen3.6-27B-Q4_0.gguf",
+    "quantization": "Q4_0"
+  },
+  "software": {
+    "engine": "llama.cpp",
+    "engineVersion": "db44417-local-sycl-q4-b70",
+    "sourcePath": "/home/steve/src/llama.cpp-q4-b70",
+    "buildPath": "/home/steve/src/llama.cpp-q4-b70/build-sycl-2026-bmg-g31",
+    "backend": "SYCL/Level Zero"
+  },
+  "hardware": {
+    "gpuName": "Intel Arc Pro B70 32GB",
+    "gpuCount": 4,
+    "vramGbPerGpu": 32,
+    "cpu": "AMD EPYC 9015",
+    "ramGb": 16,
+    "os": "Ubuntu 24.04 LTS",
+    "kernel": "6.17.0-23-generic"
+  },
+  "runConfig": {
+    "devices": "SYCL2/SYCL1/SYCL3/SYCL0",
+    "splitMode": "tensor",
+    "tensorSplit": "1/1/1/0.05",
+    "gpuLayers": 99,
+    "flashAttention": true,
+    "ubatch": 128,
+    "kvCacheDtype": "f16",
+    "threads": 8,
+    "powerLimitChanged": false,
+    "speculativeDecoding": false,
+    "environment": {
+      "GGML_SYCL_DISABLE_DNN": "1",
+      "GGML_SYCL_Q8_CACHE": "1",
+      "GGML_SYCL_ASYNC_CPY_TENSOR": "0",
+      "GGML_SYCL_ASYNC_PEER_COPY": "1",
+      "GGML_SYCL_COMM_ALLREDUCE": "1",
+      "GGML_SYCL_COMM_SINGLE_KERNEL": "1",
+      "GGML_SYCL_COMM_EVENT_BARRIER": "1",
+      "GGML_SYCL_COMM_SYNC_AFTER": "2",
+      "GGML_META_FUSE_ALLREDUCE_ADD": "1",
+      "GGML_META_FUSE_ALLREDUCE_GET_ROWS": "1",
+      "GGML_SYCL_FUSE_MMVQ2": "1",
+      "GGML_SYCL_FUSE_MMVQ2_SWIGLU": "1",
+      "GGML_SYCL_FUSE_RMS_NORM_MUL": "1",
+      "GGML_SYCL_REORDER_MMVQ_SUBGROUPS_RUNTIME": "2"
+    }
+  },
+  "runs": [
+    {
+      "label": "short-decode-screen",
+      "promptTokens": 0,
+      "outputTokens": 128,
+      "repeats": 2,
+      "tokSOut": 42.78288,
+      "json": "/home/steve/bench-results/qwen36-q4_0-gguf/quad-assist-refresh-20260507/q4-quad-assist005-rms-stack-p0n128-20260507T013139Z.jsonl",
+      "log": "/home/steve/bench-results/qwen36-q4_0-gguf/quad-assist-refresh-20260507/q4-quad-assist005-rms-stack-p0n128-20260507T013139Z.log"
+    },
+    {
+      "label": "full-validation",
+      "promptTokens": 512,
+      "outputTokens": 512,
+      "repeats": 3,
+      "tokSPrompt": 117.882824,
+      "tokSOut": 44.08756,
+      "tokSTotal": 64.17427615741703,
+      "json": "/home/steve/bench-results/qwen36-q4_0-gguf/quad-assist-refresh-20260507/q4-quad-assist005-rms-stack-p512n512-20260507T013303Z.jsonl",
+      "log": "/home/steve/bench-results/qwen36-q4_0-gguf/quad-assist-refresh-20260507/q4-quad-assist005-rms-stack-p512n512-20260507T013303Z.log",
+      "localMaxxing": {
+        "submitted": true,
+        "id": "cmoute8kg00mbld017ye0dfbz",
+        "status": "APPROVED",
+        "createdAt": "2026-05-07T01:35:44.609Z",
+        "detailedPayloadHttpStatus": 500,
+        "reducedPayloadHttpStatus": 201
+      }
+    }
+  ],
+  "comparisons": {
+    "olderFourCardAssistTokSOut": 39.204149,
+    "equalFourCardTokSOut": 34.929313,
+    "currentThreeCardBestTokSOut": 49.552666,
+    "improvementVsOlderAssistPercent": 12.456362718139857,
+    "improvementVsEqualFourCardPercent": 26.219373395634783,
+    "deltaVsThreeCardBestPercent": -11.028883894965402
+  },
+  "conclusion": "New best submitted four-card Q4_0 result, but still behind TP3. Continue treating 4x Q4_0 as a communication/launch-reduction investigation rather than the production speed path."
+}

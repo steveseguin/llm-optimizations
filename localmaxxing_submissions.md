@@ -103,6 +103,7 @@ Model: `unsloth/Qwen3.6-27B`, local GGUF file `Qwen3.6-27B-Q4_0.gguf`.
 | `llamacpp-qwen36-27b-q4_0-sycl-tp3-rmsnormmul-ub128-p512-n512` | `cmoujcois00esld01c5s6bwht` | 3 | 512 | 512 | 49.366 | 79.667 |
 | `llamacpp-qwen36-27b-q4_0-sycl-tp3-getrows-rmsmul-ub128-p512-n512` | `cmoultsa900h0ld011f0r2hcs` | 3 | 512 | 512 | 49.404 | 79.017 |
 | `llamacpp-qwen36-27b-q4_0-sycl-tp3-guardfix-ub128-p512-n512` | `cmous57ci00lqld01a8x5azdq` | 3 | 512 | 512 | 49.553 | 78.947 |
+| `llamacpp-qwen36-27b-q4_0-sycl-tp4-assist005-guardfix-p512-n512` | `cmoute8kg00mbld017ye0dfbz` | 4 | 512 | 512 | 44.088 | 64.174 |
 
 Note: `cmotnyi25001jqu01fccla8cf` is the pre-fused-SwiGLU Q4_0 GGUF baseline. It uses the same Q4_0 weights, f16 KV cache, flash attention, no speculative decoding, no power-limit changes, and software-only SYCL/Level Zero patches including Q8 activation cache, fused MMVQ2, event-barrier allreduce, fused allreduce+ADD, and `GGML_SYCL_COMM_SYNC_AFTER=2`.
 
@@ -119,6 +120,8 @@ Note: `cmoujcois00esld01c5s6bwht` is the pre-GET_ROWS best submitted quality-pre
 Note: `cmoultsa900h0ld011f0r2hcs` is the current best submitted quality-preserving Q4_0 GGUF result. It enables the opt-in `GGML_META_FUSE_ALLREDUCE_GET_ROWS=1` path on top of the RMS_NORM+MUL stack. Five-repeat same-build A/B: GET_ROWS on `49.403656 tok/s`, GET_ROWS off `48.827917 tok/s`. Greedy `llama-completion` output matched byte-for-byte. This changes scheduling only: same Q4_0 weights, f16 KV, no speculative decoding, no sampling change, and no power-limit change.
 
 Note: `cmous57ci00lqld01a8x5azdq` is the 2026-05-07 guard-fix refresh of the same quality-preserving TP3 Q4_0 stack. A misplaced Q8-cache guard temporarily disabled the validated `allreduce+ADD` path and dropped a decode-only control to `27.676519 tok/s`; removing that over-broad guard restored `backend+add` paths and produced `49.552666 tok/s` on `p512/n512/r3`. The detailed annotated LocalMaxxing payload returned HTTP 500, while the reduced core-metric payload was accepted.
+
+Note: `cmoute8kg00mbld017ye0dfbz` is the current best submitted four-card Q4_0 result. It reruns the assist split `1/1/1/0.05` after the guard fix with Q8 activation cache, fused MMVQ2, fused MMVQ2+SwiGLU, fused RMS_NORM+MUL, fused allreduce+ADD, fused final GET_ROWS, and single-kernel allreduce. It improves the older assist result by `12.46%` and equal four-card by `26.22%`, but still trails the current TP3 result by `11.03%`. The detailed annotated LocalMaxxing payload returned HTTP 500, while the reduced core-metric payload was accepted.
 
 Date: 2026-05-06
 

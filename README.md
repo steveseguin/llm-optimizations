@@ -7,7 +7,7 @@ Reproducibility notes, benchmark payloads, and local patches from the Intel Arc 
 - Host: Ubuntu 24.04.4 LTS, kernel 6.17.0-23-generic.
 - GPUs: 4x Intel Arc Pro B70 / BMG-G31, 32 GB VRAM each.
 - Original quality-preserving target remains Qwen3.6 27B `Q4_0` GGUF on llama.cpp. Current best quality-preserving GGUF result is 49.553 tok/s on three B70s at 512 prompt / 512 output, using SYCL tensor split, `-ub 128`, Q8 activation cache, fused MMVQ2, fused MMVQ2+SwiGLU, fused RMS_NORM+scale-MUL, fused allreduce+ADD, fused final allreduce+GET_ROWS, single-kernel allreduce, and `GGML_SYCL_COMM_SYNC_AFTER=2`.
-- Current four-card Q4_0 result is 39.204 tok/s with an assist split (`-ts 1/1/1/0.05`), which improves equal 4x but still trails 3x. Equal four-card split remains a negative scaling diagnostic at 34.929 tok/s.
+- Current four-card Q4_0 result is 44.088 tok/s with an assist split (`-ts 1/1/1/0.05`) after the guard-fix refresh. This improves the older assist result by 12.46% and equal 4x by 26.22%, but still trails 3x. Equal four-card split remains a negative scaling diagnostic at 34.929 tok/s.
 - Best static FP8 result so far: vLLM/XPU, `vrfai/Qwen3.6-27B-FP8`, local XPU patches, 4x B70 TP4, CPU n-gram speculative decode, 49.582 output tok/s at 512 prompt / 512 output. This preserves target-model quality through verified speculative decoding and is ahead of the current Q4_0 TP3 validation.
 - Static FP8 TP4 is also the preferred 32k-context Qwen3.6 27B layout: TP4/PP1 at `max_model_len=32768` reaches 42.996 tok/s for 2048 prompt / 256 output and reports 1,133,163 GPU KV-cache tokens. The 2026-05-07 512/512 refresh kept TP4 ahead (`45.865 tok/s` no-spec, `48.082 tok/s` n-gram). TP2/PP2 fits but is much slower for batch-1 decode (`27.722 tok/s` at 512/512) and should be treated as a capacity layout, not the speed path.
 - oneCCL `CCL_TOPO_FABRIC_VERTEX_CONNECTION_CHECK=0` was a tiny FP8 TP4 no-spec win (`46.386 tok/s` vs `45.865 tok/s`) but regressed n-gram speculation (`44.439 tok/s`) because draft acceptance collapsed. Keep default topology recognition for speculative TP4.
@@ -42,6 +42,7 @@ Reproducibility notes, benchmark payloads, and local patches from the Intel Arc 
 - `notes/2026-05-06-fp8-pp2-postreboot-validation.md`: post-reboot FP8 PP2xTP2 XCCL/load/speculative plumbing validation.
 - `notes/2026-05-07-q4-q8-allreduce-add-guardfix.md`: regression fix for the misplaced Q8-cache guard that disabled the validated allreduce+ADD path.
 - `notes/2026-05-07-fp8-tp4-pp2-refresh.md`: FP8 TP4 vs PP2xTP2 post-reboot refresh, including the oneCCL topology-toggle screen.
+- `notes/2026-05-07-q4-quad-assist-refresh.md`: current best four-card Q4_0 assist split refresh after the guard fix.
 - `data/qwen36-fp8-32k-tp4-vs-pp2-20260506.json`: post-reboot Q4 sanity plus FP8 32k-context TP4 vs TP2/PP2 validation.
 - `data/q4-esimd-blockscales-20260506.json`: structured ESIMD block-loaded scale metadata screen.
 - `data/q4-active-device-row-split-20260506.json`: structured active-device row-split patch validation and negative row-split smoke.
@@ -55,6 +56,7 @@ Reproducibility notes, benchmark payloads, and local patches from the Intel Arc 
 - `data/qwen36-fp8-pp2-postreboot-validation-20260506.json`: structured FP8 PP2xTP2 post-reboot validation data.
 - `data/qwen36-q4-q8-allreduce-add-guardfix-20260507.json`: structured Q4_0 guard-fix trace, restored throughput, and LocalMaxxing record.
 - `data/qwen36-fp8-tp4-pp2-refresh-20260507.json`: structured FP8 TP4, PP2xTP2, n-gram, and oneCCL topology-toggle refresh data.
+- `data/qwen36-q4-quad-assist-refresh-20260507.json`: structured four-card Q4_0 assist split refresh data and LocalMaxxing record.
 - `scripts/bench-qwen36-q4_0-gguf-vulkan-matrix.sh`: Q4_0 GGUF Vulkan benchmark sweep harness.
 - `scripts/bench-qwen36-q4_0-gguf-sycl-matrix.sh`: Q4_0 GGUF SYCL benchmark sweep harness.
 - `scripts/bench-qwen36-b70-single-mtp.sh`: single-B70 vLLM INT4 MTP benchmark wrapper.
