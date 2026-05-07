@@ -1195,5 +1195,40 @@
         "verified": false
       }
     }
+  },
+  {
+    "label": "llamacpp-qwen36-27b-q4_0-sycl-tp3-guardfix-ub128-p512-n512",
+    "submittedAt": "2026-05-07T01:00:43.506Z",
+    "payload": {
+      "hfId": "unsloth/Qwen3.6-27B",
+      "hardware": {
+        "hwClass": "DISCRETE_GPU",
+        "gpuName": "Intel Arc Pro B70 32GB",
+        "gpuCount": 3,
+        "vramGb": 32,
+        "cpu": "AMD EPYC 9015 8-Core Processor",
+        "ramGb": 16,
+        "os": "Ubuntu 24.04.4 LTS"
+      },
+      "engineName": "llama.cpp",
+      "engineVersion": "db44417-local-sycl-q4-b70",
+      "quantization": "Q4_0",
+      "promptTokens": 512,
+      "outputTokens": 512,
+      "contextLength": 1024,
+      "batchSize": 1,
+      "tokSOut": 49.552666,
+      "tokSTotal": 78.947383,
+      "notes": "Q4_0 GGUF, 3x B70 tensor split, post-regression guard fix restored validated allreduce+ADD with Q8 activation cache. Same quality-preserving stack as prior Q4_0 best; no speculative decode or power changes. Full flags/artifacts in steveseguin/llm-optimizations."
+    },
+    "httpStatus": 201,
+    "response": {
+      "id": "cmous57ci00lqld01a8x5azdq",
+      "status": "APPROVED",
+      "tokSOut": 49.552666,
+      "createdAt": "2026-05-07T01:00:43.506Z"
+    },
+    "detailedPayloadHttpStatus": 500,
+    "detailedPayloadResponse": "Internal server error"
   }
 ]

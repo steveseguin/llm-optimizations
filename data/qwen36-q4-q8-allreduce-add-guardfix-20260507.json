@@ -1,0 +1,98 @@
+{
+  "date": "2026-05-07",
+  "model": {
+    "hfId": "unsloth/Qwen3.6-27B",
+    "localFile": "/home/steve/models/qwen3.6-27b-q4_0-gguf/Qwen3.6-27B-Q4_0.gguf",
+    "quantization": "Q4_0"
+  },
+  "hardware": {
+    "gpu": "Intel Arc Pro B70 32GB",
+    "gpuCount": 3,
+    "devices": "SYCL2/SYCL1/SYCL3",
+    "tensorSplit": "1/1/1",
+    "cpu": "AMD EPYC 9015 8-Core Processor",
+    "os": "Ubuntu 24.04.4 LTS, kernel 6.17.0-23-generic"
+  },
+  "rootCause": {
+    "symptom": "Current-stack TP3 decode-only control dropped to 27.676519 tok/s.",
+    "badRun": {
+      "promptTokens": 0,
+      "outputTokens": 256,
+      "repeats": 2,
+      "tokSOut": 27.676519,
+      "jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/mixed-fuse-20260506/tp3-control-after-guardfix-p0n256-20260507T004029Z.jsonl",
+      "log": "/home/steve/bench-results/qwen36-q4_0-gguf/mixed-fuse-20260506/tp3-control-after-guardfix-p0n256-20260507T004029Z.log"
+    },
+    "cause": "A Q8-cache rejection in ggml_backend_sycl_comm_allreduce_add_tensor disabled the validated meta allreduce+ADD path. The guard was only appropriate for the experimental MUL_MAT+allreduce+ADD diagnostic path.",
+    "preFixMetaTrace": {
+      "jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/regression-debug-20260507/tp3-current-meta-stats-p0n1-20260507T004537Z.jsonl",
+      "log": "/home/steve/bench-results/qwen36-q4_0-gguf/regression-debug-20260507/tp3-current-meta-stats-p0n1-20260507T004537Z.log",
+      "observedPath": "plain backend allreduce for normal projection residuals, final backend+getrows only"
+    }
+  },
+  "fix": {
+    "description": "Remove the Q8-cache rejection from ggml_backend_sycl_comm_allreduce_add_tensor while leaving the Q8-cache guard on comm_mul_mat_allreduce_add.",
+    "sourceFile": "/home/steve/src/llama.cpp-q4-b70/ggml/src/ggml-sycl/ggml-sycl.cpp",
+    "patchArtifact": "patches/llama-cpp-sycl-q4-current-guardfix-20260507.patch.gz.b64"
+  },
+  "validation": {
+    "metaTrace": {
+      "promptTokens": 0,
+      "outputTokens": 1,
+      "tokSOut": 43.174532,
+      "backendAddMatches": 254,
+      "backendGetRowsMatches": 2,
+      "jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/regression-debug-20260507/tp3-fixed-meta-stats-p0n1-20260507T005433Z.jsonl",
+      "log": "/home/steve/bench-results/qwen36-q4_0-gguf/regression-debug-20260507/tp3-fixed-meta-stats-p0n1-20260507T005433Z.log"
+    },
+    "decodeOnly": {
+      "promptTokens": 0,
+      "outputTokens": 256,
+      "repeats": 3,
+      "tokSOut": 48.926449,
+      "stddevTokS": 0.134317,
+      "jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/regression-debug-20260507/tp3-fixed-control-p0n256-20260507T005551Z.jsonl",
+      "log": "/home/steve/bench-results/qwen36-q4_0-gguf/regression-debug-20260507/tp3-fixed-control-p0n256-20260507T005551Z.log"
+    },
+    "full": {
+      "promptTokens": 512,
+      "outputTokens": 512,
+      "repeats": 3,
+      "promptTokS": 194.121497,
+      "promptStddevTokS": 3.035465,
+      "tokSOut": 49.552666,
+      "decodeStddevTokS": 0.307476,
+      "tokSTotal": 78.947383,
+      "jsonl": "/home/steve/bench-results/qwen36-q4_0-gguf/regression-debug-20260507/tp3-fixed-full-p512n512-r3-20260507T005722Z.jsonl",
+      "log": "/home/steve/bench-results/qwen36-q4_0-gguf/regression-debug-20260507/tp3-fixed-full-p512n512-r3-20260507T005722Z.log"
+    }
+  },
+  "environment": {
+    "GGML_SYCL_DISABLE_DNN": "1",
+    "GGML_SYCL_Q8_CACHE": "1",
+    "GGML_SYCL_ASYNC_CPY_TENSOR": "0",
+    "GGML_SYCL_ASYNC_PEER_COPY": "1",
+    "GGML_SYCL_COMM_ALLREDUCE": "1",
+    "GGML_SYCL_COMM_SINGLE_KERNEL": "1",
+    "GGML_SYCL_COMM_EVENT_BARRIER": "1",
+    "GGML_SYCL_COMM_SYNC_AFTER": "2",
+    "GGML_META_FUSE_ALLREDUCE_ADD": "1",
+    "GGML_META_FUSE_ALLREDUCE_GET_ROWS": "1",
+    "GGML_SYCL_FUSE_MMVQ2": "1",
+    "GGML_SYCL_FUSE_MMVQ2_SWIGLU": "1",
+    "GGML_SYCL_FUSE_RMS_NORM_MUL": "1"
+  },
+  "localmaxxing": {
+    "detailedPayload": {
+      "httpStatus": 500,
+      "response": "/home/steve/bench-results/qwen36-q4_0-gguf/regression-debug-20260507/localmaxxing-q4-tp3-guardfix-20260507.response.json"
+    },
+    "reducedPayload": {
+      "httpStatus": 201,
+      "id": "cmous57ci00lqld01a8x5azdq",
+      "status": "APPROVED",
+      "response": "/home/steve/bench-results/qwen36-q4_0-gguf/regression-debug-20260507/localmaxxing-q4-tp3-guardfix-20260507-reduced.response.json"
+    }
+  },
+  "decision": "The current TP3 Q4_0 recipe is restored. The previous mixed-row TP3 A/B runs around 27 tok/s are invalid because they measured the misplaced allreduce+ADD guard rather than mixed fusion."
+}

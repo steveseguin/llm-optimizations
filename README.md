@@ -6,7 +6,7 @@ Reproducibility notes, benchmark payloads, and local patches from the Intel Arc 
 
 - Host: Ubuntu 24.04.4 LTS, kernel 6.17.0-23-generic.
 - GPUs: 4x Intel Arc Pro B70 / BMG-G31, 32 GB VRAM each.
-- Original quality-preserving target remains Qwen3.6 27B `Q4_0` GGUF on llama.cpp. Current best quality-preserving GGUF result is 49.404 tok/s on three B70s at 512 prompt / 512 output, using SYCL tensor split, `-ub 128`, Q8 activation cache, fused MMVQ2, fused MMVQ2+SwiGLU, fused RMS_NORM+scale-MUL, fused allreduce+GET_ROWS, single-kernel allreduce, fused allreduce+ADD, and `GGML_SYCL_COMM_SYNC_AFTER=2`.
+- Original quality-preserving target remains Qwen3.6 27B `Q4_0` GGUF on llama.cpp. Current best quality-preserving GGUF result is 49.553 tok/s on three B70s at 512 prompt / 512 output, using SYCL tensor split, `-ub 128`, Q8 activation cache, fused MMVQ2, fused MMVQ2+SwiGLU, fused RMS_NORM+scale-MUL, fused allreduce+ADD, fused final allreduce+GET_ROWS, single-kernel allreduce, and `GGML_SYCL_COMM_SYNC_AFTER=2`.
 - Current four-card Q4_0 result is 39.204 tok/s with an assist split (`-ts 1/1/1/0.05`), which improves equal 4x but still trails 3x. Equal four-card split remains a negative scaling diagnostic at 34.929 tok/s.
 - Best static FP8 result so far: vLLM/XPU, `vrfai/Qwen3.6-27B-FP8`, local XPU patches, 4x B70 TP4, CPU n-gram speculative decode, 49.582 output tok/s at 512 prompt / 512 output. This preserves target-model quality through verified speculative decoding and is ahead of the current Q4_0 TP3 validation.
 - Static FP8 TP4 is also the preferred 32k-context Qwen3.6 27B layout: TP4/PP1 at `max_model_len=32768` reaches 42.996 tok/s for 2048 prompt / 256 output and reports 1,133,163 GPU KV-cache tokens. TP2/PP2 fits but is much slower for batch-1 decode at 26.362 tok/s.
@@ -39,6 +39,7 @@ Reproducibility notes, benchmark payloads, and local patches from the Intel Arc 
 - `notes/2026-05-06-q4-vdr4-negative.md`: runtime-gated one-lane-per-Q4_0-block reordered MMVQ screen; regressed short decode, so keep it off.
 - `notes/2026-05-06-q4-allreduce-max-bytes.md`: opt-in larger fused allreduce ceiling probe; useful diagnostic but not a speed win.
 - `notes/2026-05-06-fp8-pp2-postreboot-validation.md`: post-reboot FP8 PP2xTP2 XCCL/load/speculative plumbing validation.
+- `notes/2026-05-07-q4-q8-allreduce-add-guardfix.md`: regression fix for the misplaced Q8-cache guard that disabled the validated allreduce+ADD path.
 - `data/qwen36-fp8-32k-tp4-vs-pp2-20260506.json`: post-reboot Q4 sanity plus FP8 32k-context TP4 vs TP2/PP2 validation.
 - `data/q4-esimd-blockscales-20260506.json`: structured ESIMD block-loaded scale metadata screen.
 - `data/q4-active-device-row-split-20260506.json`: structured active-device row-split patch validation and negative row-split smoke.
@@ -50,6 +51,7 @@ Reproducibility notes, benchmark payloads, and local patches from the Intel Arc 
 - `data/qwen36-q4-vdr4-negative-20260506.json`: structured Q4_0 reordered MMVQ VDR4 negative screen.
 - `data/qwen36-q4-allreduce-max-bytes-20260506.json`: structured Q4_0 larger allreduce-fusion ceiling probe.
 - `data/qwen36-fp8-pp2-postreboot-validation-20260506.json`: structured FP8 PP2xTP2 post-reboot validation data.
+- `data/qwen36-q4-q8-allreduce-add-guardfix-20260507.json`: structured Q4_0 guard-fix trace, restored throughput, and LocalMaxxing record.
 - `scripts/bench-qwen36-q4_0-gguf-vulkan-matrix.sh`: Q4_0 GGUF Vulkan benchmark sweep harness.
 - `scripts/bench-qwen36-q4_0-gguf-sycl-matrix.sh`: Q4_0 GGUF SYCL benchmark sweep harness.
 - `scripts/bench-qwen36-b70-single-mtp.sh`: single-B70 vLLM INT4 MTP benchmark wrapper.
@@ -68,6 +70,7 @@ Reproducibility notes, benchmark payloads, and local patches from the Intel Arc 
 - `patches/llama-cpp-sycl-fused-mmvq2-swiglu-current-20260506.patch.gz.b64`: current SYCL source diff containing the fused MMVQ2+SwiGLU path.
 - `patches/llama-cpp-sycl-rmsnormmul-current-20260506.patch.gz.b64`: current SYCL source diff containing the RMS_NORM+scale-MUL path and allocator diagnostics.
 - `patches/llama-cpp-sycl-meta-mulmat-add-diagnostic-current-20260506.patch.gz.b64`: current llama.cpp diff containing the diagnostic `MUL_MAT+allreduce+ADD` scheduler hook.
+- `patches/llama-cpp-sycl-q4-current-guardfix-20260507.patch.gz.b64`: current llama.cpp diff after restoring Q8-cache compatibility for the validated allreduce+ADD path.
 - `patches/llama-cpp-sycl-q4-vdr4-experiment-current-20260506.patch.gz.b64`: current llama.cpp diff containing the runtime-gated Q4_0 reordered MMVQ VDR4 experiment.
 - `patches/llama-cpp-meta-allreduce-max-bytes-20260506.patch`: focused opt-in max-byte knob for fused meta allreduce diagnostics.
 - `patches/vllm-xpu-mtp-fallback.patch`: vLLM 0.20.1 XPU speculative/MTP fallback patch.

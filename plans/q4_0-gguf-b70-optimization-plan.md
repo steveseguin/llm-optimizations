@@ -1481,6 +1481,26 @@ Goal: improve quality-preserving Q4_0 performance without power-limit changes.
      - keep disabled;
      - this proves 48 launches can be removed, but the deferred copy and mixed-kernel cost cancel the win;
      - a production version likely needs graph reordering before allocation or a deeper fused linear-attention block, not a late backend scheduler rewrite.
+74. 2026-05-07 Q8-cache/allreduce+ADD regression fix:
+   - after the mixed-row diagnostic work, the TP3 current-stack control unexpectedly dropped from the known high-40 tok/s range to `27.676519 tok/s` on `p0/n256/r2`;
+   - root cause:
+     - `ggml_backend_sycl_comm_allreduce_add_tensor()` had an over-broad `g_ggml_sycl_q8_cache > 0` guard;
+     - that guard was intended for the unvalidated diagnostic `MUL_MAT+allreduce+ADD` path, but it disabled the already validated meta `allreduce+ADD` path used by the production Q8 activation-cache recipe;
+     - meta trace before the fix showed the graph recognizing `fused_add`, but runtime allreduce paths were plain `backend` plus final `backend+getrows`;
+   - fix:
+     - removed the Q8-cache rejection from `ggml_backend_sycl_comm_allreduce_add_tensor()`;
+     - kept the Q8-cache guard on the experimental `comm_mul_mat_allreduce_add` diagnostic path;
+   - validation:
+     - meta trace after the fix: normal decode path reports `backend+add` for projection residuals and `backend+getrows` for the final logits path;
+     - exact decode-only control after fix: `p0/n256/r3` restored to `48.926449 tok/s`;
+     - full validation after fix: `p512/n512/r3`, prompt `194.121497 tok/s`, decode `49.552666 tok/s`, computed total `78.947383 tok/s`;
+   - LocalMaxxing:
+     - detailed annotated payload returned HTTP 500 again;
+     - reduced core-metric payload was accepted as ID `cmous57ci00lqld01a8x5azdq`;
+   - decision:
+     - this is a correctness/performance restoration for the current Q4_0 best stack, not a quality-changing optimization;
+     - invalidate the earlier mixed-row TP3 A/B results around `27 tok/s`; they were measuring the misplaced guard, not mixed fusion performance;
+     - keep `GGML_SYCL_Q8_CACHE=1`, `GGML_META_FUSE_ALLREDUCE_ADD=1`, and `GGML_META_FUSE_ALLREDUCE_GET_ROWS=1` together in the best TP3 recipe.
 
 ## Success Criteria
 
@@ -1490,7 +1510,7 @@ Goal: improve quality-preserving Q4_0 performance without power-limit changes.
 - Static FP8 current best: `vrfai/Qwen3.6-27B-FP8` on four B70s with patched vLLM/XPU FlashAttention2 plus n-gram speculative decode reaches `49.581893 tok/s` on 512 prompt / 512 output. This is ahead of the Q4_0 TP3 validation while preserving more fidelity than INT4 paths.
 - Static FP8 32k-context status: TP4 with patched vLLM/XPU FlashAttention2 succeeds at `max_model_len=32768` and reports `1,133,163` GPU KV-cache tokens with `42.996276 tok/s` at 2048 prompt / 256 output. TP2/PP2 also fits but is slower (`26.361533 tok/s`) and reports slightly less 32k KV capacity.
 - Current dual-card milestone reached: Q4_0 GGUF single session `42.106013 tok/s` on two B70s for 512 prompt / 512 output with the current fused stack, quality preserving, software-only.
-- Current improved multi-card milestone: Q4_0 GGUF single session `49.403656 tok/s` on three B70s for 512 prompt / 512 output with Q8 activation cache, fused MMVQ2, fused MMVQ2+SwiGLU, fused RMS_NORM+scale-MUL, fused allreduce+GET_ROWS, single-kernel allreduce, fused allreduce+ADD, `GGML_SYCL_COMM_SYNC_AFTER=2`, and `-ub 128`. This is quality preserving and software-only.
+- Current improved multi-card milestone: Q4_0 GGUF single session `49.552666 tok/s` on three B70s for 512 prompt / 512 output with Q8 activation cache, fused MMVQ2, fused MMVQ2+SwiGLU, fused RMS_NORM+scale-MUL, fused allreduce+ADD, fused final allreduce+GET_ROWS, single-kernel allreduce, `GGML_SYCL_COMM_SYNC_AFTER=2`, and `-ub 128`. This is quality preserving and software-only. The earlier five-repeat validation remains `49.403656 tok/s`; the 2026-05-07 guard-fix refresh was a three-repeat run.
 - Current four-card Q4_0 status: assist split `1/1/1/0.05` reaches `39.204149 tok/s`, improving the equal-split four-card result by `12.24%` but still trailing the best three-card result, so quad Q4_0 remains a kernel/scheduling investigation rather than the production path. The RMS_NORM+MUL rerun of that assist split failed with Level Zero OOM during `MUL_MAT`.
 - Dual-card success: Q4_0 GGUF single session `>=48 tok/s` first, then `>=52 tok/s`, without switching away from Q4_0.
 - Four-card success: Q4_0 GGUF single session must exceed dual-card by a meaningful margin before treating quad tensor split as viable.
