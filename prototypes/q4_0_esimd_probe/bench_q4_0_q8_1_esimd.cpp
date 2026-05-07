@@ -12,6 +12,7 @@
 #include <random>
 #include <stdexcept>
 #include <string>
+#include <type_traits>
 #include <vector>
 
 namespace esimd = sycl::ext::intel::esimd;
@@ -34,6 +35,7 @@ struct options {
     int warmup = 40;
     int check_rows = 8;
     bool fused2 = false;
+    std::string kernel = "esimd";
 };
 
 static int parse_int_arg(const char * arg, const char * name) {
@@ -68,14 +70,19 @@ static options parse_args(int argc, char ** argv) {
         } else if (a == "--fused2") {
             opt.fused2 = true;
         } else if (a == "--help" || a == "-h") {
-            std::cout << "usage: bench_q4_0_q8_1_esimd [--n rows] [--k cols] [--iters n] [--warmup n] [--check-rows n] [--fused2]\n";
+            std::cout << "usage: bench_q4_0_q8_1_esimd [--n rows] [--k cols] [--iters n] [--warmup n] [--check-rows n] [--kernel esimd|subgroup] [--fused2]\n";
             std::exit(0);
+        } else if (a == "--kernel") {
+            opt.kernel = need_value("--kernel");
         } else {
             throw std::runtime_error("unknown arg: " + a);
         }
     }
     if (opt.k % 128 != 0) {
         throw std::runtime_error("--k must be a multiple of 128");
+    }
+    if (opt.kernel != "esimd" && opt.kernel != "subgroup") {
+        throw std::runtime_error("--kernel must be esimd or subgroup");
     }
     return opt;
 }
@@ -169,6 +176,179 @@ static void q4_0_q8_1_ref_row(
         out[row] = acc;
     }
 }
+
+template <typename T>
+static inline sycl::vec<T, 4> extract_and_sign_or_zero_extend4(T val) {
+    return sycl::vec<T, 1>(val)
+        .template as<sycl::vec<std::conditional_t<std::is_signed_v<T>, int8_t, uint8_t>, 4>>()
+        .template convert<T>();
+}
+
+template <typename T1, typename T2, typename T3>
+static inline auto dp4a_emul(T1 a, T2 b, T3 c) {
+    using acc_t = int;
+    acc_t res = c;
+    auto va = extract_and_sign_or_zero_extend4(a);
+    auto vb = extract_and_sign_or_zero_extend4(b);
+    res += va[0] * vb[0];
+    res += va[1] * vb[1];
+    res += va[2] * vb[2];
+    res += va[3] * vb[3];
+    return res;
+}
+
+static inline int load_i32_from_u8(const uint8_t * p, int i32) {
+    return reinterpret_cast<const int *>(p)[i32];
+}
+
+static inline int load_i32_from_i8(const int8_t * p, int i32) {
+    return reinterpret_cast<const int *>(p)[i32];
+}
+
+struct q4_0_q8_1_subgroup_kernel {
+    const int8_t * q8;
+    const sycl::half * q8_ds;
+    const uint8_t * qs;
+    const sycl::half * d;
+    float * out;
+    int n;
+    int k;
+    int nblocks;
+
+    void operator()(sycl::nd_item<1> it) const {
+        const auto sg = it.get_sub_group();
+        const int row = (int) it.get_group_linear_id();
+        const int lane = (int) sg.get_local_linear_id();
+        if (row >= n) {
+            return;
+        }
+
+        constexpr int qi = 4;
+        constexpr int vdr = 2;
+        constexpr int lanes_per_block = qi / vdr;
+        constexpr int blocks_per_subgroup = vdr * 32 / qi;
+        static_assert(blocks_per_subgroup == 16);
+
+        const uint8_t * row_qs = qs + (size_t) row * (k / 2);
+        const sycl::half * row_d = d + (size_t) row * nblocks;
+        float partial = 0.0f;
+
+        for (int block = lane / lanes_per_block; block < nblocks; block += blocks_per_subgroup) {
+            const int iqs = vdr * (lane % lanes_per_block);
+            const uint8_t * bq4 = row_qs + block * (QK4_0 / 2);
+            const int8_t * bq8 = q8 + block * QK8_1;
+
+            int v[vdr];
+            int u[2 * vdr];
+#pragma unroll
+            for (int i = 0; i < vdr; ++i) {
+                v[i] = load_i32_from_u8(bq4, iqs + i);
+                u[2 * i + 0] = load_i32_from_i8(bq8, iqs + i);
+                u[2 * i + 1] = load_i32_from_i8(bq8, iqs + i + qi);
+            }
+
+            int sumi = 0;
+#pragma unroll
+            for (int i = 0; i < vdr; ++i) {
+                const int vi0 = (v[i] >> 0) & 0x0F0F0F0F;
+                const int vi1 = (v[i] >> 4) & 0x0F0F0F0F;
+                sumi = dp4a_emul(vi0, u[2 * i + 0], sumi);
+                sumi = dp4a_emul(vi1, u[2 * i + 1], sumi);
+            }
+
+            const float d4 = (float) row_d[block];
+            const float d8 = (float) q8_ds[(size_t) block * 2 + 0];
+            const float s8 = (float) q8_ds[(size_t) block * 2 + 1];
+            partial += d4 * (sumi * d8 - (8 * vdr / qi) * s8);
+        }
+
+        const float sum = sycl::reduce_over_group(sg, partial, std::plus<>());
+        if (sg.leader()) {
+            out[row] = sum;
+        }
+    }
+};
+
+struct q4_0_q8_1_subgroup_fused2_kernel {
+    const int8_t * q8;
+    const sycl::half * q8_ds;
+    const uint8_t * qs0;
+    const sycl::half * d0;
+    float * out0;
+    const uint8_t * qs1;
+    const sycl::half * d1;
+    float * out1;
+    int n;
+    int k;
+    int nblocks;
+
+    void operator()(sycl::nd_item<1> it) const {
+        const auto sg = it.get_sub_group();
+        const int row = (int) it.get_group_linear_id();
+        const int lane = (int) sg.get_local_linear_id();
+        if (row >= n) {
+            return;
+        }
+
+        constexpr int qi = 4;
+        constexpr int vdr = 2;
+        constexpr int lanes_per_block = qi / vdr;
+        constexpr int blocks_per_subgroup = vdr * 32 / qi;
+        static_assert(blocks_per_subgroup == 16);
+
+        const uint8_t * row_qs0 = qs0 + (size_t) row * (k / 2);
+        const uint8_t * row_qs1 = qs1 + (size_t) row * (k / 2);
+        const sycl::half * row_d0 = d0 + (size_t) row * nblocks;
+        const sycl::half * row_d1 = d1 + (size_t) row * nblocks;
+        float partial0 = 0.0f;
+        float partial1 = 0.0f;
+
+        for (int block = lane / lanes_per_block; block < nblocks; block += blocks_per_subgroup) {
+            const int iqs = vdr * (lane % lanes_per_block);
+            const int8_t * bq8 = q8 + block * QK8_1;
+
+            int u[2 * vdr];
+#pragma unroll
+            for (int i = 0; i < vdr; ++i) {
+                u[2 * i + 0] = load_i32_from_i8(bq8, iqs + i);
+                u[2 * i + 1] = load_i32_from_i8(bq8, iqs + i + qi);
+            }
+
+            auto partial_for = [&](const uint8_t * row_qs, const sycl::half * row_d) {
+                const uint8_t * bq4 = row_qs + block * (QK4_0 / 2);
+                int v[vdr];
+#pragma unroll
+                for (int i = 0; i < vdr; ++i) {
+                    v[i] = load_i32_from_u8(bq4, iqs + i);
+                }
+
+                int sumi = 0;
+#pragma unroll
+                for (int i = 0; i < vdr; ++i) {
+                    const int vi0 = (v[i] >> 0) & 0x0F0F0F0F;
+                    const int vi1 = (v[i] >> 4) & 0x0F0F0F0F;
+                    sumi = dp4a_emul(vi0, u[2 * i + 0], sumi);
+                    sumi = dp4a_emul(vi1, u[2 * i + 1], sumi);
+                }
+
+                const float d4 = (float) row_d[block];
+                const float d8 = (float) q8_ds[(size_t) block * 2 + 0];
+                const float s8 = (float) q8_ds[(size_t) block * 2 + 1];
+                return d4 * (sumi * d8 - (8 * vdr / qi) * s8);
+            };
+
+            partial0 += partial_for(row_qs0, row_d0);
+            partial1 += partial_for(row_qs1, row_d1);
+        }
+
+        const float sum0 = sycl::reduce_over_group(sg, partial0, std::plus<>());
+        const float sum1 = sycl::reduce_over_group(sg, partial1, std::plus<>());
+        if (sg.leader()) {
+            out0[row] = sum0;
+            out1[row] = sum1;
+        }
+    }
+};
 
 struct q4_0_q8_1_esimd_kernel {
     const int8_t * q8;
@@ -369,6 +549,24 @@ static sycl::event launch_single(
     });
 }
 
+static sycl::event launch_subgroup_single(
+        sycl::queue & q,
+        const int8_t * q8,
+        const sycl::half * q8_ds,
+        const uint8_t * qs,
+        const sycl::half * d,
+        float * out,
+        int n,
+        int k) {
+    const int nblocks = k / QK4_0;
+    return q.submit([&](sycl::handler & h) {
+        h.parallel_for(sycl::nd_range<1>(sycl::range<1>((size_t) n * 32), sycl::range<1>(32)),
+                       [=](sycl::nd_item<1> it) [[sycl::reqd_sub_group_size(32)]] {
+                           q4_0_q8_1_subgroup_kernel{q8, q8_ds, qs, d, out, n, k, nblocks}(it);
+                       });
+    });
+}
+
 static sycl::event launch_fused2(
         sycl::queue & q,
         const int8_t * q8,
@@ -385,6 +583,28 @@ static sycl::event launch_fused2(
     return q.submit([&](sycl::handler & h) {
         h.parallel_for(sycl::range<1>(n),
                        q4_0_q8_1_esimd_fused2_kernel{q8, q8_ds, qs0, d0, out0, qs1, d1, out1, n, k, nblocks});
+    });
+}
+
+static sycl::event launch_subgroup_fused2(
+        sycl::queue & q,
+        const int8_t * q8,
+        const sycl::half * q8_ds,
+        const uint8_t * qs0,
+        const sycl::half * d0,
+        float * out0,
+        const uint8_t * qs1,
+        const sycl::half * d1,
+        float * out1,
+        int n,
+        int k) {
+    const int nblocks = k / QK4_0;
+    return q.submit([&](sycl::handler & h) {
+        h.parallel_for(sycl::nd_range<1>(sycl::range<1>((size_t) n * 32), sycl::range<1>(32)),
+                       [=](sycl::nd_item<1> it) [[sycl::reqd_sub_group_size(32)]] {
+                           q4_0_q8_1_subgroup_fused2_kernel{
+                                   q8, q8_ds, qs0, d0, out0, qs1, d1, out1, n, k, nblocks}(it);
+                       });
     });
 }
 
@@ -454,8 +674,13 @@ int main(int argc, char ** argv) {
         q.memcpy(d_qs1, h_qs1.data(), h_qs1.size() * sizeof(uint8_t)).wait();
         q.memcpy(d_d1, h_d1.data(), h_d1.size() * sizeof(sycl::half)).wait();
 
-        if (opt.fused2) {
+        const bool use_subgroup = opt.kernel == "subgroup";
+        if (opt.fused2 && use_subgroup) {
+            launch_subgroup_fused2(q, d_q8, d_q8_ds, d_qs0, d_d0, d_out0, d_qs1, d_d1, d_out1, opt.n, opt.k).wait();
+        } else if (opt.fused2) {
             launch_fused2(q, d_q8, d_q8_ds, d_qs0, d_d0, d_out0, d_qs1, d_d1, d_out1, opt.n, opt.k).wait();
+        } else if (use_subgroup) {
+            launch_subgroup_single(q, d_q8, d_q8_ds, d_qs0, d_d0, d_out0, opt.n, opt.k).wait();
         } else {
             launch_single(q, d_q8, d_q8_ds, d_qs0, d_d0, d_out0, opt.n, opt.k).wait();
         }
@@ -492,9 +717,17 @@ int main(int argc, char ** argv) {
             check(out1, ref1);
         }
 
-        const double us = opt.fused2
+        const double us = opt.fused2 && use_subgroup
+            ? median_time_us(opt.warmup, opt.iters, [&]() {
+                return launch_subgroup_fused2(q, d_q8, d_q8_ds, d_qs0, d_d0, d_out0, d_qs1, d_d1, d_out1, opt.n, opt.k);
+            })
+            : opt.fused2
             ? median_time_us(opt.warmup, opt.iters, [&]() {
                 return launch_fused2(q, d_q8, d_q8_ds, d_qs0, d_d0, d_out0, d_qs1, d_d1, d_out1, opt.n, opt.k);
+            })
+            : use_subgroup
+            ? median_time_us(opt.warmup, opt.iters, [&]() {
+                return launch_subgroup_single(q, d_q8, d_q8_ds, d_qs0, d_d0, d_out0, opt.n, opt.k);
             })
             : median_time_us(opt.warmup, opt.iters, [&]() {
                 return launch_single(q, d_q8, d_q8_ds, d_qs0, d_d0, d_out0, opt.n, opt.k);
@@ -508,7 +741,8 @@ int main(int argc, char ** argv) {
         const double gops = ops / (us * 1.0e-6) / 1.0e9;
 
         std::cout << std::fixed << std::setprecision(3)
-                  << "mode=" << (opt.fused2 ? "fused2" : "single")
+                  << "kernel=" << opt.kernel
+                  << " mode=" << (opt.fused2 ? "fused2" : "single")
                   << " n=" << opt.n
                   << " k=" << opt.k
                   << " median_us=" << us

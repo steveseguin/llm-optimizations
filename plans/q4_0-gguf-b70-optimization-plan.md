@@ -1443,6 +1443,44 @@ Goal: improve quality-preserving Q4_0 performance without power-limit changes.
      - note: `/home/steve/llm-optimizations/notes/2026-05-06-q4-vdr4-negative.md`;
      - data: `/home/steve/llm-optimizations/data/qwen36-q4-vdr4-negative-20260506.json`;
      - patch: `/home/steve/llm-optimizations/patches/llama-cpp-sycl-q4-vdr4-experiment-current-20260506.patch.gz.b64`.
+71. 2026-05-07 exact-layout subgroup versus ESIMD screen:
+   - added a `--kernel subgroup|esimd` mode to the standalone Q4_0 probe so the ESIMD blockscale path can be compared against a llama.cpp-like reordered subgroup kernel;
+   - result: subgroup is faster on all tested Qwen3.6 Q4_0 shapes, including `17408x5120` single (`85.417 us` subgroup vs `99.687 us` ESIMD) and fused2 (`169.583 us` subgroup vs `177.708 us` ESIMD);
+   - decision:
+     - do not port the ESIMD blockscale branch directly into llama.cpp yet;
+     - the active subgroup reordered MMVQ is not the obvious bottleneck;
+     - next useful Q4 work is graph/launch reduction or a more substantial ESIMD redesign;
+   - artifacts:
+     - note: `/home/steve/llm-optimizations/notes/2026-05-07-q4-layout-lookahead-mixed-negative.md`;
+     - data: `/home/steve/llm-optimizations/data/qwen36-q4-layout-lookahead-mixed-20260507.json`;
+     - TSV: `/home/steve/bench-results/qwen36-q4_0-gguf/layout-compare-20260506/q4-layout-compare-20260506T233237Z.tsv`.
+72. 2026-05-07 non-adjacent MMVQ2 lookahead:
+   - implemented `GGML_SYCL_FUSE_MMVQ2_LOOKAHEAD=1`, with an overlap guard for later-node destination buffers;
+   - one-token debug found candidates without crashing but did not reduce visible kernel counts;
+   - no-debug `p0/n128/r2` result:
+     - off: `24.930745 tok/s`;
+     - on: `24.930451 tok/s`;
+   - decision:
+     - keep disabled;
+     - useful as scheduler scaffolding, but not a current optimization.
+73. 2026-05-07 mixed-row `attn_qkv + attn_gate` fusion:
+   - implemented `GGML_SYCL_FUSE_MMVQ2_MIXED=1` to fuse linear-attention `attn_qkv.weight` and `attn_gate.weight`, which share `attn_norm`;
+   - because the graph allocator can reuse the later `z` destination before the original gate node, the correct backend-only path writes `z` to a temporary and enqueues a deferred device copy when `z` is reached;
+   - debug counts changed as intended:
+     - plain Q4 reordered MMVQ: `528 -> 432`;
+     - mixed fused2: `0 -> 48`;
+     - deferred copies: `48`;
+     - Q8 activation conversions: `676 -> 580`;
+   - no-debug `p0/n128/r2`, normal Q8 cache:
+     - off: `25.088701 tok/s`;
+     - on: `25.092403 tok/s`;
+   - no-debug `p0/n128/r2`, Q8 cache disabled:
+     - off: `24.857660 tok/s`;
+     - on: `24.890995 tok/s`;
+   - decision:
+     - keep disabled;
+     - this proves 48 launches can be removed, but the deferred copy and mixed-kernel cost cancel the win;
+     - a production version likely needs graph reordering before allocation or a deeper fused linear-attention block, not a late backend scheduler rewrite.
 
 ## Success Criteria
 

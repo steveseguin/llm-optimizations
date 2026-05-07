@@ -1,0 +1,78 @@
+{
+  "date": "2026-05-07",
+  "model": {
+    "name": "Qwen3.6-27B-Q4_0.gguf",
+    "path": "/home/steve/models/qwen3.6-27b-q4_0-gguf/Qwen3.6-27B-Q4_0.gguf",
+    "quantization": "Q4_0"
+  },
+  "hardware": {
+    "gpu": "Intel Arc Pro B70",
+    "gpu_count_used": 1,
+    "device": "SYCL2"
+  },
+  "common_command_shape": "llama-bench -m /home/steve/models/qwen3.6-27b-q4_0-gguf/Qwen3.6-27B-Q4_0.gguf -dev SYCL2 -ngl 99 -sm none -fa 1 -ub 128 -ctk f16 -ctv f16 -t 8 --poll 50",
+  "layout_compare": {
+    "tsv": "/home/steve/bench-results/qwen36-q4_0-gguf/layout-compare-20260506/q4-layout-compare-20260506T233237Z.tsv",
+    "results_us": [
+      {"shape": "17408x5120", "mode": "single", "subgroup": 85.417, "esimd_blockscale": 99.687},
+      {"shape": "17408x5120", "mode": "fused2", "subgroup": 169.583, "esimd_blockscale": 177.708},
+      {"shape": "4352x5120", "mode": "single", "subgroup": 11.562, "esimd_blockscale": 27.604},
+      {"shape": "4352x5120", "mode": "fused2", "subgroup": 24.896, "esimd_blockscale": 44.375},
+      {"shape": "5120x17408", "mode": "single", "subgroup": 85.417, "esimd_blockscale": 107.708},
+      {"shape": "5120x17408", "mode": "fused2", "subgroup": 174.375, "esimd_blockscale": 200.938},
+      {"shape": "5120x1536", "mode": "single", "subgroup": 5.417, "esimd_blockscale": 12.187},
+      {"shape": "5120x1536", "mode": "fused2", "subgroup": 7.5, "esimd_blockscale": 17.291}
+    ],
+    "decision": "Current subgroup reordered MMVQ remains faster than the ESIMD blockscale harness on exact-layout shapes."
+  },
+  "lookahead": {
+    "env": {
+      "GGML_SYCL_FUSE_MMVQ2_LOOKAHEAD": 1,
+      "GGML_SYCL_FUSE_MMVQ2_LOOKAHEAD_MAX": 24
+    },
+    "debug_smoke": {
+      "json": "/home/steve/bench-results/qwen36-q4_0-gguf/lookahead-20260506/lookahead-debug-p0n1-20260506T234530Z.jsonl",
+      "log": "/home/steve/bench-results/qwen36-q4_0-gguf/lookahead-20260506/lookahead-debug-p0n1-20260506T234530Z.log",
+      "avg_ts": 24.809633,
+      "plain_q4_calls": 528,
+      "fused2_calls": 16,
+      "fused2_swiglu_calls": 64
+    },
+    "ab_p0n128": {
+      "tsv": "/home/steve/bench-results/qwen36-q4_0-gguf/lookahead-20260506/lookahead-ab-p0n128-20260506T234825Z.tsv",
+      "off_tok_s": 24.930745,
+      "on_tok_s": 24.930451
+    },
+    "decision": "Neutral; keep disabled."
+  },
+  "mixed_qkv_gate_deferred": {
+    "env": {
+      "GGML_SYCL_FUSE_MMVQ2_MIXED": 1,
+      "GGML_SYCL_FUSE_MMVQ2_LOOKAHEAD_MAX": 80
+    },
+    "debug_smoke": {
+      "json": "/home/steve/bench-results/qwen36-q4_0-gguf/mixed-fuse-20260506/mixed-qkv-gate-deferred-debug-p0n1-20260507T002117Z.jsonl",
+      "log": "/home/steve/bench-results/qwen36-q4_0-gguf/mixed-fuse-20260506/mixed-qkv-gate-deferred-debug-p0n1-20260507T002117Z.log",
+      "avg_ts_debug": 23.886185,
+      "plain_q4_calls": 432,
+      "mixed_fused2_calls": 48,
+      "deferred_copy_calls": 48,
+      "q8_quantize_calls": 580
+    },
+    "ab_p0n128_q8_cache_on": {
+      "tsv": "/home/steve/bench-results/qwen36-q4_0-gguf/mixed-fuse-20260506/mixed-qkv-gate-ab-p0n128-20260507T002210Z.tsv",
+      "off_tok_s": 25.088701,
+      "on_tok_s": 25.092403
+    },
+    "ab_p0n128_q8_cache_off": {
+      "tsv": "/home/steve/bench-results/qwen36-q4_0-gguf/mixed-fuse-20260506/mixed-qkv-gate-q8off-ab-p0n128-20260507T002349Z.tsv",
+      "off_tok_s": 24.85766,
+      "on_tok_s": 24.890995
+    },
+    "decision": "Mechanically works and removes 48 launches, but end-to-end decode is effectively flat; keep disabled."
+  },
+  "localmaxxing": {
+    "submitted": false,
+    "reason": "No meaningful end-to-end inference improvement; this is a negative/neutral diagnostic."
+  }
+}
