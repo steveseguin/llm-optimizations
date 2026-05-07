@@ -161,7 +161,7 @@ index 89b3450..34b0233 100644
              fields.emplace_back("no_ooae");
          }
 diff --git a/ggml/src/ggml-sycl.cpp b/ggml/src/ggml-sycl.cpp
-index e0f8536..65ae425 100644
+index e0f8536..c4b1652 100644
 --- a/ggml/src/ggml-sycl.cpp
 +++ b/ggml/src/ggml-sycl.cpp
 @@ -84,64 +84,12 @@ static __dpct_inline__ float op_add(const float a, const float b) {
@@ -602,7 +602,183 @@ index e0f8536..65ae425 100644
      GGML_ASSERT(src0->type == GGML_TYPE_F16);
  
      GGML_TENSOR_BINARY_OP_LOCALS
-@@ -3992,6 +4193,14 @@ static void ggml_sycl_sum_rows(ggml_backend_sycl_context & ctx, const ggml_tenso
+@@ -3736,6 +3937,89 @@ __dpct_inline__ static void k_copy_dst_from_contiguous(
+     }
+ }
+ 
++static __dpct_inline__ float ggml_sycl_apply_moe_gate_unary(const float x, const int unary_op, const float limit) {
++    float y;
++    switch ((ggml_unary_op) unary_op) {
++        case GGML_UNARY_OP_SILU:
++            y = x / (1.0f + sycl::native::exp(-x));
++            break;
++        case GGML_UNARY_OP_GELU:
++            {
++                const float GELU_COEF_A    = 0.044715f;
++                const float SQRT_2_OVER_PI = 0.79788456080286535587989211986876f;
++                y = 0.5f * x * (1.0f + sycl::tanh(SQRT_2_OVER_PI * x * (1.0f + GELU_COEF_A * x * x)));
++            }
++            break;
++        case GGML_UNARY_OP_RELU:
++            y = sycl::fmax(0.0f, x);
++            break;
++        default:
++            y = x;
++            break;
++    }
++
++    return limit > 1e-6f ? sycl::fmin(y, limit) : y;
++}
++
++static void moe_up_gate_combine_f32(const float * up, const float * gate, float * dst,
++                                    const int64_t n, const int unary_op, const float limit,
++                                    const sycl::nd_item<3> & item_ct1) {
++    const int64_t i = item_ct1.get_local_range(2) * item_ct1.get_group(2) +
++                      item_ct1.get_local_id(2);
++    if (i >= n) {
++        return;
++    }
++
++    dst[i] = up[i] * ggml_sycl_apply_moe_gate_unary(gate[i], unary_op, limit);
++}
++
++static void moe_up_gate_combine_merged_f32(const float * up_gate, float * dst,
++                                           const int64_t ne0, const int64_t n,
++                                           const int unary_op, const float limit,
++                                           const sycl::nd_item<3> & item_ct1) {
++    const int64_t i = item_ct1.get_local_range(2) * item_ct1.get_group(2) +
++                      item_ct1.get_local_id(2);
++    if (i >= n) {
++        return;
++    }
++
++    const int64_t i0  = i % ne0;
++    const int64_t row = i / ne0;
++    const float * row_ptr = up_gate + row * 2 * ne0;
++    const float gate = row_ptr[i0];
++    const float up   = row_ptr[ne0 + i0];
++    dst[i] = up * ggml_sycl_apply_moe_gate_unary(gate, unary_op, limit);
++}
++
++static void moe_up_gate_combine_f32_sycl(const float * up, const float * gate, float * dst,
++                                         const int64_t n, const int unary_op, const float limit,
++                                         queue_ptr stream) {
++    const int block_size = 256;
++    const int64_t num_blocks = (n + block_size - 1) / block_size;
++    stream->parallel_for(
++        sycl::nd_range<3>(sycl::range<3>(1, 1, num_blocks) *
++                              sycl::range<3>(1, 1, block_size),
++                          sycl::range<3>(1, 1, block_size)),
++        [=](sycl::nd_item<3> item_ct1) {
++            moe_up_gate_combine_f32(up, gate, dst, n, unary_op, limit, item_ct1);
++        });
++}
++
++static void moe_up_gate_combine_merged_f32_sycl(const float * up_gate, float * dst,
++                                                const int64_t ne0, const int64_t n,
++                                                const int unary_op, const float limit,
++                                                queue_ptr stream) {
++    const int block_size = 256;
++    const int64_t num_blocks = (n + block_size - 1) / block_size;
++    stream->parallel_for(
++        sycl::nd_range<3>(sycl::range<3>(1, 1, num_blocks) *
++                              sycl::range<3>(1, 1, block_size),
++                          sycl::range<3>(1, 1, block_size)),
++        [=](sycl::nd_item<3> item_ct1) {
++            moe_up_gate_combine_merged_f32(up_gate, dst, ne0, n, unary_op, limit, item_ct1);
++        });
++}
++
+ static void ggml_sycl_mul_mat_id(ggml_backend_sycl_context & ctx, const ggml_tensor *src0,
+                                  const ggml_tensor *src1,
+                                  ggml_tensor *dst) try {
+@@ -3904,6 +4188,85 @@ catch (sycl::exception const &exc) {
+   std::exit(1);
+ }
+ 
++static void ggml_sycl_moe_fused_up_gate(ggml_backend_sycl_context & ctx, const ggml_tensor * src0,
++                                        const ggml_tensor * src1, ggml_tensor * dst) try {
++    GGML_UNUSED(src0);
++    GGML_UNUSED(src1);
++
++    const ggml_tensor * up_exps   = dst->src[0];
++    const ggml_tensor * gate_exps = dst->src[1];
++    const ggml_tensor * inp       = dst->src[2];
++    const ggml_tensor * ids       = dst->src[3];
++
++    GGML_ASSERT(dst->type == GGML_TYPE_F32);
++    GGML_ASSERT(inp->type == GGML_TYPE_F32);
++    GGML_ASSERT(ids->type == GGML_TYPE_I32);
++    GGML_ASSERT(!dst->src[4] && !dst->src[5] && "SYCL MOE_FUSED_UP_GATE bias path is not implemented");
++    GGML_ASSERT(ggml_is_contiguous(dst));
++
++    const int unary_op = dst->op_params[0];
++    GGML_ASSERT(unary_op == GGML_UNARY_OP_SILU || unary_op == GGML_UNARY_OP_GELU || unary_op == GGML_UNARY_OP_RELU);
++    const float limit = *(const float *)(dst->op_params + 1);
++
++    const int64_t n = ggml_nelements(dst);
++    const size_t dst_bytes = n * sizeof(float);
++
++    queue_ptr stream = ctx.stream();
++
++    if (gate_exps) {
++        ggml_sycl_pool_alloc<char> up_tmp(ctx.pool(), dst_bytes);
++        ggml_sycl_pool_alloc<char> gate_tmp(ctx.pool(), dst_bytes);
++
++        ggml_tensor up_node = *dst;
++        up_node.op = GGML_OP_MUL_MAT_ID;
++        up_node.data = up_tmp.get();
++        up_node.src[0] = const_cast<ggml_tensor *>(up_exps);
++        up_node.src[1] = const_cast<ggml_tensor *>(inp);
++        up_node.src[2] = const_cast<ggml_tensor *>(ids);
++        up_node.src[3] = nullptr;
++        up_node.src[4] = nullptr;
++        up_node.src[5] = nullptr;
++
++        ggml_tensor gate_node = up_node;
++        gate_node.data = gate_tmp.get();
++        gate_node.src[0] = const_cast<ggml_tensor *>(gate_exps);
++
++        ggml_sycl_mul_mat_id(ctx, up_exps, inp, &up_node);
++        ggml_sycl_mul_mat_id(ctx, gate_exps, inp, &gate_node);
++
++        moe_up_gate_combine_f32_sycl((const float *) up_tmp.get(), (const float *) gate_tmp.get(),
++                                     (float *) dst->data, n, unary_op, limit, stream);
++    } else {
++        const int64_t ne0 = dst->ne[0];
++        ggml_sycl_pool_alloc<char> up_gate_tmp(ctx.pool(), 2 * dst_bytes);
++
++        ggml_tensor up_gate_node = *dst;
++        up_gate_node.op = GGML_OP_MUL_MAT_ID;
++        up_gate_node.ne[0] = 2 * ne0;
++        up_gate_node.nb[0] = sizeof(float);
++        up_gate_node.nb[1] = up_gate_node.ne[0] * up_gate_node.nb[0];
++        up_gate_node.nb[2] = up_gate_node.ne[1] * up_gate_node.nb[1];
++        up_gate_node.nb[3] = up_gate_node.ne[2] * up_gate_node.nb[2];
++        up_gate_node.data = up_gate_tmp.get();
++        up_gate_node.src[0] = const_cast<ggml_tensor *>(up_exps);
++        up_gate_node.src[1] = const_cast<ggml_tensor *>(inp);
++        up_gate_node.src[2] = const_cast<ggml_tensor *>(ids);
++        up_gate_node.src[3] = nullptr;
++        up_gate_node.src[4] = nullptr;
++        up_gate_node.src[5] = nullptr;
++
++        ggml_sycl_mul_mat_id(ctx, up_exps, inp, &up_gate_node);
++
++        moe_up_gate_combine_merged_f32_sycl((const float *) up_gate_tmp.get(), (float *) dst->data,
++                                            ne0, n, unary_op, limit, stream);
++    }
++}
++catch (sycl::exception const &exc) {
++  std::cerr << exc.what() << "Exception caught at file:" << __FILE__
++            << ", line:" << __LINE__ << std::endl;
++  std::exit(1);
++}
++
+ static void ggml_sycl_scale(ggml_backend_sycl_context & ctx, const ggml_tensor * src0, const ggml_tensor * src1, ggml_tensor * dst) {
+     ggml_sycl_op_flatten(ctx, src0, src1, dst, ggml_sycl_op_scale);
+ }
+@@ -3992,6 +4355,14 @@ static void ggml_sycl_sum_rows(ggml_backend_sycl_context & ctx, const ggml_tenso
      ggml_sycl_op_flatten(ctx, src0, src1, dst, ggml_sycl_op_sum_rows);
  }
  
@@ -617,7 +793,7 @@ index e0f8536..65ae425 100644
  static void ggml_sycl_argsort(ggml_backend_sycl_context & ctx, const ggml_tensor * src0, const ggml_tensor * src1, ggml_tensor * dst) {
      GGML_ASSERT(ggml_is_contiguous(src0));
      ggml_sycl_op_flatten(ctx, src0, src1, dst, ggml_sycl_op_argsort);
-@@ -4081,6 +4290,9 @@ bool ggml_sycl_compute_forward(ggml_backend_sycl_context & ctx, struct ggml_tens
+@@ -4081,6 +4452,9 @@ bool ggml_sycl_compute_forward(ggml_backend_sycl_context & ctx, struct ggml_tens
                  case GGML_UNARY_OP_HARDSWISH:
                      func = ggml_sycl_hardswish;
                      break;
@@ -627,7 +803,20 @@ index e0f8536..65ae425 100644
                  default:
                      return false;
              }
-@@ -4158,6 +4370,12 @@ bool ggml_sycl_compute_forward(ggml_backend_sycl_context & ctx, struct ggml_tens
+@@ -4118,6 +4492,12 @@ bool ggml_sycl_compute_forward(ggml_backend_sycl_context & ctx, struct ggml_tens
+             }
+             func = ggml_sycl_mul_mat_id;
+             break;
++        case GGML_OP_MOE_FUSED_UP_GATE:
++            if (tensor->src[0]->ne[3] != tensor->src[2]->ne[3]) {
++                return false;
++            }
++            func = ggml_sycl_moe_fused_up_gate;
++            break;
+         case GGML_OP_SCALE:
+             func = ggml_sycl_scale;
+             break;
+@@ -4158,6 +4538,12 @@ bool ggml_sycl_compute_forward(ggml_backend_sycl_context & ctx, struct ggml_tens
          case GGML_OP_SUM_ROWS:
              func = ggml_sycl_sum_rows;
              break;
@@ -640,7 +829,7 @@ index e0f8536..65ae425 100644
          case GGML_OP_ARGSORT:
              func = ggml_sycl_argsort;
              break;
-@@ -4282,6 +4500,23 @@ GGML_CALL static bool ggml_backend_buffer_is_sycl(ggml_backend_buffer_t buffer)
+@@ -4282,6 +4668,23 @@ GGML_CALL static bool ggml_backend_buffer_is_sycl(ggml_backend_buffer_t buffer)
      return buffer->iface.get_name == ggml_backend_sycl_buffer_get_name;
  }
  
@@ -664,7 +853,7 @@ index e0f8536..65ae425 100644
  static void
  ggml_backend_sycl_buffer_free_buffer(ggml_backend_buffer_t buffer) try {
      ggml_backend_sycl_buffer_context * ctx = ( ggml_backend_sycl_buffer_context *)buffer->context;
-@@ -4307,7 +4542,7 @@ ggml_backend_sycl_buffer_init_tensor(ggml_backend_buffer_t buffer,
+@@ -4307,7 +4710,7 @@ ggml_backend_sycl_buffer_init_tensor(ggml_backend_buffer_t buffer,
  
      if (tensor->view_src != NULL && tensor->view_offs == 0) {
          assert(tensor->view_src->buffer->buft == buffer->buft);
@@ -673,7 +862,7 @@ index e0f8536..65ae425 100644
          tensor->extra = tensor->view_src->extra;
          return;
      }
-@@ -4462,7 +4697,6 @@ static struct ggml_backend_buffer_i ggml_backend_sycl_buffer_interface = {
+@@ -4462,7 +4865,6 @@ static struct ggml_backend_buffer_i ggml_backend_sycl_buffer_interface = {
      /* .init_tensor     = */ ggml_backend_sycl_buffer_init_tensor,
      /* .memset_tensor   = */ ggml_backend_sycl_buffer_memset_tensor,	
      /* .set_tensor      = */ ggml_backend_sycl_buffer_set_tensor,
@@ -681,7 +870,7 @@ index e0f8536..65ae425 100644
      /* .get_tensor      = */ ggml_backend_sycl_buffer_get_tensor,
      /* .cpy_tensor      = */ ggml_backend_sycl_buffer_cpy_tensor,
      /* .clear           = */ ggml_backend_sycl_buffer_clear,
-@@ -4494,6 +4728,14 @@ ggml_backend_sycl_buffer_type_alloc_buffer(ggml_backend_buffer_type_t buft,
+@@ -4494,6 +4896,14 @@ ggml_backend_sycl_buffer_type_alloc_buffer(ggml_backend_buffer_type_t buft,
      void * dev_ptr;
      SYCL_CHECK(CHECK_TRY_ERROR(dev_ptr = (void *)sycl::malloc_device(
                                      size, *stream)));
@@ -696,7 +885,7 @@ index e0f8536..65ae425 100644
      ggml_backend_sycl_buffer_context * ctx = new  ggml_backend_sycl_buffer_context(buft_ctx->device, dev_ptr, buft_ctx->stream);
      return ggml_backend_buffer_init(buft, ggml_backend_sycl_buffer_interface, ctx, size);
  }
-@@ -4608,6 +4850,14 @@ static void get_row_split(int64_t * row_low, int64_t * row_high, const ggml_tens
+@@ -4608,6 +5018,14 @@ static void get_row_split(int64_t * row_low, int64_t * row_high, const ggml_tens
  }
  
  struct ggml_backend_sycl_split_buffer_context {
@@ -711,7 +900,7 @@ index e0f8536..65ae425 100644
      ~ggml_backend_sycl_split_buffer_context() try {
          for (ggml_tensor_extra_gpu * extra : tensor_extras) {
              for (int i = 0; i < ggml_sycl_info().device_count; ++i) {
-@@ -4623,20 +4873,17 @@ struct ggml_backend_sycl_split_buffer_context {
+@@ -4623,20 +5041,17 @@ struct ggml_backend_sycl_split_buffer_context {
                              dpct::destroy_event(extra->events[i][is])));
                      }
                  }
@@ -740,7 +929,7 @@ index e0f8536..65ae425 100644
      }
      catch (sycl::exception const &exc) {
        std::cerr << exc.what() << "Exception caught at file:" << __FILE__
-@@ -4644,8 +4891,77 @@ struct ggml_backend_sycl_split_buffer_context {
+@@ -4644,8 +5059,77 @@ struct ggml_backend_sycl_split_buffer_context {
        std::exit(1);
      }
  
@@ -818,7 +1007,7 @@ index e0f8536..65ae425 100644
  };
  
  GGML_CALL static const char * ggml_backend_sycl_split_buffer_get_name(ggml_backend_buffer_t buffer) {
-@@ -4683,7 +4999,6 @@ ggml_backend_sycl_split_buffer_init_tensor(ggml_backend_buffer_t buffer,
+@@ -4683,7 +5167,6 @@ ggml_backend_sycl_split_buffer_init_tensor(ggml_backend_buffer_t buffer,
      ggml_tensor_extra_gpu * extra = new ggml_tensor_extra_gpu{};
  
      ctx->tensor_extras.push_back(extra);
@@ -826,7 +1015,7 @@ index e0f8536..65ae425 100644
  
      for (int i = 0; i < ggml_sycl_info().device_count; ++i) {
          int64_t row_low, row_high;
-@@ -4706,14 +5021,7 @@ ggml_backend_sycl_split_buffer_init_tensor(ggml_backend_buffer_t buffer,
+@@ -4706,14 +5189,7 @@ ggml_backend_sycl_split_buffer_init_tensor(ggml_backend_buffer_t buffer,
          // currently, init_tensor cannot fail, it needs to be fixed in ggml-backend first
          ggml_sycl_set_device(i);
          const queue_ptr stream = ctx->streams[i];
@@ -842,7 +1031,7 @@ index e0f8536..65ae425 100644
  
          // set padding to 0 to avoid possible NaN values
          if (size > original_size) {
-@@ -4740,7 +5048,7 @@ ggml_backend_sycl_split_buffer_init_tensor(ggml_backend_buffer_t buffer,
+@@ -4740,7 +5216,7 @@ ggml_backend_sycl_split_buffer_init_tensor(ggml_backend_buffer_t buffer,
                  CHECK_TRY_ERROR(extra->events[i][is] = new sycl::event()));
          }
      }
@@ -851,7 +1040,7 @@ index e0f8536..65ae425 100644
      tensor->extra = extra;
  }
  catch (sycl::exception const &exc) {
-@@ -4880,11 +5188,11 @@ GGML_CALL static const char * ggml_backend_sycl_split_buffer_type_name(ggml_back
+@@ -4880,11 +5356,11 @@ GGML_CALL static const char * ggml_backend_sycl_split_buffer_type_name(ggml_back
  }
  
  GGML_CALL static ggml_backend_buffer_t ggml_backend_sycl_split_buffer_type_alloc_buffer(ggml_backend_buffer_type_t buft, size_t size) {
@@ -867,7 +1056,7 @@ index e0f8536..65ae425 100644
  
      return ggml_backend_buffer_init(buft, ggml_backend_sycl_split_buffer_interface, ctx, size);
  }
-@@ -5170,6 +5478,7 @@ GGML_CALL static bool ggml_backend_sycl_supports_op(ggml_backend_t backend, cons
+@@ -5170,6 +5646,7 @@ GGML_CALL static bool ggml_backend_sycl_supports_op(ggml_backend_t backend, cons
                  case GGML_UNARY_OP_HARDSWISH:
                  case GGML_UNARY_OP_GELU_QUICK:
                  case GGML_UNARY_OP_TANH:
@@ -875,7 +1064,44 @@ index e0f8536..65ae425 100644
                      return ggml_is_contiguous(op->src[0]);
                  default:
                      return false;
-@@ -5278,6 +5587,8 @@ GGML_CALL static bool ggml_backend_sycl_supports_op(ggml_backend_t backend, cons
+@@ -5206,6 +5683,36 @@ GGML_CALL static bool ggml_backend_sycl_supports_op(ggml_backend_t backend, cons
+                 }
+                 return true;
+             } break;
++        case GGML_OP_MOE_FUSED_UP_GATE:
++            {
++                struct ggml_tensor * up_exps   = op->src[0];
++                struct ggml_tensor * gate_exps = op->src[1];
++                struct ggml_tensor * inp       = op->src[2];
++                struct ggml_tensor * ids       = op->src[3];
++                if (!up_exps || !inp || !ids || op->type != GGML_TYPE_F32 || inp->type != GGML_TYPE_F32 || ids->type != GGML_TYPE_I32) {
++                    return false;
++                }
++                if (op->src[4] || op->src[5]) {
++                    return false;
++                }
++                if (up_exps->ne[3] != inp->ne[3]) {
++                    return false;
++                }
++                if (gate_exps && (up_exps->type != gate_exps->type || !ggml_are_same_shape(up_exps, gate_exps))) {
++                    return false;
++                }
++                if (!ggml_is_contiguous(op)) {
++                    return false;
++                }
++                const int unary_op = op->op_params[0];
++                if (unary_op != GGML_UNARY_OP_SILU && unary_op != GGML_UNARY_OP_GELU && unary_op != GGML_UNARY_OP_RELU) {
++                    return false;
++                }
++                if (up_exps->type == GGML_TYPE_BF16) {
++                    return false;
++                }
++                return true;
++            } break;
+         case GGML_OP_GET_ROWS:
+             {
+                 switch (op->src[0]->type) {
+@@ -5278,6 +5785,8 @@ GGML_CALL static bool ggml_backend_sycl_supports_op(ggml_backend_t backend, cons
          case GGML_OP_IM2COL:
          case GGML_OP_POOL_2D:
          case GGML_OP_SUM_ROWS:

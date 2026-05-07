@@ -9,10 +9,10 @@
     "note": "Diagnostic baseline only; 56/62 MoE expert layers CPU-mapped."
   },
   "superseded_by": {
-    "note": "ik_llama.cpp RPC+SYCL process-per-GPU baseline avoids the single-process allocation ceiling and reaches useful throughput.",
+    "note": "ik_llama.cpp RPC+SYCL process-per-GPU baseline avoids the single-process allocation ceiling and now has a conservative SYCL fused-MoE improvement.",
     "data": "data/minimax-m27-ikrpc-sycl-13tok-baseline-20260507.json",
-    "tok_s_out": 13.754201,
-    "localmaxxing_id": "cmovvoo6f00f5p1017yeb7kxd"
+    "tok_s_out": 13.989985,
+    "localmaxxing_id": "cmovxb67400g6p10100by6frn"
   },
   "working_results": [
     {

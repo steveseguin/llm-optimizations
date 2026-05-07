@@ -40,7 +40,7 @@ FP8 path, vLLM/XPU:
 MiniMax M2.7 UD-IQ4_XS path:
 
 - First useful four-B70 MiniMax baseline: `13.754 tok/s` for `p0/n64` with `ik_llama.cpp` process-per-GPU RPC workers, SYCL/Level Zero, layer split, runtime repack, CPU KV, fused MoE off, fused MMAD off, and local SYCL `MULTI_ADD`. LocalMaxxing `cmovvoo6f00f5p1017yeb7kxd`.
-- This avoids the single-process Level Zero aggregate allocation ceiling, but still leaves most expert fusion disabled. The next speed blocker is SYCL support for `MOE_FUSED_UP_GATE`; enabling fused MoE currently crashes there.
+- Current MiniMax best: `13.990 tok/s` for `p0/n64` after adding conservative SYCL `MOE_FUSED_UP_GATE`, enabling fused MoE, using merged gate/up experts (`-muge 1`), and keeping experimental SYCL `MUL_MULTI_ADD` on. LocalMaxxing `cmovxb67400g6p10100by6frn`.
 
 INT4 AutoRound path:
 
@@ -76,7 +76,7 @@ vLLM/XPU FP8 work:
 - Multi-card Q4_0 improves through async tensor copies, direct allreduce, Q8 activation caching, graph fusions, fused small projections, and safe allreduce+ADD scheduling. Root-residual fused allreduce+ADD is a promising performance ceiling but is not quality-cleared until its ordering hazard with meta allreduce-add is fixed. Four-card scaling still regresses because each token pays many small 20 KiB reductions and narrower row shards lose matvec efficiency.
 - Timing hooks show synchronized allreduce cost rises sharply with GPU count: roughly `1.718 ms/token` on 2 GPUs, `5.732 ms/token` on 3 GPUs, and `10.605 ms/token` on 4 GPUs for the same reduction pattern.
 - Four-GPU root/order/topology sweeps are not enough; the next useful work is reducing the number of reductions or fusing delayed reductions through safe graph regions.
-- MiniMax M2.7 is now past the pure-capacity stage by using one RPC process per B70. The working baseline is 13.754 tok/s, but the >30 tok/s target likely requires implementing SYCL `MOE_FUSED_UP_GATE` and replacing the naive fused `MUL_MULTI_ADD` attempt with a layout-aware expert combine kernel.
+- MiniMax M2.7 is now past the pure-capacity stage by using one RPC process per B70. The working baseline is 13.990 tok/s, but the >30 tok/s target likely requires replacing the conservative SYCL `MOE_FUSED_UP_GATE` decomposition and naive fused `MUL_MULTI_ADD` attempt with a layout-aware active-expert combine kernel.
 
 ## Current Next Steps
 
@@ -86,4 +86,4 @@ vLLM/XPU FP8 work:
 4. Use static FP8 TP4 with patched XPU FA2 as the best high-fidelity four-card path for now.
 5. Keep PP2 x TP2 as a capacity fallback for larger models, not a speed path for Qwen3.6 27B.
 6. Mine Intel `llm-scaler` for reduce-scatter/all-gather, fused output-kernel, Gated DeltaNet, and speculative/MTP ideas, but do not assume it will run directly on Arc/B70.
-7. For MiniMax, keep the process-per-GPU RPC layout as the capacity baseline while porting the fused expert up-gate path to SYCL and retesting fused MoE.
+7. For MiniMax, keep the process-per-GPU RPC layout as the capacity baseline while turning the newly working SYCL fused-MoE path into a lower-level active-expert kernel.

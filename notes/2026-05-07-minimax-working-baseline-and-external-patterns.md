@@ -15,8 +15,8 @@ The direct llama.cpp SYCL layer-split diagnostic below remains useful as a failu
 Current best:
 
 ```text
-13.754201 tok/s, p0/n64, 4x B70, UD-IQ4_XS, ik_llama.cpp RPC+SYCL
-LocalMaxxing: cmovvoo6f00f5p1017yeb7kxd
+13.989985 tok/s, p0/n64, 4x B70, UD-IQ4_XS, ik_llama.cpp RPC+SYCL
+LocalMaxxing: cmovxb67400g6p10100by6frn
 ```
 
 Detailed repro:

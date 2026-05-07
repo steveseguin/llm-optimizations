@@ -9,7 +9,7 @@ import urllib.request
 from pathlib import Path
 
 
-API_URL = "https://www.localmaxxing.com/api/benchmarks"
+API_URL = "https://localmaxxing.com/api/benchmarks"
 
 
 def post_payload(key: str, payload: dict) -> tuple[int, str, int | None]:
