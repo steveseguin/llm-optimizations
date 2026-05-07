@@ -1,0 +1,14 @@
+diff --git a/ggml/src/ggml-sycl/ggml-sycl.cpp b/ggml/src/ggml-sycl/ggml-sycl.cpp
+--- a/ggml/src/ggml-sycl/ggml-sycl.cpp
++++ b/ggml/src/ggml-sycl/ggml-sycl.cpp
+@@
+-    if (g_ggml_sycl_small_f32_mmv &&
++    const int small_f32_mmv_rows =
++        g_ggml_sycl_small_f32_mmv == 1 ? 64 : g_ggml_sycl_small_f32_mmv;
++    if (small_f32_mmv_rows > 0 &&
+         src0->type == GGML_TYPE_F32 && src1->type == GGML_TYPE_F32 && dst->type == GGML_TYPE_F32 &&
+-        src1_ncols <= 4 && row_diff <= 64 && ggml_is_contiguous(src0)) {
++        src1_ncols <= 4 && row_diff <= small_f32_mmv_rows && ggml_is_contiguous(src0)) {
+         ggml_mul_mat_vec_f32_f32_small_sycl((const float *) src0_dd_i, src1_ddf_i, dst_dd_i,
+                                             ne00, row_diff, src1_ncols, ldc, stream);
+         GGML_UNUSED(src1_ddq_i);

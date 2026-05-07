@@ -1,0 +1,77 @@
+{
+  "date": "2026-05-07",
+  "model": {
+    "name": "MiniMax-M2.7-UD-IQ4_XS",
+    "path": "/home/steve/models/minimax-m2.7-ud-iq4_xs-gguf/UD-IQ4_XS/MiniMax-M2.7-UD-IQ4_XS-00001-of-00004.gguf",
+    "format": "GGUF split, IQ4_XS"
+  },
+  "hardware": {
+    "gpu": "Intel Arc Pro B70 32GB",
+    "gpuCount": 4,
+    "driver": "Level Zero 1.15.37833+4"
+  },
+  "status": "no valid MiniMax score yet",
+  "findings": [
+    {
+      "topic": "row_split_q8_attention",
+      "summary": "MiniMax row split reaches block 0 then loses the Level Zero device on Q8_0 attention matvec before expert dispatch.",
+      "evidenceLog": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/minimax-m27-two-row-block0gpu-semiot-q8attn-sycl0-debug-nograph-20260507T104610Z.log",
+      "keyError": "UR_RESULT_ERROR_DEVICE_LOST after blk.0.attn_q.weight Q8_0 MUL_MAT"
+    },
+    {
+      "topic": "llama_bench_override_syntax",
+      "summary": "llama-bench uses semicolon to combine -ot overrides in one benchmark; comma creates separate benchmark variants.",
+      "correctExample": "-ot 'blk\\.0\\.attn_(q|k|v|output)\\.weight=SYCL0;blk\\.([1-9]|[1-5][0-9]|6[01])\\..*=CPU'"
+    },
+    {
+      "topic": "layer_split_large_allocations",
+      "summary": "Layer split avoids split-buffer Q8 but fails during model loading because ggml requests large per-device model buffers.",
+      "failedRuns": [
+        {
+          "ngl": 99,
+          "failedBufferBytes": 27676983296,
+          "device": "SYCL0"
+        },
+        {
+          "ngl": 60,
+          "failedBufferBytes": 25947171840,
+          "device": "SYCL0"
+        },
+        {
+          "ngl": 56,
+          "failedBufferBytes": 24217360384,
+          "device": "SYCL0"
+        },
+        {
+          "ngl": 48,
+          "failedBufferBytes": 20757737472,
+          "device": "SYCL0"
+        },
+        {
+          "ngl": 36,
+          "failedBufferBytes": 15568303104,
+          "device": "SYCL1"
+        },
+        {
+          "ngl": 32,
+          "failedBufferBytes": 13838491648,
+          "device": "SYCL1"
+        }
+      ]
+    },
+    {
+      "topic": "standalone_sycl_probe",
+      "summary": "A single visible B70 can allocate 24 GiB, while four visible B70s fail a simultaneous 8 GiB per-GPU allocation at GPU 1 in the probe.",
+      "tool": "tools/sycl_alloc_probe.cpp"
+    }
+  ],
+  "localmaxxing": {
+    "submitted": false,
+    "reason": "No real MiniMax generation benchmark has completed."
+  },
+  "nextSteps": [
+    "Prioritize MiniMax row split because it uses smaller per-tensor allocations.",
+    "Implement a focused Q8 attention fallback or temporary simple-buffer path for MiniMax row split.",
+    "Use tools/sycl_alloc_probe.cpp to reproduce and narrow the multi-device large allocation behavior before patching ggml allocator behavior."
+  ]
+}
