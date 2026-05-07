@@ -120,9 +120,19 @@
     }
   ],
   "correctness": {
-    "status": "inconclusive",
+    "status": "passed-short-deterministic-stdout-byte-compare",
     "qualityChangingOptions": false,
-    "notes": "Same target weights, f16 KV, no speculative decoding, no sampling change, no power change. Corrected llama-cli text smoke hung and generated a large repeated stdout file; add a token/logit harness before upstreaming.",
+    "notes": "Same target weights, f16 KV, no speculative decoding, no sampling change, no power change. Initial llama-cli text smoke was inconclusive, but a later capped deterministic llama-completion run produced identical non-empty stdout for root-residual off/on. Add a token/logit harness before upstreaming.",
+    "passingByteCompare": {
+      "directory": "/home/steve/bench-results/qwen36-q4_0-gguf/correctness/fuseadd-root-residual-tp3-20260507T030114Z-completion-visible",
+      "prompt": "The capital of France is",
+      "output": "The capital of France is Paris!!!!!!!!!!!!!!!\n",
+      "sha256": "4c0c2f5a51e9a501f27272deb1657d21dad4f26d1d68b38ddacefbc44465bf75",
+      "outputBytes": 47,
+      "baselineExit": 0,
+      "rootResidualExit": 0,
+      "generationFlags": "-n 16 --temp 0 --top-k 1 --top-p 1 --min-p 0 --repeat-penalty 1 --ignore-eos --display-prompt -no-cnv --simple-io -lv 1"
+    },
     "attemptDirectories": [
       "/home/steve/bench-results/qwen36-q4_0-gguf/correctness/fuseadd-root-residual-tp3-20260507T023938Z",
       "/home/steve/bench-results/qwen36-q4_0-gguf/correctness/fuseadd-root-residual-tp3-20260507T024009Z",

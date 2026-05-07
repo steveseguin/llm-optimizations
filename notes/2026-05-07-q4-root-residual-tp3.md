@@ -66,7 +66,15 @@ The reduced payload was accepted:
 
 This result does not intentionally change model quality: same Q4_0 weights, f16 KV, greedy benchmark mode, no speculative decoding, no sampling change, and no power-limit change. The root-residual flag reuses the mirrored residual tensor on the root device in the fused `allreduce+ADD` path.
 
-The attempted `llama-cli` text smoke was inconclusive. The first two commands had CLI syntax errors, and the corrected command hung while producing a large repeated stdout file. Before upstreaming or treating this as a final correctness proof, add a lower-overhead token/logit comparison harness.
+The initial `llama-cli` text smoke was inconclusive. The first two commands had CLI syntax errors, and the corrected command hung while producing a large repeated stdout file.
+
+A later capped deterministic `llama-completion` check succeeded after using the example's comma-separated device syntax and leaving console output enabled. Root-residual off and on produced identical non-empty stdout:
+
+```text
+The capital of France is Paris!!!!!!!!!!!!!!!
+```
+
+Both files had SHA256 `4c0c2f5a51e9a501f27272deb1657d21dad4f26d1d68b38ddacefbc44465bf75`. This is a useful local output-equivalence smoke, but a lower-overhead token/logit comparison harness is still the right next step before upstreaming.
 
 ## Artifacts
 
@@ -78,3 +86,4 @@ The attempted `llama-cli` text smoke was inconclusive. The first two commands ha
 - Q4_1 MMVQ A/B TSV: `/home/steve/bench-results/qwen36-q4_0-gguf/quad-assist-refresh-20260507/q4_1-mmvq-ab/q4-quad-assist005-q4_1-mmvq-ab-p0n128-20260507T021728Z.tsv`
 - Projection epilogue diagnostic TSV: `/home/steve/bench-results/qwen36-q4_0-gguf/quad-assist-refresh-20260507/mulmat-allreduce-fuse/q4-quad-assist005-mulmat-allreduce-fuse-p0n128-20260507T022028Z.tsv`
 - Inconclusive correctness attempt directory: `/home/steve/bench-results/qwen36-q4_0-gguf/correctness/fuseadd-root-residual-tp3-20260507T024037Z`
+- Passing deterministic byte-compare directory: `/home/steve/bench-results/qwen36-q4_0-gguf/correctness/fuseadd-root-residual-tp3-20260507T030114Z-completion-visible`

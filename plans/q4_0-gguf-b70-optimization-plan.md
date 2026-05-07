@@ -72,7 +72,7 @@ Latest 2026-05-07 Q4_0 follow-up:
   - forced Q4_1 MMVQ path: `42.344754 tok/s` versus default Q4_1 DMMV `42.552518 tok/s`;
   - Q8-cache-off `MUL_MAT+allreduce+ADD` diagnostic: `41.707508 tok/s` versus Q8-cache-on control `42.732977 tok/s`;
   - root skip / root rotation around the four-card assist layout were not durable wins.
-- A `llama-cli` text smoke for the TP3 root-residual flag was inconclusive because the corrected command hung and generated a large repeated stdout file. Before upstreaming this flag, add a lower-overhead token/logit correctness harness.
+- A `llama-cli` text smoke for the TP3 root-residual flag was inconclusive because the corrected command hung and generated a large repeated stdout file. A later capped deterministic `llama-completion` check with prompt echo enabled produced identical non-empty stdout for root-residual off/on. A token/logit harness is still useful before upstreaming, but the local result now has a basic output-equivalence smoke.
 
 ## Quality Constraints
 
