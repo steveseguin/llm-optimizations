@@ -1,0 +1,91 @@
+{
+  "date_utc": "2026-05-07",
+  "model": "MiniMax-M2.7-UD-IQ4_XS",
+  "hardware": "4x Intel Arc Pro B70 32GB",
+  "engine": "llama.cpp db44417+local-sycl",
+  "localmaxxing": {
+    "id": "cmovgojv80008n501lupo67x6",
+    "hfId": "MiniMaxAI/MiniMax-M2.7",
+    "note": "Diagnostic baseline only; 56/62 MoE expert layers CPU-mapped."
+  },
+  "working_results": [
+    {
+      "label": "quad-layer-ncmoe62-p0n1",
+      "n_cpu_moe": 62,
+      "prompt_tokens": 0,
+      "output_tokens": 1,
+      "tok_s_out": 0.229877,
+      "log": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/minimax-m27-quad-layer-ncmoe62-p0n1-20260507T120220Z.log"
+    },
+    {
+      "label": "quad-layer-ncmoe58-p0n1",
+      "n_cpu_moe": 58,
+      "prompt_tokens": 0,
+      "output_tokens": 1,
+      "tok_s_out": 0.233237,
+      "sycl3_model_buffer_mib": 7556.29,
+      "log": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/minimax-m27-quad-layer-ncmoe58-stair-p0n1-20260507T120651Z.log"
+    },
+    {
+      "label": "quad-layer-ncmoe56-p0n16",
+      "n_cpu_moe": 56,
+      "prompt_tokens": 0,
+      "output_tokens": 16,
+      "tok_s_out": 0.410253,
+      "sycl3_model_buffer_mib": 10760.29,
+      "log": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/minimax-m27-quad-layer-ncmoe56-p0n16-20260507T121209Z.log"
+    },
+    {
+      "label": "quad-layer-ncmoe56-p0n64",
+      "n_cpu_moe": 56,
+      "prompt_tokens": 0,
+      "output_tokens": 64,
+      "tok_s_out": 0.472124,
+      "sycl3_model_buffer_mib": 10760.29,
+      "log": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/minimax-m27-quad-layer-ncmoe56-p0n64-20260507T122246Z.log"
+    },
+    {
+      "label": "quad-layer-ncmoe54-disableopt-b1ub1-p0n16",
+      "n_cpu_moe": 54,
+      "prompt_tokens": 0,
+      "output_tokens": 16,
+      "tok_s_out": 0.403948,
+      "sycl3_model_buffer_mib": 13964.29,
+      "extra_env": "GGML_SYCL_DISABLE_OPT=1",
+      "extra_flags": "-b 1 -ub 1",
+      "log": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/minimax-m27-quad-layer-ncmoe54-disableopt-b1ub1-p0n16-20260507T121813Z.log"
+    }
+  ],
+  "failed_results": [
+    {
+      "label": "quad-layer-ncmoe54-default",
+      "failure": "Q8 reorder temp allocation failed after model load",
+      "detail": "sycl_reorder_temp_buffer: device alloc of 20054016 bytes failed, then UR_RESULT_ERROR_OUT_OF_DEVICE_MEMORY in reorder_qw_q8_0",
+      "log": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/minimax-m27-quad-layer-ncmoe54-stair-p0n1-20260507T120910Z.log"
+    },
+    {
+      "label": "quad-layer-ncmoe52",
+      "failure": "load failure",
+      "detail": "failed to allocate SYCL3 buffer of size 18002258944",
+      "log": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/minimax-m27-quad-layer-ncmoe52-stair-p0n1-20260507T121022Z.log"
+    },
+    {
+      "label": "quad-row-cpuattn-cpukv-experts0-11gpu",
+      "failure": "segmentation fault",
+      "detail": "avoided Q8 attention device-loss, then crashed at first SYCL FFN/expert split",
+      "log": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/minimax-m27-quad-row-cpuattn-cpukv-experts0-11gpu-p0n1-20260507T122041Z.log"
+    },
+    {
+      "label": "quad-layer-ncmoe50-tail12-round-robin",
+      "failure": "load failure",
+      "detail": "failed to allocate SYCL2 buffer of size 5839339520",
+      "log": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/minimax-m27-quad-layer-ncmoe50-tail12-rr-p0n1-20260507T122828Z.log"
+    }
+  ],
+  "external_references": [
+    "https://huggingface.co/MiniMaxAI/MiniMax-M2.7/blame/main/docs/vllm_deploy_guide.md",
+    "https://www.reddit.com/r/LocalLLaMA/comments/1sjx7kg/minimaxm27_nvfp4_on_2x_rtx_pro_6000_blackwell/",
+    "https://gist.github.com/adamo1139/372de9f6cdfd38155d0dbea0b2bb3878",
+    "https://github.com/ikawrakow/ik_llama.cpp/blob/main/docs/parameters.md"
+  ]
+}

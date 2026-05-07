@@ -157,3 +157,13 @@ Model: `vrfai/Qwen3.6-27B-FP8`, static compressed-tensors FP8.
 | `vllm-qwen36-vrfai-fp8-pp2tp2-capacity-negative-p512-n512` | `cmout3vhy00m6ld01162ujv21` | 4 | 512 | 512 | 27.722 | 55.445 |
 
 Note: `cmout3vhy00m6ld01162ujv21` is a capacity-focused negative result for the 2x2 FP8 layout. PP2xTP2 fits `max_model_len=32768` and reports large KV-cache headroom, but it is much slower than TP4/PP1 for batch-1 single-session speed. It uses the same FP8 target weights, auto/BF16 KV, no speculative decoding, and no power-limit changes.
+
+Date: 2026-05-07
+
+Model: `MiniMaxAI/MiniMax-M2.7`, local Unsloth GGUF `MiniMax-M2.7-UD-IQ4_XS-00001-of-00004.gguf`.
+
+| Label | LocalMaxxing ID | GPUs | Input | Output | tok/s out | tok/s total |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| `llamacpp-minimax-m27-ud-iq4_xs-sycl-layer-ncmoe56-p0-n64` | `cmovgojv80008n501lupo67x6` | 4 | 0 | 64 | 0.472 | 0.472 |
+
+Note: This is a diagnostic baseline, not an optimized all-GPU result. It uses llama.cpp layer split with `-ncmoe 56`, which CPU-maps the first 56 of 62 MoE expert layers and leaves only the final 6 expert layers GPU-resident on SYCL3. It was submitted because it is the first reproducible MiniMax completion on the 4x B70 system and records the current gap. LocalMaxxing's command parser misread `-t 8` as sampler temperature; the run is `llama-bench`, so sampling temperature is not meaningful here.
