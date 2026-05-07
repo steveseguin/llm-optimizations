@@ -74,9 +74,24 @@ I screened nearby fourth-card weights with `p0/n128/r2`:
 
 The short-screen winner, `1/1/1/0.08`, did not beat the submitted `0.05` result on a full validation: `p512/n512/r3` produced prompt `117.366467 tok/s`, decode `43.929404 tok/s`, computed total `63.930204 tok/s`. Keep `1/1/1/0.05` as the validated four-card config.
 
+## Subgroup Runtime Sweep
+
+I also screened `GGML_SYCL_REORDER_MMVQ_SUBGROUPS_RUNTIME` on the accepted split:
+
+| Runtime | tok/s out |
+| --- | ---: |
+| unset/default | 42.970405 |
+| `1` | 42.988543 |
+| `2` | 42.384839 |
+| `4` | 42.693139 |
+
+The short-screen winner, runtime `1`, failed to beat the submitted runtime `2` result on a full validation: `p512/n512/r3` produced prompt `114.726410 tok/s`, decode `43.721328 tok/s`, computed total `63.314138 tok/s`. Keep runtime `2` as the validated four-card setting for now.
+
 ## Artifacts
 
 - Short screen JSON: `/home/steve/bench-results/qwen36-q4_0-gguf/quad-assist-refresh-20260507/q4-quad-assist005-rms-stack-p0n128-20260507T013139Z.jsonl`
 - Full validation JSON: `/home/steve/bench-results/qwen36-q4_0-gguf/quad-assist-refresh-20260507/q4-quad-assist005-rms-stack-p512n512-20260507T013303Z.jsonl`
 - Split sweep TSV: `/home/steve/bench-results/qwen36-q4_0-gguf/quad-assist-refresh-20260507/split-sweep/q4-quad-assist-split-sweep-p0n128-20260507T013824Z.tsv`
 - `0.08` full validation JSON: `/home/steve/bench-results/qwen36-q4_0-gguf/quad-assist-refresh-20260507/q4-quad-assist008-rms-stack-p512n512-20260507T014421Z.jsonl`
+- Subgroup runtime sweep TSV: `/home/steve/bench-results/qwen36-q4_0-gguf/quad-assist-refresh-20260507/subgroup-sweep/q4-quad-assist005-subgroup-sweep-p0n128-20260507T014750Z.tsv`
+- Runtime `1` full validation JSON: `/home/steve/bench-results/qwen36-q4_0-gguf/quad-assist-refresh-20260507/q4-quad-assist005-sg1-rms-stack-p512n512-20260507T015242Z.jsonl`

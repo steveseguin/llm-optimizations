@@ -1556,6 +1556,17 @@ Goal: improve quality-preserving Q4_0 performance without power-limit changes.
      - keep the submitted `1/1/1/0.05` result as the validated four-card config (`44.087560 tok/s`);
      - the viable fourth-card assist range is very small, and heavier fourth-card weights regress quickly;
      - do not submit the `0.08` result to LocalMaxxing because it is a negative validation against the accepted `0.05` run.
+78. 2026-05-07 Q4_0 four-card subgroup runtime sweep:
+   - short decode sweep on the accepted split `1/1/1/0.05`, `p0/n128/r2`:
+     - runtime unset/default: `42.970405 tok/s`;
+     - runtime `1`: `42.988543 tok/s`;
+     - runtime `2`: `42.384839 tok/s`;
+     - runtime `4`: `42.693139 tok/s`;
+   - full validation for short-screen winner runtime `1`:
+     - `p512/n512/r3`: prompt `114.726410 tok/s`, decode `43.721328 tok/s`, computed total `63.314138 tok/s`;
+   - decision:
+     - keep the submitted runtime `2` full result (`44.087560 tok/s`) as the validated four-card setting;
+     - short decode screens are useful for gross regressions but not reliable for tiny subgroup-runtime differences.
 
 ## Success Criteria
 

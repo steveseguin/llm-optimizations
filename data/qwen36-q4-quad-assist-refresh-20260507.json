@@ -127,6 +127,50 @@
       "notes": "Did not beat the accepted 1/1/1/0.05 full validation."
     }
   },
+  "subgroupRuntimeSweep": {
+    "screenConfig": {
+      "tensorSplit": "1/1/1/0.05",
+      "promptTokens": 0,
+      "outputTokens": 128,
+      "repeats": 2,
+      "tsv": "/home/steve/bench-results/qwen36-q4_0-gguf/quad-assist-refresh-20260507/subgroup-sweep/q4-quad-assist005-subgroup-sweep-p0n128-20260507T014750Z.tsv"
+    },
+    "shortDecodeResults": [
+      {
+        "runtime": "unset",
+        "tokSOut": 42.970405,
+        "json": "/home/steve/bench-results/qwen36-q4_0-gguf/quad-assist-refresh-20260507/subgroup-sweep/q4-quad-assist005-sgunset-p0n128-20260507T014750Z.jsonl"
+      },
+      {
+        "runtime": "1",
+        "tokSOut": 42.988543,
+        "json": "/home/steve/bench-results/qwen36-q4_0-gguf/quad-assist-refresh-20260507/subgroup-sweep/q4-quad-assist005-sg1-p0n128-20260507T014750Z.jsonl"
+      },
+      {
+        "runtime": "2",
+        "tokSOut": 42.384839,
+        "json": "/home/steve/bench-results/qwen36-q4_0-gguf/quad-assist-refresh-20260507/subgroup-sweep/q4-quad-assist005-sg2-p0n128-20260507T014750Z.jsonl"
+      },
+      {
+        "runtime": "4",
+        "tokSOut": 42.693139,
+        "json": "/home/steve/bench-results/qwen36-q4_0-gguf/quad-assist-refresh-20260507/subgroup-sweep/q4-quad-assist005-sg4-p0n128-20260507T014750Z.jsonl"
+      }
+    ],
+    "fullValidationOfShortWinner": {
+      "runtime": "1",
+      "promptTokens": 512,
+      "outputTokens": 512,
+      "repeats": 3,
+      "tokSPrompt": 114.72641,
+      "tokSOut": 43.721328,
+      "tokSTotal": 63.31413834222714,
+      "json": "/home/steve/bench-results/qwen36-q4_0-gguf/quad-assist-refresh-20260507/q4-quad-assist005-sg1-rms-stack-p512n512-20260507T015242Z.jsonl",
+      "log": "/home/steve/bench-results/qwen36-q4_0-gguf/quad-assist-refresh-20260507/q4-quad-assist005-sg1-rms-stack-p512n512-20260507T015242Z.log",
+      "submittedToLocalMaxxing": false,
+      "notes": "Did not beat the accepted runtime 2 full validation."
+    }
+  },
   "comparisons": {
     "olderFourCardAssistTokSOut": 39.204149,
     "equalFourCardTokSOut": 34.929313,
