@@ -1626,6 +1626,18 @@ Goal: improve quality-preserving Q4_0 performance without power-limit changes.
      - this is now the current quality-cleared no-root Q4_0 TP3 result;
      - do not claim root-residual quality until the root/meta-add ordering hazard is fixed without a global host wait;
      - next useful work is a lower-overhead dependency fix for root-residual and a synthetic recurrent-layer harness for future layout changes.
+81. 2026-05-07 final-rebuild root-residual rerun:
+   - default-prompt token/logit probes on the current rebuilt binary did not reproduce the earlier root divergence:
+     - original root off/on both selected token `271`, hash `00e1eaeb550b0025`;
+     - root-on original/fused both selected token `271`, hash `00e1eaeb550b0025`;
+   - full root-on TP3 benchmark:
+     - original Q4_0 decode `50.372777 tok/s`, total `80.456838 tok/s`;
+     - fused flat `ssm_ba` decode `50.687317 tok/s`, total `80.878717 tok/s`;
+   - blocker:
+     - a two-token prompt rerun with `The capital` timed out at `240 s` before logits, so the short-prompt guard is currently unreliable;
+   - decision:
+     - root-residual is reopened as a promising path, but do not submit/promote the `50.687317 tok/s` result yet;
+     - keep no-root fused beta/alpha as the public quality-cleared baseline until the short-prompt timeout and earlier failing artifact are reconciled.
 
 ## Success Criteria
 

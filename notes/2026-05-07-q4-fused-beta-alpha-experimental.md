@@ -77,6 +77,26 @@ Follow-up attempts:
 - A host wait inside `comm_allreduce_add_tensor` made the all-current root path correct but collapsed throughput to about `29 tok/s`, so it was reverted.
 - A root queue barrier did not fix correctness, so it was reverted.
 
+## Root-Residual Rerun
+
+After the final rebuild, the exact earlier root/meta-add divergence did not reproduce on the default probe prompt:
+
+- Root off versus root on, original model: both selected token `271`, hash `00e1eaeb550b0025`.
+- Root on, original versus fused model: both selected token `271`, hash `00e1eaeb550b0025`.
+- Artifact root on/off: `/home/steve/bench-results/qwen36-q4_0-gguf/correctness/root-on-vs-off-final-nostats-20260507T081002Z`
+- Artifact original/fused root on: `/home/steve/bench-results/qwen36-q4_0-gguf/correctness/fused-ba-root-final-rerun-20260507T080518Z`
+
+Full TP3 root-residual benchmark with the flat fused model:
+
+| Model | Prompt | Decode | Computed total |
+| --- | ---: | ---: | ---: |
+| Original Q4_0, root on | `199.802378 tok/s` | `50.372777 tok/s` | `80.456838 tok/s` |
+| Fused `ssm_ba` Q4_0, root on | `200.046542 tok/s` | `50.687317 tok/s` | `80.878717 tok/s` |
+
+Artifact: `/home/steve/bench-results/qwen36-q4_0-gguf/tp3-refresh-20260507/fused-ba-model/root-rerun-20260507T081227Z`
+
+This is promising, but I am not promoting it over the no-root LocalMaxxing result yet. A follow-up two-token prompt check using `The capital` timed out at `240 s` before producing logits, while the earlier failing artifact also used a two-token prompt shape. Until that is understood, keep the no-root result as the public quality-cleared baseline and treat root-residual as reopened but not fully re-cleared.
+
 ## Decision
 
 Keep the fused beta/alpha work as a quality-cleared no-root experimental branch and as evidence that small recurrent projection fusion is worth pursuing. Do not use `GGML_SYCL_COMM_FUSEADD_ROOT_RESIDUAL=1` for quality claims until the root/meta-add ordering bug is fixed by a lower-overhead synchronization or dependency model.

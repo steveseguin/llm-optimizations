@@ -26,6 +26,7 @@ Quality-preserving Q4_0 GGUF path, llama.cpp/SYCL:
 - 3x B70 Q8 activation-cache validation, 512 prompt / 512 output: `41.659 tok/s`, LocalMaxxing `cmorn71e2000kib0415vo51vj`.
 - 3x B70 current quality-cleared no-root Q4_0 stack with experimental flat fused Qwen35 `ssm_ba` GGUF, 512 prompt / 512 output: `50.130 tok/s`, LocalMaxxing `cmov6p4r7007tqr01yi8ug4un`.
 - 3x B70 root-residual performance ceiling with `--poll 25`, 512 prompt / 512 output: `50.922 tok/s`, LocalMaxxing `cmouxjqao000npn01hxqn68td`, now marked suspect because later token/logit probing found the root-residual plus meta allreduce-add pair can diverge.
+- 3x B70 final-rebuild root-residual rerun with flat fused `ssm_ba` GGUF: `50.687 tok/s` decode and `80.879 tok/s` total. Default-prompt root checks passed, but a two-token prompt follow-up timed out, so this is documented but not submitted/promoted.
 - 4x B70 Q4_0 remains negative-scaling: `31.482 tok/s` without Q8 cache and `31.913 tok/s` with Q8 cache; LocalMaxxing `cmor2e5r00004jl04o99d26p8` and `cmornec37000okw040zl9563z`.
 
 FP8 path, vLLM/XPU:

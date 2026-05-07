@@ -68,6 +68,23 @@ The reduced payload was accepted before the later correctness issue was found:
 
 Follow-up status: submitted, approved, but now annotated locally as suspect/not currently quality-cleared pending a root-residual ordering fix.
 
+## Final-Rebuild Rerun
+
+After the final rebuild, the exact default-prompt root checks did not reproduce the earlier divergence:
+
+- Original model, root off versus root on: token `271`, hash `00e1eaeb550b0025` for both.
+- Root on, original versus fused flat `ssm_ba` model: token `271`, hash `00e1eaeb550b0025` for both.
+- Root-on full benchmark, original model: prompt `199.802378 tok/s`, decode `50.372777 tok/s`, total `80.456838 tok/s`.
+- Root-on full benchmark, fused flat `ssm_ba` model: prompt `200.046542 tok/s`, decode `50.687317 tok/s`, total `80.878717 tok/s`.
+
+Artifacts:
+
+- `/home/steve/bench-results/qwen36-q4_0-gguf/correctness/root-on-vs-off-final-nostats-20260507T081002Z`
+- `/home/steve/bench-results/qwen36-q4_0-gguf/correctness/fused-ba-root-final-rerun-20260507T080518Z`
+- `/home/steve/bench-results/qwen36-q4_0-gguf/tp3-refresh-20260507/fused-ba-model/root-rerun-20260507T081227Z`
+
+I am still leaving the LocalMaxxing root-residual records marked suspect for now. A two-token prompt rerun with `The capital` timed out at `240 s` before producing logits, while the earlier failing artifact also used a two-token prompt shape. The root-residual path is worth pursuing again, but the current public quality-cleared result remains the no-root fused-beta/alpha LocalMaxxing record.
+
 ## Negative Follow-Ups
 
 | Screen | Best / comparison | Decision |

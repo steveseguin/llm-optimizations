@@ -228,6 +228,35 @@
       "tokSTotal": 80.20473519933404,
       "artifact": "/home/steve/bench-results/qwen36-q4_0-gguf/tp3-refresh-20260507/fused-ba-model/fused-ba-flat-no-root-p512n512-r3-20260507T065943Z.tsv",
       "qualityArtifact": "/home/steve/bench-results/qwen36-q4_0-gguf/correctness/fused-ba-no-root-final-20260507T073839Z"
+    },
+    "finalRebuildRerun": {
+      "status": "promising but not promoted",
+      "rootOffVsRootOnOriginal": {
+        "artifact": "/home/steve/bench-results/qwen36-q4_0-gguf/correctness/root-on-vs-off-final-nostats-20260507T081002Z",
+        "token": 271,
+        "hash": "00e1eaeb550b0025",
+        "matched": true
+      },
+      "rootOnOriginalVsFused": {
+        "artifact": "/home/steve/bench-results/qwen36-q4_0-gguf/correctness/fused-ba-root-final-rerun-20260507T080518Z",
+        "token": 271,
+        "hash": "00e1eaeb550b0025",
+        "matched": true
+      },
+      "fullBenchmarkRootOn": {
+        "artifact": "/home/steve/bench-results/qwen36-q4_0-gguf/tp3-refresh-20260507/fused-ba-model/root-rerun-20260507T081227Z",
+        "originalTokSOut": 50.372777,
+        "originalTokSTotal": 80.45683822686443,
+        "fusedTokSOut": 50.687317,
+        "fusedTokSTotal": 80.87871651470131
+      },
+      "twoTokenPromptFollowup": {
+        "artifact": "/home/steve/bench-results/qwen36-q4_0-gguf/correctness/root-thecapital-final-rerun-20260507T082522Z",
+        "prompt": "The capital",
+        "status": "timeout",
+        "timeoutSeconds": 240
+      },
+      "decision": "Keep root-residual as reopened but not fully re-cleared; no-root fused beta/alpha remains the public quality-cleared baseline."
     }
   },
   "conclusion": "Root-residual plus --poll 25 remains a useful performance ceiling at 50.922114 tok/s, but it is not currently quality-cleared after a later token/logit harness found a root-residual plus meta allreduce-add divergence. Keep root-residual disabled for quality claims until the ordering hazard is fixed."

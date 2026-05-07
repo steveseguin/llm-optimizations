@@ -66,6 +66,17 @@
       "fused_decode_tok_s": 29.247443,
       "artifact": "/home/steve/bench-results/qwen36-q4_0-gguf/tp3-refresh-20260507/fused-ba-model/fused-ba-flat-all-current-after-wait-p512n512-r3-20260507T071628Z.tsv",
       "decision": "Reverted. Host wait fixed correctness but destroyed throughput."
+    },
+    "final_rebuild_root_rerun_p512_n512_r3": {
+      "status": "promising_not_promoted",
+      "original_prompt_tok_s": 199.802378,
+      "original_decode_tok_s": 50.372777,
+      "original_total_tok_s": 80.45683822686443,
+      "fused_prompt_tok_s": 200.046542,
+      "fused_decode_tok_s": 50.687317,
+      "fused_total_tok_s": 80.87871651470131,
+      "artifact": "/home/steve/bench-results/qwen36-q4_0-gguf/tp3-refresh-20260507/fused-ba-model/root-rerun-20260507T081227Z",
+      "decision": "Do not submit/promote yet because a two-token prompt follow-up timed out."
     }
   },
   "quality": {
@@ -106,6 +117,29 @@
       },
       "meta_add_meta_rows": {
         "passed": true
+      }
+    },
+    "final_rebuild_root_rerun": {
+      "default_prompt_root_off_vs_on_original": {
+        "artifact": "/home/steve/bench-results/qwen36-q4_0-gguf/correctness/root-on-vs-off-final-nostats-20260507T081002Z",
+        "same_token": true,
+        "token": 271,
+        "hash_match": true,
+        "hash": "00e1eaeb550b0025"
+      },
+      "default_prompt_root_on_original_vs_fused": {
+        "artifact": "/home/steve/bench-results/qwen36-q4_0-gguf/correctness/fused-ba-root-final-rerun-20260507T080518Z",
+        "same_token": true,
+        "token": 271,
+        "hash_match": true,
+        "hash": "00e1eaeb550b0025"
+      },
+      "two_token_prompt_followup": {
+        "artifact": "/home/steve/bench-results/qwen36-q4_0-gguf/correctness/root-thecapital-final-rerun-20260507T082522Z",
+        "prompt": "The capital",
+        "n_prompt": 2,
+        "status": "timeout",
+        "timeout_seconds": 240
       }
     }
   },
