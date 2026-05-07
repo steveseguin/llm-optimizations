@@ -48,7 +48,7 @@
       "GGML_SYCL_FUSE_MMVQ2_SWIGLU": "1",
       "GGML_SYCL_FUSE_RMS_NORM_MUL": "1"
     },
-    "commandSnippet": "llama-bench -m /home/steve/models/qwen3.6-27b-q4_0-gguf/Qwen3.6-27B-Q4_0.gguf -dev SYCL2/SYCL1/SYCL3 -ngl 99 -sm tensor -ts 1/1/1 -fa 1 -ub 128 -ctk f16 -ctv f16 -t 8 -p 512 -n 512 -r 3 --poll 50 -o jsonl"
+    "commandSnippet": "llama-bench -m /home/steve/models/qwen3.6-27b-q4_0-gguf/Qwen3.6-27B-Q4_0.gguf -dev SYCL2/SYCL1/SYCL3 -ngl 99 -sm tensor -ts 1/1/1 -fa 1 -ub 128 -ctk f16 -ctv f16 -t 8 -p 512 -n 512 -r 3 --poll 25 -o jsonl"
   },
   "runs": [
     {
@@ -86,12 +86,33 @@
         "createdAt": "2026-05-07T02:44:34.853Z",
         "reducedPayloadHttpStatus": 201
       }
+    },
+    {
+      "label": "tp3-full-fuseadd-root-residual-poll25",
+      "promptTokens": 512,
+      "outputTokens": 512,
+      "repeats": 3,
+      "poll": 25,
+      "tokSPrompt": 200.81687,
+      "tokSOut": 50.922114,
+      "tokSTotal": 81.24303502601869,
+      "json": "/home/steve/bench-results/qwen36-q4_0-gguf/tp3-refresh-20260507/poll-sweep-root/poll25-root-p512n512-r3-20260507T032932Z.jsonl",
+      "log": "/home/steve/bench-results/qwen36-q4_0-gguf/tp3-refresh-20260507/poll-sweep-root/poll25-root-p512n512-r3-20260507T032932Z.log",
+      "localMaxxing": {
+        "submitted": true,
+        "id": "cmouxjqao000npn01hxqn68td",
+        "status": "APPROVED",
+        "createdAt": "2026-05-07T03:31:59.329Z",
+        "detailedPayloadHttpStatus": 500,
+        "reducedPayloadHttpStatus": 201
+      }
     }
   ],
   "comparisons": {
     "guardFixTp3TokSOut": 49.552666,
     "rootResidualTp3TokSOut": 50.808572,
-    "improvementVsGuardFixPercent": 2.534485
+    "rootResidualPoll25TokSOut": 50.922114,
+    "improvementVsGuardFixPercent": 2.76362
   },
   "negativeScreens": [
     {
@@ -117,6 +138,39 @@
       "q8CacheOffMulMatAllreduceAddTokSOut": 41.707508,
       "tsv": "/home/steve/bench-results/qwen36-q4_0-gguf/quad-assist-refresh-20260507/mulmat-allreduce-fuse/q4-quad-assist005-mulmat-allreduce-fuse-p0n128-20260507T022028Z.tsv",
       "decision": "Keep Q8 cache on; leave GGML_META_FUSE_MUL_MAT_ALLREDUCE_ADD off."
+    },
+    {
+      "label": "tp3-mixed-current-stack",
+      "baselineTokSOut": 49.156118,
+      "lookaheadTokSOut": 48.400919,
+      "mixedTokSOut": 47.899958,
+      "mixedLookaheadTokSOut": 47.817741,
+      "tsv": "/home/steve/bench-results/qwen36-q4_0-gguf/tp3-refresh-20260507/mixed-current-stack/q4-tp3-root-mixed-ab-p0n128-20260507T030513Z.tsv",
+      "decision": "Keep GGML_SYCL_FUSE_MMVQ2_MIXED and LOOKAHEAD disabled on the TP3 root-residual recipe."
+    },
+    {
+      "label": "tp3-ubatch-root",
+      "shortSweepBest": {
+        "ubatch": 64,
+        "tokSOut": 49.426433
+      },
+      "fullValidationUb64TokSOut": 50.192228,
+      "fullValidationUb64TokSTotal": 76.04413494732131,
+      "tsv": "/home/steve/bench-results/qwen36-q4_0-gguf/tp3-refresh-20260507/ubatch-sweep-root/q4-tp3-root-ubatch-p0n128-20260507T031254Z.tsv",
+      "fullJson": "/home/steve/bench-results/qwen36-q4_0-gguf/tp3-refresh-20260507/ubatch-sweep-root/ub64-root-p512n512-r3-20260507T032201Z.jsonl",
+      "decision": "Keep ubatch 128; the ub64 short win did not survive full validation."
+    },
+    {
+      "label": "tp3-poll-root",
+      "shortSweepBest": {
+        "poll": 25,
+        "tokSOut": 49.398782
+      },
+      "fullValidationPoll25TokSOut": 50.922114,
+      "fullValidationPoll25TokSTotal": 81.24303502601869,
+      "tsv": "/home/steve/bench-results/qwen36-q4_0-gguf/tp3-refresh-20260507/poll-sweep-root/q4-tp3-root-poll-p0n128-20260507T032404Z.tsv",
+      "fullJson": "/home/steve/bench-results/qwen36-q4_0-gguf/tp3-refresh-20260507/poll-sweep-root/poll25-root-p512n512-r3-20260507T032932Z.jsonl",
+      "decision": "Promote --poll 25 for the current TP3 recipe."
     }
   ],
   "correctness": {
@@ -139,5 +193,5 @@
       "/home/steve/bench-results/qwen36-q4_0-gguf/correctness/fuseadd-root-residual-tp3-20260507T024037Z"
     ]
   },
-  "conclusion": "New best submitted quality-preserving Q4_0 GGUF TP3 result. Root-residual fusion is useful on TP3 but not on the current four-card assist layout; next work should add a cheap correctness harness and continue reducing launch/collective count."
+  "conclusion": "New best submitted quality-preserving Q4_0 GGUF TP3 result is 50.922114 tok/s with root-residual fusion and --poll 25. Root-residual fusion is useful on TP3 but not on the current four-card assist layout; mixed lookahead/deferred fusion and ub64 are negative. Next work should add tensor-level matmul diagnostics and continue reducing launch/collective count."
 }

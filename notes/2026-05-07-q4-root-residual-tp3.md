@@ -41,17 +41,19 @@ GGML_SYCL_FUSE_RMS_NORM_MUL=1
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
 | TP3 short baseline | 0 | 128 | 2 | n/a | 48.349109 | n/a |
 | TP3 short root-residual | 0 | 128 | 2 | n/a | 48.894885 | n/a |
-| TP3 full root-residual | 512 | 512 | 3 | 193.705831 | 50.808572 | 80.501734 |
+| TP3 full root-residual, poll 50 | 512 | 512 | 3 | 193.705831 | 50.808572 | 80.501734 |
+| TP3 full root-residual, poll 25 | 512 | 512 | 3 | 200.816870 | 50.922114 | 81.243035 |
 
-This is `+2.53%` versus the guard-fix TP3 validation (`49.552666 tok/s`) and is the current best quality-preserving Q4_0 GGUF result.
+The poll-25 refresh is `+2.76%` versus the guard-fix TP3 validation (`49.552666 tok/s`) and is the current best quality-preserving Q4_0 GGUF result.
 
 ## LocalMaxxing
 
 The reduced payload was accepted:
 
-- ID: `cmouvurhh00nqld010dtr4xrl`
-- Output throughput: `50.808572 tok/s`
-- Total throughput: `80.5017335619557 tok/s`
+- Poll-50 ID: `cmouvurhh00nqld010dtr4xrl`
+- Poll-25 ID: `cmouxjqao000npn01hxqn68td`
+- Best output throughput: `50.922114 tok/s`
+- Best total throughput: `81.24303502601869 tok/s`
 
 ## Negative Follow-Ups
 
@@ -61,6 +63,8 @@ The reduced payload was accepted:
 | Q4_1 forced MMVQ | `42.344754 tok/s` versus default DMMV `42.552518 tok/s` | Default-off experiment only. |
 | Q8-off `MUL_MAT+allreduce+ADD` diagnostic | `41.707508 tok/s` versus Q8-cache-on control `42.732977 tok/s` | Keep Q8 cache on; leave diagnostic off. |
 | Four-card root skip / rotation | short screens at or below baseline except one non-durable root-residual screen | Do not pursue as a standalone topology tweak. |
+| TP3 mixed `attn_qkv + attn_gate` fusion | `47.899958 tok/s` versus baseline `49.156118 tok/s` | Keep mixed/deferred fusion disabled. |
+| TP3 ubatch 64 full validation | `50.192228 tok/s` versus poll-50 `-ub 128` `50.808572 tok/s` | Keep `-ub 128`. |
 
 ## Correctness Status
 
@@ -81,9 +85,13 @@ Both files had SHA256 `4c0c2f5a51e9a501f27272deb1657d21dad4f26d1d68b38ddacefbc44
 - TP3 short A/B TSV: `/home/steve/bench-results/qwen36-q4_0-gguf/tp3-refresh-20260507/comm-micro-sweep/q4-tp3-fuseadd-root-p0n128-20260507T023419Z.tsv`
 - TP3 full validation JSON: `/home/steve/bench-results/qwen36-q4_0-gguf/tp3-refresh-20260507/comm-micro-sweep/fuseadd_root-p512n512-r3-20260507T023649Z.jsonl`
 - TP3 full validation log: `/home/steve/bench-results/qwen36-q4_0-gguf/tp3-refresh-20260507/comm-micro-sweep/fuseadd_root-p512n512-r3-20260507T023649Z.log`
+- TP3 poll-25 full validation JSON: `/home/steve/bench-results/qwen36-q4_0-gguf/tp3-refresh-20260507/poll-sweep-root/poll25-root-p512n512-r3-20260507T032932Z.jsonl`
 - Four-card comm micro-sweep TSV: `/home/steve/bench-results/qwen36-q4_0-gguf/quad-assist-refresh-20260507/comm-micro-sweep/q4-quad-assist005-comm-micro-p0n128-20260507T022429Z.tsv`
 - Four-card root-residual full JSON: `/home/steve/bench-results/qwen36-q4_0-gguf/quad-assist-refresh-20260507/comm-micro-sweep/fuseadd_root-p512n512-r3-20260507T023158Z.jsonl`
 - Q4_1 MMVQ A/B TSV: `/home/steve/bench-results/qwen36-q4_0-gguf/quad-assist-refresh-20260507/q4_1-mmvq-ab/q4-quad-assist005-q4_1-mmvq-ab-p0n128-20260507T021728Z.tsv`
 - Projection epilogue diagnostic TSV: `/home/steve/bench-results/qwen36-q4_0-gguf/quad-assist-refresh-20260507/mulmat-allreduce-fuse/q4-quad-assist005-mulmat-allreduce-fuse-p0n128-20260507T022028Z.tsv`
+- TP3 mixed fusion A/B TSV: `/home/steve/bench-results/qwen36-q4_0-gguf/tp3-refresh-20260507/mixed-current-stack/q4-tp3-root-mixed-ab-p0n128-20260507T030513Z.tsv`
+- TP3 ubatch sweep TSV: `/home/steve/bench-results/qwen36-q4_0-gguf/tp3-refresh-20260507/ubatch-sweep-root/q4-tp3-root-ubatch-p0n128-20260507T031254Z.tsv`
+- TP3 poll sweep TSV: `/home/steve/bench-results/qwen36-q4_0-gguf/tp3-refresh-20260507/poll-sweep-root/q4-tp3-root-poll-p0n128-20260507T032404Z.tsv`
 - Inconclusive correctness attempt directory: `/home/steve/bench-results/qwen36-q4_0-gguf/correctness/fuseadd-root-residual-tp3-20260507T024037Z`
 - Passing deterministic byte-compare directory: `/home/steve/bench-results/qwen36-q4_0-gguf/correctness/fuseadd-root-residual-tp3-20260507T030114Z-completion-visible`

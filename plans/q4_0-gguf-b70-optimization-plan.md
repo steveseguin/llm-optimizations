@@ -65,13 +65,15 @@ Therefore the Linux target is not speculative: first reach `>=27 tok/s`, then `>
 
 Latest 2026-05-07 Q4_0 follow-up:
 
-- Current best quality-preserving Q4_0 GGUF result is now TP3 at `50.808572 tok/s` decode and `80.501734 tok/s` total for 512 prompt / 512 output. The only new enabled flag versus the guard-fix stack is `GGML_SYCL_COMM_FUSEADD_ROOT_RESIDUAL=1`.
+- Current best quality-preserving Q4_0 GGUF result is now TP3 at `50.922114 tok/s` decode and `81.243035 tok/s` total for 512 prompt / 512 output. The best refresh keeps `GGML_SYCL_COMM_FUSEADD_ROOT_RESIDUAL=1` and changes `--poll 50` to `--poll 25`.
 - This keeps the same Q4_0 weights, f16 KV cache, flash attention, Q8 activation cache, fused MMVQ2, fused MMVQ2+SwiGLU, fused RMS_NORM+MUL, fused allreduce+ADD, fused final GET_ROWS, single-kernel allreduce, no speculative decoding, no sampling change, and no power-limit change.
 - Four-card assist did not benefit from the same full validation: `GGML_SYCL_COMM_FUSEADD_ROOT_RESIDUAL=1` reached `43.884730 tok/s`, below the accepted `44.087560 tok/s`.
 - Negative screens from the same pass:
   - forced Q4_1 MMVQ path: `42.344754 tok/s` versus default Q4_1 DMMV `42.552518 tok/s`;
   - Q8-cache-off `MUL_MAT+allreduce+ADD` diagnostic: `41.707508 tok/s` versus Q8-cache-on control `42.732977 tok/s`;
   - root skip / root rotation around the four-card assist layout were not durable wins.
+  - TP3 mixed `attn_qkv+attn_gate` fusion regressed short decode from `49.156118` to `47.899958 tok/s`;
+  - TP3 `-ub 64` won a short screen but lost full validation at `50.192228 tok/s`, so keep `-ub 128`.
 - A `llama-cli` text smoke for the TP3 root-residual flag was inconclusive because the corrected command hung and generated a large repeated stdout file. A later capped deterministic `llama-completion` check with prompt echo enabled produced identical non-empty stdout for root-residual off/on. A token/logit harness is still useful before upstreaming, but the local result now has a basic output-equivalence smoke.
 
 ## Quality Constraints
