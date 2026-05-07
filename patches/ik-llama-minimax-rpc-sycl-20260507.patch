@@ -161,7 +161,7 @@ index 89b3450..34b0233 100644
              fields.emplace_back("no_ooae");
          }
 diff --git a/ggml/src/ggml-sycl.cpp b/ggml/src/ggml-sycl.cpp
-index e0f8536..65f8afc 100644
+index e0f8536..fce7c66 100644
 --- a/ggml/src/ggml-sycl.cpp
 +++ b/ggml/src/ggml-sycl.cpp
 @@ -39,6 +39,7 @@
@@ -1144,7 +1144,7 @@ index e0f8536..65f8afc 100644
      }
      catch (sycl::exception const &exc) {
        std::cerr << exc.what() << "Exception caught at file:" << __FILE__
-@@ -4644,8 +5245,77 @@ struct ggml_backend_sycl_split_buffer_context {
+@@ -4644,8 +5245,149 @@ struct ggml_backend_sycl_split_buffer_context {
        std::exit(1);
      }
  
@@ -1158,20 +1158,54 @@ index e0f8536..65f8afc 100644
 +        return (value + alignment - 1) / alignment * alignment;
 +    }
 +
-+    char * alloc(int device, size_t size) {
++    size_t pool_size(int device) const {
++        size_t total = 0;
++        for (const split_pool_chunk & chunk : pools[device]) {
++            total += chunk.size;
++        }
++        return total;
++    }
++
++    size_t pool_used(int device) const {
++        size_t total = 0;
++        for (const split_pool_chunk & chunk : pools[device]) {
++            total += chunk.offset;
++        }
++        return total;
++    }
++
++    void log_pool_state(const char * prefix, int device) const {
++        fprintf(stderr, "%s: device=%d pool_used=%zu pool_size=%zu chunks=%zu\n",
++                prefix, device, pool_used(device), pool_size(device), pools[device].size());
++    }
++
++    char * alloc(int device, size_t size, const ggml_tensor * tensor = nullptr) {
 +        constexpr size_t alignment = 256;
 +        constexpr size_t preferred_chunk_size = size_t(1024) * 1024 * 1024;
 +        const size_t aligned_size = align_up(size, alignment);
++        const int debug = get_sycl_env("GGML_SYCL_SPLIT_POOL_DEBUG", 0);
++        const bool exact_fallback = get_sycl_env("GGML_SYCL_SPLIT_ALLOC_EXACT", 0) != 0;
 +
 +        for (split_pool_chunk & chunk : pools[device]) {
 +            const size_t offset = align_up(chunk.offset, alignment);
 +            if (offset + aligned_size <= chunk.size) {
 +                chunk.offset = offset + aligned_size;
++                if (debug >= 2) {
++                    fprintf(stderr, "split_pool_alloc: device=%d tensor=%s request=%zu aligned=%zu offset=%zu used=%zu pool=%zu chunks=%zu\n",
++                            device, tensor ? tensor->name : "(null)", size, aligned_size, offset,
++                            pool_used(device), pool_size(device), pools[device].size());
++                }
 +                return chunk.data + offset;
 +            }
 +        }
 +
-+        size_t alloc_size = std::max(aligned_size, preferred_chunk_size);
++        if (debug) {
++            fprintf(stderr, "split_pool_spill: device=%d tensor=%s request=%zu aligned=%zu pool_used=%zu pool_size=%zu chunks=%zu\n",
++                    device, tensor ? tensor->name : "(null)", size, aligned_size,
++                    pool_used(device), pool_size(device), pools[device].size());
++        }
++
++        size_t alloc_size = exact_fallback ? aligned_size : std::max(aligned_size, preferred_chunk_size);
 +        ggml_sycl_set_device(device);
 +        char * data = nullptr;
 +        SYCL_CHECK(CHECK_TRY_ERROR(data = (char *) sycl::malloc_device(alloc_size, *(streams[device]))));
@@ -1184,11 +1218,17 @@ index e0f8536..65f8afc 100644
 +            size_t free_mem = 0;
 +            size_t total_mem = 0;
 +            dpct::dev_mgr::instance().get_device(device).get_memory_info(free_mem, total_mem);
-+            GGML_ABORT("%s: sycl::malloc_device returned null: device=%d size=%zu chunk_size=%zu max_alloc=%zu free=%zu total=%zu\n",
-+                       __func__, device, aligned_size, alloc_size, max_alloc, free_mem, total_mem);
++            log_pool_state(__func__, device);
++            GGML_ABORT("%s: sycl::malloc_device returned null: device=%d tensor=%s size=%zu chunk_size=%zu max_alloc=%zu free=%zu total=%zu\n",
++                       __func__, device, tensor ? tensor->name : "(null)", aligned_size, alloc_size, max_alloc, free_mem, total_mem);
 +        }
 +
 +        pools[device].push_back({ data, alloc_size, aligned_size });
++        if (debug) {
++            fprintf(stderr, "split_pool_spill_allocated: device=%d tensor=%s request=%zu chunk_size=%zu pool_used=%zu pool_size=%zu chunks=%zu\n",
++                    device, tensor ? tensor->name : "(null)", size, alloc_size,
++                    pool_used(device), pool_size(device), pools[device].size());
++        }
 +        return data;
 +    }
 +
@@ -1216,13 +1256,45 @@ index e0f8536..65f8afc 100644
 +        }
 +    }
 +
++    void reserve_per_device(size_t requested_size, size_t requested_chunk_size = 0) {
++        if (requested_size == 0 || pools.empty()) {
++            return;
++        }
++
++        constexpr size_t preferred_chunk_size = size_t(1024) * 1024 * 1024;
++        const size_t pool_size = align_up(requested_size, preferred_chunk_size);
++        const size_t chunk_size = requested_chunk_size == 0
++            ? pool_size
++            : align_up(requested_chunk_size, preferred_chunk_size);
++
++        for (int device = 0; device < int(pools.size()); ++device) {
++            size_t remaining = pool_size;
++            while (remaining > 0) {
++                const size_t this_chunk = std::min(chunk_size, remaining);
++                ggml_sycl_set_device(device);
++                char * data = nullptr;
++                SYCL_CHECK(CHECK_TRY_ERROR(data = (char *) sycl::malloc_device(this_chunk, *(streams[device]))));
++                if (data == nullptr) {
++                    const size_t max_alloc = dpct::get_current_device().get_max_mem_alloc_size();
++                    size_t free_mem = 0;
++                    size_t total_mem = 0;
++                    dpct::dev_mgr::instance().get_device(device).get_memory_info(free_mem, total_mem);
++                    GGML_ABORT("%s: sycl::malloc_device returned null: device=%d chunk_size=%zu pool_size=%zu max_alloc=%zu free=%zu total=%zu\n",
++                               __func__, device, this_chunk, pool_size, max_alloc, free_mem, total_mem);
++                }
++                pools[device].push_back({ data, this_chunk, 0 });
++                remaining -= this_chunk;
++            }
++        }
++    }
++
      std::vector<ggml_tensor_extra_gpu *> tensor_extras;
      std::vector<queue_ptr> streams;
 +    std::vector<std::vector<split_pool_chunk>> pools;
  };
  
  GGML_CALL static const char * ggml_backend_sycl_split_buffer_get_name(ggml_backend_buffer_t buffer) {
-@@ -4683,7 +5353,6 @@ ggml_backend_sycl_split_buffer_init_tensor(ggml_backend_buffer_t buffer,
+@@ -4683,7 +5425,6 @@ ggml_backend_sycl_split_buffer_init_tensor(ggml_backend_buffer_t buffer,
      ggml_tensor_extra_gpu * extra = new ggml_tensor_extra_gpu{};
  
      ctx->tensor_extras.push_back(extra);
@@ -1230,7 +1302,7 @@ index e0f8536..65f8afc 100644
  
      for (int i = 0; i < ggml_sycl_info().device_count; ++i) {
          int64_t row_low, row_high;
-@@ -4706,14 +5375,7 @@ ggml_backend_sycl_split_buffer_init_tensor(ggml_backend_buffer_t buffer,
+@@ -4706,14 +5447,7 @@ ggml_backend_sycl_split_buffer_init_tensor(ggml_backend_buffer_t buffer,
          // currently, init_tensor cannot fail, it needs to be fixed in ggml-backend first
          ggml_sycl_set_device(i);
          const queue_ptr stream = ctx->streams[i];
@@ -1242,11 +1314,11 @@ index e0f8536..65f8afc 100644
 -        */
 -        SYCL_CHECK(CHECK_TRY_ERROR(buf = (char *)sycl::malloc_device(
 -                                        size, *stream)));
-+        char * buf = ctx->alloc(i, size);
++        char * buf = ctx->alloc(i, size, tensor);
  
          // set padding to 0 to avoid possible NaN values
          if (size > original_size) {
-@@ -4740,7 +5402,7 @@ ggml_backend_sycl_split_buffer_init_tensor(ggml_backend_buffer_t buffer,
+@@ -4740,7 +5474,7 @@ ggml_backend_sycl_split_buffer_init_tensor(ggml_backend_buffer_t buffer,
                  CHECK_TRY_ERROR(extra->events[i][is] = new sycl::event()));
          }
      }
@@ -1255,7 +1327,19 @@ index e0f8536..65f8afc 100644
      tensor->extra = extra;
  }
  catch (sycl::exception const &exc) {
-@@ -4880,11 +5542,11 @@ GGML_CALL static const char * ggml_backend_sycl_split_buffer_type_name(ggml_back
+@@ -4790,6 +5524,11 @@ ggml_backend_sycl_split_buffer_set_tensor(ggml_backend_buffer_t buffer,
+         */
+         ggml_sycl_set_device(i);
+         const queue_ptr stream = ctx->streams[i];
++        if (get_sycl_env("GGML_SYCL_SPLIT_COPY_DEBUG", 0) != 0) {
++            fprintf(stderr,
++                    "split_copy_set_tensor: device=%d tensor=%s rows=[%" PRId64 ",%" PRId64 ") bytes=%zu padded_bytes=%zu offset=%zu\n",
++                    i, tensor->name, row_low, row_high, original_size, size, offset_split);
++        }
+         SYCL_CHECK(CHECK_TRY_ERROR(
+             (*stream)
+                 .memcpy(extra->data_device[i], buf_host, original_size)
+@@ -4880,11 +5619,27 @@ GGML_CALL static const char * ggml_backend_sycl_split_buffer_type_name(ggml_back
  }
  
  GGML_CALL static ggml_backend_buffer_t ggml_backend_sycl_split_buffer_type_alloc_buffer(ggml_backend_buffer_type_t buft, size_t size) {
@@ -1263,15 +1347,31 @@ index e0f8536..65f8afc 100644
 -    // instead, we allocate them for each tensor separately in init_tensor
 -    // however, the size still represents the maximum cumulative size of all the device buffers after the tensors are allocated,
 -    // as returned by get_alloc_size. this limit is enforced during tensor allocation by ggml-alloc, so it must be correct.
-+    // B70/Level Zero currently fails after a small number of USM allocations
-+    // even when most VRAM is free, so reserve coarse per-device pools here and
-+    // suballocate individual split tensors in init_tensor.
++    // B70/Level Zero can fail after many USM allocations even when most VRAM is
++    // free. Pre-reserving coarse pools helps some models, but MiniMax graph
++    // split can overestimate the split buffer enough to exceed per-card VRAM.
      ggml_backend_sycl_split_buffer_context * ctx = new ggml_backend_sycl_split_buffer_context();
-+    ctx->reserve(size);
++    if (const char * env = getenv("GGML_SYCL_SPLIT_POOL_MIB")) {
++        const int mib = std::atoi(env);
++        if (mib > 0) {
++            size_t chunk_size = 0;
++            if (const char * chunk_env = getenv("GGML_SYCL_SPLIT_POOL_CHUNK_MIB")) {
++                const int chunk_mib = std::atoi(chunk_env);
++                if (chunk_mib > 0) {
++                    chunk_size = size_t(chunk_mib) * 1024 * 1024;
++                }
++            }
++            ctx->reserve_per_device(size_t(mib) * 1024 * 1024, chunk_size);
++        }
++    } else if (const char * env = getenv("GGML_SYCL_SPLIT_PRE_RESERVE")) {
++        if (std::atoi(env) != 0) {
++            ctx->reserve(size);
++        }
++    }
  
      return ggml_backend_buffer_init(buft, ggml_backend_sycl_split_buffer_interface, ctx, size);
  }
-@@ -5170,6 +5832,7 @@ GGML_CALL static bool ggml_backend_sycl_supports_op(ggml_backend_t backend, cons
+@@ -5170,6 +5925,7 @@ GGML_CALL static bool ggml_backend_sycl_supports_op(ggml_backend_t backend, cons
                  case GGML_UNARY_OP_HARDSWISH:
                  case GGML_UNARY_OP_GELU_QUICK:
                  case GGML_UNARY_OP_TANH:
@@ -1279,7 +1379,7 @@ index e0f8536..65f8afc 100644
                      return ggml_is_contiguous(op->src[0]);
                  default:
                      return false;
-@@ -5206,6 +5869,36 @@ GGML_CALL static bool ggml_backend_sycl_supports_op(ggml_backend_t backend, cons
+@@ -5206,6 +5962,36 @@ GGML_CALL static bool ggml_backend_sycl_supports_op(ggml_backend_t backend, cons
                  }
                  return true;
              } break;
@@ -1316,7 +1416,7 @@ index e0f8536..65f8afc 100644
          case GGML_OP_GET_ROWS:
              {
                  switch (op->src[0]->type) {
-@@ -5278,6 +5971,8 @@ GGML_CALL static bool ggml_backend_sycl_supports_op(ggml_backend_t backend, cons
+@@ -5278,6 +6064,8 @@ GGML_CALL static bool ggml_backend_sycl_supports_op(ggml_backend_t backend, cons
          case GGML_OP_IM2COL:
          case GGML_OP_POOL_2D:
          case GGML_OP_SUM_ROWS:
