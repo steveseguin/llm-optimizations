@@ -1501,6 +1501,25 @@ Goal: improve quality-preserving Q4_0 performance without power-limit changes.
      - this is a correctness/performance restoration for the current Q4_0 best stack, not a quality-changing optimization;
      - invalidate the earlier mixed-row TP3 A/B results around `27 tok/s`; they were measuring the misplaced guard, not mixed fusion performance;
      - keep `GGML_SYCL_Q8_CACHE=1`, `GGML_META_FUSE_ALLREDUCE_ADD=1`, and `GGML_META_FUSE_ALLREDUCE_GET_ROWS=1` together in the best TP3 recipe.
+75. 2026-05-07 FP8 TP4 versus PP2xTP2 post-reboot refresh:
+   - validated the static compressed-tensors FP8 model after reboot with the current vLLM/XPU source stack (`c51df4300` plus local patches);
+   - 512 prompt / 512 output, `max_model_len=32768`, 3 measured repeats:
+     - PP2xTP2, no speculation: `27.722318 tok/s` output, `55.444635 tok/s` total;
+     - TP4/PP1, no speculation, default oneCCL topology recognition: `45.864956 tok/s` output, `91.729913 tok/s` total;
+     - TP4/PP1, n-gram speculative decode (`num_speculative_tokens=4`, lookup `2..4`), default topology: `48.082178 tok/s` output, `96.164356 tok/s` total;
+     - TP4/PP1, no speculation, `CCL_TOPO_FABRIC_VERTEX_CONNECTION_CHECK=0`: `46.386137 tok/s` output, `92.772274 tok/s` total;
+     - TP4/PP1, n-gram plus `CCL_TOPO_FABRIC_VERTEX_CONNECTION_CHECK=0`: `44.438715 tok/s` output, `88.877430 tok/s` total;
+   - observations:
+     - TP4 remains the speed layout for batch-1 Qwen3.6 27B FP8 on four B70s;
+     - PP2xTP2 is useful for capacity and pipeline/layout validation, but it is not a speed path at batch 1;
+     - the oneCCL topology override is a small no-spec win but a speculative-decode regression because n-gram acceptance collapsed on the measured run;
+     - vLLM reports XPU graph disabled for all TP/PP multi-GPU runs because XPU graph capture does not support communication ops when `world_size_across_dp > 1`;
+   - LocalMaxxing:
+     - submitted the PP2xTP2 capacity-focused negative result as ID `cmout3vhy00m6ld01162ujv21`;
+   - decision:
+     - keep the prior submitted FP8 best (`49.581893 tok/s`, TP4 n-gram default topology) as the headline static FP8 result;
+     - do not use PP2xTP2 for single-session speed unless a later vLLM pipeline scheduler or communication change materially improves it;
+     - keep default oneCCL topology recognition for speculative runs; the override is only worth revisiting for no-spec or microbench work.
 
 ## Success Criteria
 
@@ -1509,6 +1528,7 @@ Goal: improve quality-preserving Q4_0 performance without power-limit changes.
 - FP8 investigation success: official `Qwen/Qwen3.6-27B-FP8` reaches or beats the current Q4_0 TP3 result while preserving output quality.
 - Static FP8 current best: `vrfai/Qwen3.6-27B-FP8` on four B70s with patched vLLM/XPU FlashAttention2 plus n-gram speculative decode reaches `49.581893 tok/s` on 512 prompt / 512 output. This is ahead of the Q4_0 TP3 validation while preserving more fidelity than INT4 paths.
 - Static FP8 32k-context status: TP4 with patched vLLM/XPU FlashAttention2 succeeds at `max_model_len=32768` and reports `1,133,163` GPU KV-cache tokens with `42.996276 tok/s` at 2048 prompt / 256 output. TP2/PP2 also fits but is slower (`26.361533 tok/s`) and reports slightly less 32k KV capacity.
+- Static FP8 post-reboot refresh: TP4/PP1 remains preferred for speed (`45.864956 tok/s` no-spec, `48.082178 tok/s` n-gram on this repeat), while PP2xTP2 fits 32K context but only reaches `27.722318 tok/s` at 512/512. A oneCCL topology override gives a tiny no-spec gain (`46.386137 tok/s`) but hurts n-gram speculation (`44.438715 tok/s`).
 - Current dual-card milestone reached: Q4_0 GGUF single session `42.106013 tok/s` on two B70s for 512 prompt / 512 output with the current fused stack, quality preserving, software-only.
 - Current improved multi-card milestone: Q4_0 GGUF single session `49.552666 tok/s` on three B70s for 512 prompt / 512 output with Q8 activation cache, fused MMVQ2, fused MMVQ2+SwiGLU, fused RMS_NORM+scale-MUL, fused allreduce+ADD, fused final allreduce+GET_ROWS, single-kernel allreduce, `GGML_SYCL_COMM_SYNC_AFTER=2`, and `-ub 128`. This is quality preserving and software-only. The earlier five-repeat validation remains `49.403656 tok/s`; the 2026-05-07 guard-fix refresh was a three-repeat run.
 - Current four-card Q4_0 status: assist split `1/1/1/0.05` reaches `39.204149 tok/s`, improving the equal-split four-card result by `12.24%` but still trailing the best three-card result, so quad Q4_0 remains a kernel/scheduling investigation rather than the production path. The RMS_NORM+MUL rerun of that assist split failed with Level Zero OOM during `MUL_MAT`.

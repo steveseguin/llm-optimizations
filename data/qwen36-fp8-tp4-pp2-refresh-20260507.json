@@ -1,0 +1,157 @@
+{
+  "date": "2026-05-07",
+  "model": {
+    "hfId": "vrfai/Qwen3.6-27B-FP8",
+    "localPath": "/home/steve/models/qwen3.6-27b-fp8-vrfai",
+    "quantization": "FP8 static compressed-tensors"
+  },
+  "software": {
+    "engine": "vllm",
+    "engineVersion": "0.20.1",
+    "sourcePath": "/home/steve/src/vllm",
+    "sourceCommit": "c51df4300",
+    "localPatches": true,
+    "wrapper": "/home/steve/llm-optimizations-publish/scripts/bench-vllm-qwen36-fp8.sh"
+  },
+  "hardware": {
+    "gpuName": "Intel Arc Pro B70 32GB",
+    "gpuCount": 4,
+    "vramGbPerGpu": 32,
+    "cpu": "AMD EPYC 9015",
+    "ramGb": 16,
+    "os": "Ubuntu 24.04 LTS",
+    "kernel": "6.17.0-23-generic"
+  },
+  "commonRunConfig": {
+    "inputTokens": 512,
+    "outputTokens": 512,
+    "maxModelLen": 32768,
+    "batchSize": 1,
+    "numIters": 3,
+    "warmupIters": 1,
+    "quantization": "compressed-tensors",
+    "kvCacheDtype": "auto",
+    "attentionBackend": "XPU FlashAttention2",
+    "cclAtlTransport": "ofi",
+    "powerLimitChanged": false
+  },
+  "runs": [
+    {
+      "label": "pp2-tp2-nospec-default-topology",
+      "tensorParallel": 2,
+      "pipelineParallel": 2,
+      "speculative": false,
+      "extraEnv": {},
+      "avgLatencySeconds": 18.468874345329823,
+      "latenciesSeconds": [
+        18.492325865998282,
+        18.45278443999996,
+        18.461512729991227
+      ],
+      "tokSOut": 27.722317582905,
+      "tokSTotal": 55.44463516581,
+      "json": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp2-pp2-in512-out512-bs1-20260507T010724Z.json",
+      "log": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp2-pp2-in512-out512-bs1-20260507T010724Z.log",
+      "notes": "Capacity-focused layout. Fits 32K context and reported about 1.15M GPU KV-cache tokens, but is slow for batch-1 decode.",
+      "localMaxxing": {
+        "submitted": true,
+        "id": "cmout3vhy00m6ld01162ujv21",
+        "status": "APPROVED",
+        "createdAt": "2026-05-07T01:27:41.110Z"
+      }
+    },
+    {
+      "label": "tp4-nospec-default-topology",
+      "tensorParallel": 4,
+      "pipelineParallel": 1,
+      "speculative": false,
+      "extraEnv": {},
+      "avgLatencySeconds": 11.163206981000258,
+      "latenciesSeconds": [
+        11.129863756999839,
+        11.212503536997247,
+        11.147253649003687
+      ],
+      "tokSOut": 45.864956268518746,
+      "tokSTotal": 91.72991253703749,
+      "json": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp4-pp1-in512-out512-bs1-20260507T011158Z.json",
+      "log": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp4-pp1-in512-out512-bs1-20260507T011158Z.log"
+    },
+    {
+      "label": "tp4-ngram4-default-topology",
+      "tensorParallel": 4,
+      "pipelineParallel": 1,
+      "speculative": true,
+      "speculativeConfig": {
+        "method": "ngram",
+        "numSpeculativeTokens": 4,
+        "promptLookupMin": 2,
+        "promptLookupMax": 4
+      },
+      "extraEnv": {},
+      "avgLatencySeconds": 10.648436122001536,
+      "latenciesSeconds": [
+        7.739589668010012,
+        11.91627441199671,
+        12.289444285997888
+      ],
+      "tokSOut": 48.082177902360534,
+      "tokSTotal": 96.16435580472107,
+      "json": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp4-pp1-in512-out512-bs1-20260507T011540Z.json",
+      "log": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp4-pp1-in512-out512-bs1-20260507T011540Z.log",
+      "notes": "Better than no-spec on this repeat, but lower than the previous submitted FP8 best of 49.581893 tok/s."
+    },
+    {
+      "label": "tp4-nospec-ccl-fabric-check-off",
+      "tensorParallel": 4,
+      "pipelineParallel": 1,
+      "speculative": false,
+      "extraEnv": {
+        "CCL_TOPO_FABRIC_VERTEX_CONNECTION_CHECK": "0"
+      },
+      "avgLatencySeconds": 11.037780504998713,
+      "latenciesSeconds": [
+        11.03000744599558,
+        11.129353914002422,
+        10.953980154998135
+      ],
+      "tokSOut": 46.38613711951683,
+      "tokSTotal": 92.77227423903366,
+      "json": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp4-pp1-in512-out512-bs1-20260507T012024Z.json",
+      "log": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp4-pp1-in512-out512-bs1-20260507T012024Z.log",
+      "notes": "Tiny no-spec improvement over default topology recognition."
+    },
+    {
+      "label": "tp4-ngram4-ccl-fabric-check-off",
+      "tensorParallel": 4,
+      "pipelineParallel": 1,
+      "speculative": true,
+      "speculativeConfig": {
+        "method": "ngram",
+        "numSpeculativeTokens": 4,
+        "promptLookupMin": 2,
+        "promptLookupMax": 4
+      },
+      "extraEnv": {
+        "CCL_TOPO_FABRIC_VERTEX_CONNECTION_CHECK": "0"
+      },
+      "avgLatencySeconds": 11.521485229333242,
+      "latenciesSeconds": [
+        11.846552745002555,
+        11.338764282001648,
+        11.379138660995523
+      ],
+      "tokSOut": 44.43871513166275,
+      "tokSTotal": 88.8774302633255,
+      "json": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp4-pp1-in512-out512-bs1-20260507T012303Z.json",
+      "log": "/home/steve/bench-results/qwen36-fp8-vllm/vllm-qwen36-fp8-compressed-tensors-tp4-pp1-in512-out512-bs1-20260507T012303Z.log",
+      "notes": "Speculative regression. The log showed low n-gram acceptance, so keep default topology recognition for speculative TP4 runs."
+    }
+  ],
+  "conclusions": [
+    "TP4/PP1 remains the speed layout for batch-1 static FP8 Qwen3.6 27B on 4x B70.",
+    "PP2xTP2 is capacity-friendly but too slow for single-session speed in current vLLM.",
+    "CCL_TOPO_FABRIC_VERTEX_CONNECTION_CHECK=0 is a small no-spec win but hurts n-gram speculation on this prompt/run.",
+    "XPU graph is not currently usable for multi-GPU TP/PP because vLLM disables it for communication ops when world size is greater than one."
+  ]
+}

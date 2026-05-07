@@ -135,3 +135,13 @@ Note: `cmotql1v60013qy01016jcs7r` is the current best submitted static FP8 resul
 Note: `cmottw16x002wqy01jvbluobl` is the long-context FP8 validation. It is slower than the 512/512 best but shows the static FP8 TP4 path works at a 2048-token prompt window with high total throughput.
 
 Note: `cmoudx2qr00c3ld01xxq8hiu0` is the clean 32k-context FP8 validation. It uses no speculative decoding and records XPU/Level Zero in `engineFlags.extraFlags` because the LocalMaxxing backend enum currently rejects `xpu`.
+
+Date: 2026-05-07
+
+Model: `vrfai/Qwen3.6-27B-FP8`, static compressed-tensors FP8.
+
+| Label | LocalMaxxing ID | GPUs | Input | Output | tok/s out | tok/s total |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| `vllm-qwen36-vrfai-fp8-pp2tp2-capacity-negative-p512-n512` | `cmout3vhy00m6ld01162ujv21` | 4 | 512 | 512 | 27.722 | 55.445 |
+
+Note: `cmout3vhy00m6ld01162ujv21` is a capacity-focused negative result for the 2x2 FP8 layout. PP2xTP2 fits `max_model_len=32768` and reports large KV-cache headroom, but it is much slower than TP4/PP1 for batch-1 single-session speed. It uses the same FP8 target weights, auto/BF16 KV, no speculative decoding, and no power-limit changes.

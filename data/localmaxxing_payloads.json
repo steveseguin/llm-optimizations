@@ -1230,5 +1230,52 @@
     },
     "detailedPayloadHttpStatus": 500,
     "detailedPayloadResponse": "Internal server error"
+  },
+  {
+    "label": "vllm-qwen36-vrfai-fp8-pp2tp2-capacity-negative-p512-n512",
+    "submittedAt": "2026-05-07T01:27:41.110Z",
+    "payload": {
+      "hfId": "vrfai/Qwen3.6-27B-FP8",
+      "modelRevision": "main",
+      "hardware": {
+        "hwClass": "DISCRETE_GPU",
+        "gpuName": "Intel Arc Pro B70 32GB",
+        "gpuCount": 4,
+        "vramGb": 32,
+        "cpu": "AMD EPYC 9015",
+        "ramGb": 16,
+        "os": "Ubuntu 24.04 LTS, kernel 6.17.0-23-generic"
+      },
+      "engineName": "vllm",
+      "engineVersion": "0.20.1",
+      "quantization": "FP8 static compressed-tensors",
+      "promptTokens": 512,
+      "outputTokens": 512,
+      "contextLength": 32768,
+      "batchSize": 1,
+      "tokSOut": 27.722317582905,
+      "tokSTotal": 55.44463516581,
+      "notes": "Capacity-focused negative result for Qwen3.6 27B FP8 on 4x Intel Arc Pro B70. vLLM PP2xTP2 fits 32K context and reports about 1.15M GPU KV-cache tokens, but batch-1 decode is much slower than TP4/PP1. No speculative decoding; target FP8 weights and auto/BF16 KV preserved.",
+      "engineFlags": {
+        "commandSnippet": "MODEL_DIR=/home/steve/models/qwen3.6-27b-fp8-vrfai TP=2 PP=2 ONEAPI_DEVICE_SELECTOR=level_zero:0,1,2,3 INPUT_LEN=512 OUTPUT_LEN=512 MAX_MODEL_LEN=32768 NUM_ITERS=3 WARMUP_ITERS=1 QUANTIZATION=compressed-tensors KV_CACHE_DTYPE=auto bench-vllm-qwen36-fp8.sh",
+        "tensorParallel": 2,
+        "pipelineParallel": 2,
+        "contextLength": 32768,
+        "attentionBackend": "flash_attn",
+        "flashAttn": true,
+        "chunkedPrefill": true,
+        "concurrency": 1,
+        "specDecoding": false,
+        "kvCacheDtype": "auto",
+        "extraFlags": "Intel XPU/Level Zero, XCCL backend, CCL_ATL_TRANSPORT=ofi, vLLM local source c51df4300 with XPU patches"
+      }
+    },
+    "httpStatus": 201,
+    "response": {
+      "id": "cmout3vhy00m6ld01162ujv21",
+      "status": "APPROVED",
+      "tokSOut": 27.722317582905,
+      "createdAt": "2026-05-07T01:27:41.110Z"
+    }
   }
 ]
