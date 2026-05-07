@@ -5,9 +5,9 @@ The input GGUF is preserved. The output GGUF contains every original tensor plus
 one F32 tensor named `blk.N.ssm_ba.weight` for each layer that has both
 `blk.N.ssm_beta.weight` and `blk.N.ssm_alpha.weight`.
 
-The fused tensor layout stores beta/alpha rows interleaved inside each SSM
-group. The row order is chosen so the existing qwen3next-style fused graph
-emits the same flat beta and alpha vectors as Qwen3.5's separate tensors.
+The fused tensor layout stores all beta rows followed by all alpha rows. This
+lets the runtime slice each half directly while preserving Qwen3.5's native
+row ownership under tensor split.
 """
 
 from __future__ import annotations
@@ -58,16 +58,6 @@ def main() -> int:
     writer = gguf.GGUFWriter(args.output, arch)
     writer.data_alignment = reader.alignment
 
-    n_k_heads_field = reader.get_field(f"{arch}.ssm.group_count")
-    n_v_heads_field = reader.get_field(f"{arch}.ssm.time_step_rank")
-    if n_k_heads_field is None or n_v_heads_field is None:
-        raise SystemExit(f"input GGUF is missing {arch} SSM head metadata")
-    n_k_heads = int(n_k_heads_field.contents())
-    n_v_heads = int(n_v_heads_field.contents())
-    if n_v_heads % n_k_heads != 0:
-        raise SystemExit(f"n_v_heads must be divisible by n_k_heads, got {n_v_heads}/{n_k_heads}")
-    head_ratio = n_v_heads // n_k_heads
-
     for key, field in reader.fields.items():
         if key.startswith("GGUF."):
             continue
@@ -109,12 +99,7 @@ def main() -> int:
         if beta.data.shape != alpha.data.shape:
             raise SystemExit(f"shape mismatch for {prefix}: beta {beta.data.shape}, alpha {alpha.data.shape}")
 
-        beta_by_group = beta.data.reshape(n_k_heads, head_ratio, beta.data.shape[1])
-        alpha_by_group = alpha.data.reshape(n_k_heads, head_ratio, alpha.data.shape[1])
-        fused = np.empty((n_k_heads, 2 * head_ratio, beta.data.shape[1]), dtype=np.float32)
-        fused[:, :head_ratio, :] = beta_by_group
-        fused[:, head_ratio:, :] = alpha_by_group
-        fused = np.ascontiguousarray(fused.reshape(2 * n_v_heads, beta.data.shape[1]))
+        fused = np.ascontiguousarray(np.concatenate([beta.data, alpha.data], axis=0))
         writer.add_tensor(fused_name, fused)
         fused_names.add(fused_name)
         fused_count += 1

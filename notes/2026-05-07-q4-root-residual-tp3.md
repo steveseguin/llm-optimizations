@@ -4,6 +4,17 @@
 
 After the Q8-cache guard fix restored the validated fused `allreduce+ADD` path, I screened small collective-side options that could remove residual-buffer reads without changing model weights, KV dtype, sampling, or GPU power. The useful option was `GGML_SYCL_COMM_FUSEADD_ROOT_RESIDUAL=1` on the three-card TP3 layout.
 
+## Later Correctness Update
+
+The root-residual result below was submitted before the stronger token/logit probe existed. A later fused-beta/alpha validation run isolated a correctness hazard in the combination of:
+
+```bash
+GGML_SYCL_COMM_FUSEADD_ROOT_RESIDUAL=1
+GGML_META_FUSE_ALLREDUCE_ADD=1
+```
+
+Each option passed individually, but the pair can diverge. Treat the LocalMaxxing records in this note as historical performance data, not as currently quality-cleared results. The current quality-cleared Q4_0 TP3 path disables `GGML_SYCL_COMM_FUSEADD_ROOT_RESIDUAL` and uses the no-root fused beta/alpha result documented in `notes/2026-05-07-q4-fused-beta-alpha-experimental.md`.
+
 ## Configuration
 
 - Model: `/home/steve/models/qwen3.6-27b-q4_0-gguf/Qwen3.6-27B-Q4_0.gguf`
@@ -44,16 +55,18 @@ GGML_SYCL_FUSE_RMS_NORM_MUL=1
 | TP3 full root-residual, poll 50 | 512 | 512 | 3 | 193.705831 | 50.808572 | 80.501734 |
 | TP3 full root-residual, poll 25 | 512 | 512 | 3 | 200.816870 | 50.922114 | 81.243035 |
 
-The poll-25 refresh is `+2.76%` versus the guard-fix TP3 validation (`49.552666 tok/s`) and is the current best quality-preserving Q4_0 GGUF result.
+The poll-25 refresh was `+2.76%` versus the guard-fix TP3 validation (`49.552666 tok/s`). This is still useful as a performance ceiling, but it is no longer marked quality-preserving after the later token/logit probe found the root-residual plus meta allreduce-add ordering hazard.
 
 ## LocalMaxxing
 
-The reduced payload was accepted:
+The reduced payload was accepted before the later correctness issue was found:
 
 - Poll-50 ID: `cmouvurhh00nqld010dtr4xrl`
 - Poll-25 ID: `cmouxjqao000npn01hxqn68td`
 - Best output throughput: `50.922114 tok/s`
 - Best total throughput: `81.24303502601869 tok/s`
+
+Follow-up status: submitted, approved, but now annotated locally as suspect/not currently quality-cleared pending a root-residual ordering fix.
 
 ## Negative Follow-Ups
 
@@ -78,7 +91,7 @@ A later capped deterministic `llama-completion` check succeeded after using the 
 The capital of France is Paris!!!!!!!!!!!!!!!
 ```
 
-Both files had SHA256 `4c0c2f5a51e9a501f27272deb1657d21dad4f26d1d68b38ddacefbc44465bf75`. This is a useful local output-equivalence smoke, but a lower-overhead token/logit comparison harness is still the right next step before upstreaming.
+Both files had SHA256 `4c0c2f5a51e9a501f27272deb1657d21dad4f26d1d68b38ddacefbc44465bf75`. This smoke was too weak. The later token/logit harness found that the root-residual plus meta allreduce-add pair can diverge, while no-root runs remain byte-identical. Do not upstream or claim quality preservation for root-residual until that ordering issue is fixed.
 
 ## Artifacts
 
@@ -95,3 +108,5 @@ Both files had SHA256 `4c0c2f5a51e9a501f27272deb1657d21dad4f26d1d68b38ddacefbc44
 - TP3 poll sweep TSV: `/home/steve/bench-results/qwen36-q4_0-gguf/tp3-refresh-20260507/poll-sweep-root/q4-tp3-root-poll-p0n128-20260507T032404Z.tsv`
 - Inconclusive correctness attempt directory: `/home/steve/bench-results/qwen36-q4_0-gguf/correctness/fuseadd-root-residual-tp3-20260507T024037Z`
 - Passing deterministic byte-compare directory: `/home/steve/bench-results/qwen36-q4_0-gguf/correctness/fuseadd-root-residual-tp3-20260507T030114Z-completion-visible`
+- Later minimal failing token/logit interaction: `/home/steve/bench-results/qwen36-q4_0-gguf/correctness/fused-ba-meta-pair-isolation-20260507T064644Z`
+- Failed root queue barrier follow-up: `/home/steve/bench-results/qwen36-q4_0-gguf/correctness/fused-ba-root-meta-add-rootbarrier-20260507T072854Z`

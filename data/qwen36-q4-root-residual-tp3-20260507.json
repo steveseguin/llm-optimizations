@@ -174,9 +174,9 @@
     }
   ],
   "correctness": {
-    "status": "passed-short-deterministic-stdout-byte-compare",
+    "status": "superseded-by-later-token-logit-failure",
     "qualityChangingOptions": false,
-    "notes": "Same target weights, f16 KV, no speculative decoding, no sampling change, no power change. Initial llama-cli text smoke was inconclusive, but a later capped deterministic llama-completion run produced identical non-empty stdout for root-residual off/on. Add a token/logit harness before upstreaming.",
+    "notes": "Same target weights, f16 KV, no speculative decoding, no sampling change, no power change. Initial llama-cli text smoke was inconclusive, and a later capped deterministic llama-completion run produced identical non-empty stdout for root-residual off/on. A stronger later token/logit harness found that root-residual plus meta allreduce-add can diverge, so this smoke is no longer sufficient for quality clearance.",
     "passingByteCompare": {
       "directory": "/home/steve/bench-results/qwen36-q4_0-gguf/correctness/fuseadd-root-residual-tp3-20260507T030114Z-completion-visible",
       "prompt": "The capital of France is",
@@ -193,5 +193,42 @@
       "/home/steve/bench-results/qwen36-q4_0-gguf/correctness/fuseadd-root-residual-tp3-20260507T024037Z"
     ]
   },
-  "conclusion": "New best submitted quality-preserving Q4_0 GGUF TP3 result is 50.922114 tok/s with root-residual fusion and --poll 25. Root-residual fusion is useful on TP3 but not on the current four-card assist layout; mixed lookahead/deferred fusion and ub64 are negative. Next work should add tensor-level matmul diagnostics and continue reducing launch/collective count."
+  "laterCorrectnessUpdate": {
+    "date": "2026-05-07",
+    "status": "submitted historical performance result; not currently quality-cleared",
+    "minimalBadInteraction": [
+      "GGML_SYCL_COMM_FUSEADD_ROOT_RESIDUAL=1",
+      "GGML_META_FUSE_ALLREDUCE_ADD=1"
+    ],
+    "failingArtifact": "/home/steve/bench-results/qwen36-q4_0-gguf/correctness/fused-ba-meta-pair-isolation-20260507T064644Z",
+    "rootMetaAddFailure": {
+      "originalToken": 220,
+      "originalHash": "c57597537930eab9",
+      "fusedToken": 271,
+      "fusedHash": "f8be73fee293172b"
+    },
+    "failedFixes": [
+      {
+        "label": "host wait in comm_allreduce_add_tensor",
+        "correctness": "passed",
+        "throughput": "collapsed to about 29 tok/s",
+        "artifact": "/home/steve/bench-results/qwen36-q4_0-gguf/tp3-refresh-20260507/fused-ba-model/fused-ba-flat-all-current-after-wait-p512n512-r3-20260507T071628Z.tsv",
+        "decision": "reverted"
+      },
+      {
+        "label": "root queue barrier",
+        "correctness": "failed",
+        "artifact": "/home/steve/bench-results/qwen36-q4_0-gguf/correctness/fused-ba-root-meta-add-rootbarrier-20260507T072854Z",
+        "decision": "reverted"
+      }
+    ],
+    "safeAlternative": {
+      "label": "fused beta/alpha no-root TP3",
+      "tokSOut": 50.1299,
+      "tokSTotal": 80.20473519933404,
+      "artifact": "/home/steve/bench-results/qwen36-q4_0-gguf/tp3-refresh-20260507/fused-ba-model/fused-ba-flat-no-root-p512n512-r3-20260507T065943Z.tsv",
+      "qualityArtifact": "/home/steve/bench-results/qwen36-q4_0-gguf/correctness/fused-ba-no-root-final-20260507T073839Z"
+    }
+  },
+  "conclusion": "Root-residual plus --poll 25 remains a useful performance ceiling at 50.922114 tok/s, but it is not currently quality-cleared after a later token/logit harness found a root-residual plus meta allreduce-add divergence. Keep root-residual disabled for quality claims until the ordering hazard is fixed."
 }

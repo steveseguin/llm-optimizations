@@ -6,8 +6,8 @@ Reproducibility notes, benchmark payloads, and local patches from the Intel Arc 
 
 - Host: Ubuntu 24.04.4 LTS, kernel 6.17.0-23-generic.
 - GPUs: 4x Intel Arc Pro B70 / BMG-G31, 32 GB VRAM each.
-- Original quality-preserving target remains Qwen3.6 27B `Q4_0` GGUF on llama.cpp. Current best quality-preserving GGUF result is 50.922 tok/s on three B70s at 512 prompt / 512 output, using SYCL tensor split, `-ub 128`, `--poll 25`, Q8 activation cache, fused MMVQ2, fused MMVQ2+SwiGLU, fused RMS_NORM+scale-MUL, fused allreduce+ADD, fused final allreduce+GET_ROWS, single-kernel allreduce, `GGML_SYCL_COMM_SYNC_AFTER=2`, and `GGML_SYCL_COMM_FUSEADD_ROOT_RESIDUAL=1`.
-- Experimental Qwen35 fused beta/alpha GGUF reached 51.338 decode tok/s on three B70s at 512 prompt / 512 output, but it is not quality-cleared. Step-0 top token matched the original in the logit probe, but full logits differed, so this is not a LocalMaxxing result yet.
+- Original quality-preserving target remains Qwen3.6 27B `Q4_0` GGUF on llama.cpp. Current quality-cleared no-root GGUF result is 50.130 tok/s on three B70s at 512 prompt / 512 output using the experimental flat Qwen35 fused beta/alpha GGUF, SYCL tensor split, `-ub 128`, `--poll 25`, Q8 activation cache, fused MMVQ2, fused MMVQ2+SwiGLU, fused RMS_NORM+scale-MUL, fused allreduce+ADD, fused final allreduce+GET_ROWS, single-kernel allreduce, and `GGML_SYCL_COMM_SYNC_AFTER=2`, with `GGML_SYCL_COMM_FUSEADD_ROOT_RESIDUAL=0`. LocalMaxxing accepted this experimental result as `cmov6p4r7007tqr01yi8ug4un`.
+- The earlier 50.922 tok/s three-B70 root-residual record remains an important performance ceiling, but it is now marked suspect rather than quality-cleared. A later token/logit probe found the minimal bad interaction `GGML_SYCL_COMM_FUSEADD_ROOT_RESIDUAL=1` plus `GGML_META_FUSE_ALLREDUCE_ADD=1`. The accepted LocalMaxxing IDs are historical pending a root-residual ordering fix.
 - Current four-card Q4_0 result is 44.088 tok/s with an assist split (`-ts 1/1/1/0.05`) after the guard-fix refresh. This improves the older assist result by 12.46% and equal 4x by 26.22%, but still trails 3x. Equal four-card split remains a negative scaling diagnostic at 34.929 tok/s.
 - Best static FP8 result so far: vLLM/XPU, `vrfai/Qwen3.6-27B-FP8`, local XPU patches, 4x B70 TP4, CPU n-gram speculative decode, 49.582 output tok/s at 512 prompt / 512 output. This preserves target-model quality through verified speculative decoding, but now trails the current Q4_0 TP3 decode result by about 2.6%.
 - Static FP8 TP4 is also the preferred 32k-context Qwen3.6 27B layout: TP4/PP1 at `max_model_len=32768` reaches 42.996 tok/s for 2048 prompt / 256 output and reports 1,133,163 GPU KV-cache tokens. The 2026-05-07 512/512 refresh kept TP4 ahead (`45.865 tok/s` no-spec, `48.082 tok/s` n-gram). TP2/PP2 fits but is much slower for batch-1 decode (`27.722 tok/s` at 512/512) and should be treated as a capacity layout, not the speed path.
@@ -44,8 +44,8 @@ Reproducibility notes, benchmark payloads, and local patches from the Intel Arc 
 - `notes/2026-05-07-q4-q8-allreduce-add-guardfix.md`: regression fix for the misplaced Q8-cache guard that disabled the validated allreduce+ADD path.
 - `notes/2026-05-07-fp8-tp4-pp2-refresh.md`: FP8 TP4 vs PP2xTP2 post-reboot refresh, including the oneCCL topology-toggle screen.
 - `notes/2026-05-07-q4-quad-assist-refresh.md`: current best four-card Q4_0 assist split refresh after the guard fix.
-- `notes/2026-05-07-q4-root-residual-tp3.md`: current best three-card Q4_0 TP3 root-residual validation plus negative follow-up screens.
-- `notes/2026-05-07-q4-fused-beta-alpha-experimental.md`: speed-positive but not quality-cleared Qwen35 fused `ssm_beta`/`ssm_alpha` GGUF experiment.
+- `notes/2026-05-07-q4-root-residual-tp3.md`: three-card Q4_0 TP3 root-residual performance ceiling, now annotated as not currently quality-cleared after the later token/logit failure.
+- `notes/2026-05-07-q4-fused-beta-alpha-experimental.md`: flat-layout Qwen35 fused `ssm_beta`/`ssm_alpha` GGUF experiment, quality-cleared with root-residual disabled.
 - `data/qwen36-fp8-32k-tp4-vs-pp2-20260506.json`: post-reboot Q4 sanity plus FP8 32k-context TP4 vs TP2/PP2 validation.
 - `data/q4-esimd-blockscales-20260506.json`: structured ESIMD block-loaded scale metadata screen.
 - `data/q4-active-device-row-split-20260506.json`: structured active-device row-split patch validation and negative row-split smoke.
@@ -60,8 +60,8 @@ Reproducibility notes, benchmark payloads, and local patches from the Intel Arc 
 - `data/qwen36-q4-q8-allreduce-add-guardfix-20260507.json`: structured Q4_0 guard-fix trace, restored throughput, and LocalMaxxing record.
 - `data/qwen36-fp8-tp4-pp2-refresh-20260507.json`: structured FP8 TP4, PP2xTP2, n-gram, and oneCCL topology-toggle refresh data.
 - `data/qwen36-q4-quad-assist-refresh-20260507.json`: structured four-card Q4_0 assist split refresh data and LocalMaxxing record.
-- `data/qwen36-q4-root-residual-tp3-20260507.json`: structured root-residual TP3 result, negative follow-up screens, and LocalMaxxing record.
-- `data/qwen36-q4-fused-beta-alpha-20260507.json`: structured fused beta-alpha GGUF experiment data; not submitted because quality is unresolved.
+- `data/qwen36-q4-root-residual-tp3-20260507.json`: structured root-residual TP3 performance ceiling, negative follow-up screens, LocalMaxxing IDs, and later correctness correction.
+- `data/qwen36-q4-fused-beta-alpha-20260507.json`: structured flat-layout fused beta-alpha GGUF experiment data and final no-root correctness/performance validation.
 - `scripts/bench-qwen36-q4_0-gguf-vulkan-matrix.sh`: Q4_0 GGUF Vulkan benchmark sweep harness.
 - `scripts/bench-qwen36-q4_0-gguf-sycl-matrix.sh`: Q4_0 GGUF SYCL benchmark sweep harness.
 - `scripts/bench-qwen36-b70-single-mtp.sh`: single-B70 vLLM INT4 MTP benchmark wrapper.
@@ -82,7 +82,7 @@ Reproducibility notes, benchmark payloads, and local patches from the Intel Arc 
 - `patches/llama-cpp-sycl-rmsnormmul-current-20260506.patch.gz.b64`: current SYCL source diff containing the RMS_NORM+scale-MUL path and allocator diagnostics.
 - `patches/llama-cpp-sycl-meta-mulmat-add-diagnostic-current-20260506.patch.gz.b64`: current llama.cpp diff containing the diagnostic `MUL_MAT+allreduce+ADD` scheduler hook.
 - `patches/llama-cpp-sycl-q4-current-guardfix-20260507.patch.gz.b64`: current llama.cpp diff after restoring Q8-cache compatibility for the validated allreduce+ADD path.
-- `patches/llama-cpp-qwen35-fused-beta-alpha-experimental-20260507.patch.gz.b64`: experimental Qwen35 fused `ssm_beta`/`ssm_alpha` GGUF source branch; speed-positive but not quality-cleared.
+- `patches/llama-cpp-qwen35-fused-beta-alpha-experimental-20260507.patch.gz.b64`: experimental Qwen35 fused `ssm_beta`/`ssm_alpha` GGUF source branch; quality-cleared only with root-residual disabled.
 - `patches/llama-cpp-sycl-q4_1-mmvq-experiment-20260507.patch`: focused default-off Q4_1 MMVQ dispatch experiment, retained as a negative result.
 - `patches/llama-cpp-sycl-q4-vdr4-experiment-current-20260506.patch.gz.b64`: current llama.cpp diff containing the runtime-gated Q4_0 reordered MMVQ VDR4 experiment.
 - `patches/llama-cpp-meta-allreduce-max-bytes-20260506.patch`: focused opt-in max-byte knob for fused meta allreduce diagnostics.
@@ -93,4 +93,4 @@ Reproducibility notes, benchmark payloads, and local patches from the Intel Arc 
 
 ## Notes
 
-The strongest quality-preserving paths are now Q4_0 GGUF TP3 and static FP8 TP4 with verified n-gram speculative decoding. The INT4 AutoRound path remains interesting for maximum speed, but it should be treated separately because it changes quantization quality more aggressively.
+The strongest quality-preserving paths are now Q4_0 GGUF TP3 with root-residual disabled and static FP8 TP4 with verified n-gram speculative decoding. The INT4 AutoRound path remains interesting for maximum speed, but it should be treated separately because it changes quantization quality more aggressively.

@@ -24,7 +24,8 @@ Quality-preserving Q4_0 GGUF path, llama.cpp/SYCL:
 - 3x B70 single-kernel allreduce, selector/root order `2,1,3`: `41.737 tok/s`, LocalMaxxing `cmoqqed6s0007jv049wnizwle`.
 - 3x B70 Q8 activation-cache short run, 512 prompt / 256 output: `42.432 tok/s`, LocalMaxxing `cmordq9t5000dl404x309pj48`.
 - 3x B70 Q8 activation-cache validation, 512 prompt / 512 output: `41.659 tok/s`, LocalMaxxing `cmorn71e2000kib0415vo51vj`.
-- 3x B70 current fused Q4_0 stack with `GGML_SYCL_COMM_FUSEADD_ROOT_RESIDUAL=1` and `--poll 25`, 512 prompt / 512 output: `50.922 tok/s`, LocalMaxxing `cmouxjqao000npn01hxqn68td`.
+- 3x B70 current quality-cleared no-root Q4_0 stack with experimental flat fused Qwen35 `ssm_ba` GGUF, 512 prompt / 512 output: `50.130 tok/s`, LocalMaxxing `cmov6p4r7007tqr01yi8ug4un`.
+- 3x B70 root-residual performance ceiling with `--poll 25`, 512 prompt / 512 output: `50.922 tok/s`, LocalMaxxing `cmouxjqao000npn01hxqn68td`, now marked suspect because later token/logit probing found the root-residual plus meta allreduce-add pair can diverge.
 - 4x B70 Q4_0 remains negative-scaling: `31.482 tok/s` without Q8 cache and `31.913 tok/s` with Q8 cache; LocalMaxxing `cmor2e5r00004jl04o99d26p8` and `cmornec37000okw040zl9563z`.
 
 FP8 path, vLLM/XPU:
@@ -66,7 +67,7 @@ vLLM/XPU FP8 work:
 
 - Single-card Q4_0 is not limited by flash attention, ubatch, graph capture, oneDNN, AOT alone, or a missing reordered MMVQ path.
 - Reordered Q4_0 MMVQ is required; disabling it drops single-card speed to about `15 tok/s`.
-- Multi-card Q4_0 improves through async tensor copies, direct allreduce, Q8 activation caching, graph fusions, and root-residual fused allreduce+ADD scheduling, but four-card scaling still regresses because each token pays many small 20 KiB reductions and narrower row shards lose matvec efficiency.
+- Multi-card Q4_0 improves through async tensor copies, direct allreduce, Q8 activation caching, graph fusions, fused small projections, and safe allreduce+ADD scheduling. Root-residual fused allreduce+ADD is a promising performance ceiling but is not quality-cleared until its ordering hazard with meta allreduce-add is fixed. Four-card scaling still regresses because each token pays many small 20 KiB reductions and narrower row shards lose matvec efficiency.
 - Timing hooks show synchronized allreduce cost rises sharply with GPU count: roughly `1.718 ms/token` on 2 GPUs, `5.732 ms/token` on 3 GPUs, and `10.605 ms/token` on 4 GPUs for the same reduction pattern.
 - Four-GPU root/order/topology sweeps are not enough; the next useful work is reducing the number of reductions or fusing delayed reductions through safe graph regions.
 - MiniMax M2.7 currently proves capacity pressure and split-expert allocator issues, not useful performance: tensor split is unsupported for `minimax-m2`, layer split fails large SYCL allocations, and row split currently fails on GPU expert tensor allocation unless experts are left CPU/file-backed.
@@ -75,7 +76,7 @@ vLLM/XPU FP8 work:
 
 1. Keep Q4_0 single-card profiling focused on reordered MMVQ and activation quantization launch overhead.
 2. Prototype fewer/fused Meta allreduces for Q4_0 multi-GPU; do not spend more time on simple root-copy or pairwise allreduce topology variants.
-3. Use 3x B70 Q4_0 at `50.922 tok/s` as the current best quality-preserving speed point; treat 4x Q4_0 as a profiling target until communication overhead is reduced.
+3. Use 3x B70 Q4_0 no-root fused beta/alpha at `50.130 tok/s` as the current quality-cleared speed point; treat root-residual `50.922 tok/s` as a performance ceiling until the correctness hazard is fixed.
 4. Use static FP8 TP4 with patched XPU FA2 as the best high-fidelity four-card path for now.
 5. Keep PP2 x TP2 as a capacity fallback for larger models, not a speed path for Qwen3.6 27B.
 6. Mine Intel `llm-scaler` for reduce-scatter/all-gather, fused output-kernel, Gated DeltaNet, and speculative/MTP ideas, but do not assume it will run directly on Arc/B70.

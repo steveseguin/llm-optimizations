@@ -1312,5 +1312,42 @@
     },
     "detailedPayloadHttpStatus": 500,
     "detailedPayloadResponse": "Internal server error"
+  },
+  {
+    "label": "llamacpp-qwen36-27b-q4_0-sycl-tp3-fused-ba-no-root-p512-n512",
+    "submittedAt": "2026-05-07T07:48:07.891Z",
+    "payload": {
+      "hfId": "unsloth/Qwen3.6-27B",
+      "modelRevision": "main",
+      "hardware": {
+        "hwClass": "DISCRETE_GPU",
+        "gpuName": "Intel Arc Pro B70 32GB",
+        "gpuCount": 3,
+        "vramGb": 32,
+        "cpu": "AMD EPYC 9015 8-Core Processor",
+        "ramGb": 16,
+        "os": "Ubuntu 24.04.4 LTS, kernel 6.17.0-23-generic"
+      },
+      "engineName": "llama.cpp",
+      "engineVersion": "db44417-local-sycl-q4-b70",
+      "quantization": "Q4_0+fused-ssm_ba",
+      "promptTokens": 512,
+      "outputTokens": 512,
+      "contextLength": 1024,
+      "batchSize": 1,
+      "tokSOut": 50.1299,
+      "tokSTotal": 80.20473519933404,
+      "notes": "Experimental augmented GGUF with added flat Qwen35 ssm_ba tensors generated from the same Q4_0 beta/alpha weights. TP3 no-root safe flags; token/logit probe matched original byte-for-byte. Root-residual + meta allreduce-add is intentionally disabled and marked unsafe pending an ordering fix. No speculative decoding or power changes. Full flags/artifacts in steveseguin/llm-optimizations."
+    },
+    "httpStatus": 201,
+    "response": {
+      "id": "cmov6p4r7007tqr01yi8ug4un",
+      "status": "APPROVED",
+      "tokSOut": 50.1299,
+      "tokSTotal": 80.20473519933404,
+      "createdAt": "2026-05-07T07:48:07.891Z"
+    },
+    "detailedPayloadHttpStatus": 500,
+    "detailedPayloadResponse": "Internal server error"
   }
 ]

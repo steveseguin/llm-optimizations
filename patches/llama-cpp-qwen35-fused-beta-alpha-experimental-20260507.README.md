@@ -3,8 +3,9 @@
 Patch artifact:
 
 - `llama-cpp-qwen35-fused-beta-alpha-experimental-20260507.patch.gz.b64`
-- decoded patch sha256: `1aea32ffd0318fdaf8eef98bc914f433226cf6d852cac521fe85e9c2a1203409`
-- encoded artifact sha256: `38198d1bf72b0bbb3598c0ab0933738e0dd365bed4a62f0e8dcb2628bce2f8c5`
+- decoded patch sha256: `df786dd95dee04f072029ddcc1f054c2816b339d0d76c433fa86eda49a5054aa`
+- encoded artifact sha256: `7a19e61fa0bc9923e1b0bb6f4e0ea4404fe402f54d9411a6cbb5fb2118226ac3`
+- decoded patch line count: `1343`
 
 Decode:
 
@@ -17,10 +18,11 @@ Scope:
 - optional Qwen35/Qwen35MoE `blk.N.ssm_ba.weight` loader path;
 - Qwen35 graph path for fused beta/alpha projection;
 - Qwen35 fused tensor split-granularity fix;
-- Meta split-state diagnostics needed to debug the first failed fused load.
+- Meta split-state propagation needed to preserve fused `ssm_ba` row ownership through `MUL_MAT` and exact beta/alpha `VIEW` subsets;
+- current in-file dependencies from the active local Q4_0 SYCL patch stack where they share the same touched files.
 
 Status:
 
-- speed-positive on TP3 Q4_0 GGUF;
-- not quality-cleared because full logits differ from the original model;
-- do not treat as a production patch or LocalMaxxing result yet.
+- quality-cleared only with `GGML_SYCL_COMM_FUSEADD_ROOT_RESIDUAL=0`;
+- final no-root TP3 result: `50.129900 tok/s` decode at 512 prompt / 512 output;
+- root-residual plus meta allreduce-add is not quality-cleared and remains the next bug to fix before this can become a production patch.

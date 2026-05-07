@@ -5,7 +5,10 @@
     "fused_beta_alpha": "/home/steve/models/qwen3.6-27b-q4_0-fused-ba-gguf/Qwen3.6-27B-Q4_0-fused-ba.gguf",
     "architecture": "qwen35",
     "quantization": "Q4_0",
-    "fused_tensors_added": 48
+    "fused_tensors_added": 48,
+    "fused_layout": "flat: all beta rows followed by all alpha rows",
+    "weights_changed": false,
+    "extra_tensors_added": true
   },
   "hardware": {
     "gpu": "Intel Arc Pro B70 / BMG-G31",
@@ -21,7 +24,7 @@
     "poll": 25,
     "kv_cache": "f16",
     "flash_attention": true,
-    "flags": [
+    "safe_flags": [
       "GGML_SYCL_FORCE_MMVQ_Q4_1=0",
       "GGML_SYCL_DISABLE_DNN=1",
       "GGML_SYCL_Q8_CACHE=1",
@@ -31,44 +34,91 @@
       "GGML_SYCL_COMM_SINGLE_KERNEL=1",
       "GGML_SYCL_COMM_EVENT_BARRIER=1",
       "GGML_SYCL_COMM_SYNC_AFTER=2",
-      "GGML_SYCL_COMM_FUSEADD_ROOT_RESIDUAL=1",
+      "GGML_SYCL_COMM_FUSEADD_ROOT_RESIDUAL=0",
       "GGML_META_FUSE_ALLREDUCE_ADD=1",
       "GGML_META_FUSE_ALLREDUCE_GET_ROWS=1",
       "GGML_SYCL_FUSE_MMVQ2=1",
       "GGML_SYCL_FUSE_MMVQ2_SWIGLU=1",
-      "GGML_SYCL_FUSE_RMS_NORM_MUL=1",
-      "GGML_SYCL_SMALL_F32_MMV=0"
+      "GGML_SYCL_FUSE_RMS_NORM_MUL=1"
     ]
   },
   "results": {
-    "short_decode_p0_n128_r3": {
-      "original_tok_s": 48.726023,
-      "fused_tok_s": 50.414495,
-      "artifact": "/home/steve/bench-results/qwen36-q4_0-gguf/tp3-refresh-20260507/fused-ba-model/fused-ba-layout2-ab-p0n128-r3-20260507T053025Z.tsv"
+    "flat_layout_safe_no_root_p512_n512_r3": {
+      "original_prompt_tok_s": 193.872714,
+      "original_decode_tok_s": 49.52499,
+      "original_total_tok_s": 78.89593093386667,
+      "fused_prompt_tok_s": 200.480796,
+      "fused_decode_tok_s": 50.1299,
+      "fused_total_tok_s": 80.20473519933404,
+      "decode_delta_tok_s": 0.60491,
+      "decode_delta_percent": 1.22142,
+      "artifact": "/home/steve/bench-results/qwen36-q4_0-gguf/tp3-refresh-20260507/fused-ba-model/fused-ba-flat-no-root-p512n512-r3-20260507T065943Z.tsv"
     },
-    "full_p512_n512_r3": {
-      "original_prompt_tok_s": 195.046919,
-      "original_decode_tok_s": 50.914445,
-      "original_total_tok_s": 80.75012651047875,
-      "fused_prompt_tok_s": 200.681918,
-      "fused_decode_tok_s": 51.338431,
-      "fused_total_tok_s": 81.7608168631705,
-      "artifact": "/home/steve/bench-results/qwen36-q4_0-gguf/tp3-refresh-20260507/fused-ba-model/fused-ba-layout2-ab-p512n512-r3-20260507T054539Z.tsv"
+    "flat_layout_safe_flags_short_p0_n128_r3": {
+      "original_no_root_tok_s": 48.252739,
+      "fused_no_root_tok_s": 49.369187,
+      "original_no_meta_add_tok_s": 27.442101,
+      "fused_no_meta_add_tok_s": 27.941093,
+      "artifact": "/home/steve/bench-results/qwen36-q4_0-gguf/tp3-refresh-20260507/fused-ba-model/fused-ba-flat-safe-flags-p0n128-r3-20260507T065456Z.tsv"
+    },
+    "transient_host_wait_all_current": {
+      "original_decode_tok_s": 28.974221,
+      "fused_decode_tok_s": 29.247443,
+      "artifact": "/home/steve/bench-results/qwen36-q4_0-gguf/tp3-refresh-20260507/fused-ba-model/fused-ba-flat-all-current-after-wait-p512n512-r3-20260507T071628Z.tsv",
+      "decision": "Reverted. Host wait fixed correctness but destroyed throughput."
     }
   },
   "quality": {
-    "status": "not_cleared",
-    "logit_probe": {
-      "artifact": "/home/steve/bench-results/qwen36-q4_0-gguf/correctness/fused-ba-logit-probe-20260507T052727Z",
-      "step0_same_top_token": true,
-      "step0_top_token": 271,
-      "full_logit_hash_match": false
+    "status": "cleared_with_root_residual_disabled",
+    "final_no_root_logit_probe": {
+      "artifact": "/home/steve/bench-results/qwen36-q4_0-gguf/correctness/fused-ba-no-root-final-20260507T073839Z",
+      "same_token": true,
+      "token": 321,
+      "hash_match": true,
+      "hash": "4f77fb8d90ed49e6"
     },
-    "completion_byte_compare": "unusable: original repeated runs differed",
-    "perplexity": "timeout: original did not finish 4 chunks of 512 context within 600 seconds"
+    "single_gpu_flat_probe": {
+      "artifact": "/home/steve/bench-results/qwen36-q4_0-gguf/correctness/fused-ba-logit-probe-flat-single-20260507T061507Z",
+      "same_token": true,
+      "token": 321,
+      "hash_match": true,
+      "hash": "681ad69c58fffd49"
+    },
+    "tp3_no_fusions_flat_probe": {
+      "artifact": "/home/steve/bench-results/qwen36-q4_0-gguf/correctness/fused-ba-logit-probe-flat-tp3-nofusions-20260507T061721Z",
+      "same_token": true,
+      "token": 321,
+      "hash_match": true,
+      "hash": "f97bd3230bbf35f5"
+    },
+    "unsafe_interaction": {
+      "status": "root_residual_plus_meta_allreduce_add_not_cleared",
+      "artifact": "/home/steve/bench-results/qwen36-q4_0-gguf/correctness/fused-ba-meta-pair-isolation-20260507T064644Z",
+      "root_meta_add": {
+        "passed": false,
+        "original_token": 220,
+        "original_hash": "c57597537930eab9",
+        "fused_token": 271,
+        "fused_hash": "f8be73fee293172b"
+      },
+      "root_meta_rows": {
+        "passed": true
+      },
+      "meta_add_meta_rows": {
+        "passed": true
+      }
+    }
   },
   "localmaxxing": {
-    "submitted": false,
-    "reason": "speed-positive but not quality-cleared"
-  }
+    "submitted": true,
+    "id": "cmov6p4r7007tqr01yi8ug4un",
+    "status": "APPROVED",
+    "createdAt": "2026-05-07T07:48:07.891Z",
+    "tokSOut": 50.1299,
+    "tokSTotal": 80.20473519933404,
+    "detailedPayloadHttpStatus": 500,
+    "reducedPayloadHttpStatus": 201,
+    "notes": "Submitted as Q4_0+fused-ssm_ba experimental augmented GGUF. Root-residual disabled because the root-residual plus meta allreduce-add interaction is not quality-cleared."
+  },
+  "decision": "Use as the current quality-cleared no-root Q4_0 TP3 experimental result. Do not use root-residual for quality claims until the ordering issue is fixed."
 }

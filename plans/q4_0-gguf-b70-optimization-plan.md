@@ -65,8 +65,9 @@ Therefore the Linux target is not speculative: first reach `>=27 tok/s`, then `>
 
 Latest 2026-05-07 Q4_0 follow-up:
 
-- Current best quality-preserving Q4_0 GGUF result is now TP3 at `50.922114 tok/s` decode and `81.243035 tok/s` total for 512 prompt / 512 output. The best refresh keeps `GGML_SYCL_COMM_FUSEADD_ROOT_RESIDUAL=1` and changes `--poll 50` to `--poll 25`.
-- This keeps the same Q4_0 weights, f16 KV cache, flash attention, Q8 activation cache, fused MMVQ2, fused MMVQ2+SwiGLU, fused RMS_NORM+MUL, fused allreduce+ADD, fused final GET_ROWS, single-kernel allreduce, no speculative decoding, no sampling change, and no power-limit change.
+- Current quality-cleared Q4_0 GGUF result is now TP3 at `50.129900 tok/s` decode and `80.204735 tok/s` total for 512 prompt / 512 output, using the experimental flat Qwen35 fused `ssm_ba` augmented GGUF with `GGML_SYCL_COMM_FUSEADD_ROOT_RESIDUAL=0`.
+- The earlier root-residual result remains the raw performance ceiling at `50.922114 tok/s` decode and `81.243035 tok/s` total, but it is now marked suspect rather than quality-cleared. A later token/logit harness found the minimal bad interaction `GGML_SYCL_COMM_FUSEADD_ROOT_RESIDUAL=1` plus `GGML_META_FUSE_ALLREDUCE_ADD=1`.
+- The no-root result keeps the same effective Q4_0 beta/alpha weights, f16 KV cache, flash attention, Q8 activation cache, fused MMVQ2, fused MMVQ2+SwiGLU, fused RMS_NORM+MUL, fused allreduce+ADD, fused final GET_ROWS, single-kernel allreduce, no speculative decoding, no sampling change, and no power-limit change.
 - Four-card assist did not benefit from the same full validation: `GGML_SYCL_COMM_FUSEADD_ROOT_RESIDUAL=1` reached `43.884730 tok/s`, below the accepted `44.087560 tok/s`.
 - Negative screens from the same pass:
   - forced Q4_1 MMVQ path: `42.344754 tok/s` versus default Q4_1 DMMV `42.552518 tok/s`;
@@ -74,7 +75,7 @@ Latest 2026-05-07 Q4_0 follow-up:
   - root skip / root rotation around the four-card assist layout were not durable wins.
   - TP3 mixed `attn_qkv+attn_gate` fusion regressed short decode from `49.156118` to `47.899958 tok/s`;
   - TP3 `-ub 64` won a short screen but lost full validation at `50.192228 tok/s`, so keep `-ub 128`.
-- A `llama-cli` text smoke for the TP3 root-residual flag was inconclusive because the corrected command hung and generated a large repeated stdout file. A later capped deterministic `llama-completion` check with prompt echo enabled produced identical non-empty stdout for root-residual off/on. A token/logit harness is still useful before upstreaming, but the local result now has a basic output-equivalence smoke.
+- A `llama-cli` text smoke for the TP3 root-residual flag was inconclusive, and a later `llama-completion` byte-compare was too weak. The token/logit harness supersedes it: root-residual plus meta allreduce-add is not currently safe, while the final no-root fused beta/alpha run matched the original byte-for-byte.
 
 ## Quality Constraints
 
@@ -1598,7 +1599,9 @@ Goal: improve quality-preserving Q4_0 performance without power-limit changes.
      - added optional Qwen35/Qwen35MoE loader support for `blk.N.ssm_ba.weight`;
      - when fused weights are present, separate alpha/beta tensors are loaded with `TENSOR_SKIP` fallback flags;
      - added `scripts/add-qwen35-fused-ba-gguf.py` to generate an augmented GGUF from the original Q4_0 file;
+     - changed the fused tensor layout to flat beta rows followed by flat alpha rows;
      - fixed the Qwen35 fused tensor split granularity to match the separate alpha/beta per-group granularity;
+     - taught the Meta split-state path to preserve fused `ssm_ba` row segments through `MUL_MAT` and exact beta/alpha `VIEW` subsets;
    - debugging:
      - first fused load failed in Meta split-state propagation at `ADD(alpha_cont, ssm_dt.bias)`;
      - diagnostic split print showed fused alpha split `[12,12,24]` while the native timestep bias summed to `[12,18,18]`;
@@ -1606,30 +1609,34 @@ Goal: improve quality-preserving Q4_0 performance without power-limit changes.
    - generated model:
      - `/home/steve/models/qwen3.6-27b-q4_0-fused-ba-gguf/Qwen3.6-27B-Q4_0-fused-ba.gguf`;
      - `48` fused `ssm_ba` tensors were added;
-   - speed screens, TP3, current best stack, `--poll 25`:
-     - `p0/n16/r1` smoke: `45.437738 tok/s`;
-     - `p0/n128/r3`: original `48.726023 tok/s`, fused `50.414495 tok/s`;
-     - `p512/n512/r3`: original prompt `195.046919 tok/s`, original decode `50.914445 tok/s`;
-     - `p512/n512/r3`: fused prompt `200.681918 tok/s`, fused decode `51.338431 tok/s`, computed total `81.760817 tok/s`;
+   - final safe speed screens, TP3, `--poll 25`, `GGML_SYCL_COMM_FUSEADD_ROOT_RESIDUAL=0`:
+     - `p0/n128/r3`: original no-root `48.252739 tok/s`, fused no-root `49.369187 tok/s`;
+     - `p512/n512/r3`: original no-root prompt `193.872714 tok/s`, decode `49.524990 tok/s`, computed total `78.895931 tok/s`;
+     - `p512/n512/r3`: fused no-root prompt `200.480796 tok/s`, decode `50.129900 tok/s`, computed total `80.204735 tok/s`;
+     - fused no-root delta: `+0.604910 tok/s` decode, or `+1.22%`;
    - quality status:
-     - logit probe step 0 selected the same top token (`271`) but full logit hash and top logits differed;
-     - `llama-completion` byte-compare is not usable as a verdict right now because two original-model runs also differed;
-     - `llama-perplexity --chunks 4 -c 512` did not finish the original model within `600 s`, so PPL parity is not cleared;
+     - final no-root token/logit probe matched the original byte-for-byte: token `321`, hash `4f77fb8d90ed49e6`;
+     - single-GPU and TP3 no-fusion probes also passed after the flat layout change;
+     - root-residual plus meta allreduce-add is not quality-cleared: original token/hash `220` / `c57597537930eab9`, fused token/hash `271` / `f8be73fee293172b`;
+     - a host wait fixed the root-residual path but collapsed throughput to about `29 tok/s`; a root queue barrier did not fix correctness; both changes were reverted;
+   - LocalMaxxing:
+     - detailed payload returned HTTP 500;
+     - reduced core-metric payload was accepted as `cmov6p4r7007tqr01yi8ug4un`;
    - decision:
-     - do not submit this result to LocalMaxxing yet;
-     - treat fused beta-alpha as an experimental speed branch, not a validated quality-preserving result;
-     - next useful work is a synthetic recurrent-layer harness or a Meta split-state representation that preserves row-level segment ownership through the fused reshape/view chain.
+     - this is now the current quality-cleared no-root Q4_0 TP3 result;
+     - do not claim root-residual quality until the root/meta-add ordering hazard is fixed without a global host wait;
+     - next useful work is a lower-overhead dependency fix for root-residual and a synthetic recurrent-layer harness for future layout changes.
 
 ## Success Criteria
 
 - First accepted improvement: Q4_0 GGUF single B70 `>=27 tok/s` with a reproducible command and no quality-changing flags.
 - Strong success: Q4_0 GGUF single B70 `>=29 tok/s`.
 - FP8 investigation success: official `Qwen/Qwen3.6-27B-FP8` reaches or beats the current Q4_0 TP3 result while preserving output quality.
-- Static FP8 current best: `vrfai/Qwen3.6-27B-FP8` on four B70s with patched vLLM/XPU FlashAttention2 plus n-gram speculative decode reaches `49.581893 tok/s` on 512 prompt / 512 output. This is ahead of the Q4_0 TP3 validation while preserving more fidelity than INT4 paths.
+- Static FP8 current best: `vrfai/Qwen3.6-27B-FP8` on four B70s with patched vLLM/XPU FlashAttention2 plus n-gram speculative decode reaches `49.581893 tok/s` on 512 prompt / 512 output. This now trails the no-root Q4_0 TP3 result slightly, but it remains the best higher-fidelity FP8 path and preserves more fidelity than INT4 paths.
 - Static FP8 32k-context status: TP4 with patched vLLM/XPU FlashAttention2 succeeds at `max_model_len=32768` and reports `1,133,163` GPU KV-cache tokens with `42.996276 tok/s` at 2048 prompt / 256 output. TP2/PP2 also fits but is slower (`26.361533 tok/s`) and reports slightly less 32k KV capacity.
 - Static FP8 post-reboot refresh: TP4/PP1 remains preferred for speed (`45.864956 tok/s` no-spec, `48.082178 tok/s` n-gram on this repeat), while PP2xTP2 fits 32K context but only reaches `27.722318 tok/s` at 512/512. A oneCCL topology override gives a tiny no-spec gain (`46.386137 tok/s`) but hurts n-gram speculation (`44.438715 tok/s`).
 - Current dual-card milestone reached: Q4_0 GGUF single session `42.106013 tok/s` on two B70s for 512 prompt / 512 output with the current fused stack, quality preserving, software-only.
-- Current improved multi-card milestone: Q4_0 GGUF single session `50.922114 tok/s` on three B70s for 512 prompt / 512 output with Q8 activation cache, fused MMVQ2, fused MMVQ2+SwiGLU, fused RMS_NORM+scale-MUL, fused allreduce+ADD, root-residual fused ADD, fused final allreduce+GET_ROWS, single-kernel allreduce, `GGML_SYCL_COMM_SYNC_AFTER=2`, `--poll 25`, and `-ub 128`. This is quality preserving and software-only. The fused beta-alpha augmented GGUF reached `51.338431 tok/s` decode but is not quality-cleared and is therefore not the current validated best.
+- Current improved multi-card milestone: Q4_0 GGUF single session `50.129900 tok/s` on three B70s for 512 prompt / 512 output with the experimental flat fused-beta/alpha GGUF, Q8 activation cache, fused MMVQ2, fused MMVQ2+SwiGLU, fused RMS_NORM+scale-MUL, fused allreduce+ADD, fused final allreduce+GET_ROWS, single-kernel allreduce, `GGML_SYCL_COMM_SYNC_AFTER=2`, `--poll 25`, `-ub 128`, and root-residual disabled. This is quality-cleared and software-only. Root-residual `50.922114 tok/s` remains a performance ceiling but is not currently quality-cleared.
 - Current four-card Q4_0 status: assist split `1/1/1/0.05` reaches `44.087560 tok/s` after the guard-fix refresh, improving the older assist result by `12.46%` and the equal-split four-card result by `26.22%`, but still trailing the best three-card result by `11.03%`. Quad Q4_0 remains a kernel/scheduling investigation rather than the production path.
 - Dual-card success: Q4_0 GGUF single session `>=48 tok/s` first, then `>=52 tok/s`, without switching away from Q4_0.
 - Four-card success: Q4_0 GGUF single session must exceed dual-card by a meaningful margin before treating quad tensor split as viable.
