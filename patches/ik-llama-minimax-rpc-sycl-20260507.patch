@@ -161,10 +161,18 @@ index 89b3450..34b0233 100644
              fields.emplace_back("no_ooae");
          }
 diff --git a/ggml/src/ggml-sycl.cpp b/ggml/src/ggml-sycl.cpp
-index e0f8536..c4b1652 100644
+index e0f8536..65f8afc 100644
 --- a/ggml/src/ggml-sycl.cpp
 +++ b/ggml/src/ggml-sycl.cpp
-@@ -84,64 +84,12 @@ static __dpct_inline__ float op_add(const float a, const float b) {
+@@ -39,6 +39,7 @@
+ #include "ggml-sycl/backend.hpp"
+ #include "ggml-sycl/common.hpp"
+ #include "ggml-sycl/presets.hpp"
++#include "ggml-sycl/vecdotq.hpp"
+ 
+ bool   ggml_sycl_loaded(void);
+ void   ggml_sycl_free_data(struct ggml_tensor * tensor);
+@@ -84,64 +85,12 @@ static __dpct_inline__ float op_add(const float a, const float b) {
      return a + b;
  }
  
@@ -233,7 +241,7 @@ index e0f8536..c4b1652 100644
  }
  
  template<float (*bin_op)(const float, const float), typename src0_t, typename src1_t, typename dst_t>
-@@ -311,6 +259,17 @@ static void hardsigmoid_f32(const float * x, float * dst, const int k,
+@@ -311,6 +260,17 @@ static void hardsigmoid_f32(const float * x, float * dst, const int k,
      dst[i] = sycl::fmin(1.0f, sycl::fmax(0.0f, (x[i] + 3.0f) / 6.0f));
  }
  
@@ -251,7 +259,7 @@ index e0f8536..c4b1652 100644
  static void hardswish_f32(const float * x, float * dst, const int k,
                            const sycl::nd_item<3> &item_ct1) {
      const int i = item_ct1.get_local_range(2) * item_ct1.get_group(2) +
-@@ -1340,6 +1299,18 @@ static void hardsigmoid_f32_sycl(const float *x, float *dst, const int k,
+@@ -1340,6 +1300,18 @@ static void hardsigmoid_f32_sycl(const float *x, float *dst, const int k,
          });
  }
  
@@ -270,7 +278,7 @@ index e0f8536..c4b1652 100644
  static void hardswish_f32_sycl(const float *x, float *dst, const int k,
                                 queue_ptr stream) {
      const int num_blocks = (k + SYCL_HARDSWISH_BLOCK_SIZE - 1) / SYCL_HARDSWISH_BLOCK_SIZE;
-@@ -1729,6 +1700,148 @@ static void sum_rows_f32_sycl(const float *x, float *dst, const int ncols,
+@@ -1729,6 +1701,148 @@ static void sum_rows_f32_sycl(const float *x, float *dst, const int ncols,
                               });
  }
  
@@ -419,7 +427,7 @@ index e0f8536..c4b1652 100644
  static int next_power_of_2(int x) {
      int n = 1;
      while (n < x) {
-@@ -2114,12 +2227,12 @@ static dpct::err0 ggml_sycl_cpy_tensor_2d(void *dst,
+@@ -2114,12 +2228,12 @@ static dpct::err0 ggml_sycl_cpy_tensor_2d(void *dst,
  
      dpct::memcpy_direction kind;
      char * src_ptr;
@@ -435,7 +443,7 @@ index e0f8536..c4b1652 100644
          kind = dpct::device_to_device;
          ggml_tensor_extra_gpu * extra = (ggml_tensor_extra_gpu *) src->extra;
          int id;
-@@ -2411,6 +2524,22 @@ static void ggml_sycl_op_hardswish(ggml_backend_sycl_context & ctx, const ggml_t
+@@ -2411,6 +2525,22 @@ static void ggml_sycl_op_hardswish(ggml_backend_sycl_context & ctx, const ggml_t
      (void) src1_dd;
  }
  
@@ -458,7 +466,7 @@ index e0f8536..c4b1652 100644
  inline void ggml_sycl_op_leaky_relu(ggml_backend_sycl_context & ctx, const ggml_tensor *src0,
                                      const ggml_tensor *src1, ggml_tensor *dst,
                                      const float *src0_dd, const float *src1_dd,
-@@ -2749,6 +2878,72 @@ inline void ggml_sycl_op_sum_rows(ggml_backend_sycl_context & ctx, const ggml_te
+@@ -2749,6 +2879,72 @@ inline void ggml_sycl_op_sum_rows(ggml_backend_sycl_context & ctx, const ggml_te
      (void) src1_dd;
  }
  
@@ -531,7 +539,7 @@ index e0f8536..c4b1652 100644
  inline void ggml_sycl_op_argsort(ggml_backend_sycl_context & ctx, const ggml_tensor *src0,
                                   const ggml_tensor *src1, ggml_tensor *dst,
                                   const float *src0_dd, const float *src1_dd,
-@@ -2848,8 +3043,8 @@ static void ggml_sycl_op_flatten(ggml_backend_sycl_context & ctx, const ggml_ten
+@@ -2848,8 +3044,8 @@ static void ggml_sycl_op_flatten(ggml_backend_sycl_context & ctx, const ggml_ten
      const bool use_src1 = src1 != nullptr;
      const int64_t nrows1 = use_src1 ? ggml_nrows(src1) : 1;
  
@@ -542,7 +550,7 @@ index e0f8536..c4b1652 100644
  
      ggml_tensor_extra_gpu * src0_extra =            (ggml_tensor_extra_gpu *) src0->extra;
      ggml_tensor_extra_gpu * src1_extra = use_src1 ? (ggml_tensor_extra_gpu *) src1->extra : nullptr;
-@@ -2943,8 +3138,8 @@ static void ggml_sycl_op_mul_mat(ggml_backend_sycl_context & ctx, const ggml_ten
+@@ -2943,8 +3139,8 @@ static void ggml_sycl_op_mul_mat(ggml_backend_sycl_context & ctx, const ggml_ten
      const int nb2 = dst->nb[2];
      const int nb3 = dst->nb[3];
  
@@ -553,7 +561,7 @@ index e0f8536..c4b1652 100644
      GGML_ASSERT(src1->type == GGML_TYPE_F32 || (src1->ne[2] == 1 && src1->ne[3] == 1));
  
      GGML_ASSERT(ne12 >= ne02 && ne12 % ne02 == 0);
-@@ -2965,7 +3160,7 @@ static void ggml_sycl_op_mul_mat(ggml_backend_sycl_context & ctx, const ggml_ten
+@@ -2965,7 +3161,7 @@ static void ggml_sycl_op_mul_mat(ggml_backend_sycl_context & ctx, const ggml_ten
  
      int64_t src1_padded_col_size = GGML_PAD(ne10, MATRIX_ROW_PADDING);
  
@@ -562,7 +570,7 @@ index e0f8536..c4b1652 100644
      GGML_ASSERT(!(split && ne02 > 1));
      GGML_ASSERT(!(split && ne03 > 1));
      GGML_ASSERT(!(split && ne02 < ne12));
-@@ -3329,6 +3524,12 @@ static void ggml_sycl_hardswish(ggml_backend_sycl_context & ctx, const ggml_tens
+@@ -3329,6 +3525,12 @@ static void ggml_sycl_hardswish(ggml_backend_sycl_context & ctx, const ggml_tens
      GGML_SYCL_DEBUG("call %s done\n", __func__);
  }
  
@@ -575,7 +583,7 @@ index e0f8536..c4b1652 100644
  static void ggml_sycl_leaky_relu(ggml_backend_sycl_context & ctx, const ggml_tensor * src0, const ggml_tensor * src1, ggml_tensor * dst) {
      GGML_SYCL_DEBUG("call %s\n", __func__);
      ggml_sycl_op_flatten(ctx, src0, src1, dst, ggml_sycl_op_leaky_relu);
-@@ -3376,7 +3577,7 @@ static void ggml_sycl_mul_mat_vec_p021(ggml_backend_sycl_context & ctx, const gg
+@@ -3376,7 +3578,7 @@ static void ggml_sycl_mul_mat_vec_p021(ggml_backend_sycl_context & ctx, const gg
                                         const ggml_tensor *src1,
                                         ggml_tensor *dst) try {
      GGML_ASSERT(ggml_is_permuted(src0) && ggml_is_permuted(src1));
@@ -584,7 +592,7 @@ index e0f8536..c4b1652 100644
      GGML_ASSERT(src0->nb[0] <= src0->nb[1] && src0->nb[2] <= src0->nb[3]); // 0213 permutation
      GGML_ASSERT(src1->nb[0] <= src1->nb[1] && src1->nb[2] <= src1->nb[3]); // 0213 permutation
      GGML_ASSERT(src0->type == GGML_TYPE_F16);
-@@ -3409,7 +3610,7 @@ static void ggml_sycl_mul_mat_vec_nc(ggml_backend_sycl_context & ctx, const ggml
+@@ -3409,7 +3611,7 @@ static void ggml_sycl_mul_mat_vec_nc(ggml_backend_sycl_context & ctx, const ggml
      GGML_ASSERT(!ggml_is_transposed(src0));
      GGML_ASSERT(!ggml_is_transposed(src1));
      GGML_ASSERT(!ggml_is_permuted(src0));
@@ -593,7 +601,7 @@ index e0f8536..c4b1652 100644
      GGML_ASSERT(src0->type == GGML_TYPE_F16);
      GGML_ASSERT(src1->type == GGML_TYPE_F32);
  
-@@ -3471,7 +3672,7 @@ static void ggml_sycl_mul_mat_batched_sycl(ggml_backend_sycl_context & ctx,
+@@ -3471,7 +3673,7 @@ static void ggml_sycl_mul_mat_batched_sycl(ggml_backend_sycl_context & ctx,
                                               ggml_tensor *dst) try {
      GGML_ASSERT(!ggml_is_transposed(src0));
      GGML_ASSERT(!ggml_is_transposed(src1));
@@ -602,7 +610,7 @@ index e0f8536..c4b1652 100644
      GGML_ASSERT(src0->type == GGML_TYPE_F16);
  
      GGML_TENSOR_BINARY_OP_LOCALS
-@@ -3736,6 +3937,89 @@ __dpct_inline__ static void k_copy_dst_from_contiguous(
+@@ -3736,6 +3938,208 @@ __dpct_inline__ static void k_copy_dst_from_contiguous(
      }
  }
  
@@ -689,10 +697,167 @@ index e0f8536..c4b1652 100644
 +        });
 +}
 +
++static __dpct_inline__ float moe_iq4_xs_q8_1_dot(const char * row, const block_q8_1 * y,
++                                                 const int ncols,
++                                                 const sycl::nd_item<3> & item_ct1) {
++    const int blocks_per_row = ncols / QK_K;
++    constexpr int qi = QI4_XS / 4;
++    constexpr int vdr = 1;
++    const int blocks_per_warp = vdr * WARP_SIZE / qi;
++
++    float tmp = 0.0f;
++    const block_iq4_xs * x = (const block_iq4_xs *) row;
++
++    for (int i = item_ct1.get_local_id(2) / (qi / vdr); i < blocks_per_row;
++         i += blocks_per_warp) {
++        const int iby = i * (QK_K / QK8_1);
++        const int iqs = vdr * (item_ct1.get_local_id(2) % (qi / vdr));
++        tmp += vec_dot_iq4_xs_q8_1(&x[i], &y[iby], iqs);
++    }
++
++#pragma unroll
++    for (int mask = WARP_SIZE / 2; mask > 0; mask >>= 1) {
++        tmp += dpct::permute_sub_group_by_xor(item_ct1.get_sub_group(), tmp, mask);
++    }
++
++    return tmp;
++}
++
++static void moe_up_gate_merged_iq4_xs_q8_1_sycl(const char * up_gate, const char * inp_q8_1,
++                                                const char * ids, float * dst,
++                                                const int64_t ncols, const int64_t n_ff,
++                                                const int64_t n_ids, const int64_t n_tokens,
++                                                const size_t nb01, const size_t nb02,
++                                                const size_t ids_nb0, const size_t ids_nb1,
++                                                const size_t dst_nb1, const size_t dst_nb2,
++                                                const int64_t inp_padded_col_size,
++                                                const int unary_op, const float limit,
++                                                queue_ptr stream) {
++    GGML_ASSERT(ncols % QK_K == 0);
++    const size_t q8_1_ts = sizeof(block_q8_1);
++    const size_t q8_1_bs = QK8_1;
++    const int block_rows = GGML_SYCL_MMV_Y;
++    const int64_t row_blocks = (n_ff + block_rows - 1) / block_rows;
++
++    stream->submit([&](sycl::handler & cgh) {
++        cgh.parallel_for(
++            sycl::nd_range<3>(
++                sycl::range<3>(n_tokens, row_blocks, n_ids) *
++                    sycl::range<3>(1, block_rows, WARP_SIZE),
++                sycl::range<3>(1, block_rows, WARP_SIZE)),
++            [=](sycl::nd_item<3> item_ct1) [[intel::reqd_sub_group_size(WARP_SIZE)]] {
++                const int64_t token = item_ct1.get_group(0);
++                const int64_t row = item_ct1.get_group(1) * item_ct1.get_local_range(1) +
++                                    item_ct1.get_local_id(1);
++                const int64_t id = item_ct1.get_group(2);
++                if (row >= n_ff) {
++                    return;
++                }
++
++                const int32_t expert = *(const int32_t *)(ids + token * ids_nb1 + id * ids_nb0);
++                const char * expert_base = up_gate + expert * nb02;
++                const char * gate_row = expert_base + row * nb01;
++                const char * up_row = expert_base + (row + n_ff) * nb01;
++                const block_q8_1 * y = (const block_q8_1 *)
++                    (inp_q8_1 + token * inp_padded_col_size * q8_1_ts / q8_1_bs);
++
++                const float gate = moe_iq4_xs_q8_1_dot(gate_row, y, ncols, item_ct1);
++                const float up = moe_iq4_xs_q8_1_dot(up_row, y, ncols, item_ct1);
++
++                if (item_ct1.get_local_id(2) == 0) {
++                    float * dst_row = (float *)((char *)dst + token * dst_nb2 + id * dst_nb1);
++                    dst_row[row] = up * ggml_sycl_apply_moe_gate_unary(gate, unary_op, limit);
++                }
++            });
++    });
++}
++
++static void mul_mat_id_iq4_xs_q8_1_sycl(const char * weights, const char * src1_q8_1,
++                                        const char * ids, float * dst,
++                                        const int64_t ncols, const int64_t nrows,
++                                        const int64_t n_ids, const int64_t n_tokens,
++                                        const size_t weights_nb1, const size_t weights_nb2,
++                                        const size_t ids_nb0, const size_t ids_nb1,
++                                        const size_t dst_nb1, const size_t dst_nb2,
++                                        const int64_t src1_padded_col_size,
++                                        queue_ptr stream) {
++    GGML_ASSERT(ncols % QK_K == 0);
++    const size_t q8_1_ts = sizeof(block_q8_1);
++    const size_t q8_1_bs = QK8_1;
++    const int block_rows = GGML_SYCL_MMV_Y;
++    const int64_t row_blocks = (nrows + block_rows - 1) / block_rows;
++
++    stream->submit([&](sycl::handler & cgh) {
++        cgh.parallel_for(
++            sycl::nd_range<3>(
++                sycl::range<3>(n_tokens, row_blocks, n_ids) *
++                    sycl::range<3>(1, block_rows, WARP_SIZE),
++                sycl::range<3>(1, block_rows, WARP_SIZE)),
++            [=](sycl::nd_item<3> item_ct1) [[intel::reqd_sub_group_size(WARP_SIZE)]] {
++                const int64_t token = item_ct1.get_group(0);
++                const int64_t row = item_ct1.get_group(1) * item_ct1.get_local_range(1) +
++                                    item_ct1.get_local_id(1);
++                const int64_t id = item_ct1.get_group(2);
++                if (row >= nrows) {
++                    return;
++                }
++
++                const int32_t expert = *(const int32_t *)(ids + token * ids_nb1 + id * ids_nb0);
++                const char * row_ptr = weights + expert * weights_nb2 + row * weights_nb1;
++                const block_q8_1 * y = (const block_q8_1 *)
++                    (src1_q8_1 + (token * n_ids + id) * src1_padded_col_size * q8_1_ts / q8_1_bs);
++                const float value = moe_iq4_xs_q8_1_dot(row_ptr, y, ncols, item_ct1);
++
++                if (item_ct1.get_local_id(2) == 0) {
++                    float * dst_row = (float *)((char *)dst + token * dst_nb2 + id * dst_nb1);
++                    dst_row[row] = value;
++                }
++            });
++    });
++}
++
  static void ggml_sycl_mul_mat_id(ggml_backend_sycl_context & ctx, const ggml_tensor *src0,
                                   const ggml_tensor *src1,
                                   ggml_tensor *dst) try {
-@@ -3904,6 +4188,85 @@ catch (sycl::exception const &exc) {
+@@ -3752,6 +4156,37 @@ static void ggml_sycl_mul_mat_id(ggml_backend_sycl_context & ctx, const ggml_ten
+     std::vector<char> ids_host(ggml_nbytes(ids));
+     const char * ids_dev = (const char *) ids->data;
+ 
++    static const bool use_fast_iq4_xs_mmid =
++        get_sycl_env("GGML_SYCL_FAST_MUL_MAT_ID_IQ4_XS", 0) != 0;
++
++    if (use_fast_iq4_xs_mmid &&
++        src0->type == GGML_TYPE_IQ4_XS &&
++        src1->type == GGML_TYPE_F32 &&
++        dst->type == GGML_TYPE_F32 &&
++        ids->type == GGML_TYPE_I32 &&
++        ggml_is_contiguous(src0) &&
++        ggml_is_contiguous(src1) &&
++        ggml_is_contiguous(dst) &&
++        src1->ne[0] == src0->ne[0] &&
++        dst->ne[0] == src0->ne[1] &&
++        src1->ne[1] == n_ids &&
++        ids->ne[1] == dst->ne[2] &&
++        ggml_nrows(src1) == n_ids * ids->ne[1]) {
++        const int64_t n_tokens = ids->ne[1];
++        const int64_t src1_padded_col_size = GGML_PAD(src1->ne[0], MATRIX_ROW_PADDING);
++        const size_t q8_1_bytes = n_tokens * n_ids * src1_padded_col_size * sizeof(block_q8_1) / QK8_1;
++        ggml_sycl_pool_alloc<char> src1_q8_1(ctx.pool(), q8_1_bytes);
++
++        quantize_row_q8_1_sycl((const float *) src1->data, src1_q8_1.get(), src1->ne[0],
++                               n_tokens * n_ids, src1_padded_col_size, stream);
++        mul_mat_id_iq4_xs_q8_1_sycl((const char *) src0->data, src1_q8_1.get(), ids_dev,
++                                    (float *) dst->data, src1->ne[0], dst->ne[0],
++                                    n_ids, n_tokens, src0->nb[1], src0->nb[2],
++                                    ids->nb[0], ids->nb[1], dst->nb[1], dst->nb[2],
++                                    src1_padded_col_size, stream);
++        return;
++    }
++
+     SYCL_CHECK(CHECK_TRY_ERROR(
+         stream->memcpy(ids_host.data(), ids_dev, ggml_nbytes(ids))));
+     SYCL_CHECK(CHECK_TRY_ERROR(stream->wait()));
+@@ -3904,6 +4339,107 @@ catch (sycl::exception const &exc) {
    std::exit(1);
  }
  
@@ -746,6 +911,28 @@ index e0f8536..c4b1652 100644
 +                                     (float *) dst->data, n, unary_op, limit, stream);
 +    } else {
 +        const int64_t ne0 = dst->ne[0];
++        const int64_t n_tokens = dst->ne[2] * dst->ne[3];
++        if (up_exps->type == GGML_TYPE_IQ4_XS &&
++            ggml_is_contiguous(up_exps) &&
++            ggml_is_contiguous(inp) &&
++            inp->ne[0] == up_exps->ne[0] &&
++            ids->ne[0] == dst->ne[1] &&
++            n_tokens == ggml_nrows(inp)) {
++            const int64_t inp_padded_col_size = GGML_PAD(inp->ne[0], MATRIX_ROW_PADDING);
++            const size_t q8_1_bytes = n_tokens * inp_padded_col_size * sizeof(block_q8_1) / QK8_1;
++            ggml_sycl_pool_alloc<char> inp_q8_1(ctx.pool(), q8_1_bytes);
++
++            quantize_row_q8_1_sycl((const float *) inp->data, inp_q8_1.get(), inp->ne[0],
++                                   n_tokens, inp_padded_col_size, stream);
++            moe_up_gate_merged_iq4_xs_q8_1_sycl((const char *) up_exps->data, inp_q8_1.get(),
++                                                (const char *) ids->data, (float *) dst->data,
++                                                inp->ne[0], ne0, ids->ne[0], n_tokens,
++                                                up_exps->nb[1], up_exps->nb[2],
++                                                ids->nb[0], ids->nb[1], dst->nb[1], dst->nb[2],
++                                                inp_padded_col_size, unary_op, limit, stream);
++            return;
++        }
++
 +        ggml_sycl_pool_alloc<char> up_gate_tmp(ctx.pool(), 2 * dst_bytes);
 +
 +        ggml_tensor up_gate_node = *dst;
@@ -778,7 +965,7 @@ index e0f8536..c4b1652 100644
  static void ggml_sycl_scale(ggml_backend_sycl_context & ctx, const ggml_tensor * src0, const ggml_tensor * src1, ggml_tensor * dst) {
      ggml_sycl_op_flatten(ctx, src0, src1, dst, ggml_sycl_op_scale);
  }
-@@ -3992,6 +4355,14 @@ static void ggml_sycl_sum_rows(ggml_backend_sycl_context & ctx, const ggml_tenso
+@@ -3992,6 +4528,14 @@ static void ggml_sycl_sum_rows(ggml_backend_sycl_context & ctx, const ggml_tenso
      ggml_sycl_op_flatten(ctx, src0, src1, dst, ggml_sycl_op_sum_rows);
  }
  
@@ -793,7 +980,18 @@ index e0f8536..c4b1652 100644
  static void ggml_sycl_argsort(ggml_backend_sycl_context & ctx, const ggml_tensor * src0, const ggml_tensor * src1, ggml_tensor * dst) {
      GGML_ASSERT(ggml_is_contiguous(src0));
      ggml_sycl_op_flatten(ctx, src0, src1, dst, ggml_sycl_op_argsort);
-@@ -4081,6 +4452,9 @@ bool ggml_sycl_compute_forward(ggml_backend_sycl_context & ctx, struct ggml_tens
+@@ -4032,6 +4576,10 @@ bool ggml_sycl_compute_forward(ggml_backend_sycl_context & ctx, struct ggml_tens
+     if (!g_sycl_loaded) return false;
+ 
+     ggml_sycl_func_t func;
++    static const bool op_timing = []() {
++        const char * env = getenv("GGML_SYCL_OP_TIMING");
++        return env && strcmp(env, "0") != 0;
++    }();
+ 
+     switch (tensor->op) {
+         case GGML_OP_CONV_TRANSPOSE_1D:
+@@ -4081,6 +4629,9 @@ bool ggml_sycl_compute_forward(ggml_backend_sycl_context & ctx, struct ggml_tens
                  case GGML_UNARY_OP_HARDSWISH:
                      func = ggml_sycl_hardswish;
                      break;
@@ -803,7 +1001,7 @@ index e0f8536..c4b1652 100644
                  default:
                      return false;
              }
-@@ -4118,6 +4492,12 @@ bool ggml_sycl_compute_forward(ggml_backend_sycl_context & ctx, struct ggml_tens
+@@ -4118,6 +4669,12 @@ bool ggml_sycl_compute_forward(ggml_backend_sycl_context & ctx, struct ggml_tens
              }
              func = ggml_sycl_mul_mat_id;
              break;
@@ -816,7 +1014,7 @@ index e0f8536..c4b1652 100644
          case GGML_OP_SCALE:
              func = ggml_sycl_scale;
              break;
-@@ -4158,6 +4538,12 @@ bool ggml_sycl_compute_forward(ggml_backend_sycl_context & ctx, struct ggml_tens
+@@ -4158,6 +4715,12 @@ bool ggml_sycl_compute_forward(ggml_backend_sycl_context & ctx, struct ggml_tens
          case GGML_OP_SUM_ROWS:
              func = ggml_sycl_sum_rows;
              break;
@@ -829,7 +1027,24 @@ index e0f8536..c4b1652 100644
          case GGML_OP_ARGSORT:
              func = ggml_sycl_argsort;
              break;
-@@ -4282,6 +4668,23 @@ GGML_CALL static bool ggml_backend_buffer_is_sycl(ggml_backend_buffer_t buffer)
+@@ -4172,7 +4735,16 @@ bool ggml_sycl_compute_forward(ggml_backend_sycl_context & ctx, struct ggml_tens
+         ggml_sycl_set_peer_access(tensor->src[1]->ne[1], ctx.device);
+     }
+ 
++    const int64_t timing_start_us = op_timing ? ggml_time_us() : 0;
+     func(ctx, tensor->src[0], tensor->src[1], tensor);
++    if (op_timing) {
++        SYCL_CHECK(CHECK_TRY_ERROR(ctx.stream()->wait()));
++        const int64_t timing_us = ggml_time_us() - timing_start_us;
++        fprintf(stderr,
++                "[SYCL_OP_TIMING] dev=%d op=%s name=%s ne=%" PRId64 "x%" PRId64 "x%" PRId64 "x%" PRId64 " us=%" PRId64 "\n",
++                ctx.device, ggml_op_name(tensor->op), tensor->name,
++                tensor->ne[0], tensor->ne[1], tensor->ne[2], tensor->ne[3], timing_us);
++    }
+     return true;
+ }
+ 
+@@ -4282,6 +4854,23 @@ GGML_CALL static bool ggml_backend_buffer_is_sycl(ggml_backend_buffer_t buffer)
      return buffer->iface.get_name == ggml_backend_sycl_buffer_get_name;
  }
  
@@ -853,7 +1068,7 @@ index e0f8536..c4b1652 100644
  static void
  ggml_backend_sycl_buffer_free_buffer(ggml_backend_buffer_t buffer) try {
      ggml_backend_sycl_buffer_context * ctx = ( ggml_backend_sycl_buffer_context *)buffer->context;
-@@ -4307,7 +4710,7 @@ ggml_backend_sycl_buffer_init_tensor(ggml_backend_buffer_t buffer,
+@@ -4307,7 +4896,7 @@ ggml_backend_sycl_buffer_init_tensor(ggml_backend_buffer_t buffer,
  
      if (tensor->view_src != NULL && tensor->view_offs == 0) {
          assert(tensor->view_src->buffer->buft == buffer->buft);
@@ -862,7 +1077,7 @@ index e0f8536..c4b1652 100644
          tensor->extra = tensor->view_src->extra;
          return;
      }
-@@ -4462,7 +4865,6 @@ static struct ggml_backend_buffer_i ggml_backend_sycl_buffer_interface = {
+@@ -4462,7 +5051,6 @@ static struct ggml_backend_buffer_i ggml_backend_sycl_buffer_interface = {
      /* .init_tensor     = */ ggml_backend_sycl_buffer_init_tensor,
      /* .memset_tensor   = */ ggml_backend_sycl_buffer_memset_tensor,	
      /* .set_tensor      = */ ggml_backend_sycl_buffer_set_tensor,
@@ -870,7 +1085,7 @@ index e0f8536..c4b1652 100644
      /* .get_tensor      = */ ggml_backend_sycl_buffer_get_tensor,
      /* .cpy_tensor      = */ ggml_backend_sycl_buffer_cpy_tensor,
      /* .clear           = */ ggml_backend_sycl_buffer_clear,
-@@ -4494,6 +4896,14 @@ ggml_backend_sycl_buffer_type_alloc_buffer(ggml_backend_buffer_type_t buft,
+@@ -4494,6 +5082,14 @@ ggml_backend_sycl_buffer_type_alloc_buffer(ggml_backend_buffer_type_t buft,
      void * dev_ptr;
      SYCL_CHECK(CHECK_TRY_ERROR(dev_ptr = (void *)sycl::malloc_device(
                                      size, *stream)));
@@ -885,7 +1100,7 @@ index e0f8536..c4b1652 100644
      ggml_backend_sycl_buffer_context * ctx = new  ggml_backend_sycl_buffer_context(buft_ctx->device, dev_ptr, buft_ctx->stream);
      return ggml_backend_buffer_init(buft, ggml_backend_sycl_buffer_interface, ctx, size);
  }
-@@ -4608,6 +5018,14 @@ static void get_row_split(int64_t * row_low, int64_t * row_high, const ggml_tens
+@@ -4608,6 +5204,14 @@ static void get_row_split(int64_t * row_low, int64_t * row_high, const ggml_tens
  }
  
  struct ggml_backend_sycl_split_buffer_context {
@@ -900,7 +1115,7 @@ index e0f8536..c4b1652 100644
      ~ggml_backend_sycl_split_buffer_context() try {
          for (ggml_tensor_extra_gpu * extra : tensor_extras) {
              for (int i = 0; i < ggml_sycl_info().device_count; ++i) {
-@@ -4623,20 +5041,17 @@ struct ggml_backend_sycl_split_buffer_context {
+@@ -4623,20 +5227,17 @@ struct ggml_backend_sycl_split_buffer_context {
                              dpct::destroy_event(extra->events[i][is])));
                      }
                  }
@@ -929,7 +1144,7 @@ index e0f8536..c4b1652 100644
      }
      catch (sycl::exception const &exc) {
        std::cerr << exc.what() << "Exception caught at file:" << __FILE__
-@@ -4644,8 +5059,77 @@ struct ggml_backend_sycl_split_buffer_context {
+@@ -4644,8 +5245,77 @@ struct ggml_backend_sycl_split_buffer_context {
        std::exit(1);
      }
  
@@ -1007,7 +1222,7 @@ index e0f8536..c4b1652 100644
  };
  
  GGML_CALL static const char * ggml_backend_sycl_split_buffer_get_name(ggml_backend_buffer_t buffer) {
-@@ -4683,7 +5167,6 @@ ggml_backend_sycl_split_buffer_init_tensor(ggml_backend_buffer_t buffer,
+@@ -4683,7 +5353,6 @@ ggml_backend_sycl_split_buffer_init_tensor(ggml_backend_buffer_t buffer,
      ggml_tensor_extra_gpu * extra = new ggml_tensor_extra_gpu{};
  
      ctx->tensor_extras.push_back(extra);
@@ -1015,7 +1230,7 @@ index e0f8536..c4b1652 100644
  
      for (int i = 0; i < ggml_sycl_info().device_count; ++i) {
          int64_t row_low, row_high;
-@@ -4706,14 +5189,7 @@ ggml_backend_sycl_split_buffer_init_tensor(ggml_backend_buffer_t buffer,
+@@ -4706,14 +5375,7 @@ ggml_backend_sycl_split_buffer_init_tensor(ggml_backend_buffer_t buffer,
          // currently, init_tensor cannot fail, it needs to be fixed in ggml-backend first
          ggml_sycl_set_device(i);
          const queue_ptr stream = ctx->streams[i];
@@ -1031,7 +1246,7 @@ index e0f8536..c4b1652 100644
  
          // set padding to 0 to avoid possible NaN values
          if (size > original_size) {
-@@ -4740,7 +5216,7 @@ ggml_backend_sycl_split_buffer_init_tensor(ggml_backend_buffer_t buffer,
+@@ -4740,7 +5402,7 @@ ggml_backend_sycl_split_buffer_init_tensor(ggml_backend_buffer_t buffer,
                  CHECK_TRY_ERROR(extra->events[i][is] = new sycl::event()));
          }
      }
@@ -1040,7 +1255,7 @@ index e0f8536..c4b1652 100644
      tensor->extra = extra;
  }
  catch (sycl::exception const &exc) {
-@@ -4880,11 +5356,11 @@ GGML_CALL static const char * ggml_backend_sycl_split_buffer_type_name(ggml_back
+@@ -4880,11 +5542,11 @@ GGML_CALL static const char * ggml_backend_sycl_split_buffer_type_name(ggml_back
  }
  
  GGML_CALL static ggml_backend_buffer_t ggml_backend_sycl_split_buffer_type_alloc_buffer(ggml_backend_buffer_type_t buft, size_t size) {
@@ -1056,7 +1271,7 @@ index e0f8536..c4b1652 100644
  
      return ggml_backend_buffer_init(buft, ggml_backend_sycl_split_buffer_interface, ctx, size);
  }
-@@ -5170,6 +5646,7 @@ GGML_CALL static bool ggml_backend_sycl_supports_op(ggml_backend_t backend, cons
+@@ -5170,6 +5832,7 @@ GGML_CALL static bool ggml_backend_sycl_supports_op(ggml_backend_t backend, cons
                  case GGML_UNARY_OP_HARDSWISH:
                  case GGML_UNARY_OP_GELU_QUICK:
                  case GGML_UNARY_OP_TANH:
@@ -1064,7 +1279,7 @@ index e0f8536..c4b1652 100644
                      return ggml_is_contiguous(op->src[0]);
                  default:
                      return false;
-@@ -5206,6 +5683,36 @@ GGML_CALL static bool ggml_backend_sycl_supports_op(ggml_backend_t backend, cons
+@@ -5206,6 +5869,36 @@ GGML_CALL static bool ggml_backend_sycl_supports_op(ggml_backend_t backend, cons
                  }
                  return true;
              } break;
@@ -1101,7 +1316,7 @@ index e0f8536..c4b1652 100644
          case GGML_OP_GET_ROWS:
              {
                  switch (op->src[0]->type) {
-@@ -5278,6 +5785,8 @@ GGML_CALL static bool ggml_backend_sycl_supports_op(ggml_backend_t backend, cons
+@@ -5278,6 +5971,8 @@ GGML_CALL static bool ggml_backend_sycl_supports_op(ggml_backend_t backend, cons
          case GGML_OP_IM2COL:
          case GGML_OP_POOL_2D:
          case GGML_OP_SUM_ROWS:

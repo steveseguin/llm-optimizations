@@ -1450,5 +1450,57 @@
       "tokSTotal": 13.989985,
       "createdAt": "2026-05-07T20:13:06.208Z"
     }
+  },
+  {
+    "label": "llamacpp-minimax-m27-udiq4xs-ikrpc-fastiq4xsmoe-quad-b70-p0-n64",
+    "submittedAt": "2026-05-07T21:26:12.719Z",
+    "payload": {
+      "hfId": "unsloth/MiniMax-M2.7",
+      "modelRevision": "main",
+      "hardware": {
+        "hwClass": "DISCRETE_GPU",
+        "gpuName": "Intel Arc Pro B70 32GB",
+        "gpuCount": 4,
+        "vramGb": 32,
+        "cpu": "AMD EPYC 9015 8-Core Processor",
+        "ramGb": 16,
+        "os": "Ubuntu 24.04.4 LTS"
+      },
+      "engineName": "llama.cpp",
+      "engineVersion": "ik_llama.cpp 9a26522 + SYCL IQ4_XS patches",
+      "quantization": "UD-IQ4_XS",
+      "promptTokens": 0,
+      "outputTokens": 64,
+      "contextLength": 64,
+      "batchSize": 1,
+      "tokSOut": 14.146009,
+      "tokSTotal": 14.146009,
+      "peakVramGb": 26.4,
+      "notes": "MiniMax M2.7 230B.A10B UD-IQ4_XS GGUF on 4x Intel Arc Pro B70 using ik_llama.cpp process-per-GPU RPC+SYCL workers. Warm-worker run after adding a direct IQ4_XS merged up/gate active-expert SYCL path; the experimental IQ4_XS down-projection path regressed and is disabled by default. Load/repack time is excluded by llama-bench eval timing. No speculative decoding, no expert dropping, no power-limit changes.",
+      "engineFlags": {
+        "commandSnippet": "GGML_DISABLE_FUSED_RMS_NORM=1 GGML_DISABLE_FUSED_MUL_UNARY=1 llama-bench -m MiniMax-M2.7-UD-IQ4_XS-00001-of-00004.gguf -rpc 127.0.0.1:50100|0,127.0.0.1:50101|0,127.0.0.1:50102|0,127.0.0.1:50103|0 -p 0 -n 64 -r 1 -ngl 99 -sm layer -ts 0/1/1/1/1 -fa 0 -nkvo 1 -ub 32 -ctk f16 -ctv f16 -threads 4 -w 0 -mmp 1 -rtr 1 -fmoe 1 -no-mmad 0 -muge 1 -o json",
+        "pipelineParallel": 4,
+        "gpuLayers": 99,
+        "splitMode": "layer",
+        "kvCacheDtype": "f16",
+        "flashAttn": false,
+        "contextLength": 64,
+        "attentionBackend": "standard",
+        "temperature": 0,
+        "topP": 1,
+        "specDecoding": false,
+        "mtpEnabled": false,
+        "extraFlags": "SYCL backend via 4 local rpc-server workers, ONEAPI_DEVICE_SELECTOR=level_zero:0..3, UR_L0_ENABLE_RELAXED_ALLOCATION_LIMITS=1, GGML_SYCL_DISABLE_DNN=1, runtime repack enabled, no_kv_offload=true, fused_moe=true, merged_up_gate_experts=true, direct IQ4_XS merged up/gate active-expert path=true, GGML_SYCL_FAST_MUL_MAT_ID_IQ4_XS not set"
+      }
+    },
+    "httpStatus": 201,
+    "response": {
+      "id": "cmovzx6um00hrp101ldegbaga",
+      "status": "APPROVED",
+      "tokSOut": 14.146009,
+      "tokSTotal": 14.146009,
+      "createdAt": "2026-05-07T21:26:12.719Z"
+    },
+    "notes": "Initial POST failed with HTTP 400 because engineVersion exceeded LocalMaxxing 64-character limit; resubmitted with shorter engineVersion. No API key stored."
   }
 ]
