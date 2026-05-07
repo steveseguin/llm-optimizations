@@ -54,6 +54,27 @@
       "extra_env": "GGML_SYCL_DISABLE_OPT=1",
       "extra_flags": "-b 1 -ub 1",
       "log": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/minimax-m27-quad-layer-ncmoe54-disableopt-b1ub1-p0n16-20260507T121813Z.log"
+    },
+    {
+      "label": "quad-layer-ncmoe54-reorder-hostfb0-p0n1",
+      "n_cpu_moe": 54,
+      "prompt_tokens": 0,
+      "output_tokens": 1,
+      "tok_s_out": 0.267557,
+      "sycl3_model_buffer_mib": 13964.29,
+      "extra_env": "GGML_SYCL_REORDER_HOST_FALLBACK=0",
+      "log": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/minimax-m27-quad-layer-ncmoe54-reorder-hostfb0-p0n1-20260507T123934Z.log"
+    },
+    {
+      "label": "quad-layer-ncmoe54-reorder-hostfb0-b1ub1-p0n16",
+      "n_cpu_moe": 54,
+      "prompt_tokens": 0,
+      "output_tokens": 16,
+      "tok_s_out": 0.389894,
+      "sycl3_model_buffer_mib": 13964.29,
+      "extra_env": "GGML_SYCL_REORDER_HOST_FALLBACK=0",
+      "extra_flags": "-b 1 -ub 1",
+      "log": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/minimax-m27-quad-layer-ncmoe54-reorder-hostfb0-b1ub1-p0n16-20260507T124107Z.log"
     }
   ],
   "failed_results": [
@@ -87,5 +108,8 @@
     "https://www.reddit.com/r/LocalLLaMA/comments/1sjx7kg/minimaxm27_nvfp4_on_2x_rtx_pro_6000_blackwell/",
     "https://gist.github.com/adamo1139/372de9f6cdfd38155d0dbea0b2bb3878",
     "https://github.com/ikawrakow/ik_llama.cpp/blob/main/docs/parameters.md"
+  ],
+  "patches": [
+    "patches/llama-cpp-sycl-reorder-host-fallback-env-20260507.patch"
   ]
 }

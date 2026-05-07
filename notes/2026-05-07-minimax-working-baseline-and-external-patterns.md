@@ -85,9 +85,19 @@ This is a diagnostic baseline, not an optimized result. `-ncmoe 56` means the fi
 | `-ncmoe 54`, default optimize | abort | Q8 reorder temp allocation failed after loading a `13964.29 MiB` SYCL3 model buffer |
 | `-ncmoe 54`, `GGML_SYCL_DISABLE_OPT=1`, `p0/n1` | `0.268751 tok/s` | disabling reorder avoids the abort |
 | `-ncmoe 54`, `GGML_SYCL_DISABLE_OPT=1`, `-b 1 -ub 1`, `p0/n16` | `0.403948 tok/s` | stable but not faster than `-ncmoe 56` |
+| `-ncmoe 54`, `GGML_SYCL_REORDER_HOST_FALLBACK=0`, `p0/n1` | `0.267557 tok/s` | targeted patch skips failed reorder temp allocations without global `GGML_SYCL_DISABLE_OPT=1` |
+| `-ncmoe 54`, `GGML_SYCL_REORDER_HOST_FALLBACK=0`, `-b 1 -ub 1`, `p0/n16` | `0.389894 tok/s` | stable, slightly slower than both `-ncmoe 56` and global disable-opt |
 | `-ncmoe 52` | load failure | SYCL3 allocation `18002258944` bytes failed |
 
 The important detail is that `-ncmoe 54` is not primarily a model-buffer fit issue. It loads, then Q8 reorder asks for a 20,054,016-byte temporary buffer and Level Zero returns OOM. `GGML_SYCL_DISABLE_OPT=1` proves skipping reorder avoids that crash, but speed does not improve.
+
+I added a targeted patch so reorder host fallback can be disabled at runtime:
+
+```text
+patches/llama-cpp-sycl-reorder-host-fallback-env-20260507.patch
+```
+
+With `GGML_SYCL_REORDER_HOST_FALLBACK=0`, failed reorder temp allocations now return `false` and the caller skips reorder for that tensor instead of falling through to host USM and aborting. This is cleaner than global `GGML_SYCL_DISABLE_OPT=1`, but it did not improve MiniMax throughput.
 
 ## Failed Row-Split Workaround
 

@@ -1,0 +1,30 @@
+diff --git a/ggml/src/ggml-sycl/ggml-sycl.cpp b/ggml/src/ggml-sycl/ggml-sycl.cpp
+--- a/ggml/src/ggml-sycl/ggml-sycl.cpp
++++ b/ggml/src/ggml-sycl/ggml-sycl.cpp
+@@
+ // RAII wrapper for temporary reorder buffers with optional host memory fallback.
+ // When device allocation fails and GGML_SYCL_HOST_MEM_FALLBACK is enabled,
+ // falls back to host memory so the reorder kernel can still run (over PCIe).
+ // Device access to host memory requires Linux kernel 6.8+ (Ubuntu 26.04+).
++static bool sycl_reorder_host_fallback_enabled() {
++    static const bool enabled = []() {
++        const char * env = std::getenv("GGML_SYCL_REORDER_HOST_FALLBACK");
++        return env == nullptr || std::atoi(env) != 0;
++    }();
++    return enabled;
++}
++
+ struct sycl_reorder_temp_buffer {
+     void *          ptr  = nullptr;
+     dpct::queue_ptr stream;
+ 
+     sycl_reorder_temp_buffer(dpct::queue_ptr stream, size_t size) : stream(stream) {
+         ptr = sycl_ext_malloc_device(stream, size);
+ #ifdef GGML_SYCL_HOST_MEM_FALLBACK
+-        if (!ptr) {
++        if (!ptr && sycl_reorder_host_fallback_enabled()) {
+             ptr = sycl::malloc_host(size, *stream);
+             if (ptr) {
+                 host_fallback = true;
+                 GGML_LOG_WARN("%s: device alloc of %zu bytes failed, using host memory fallback\n", __func__, size);
+             }
