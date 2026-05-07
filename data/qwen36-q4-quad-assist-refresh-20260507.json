@@ -171,6 +171,43 @@
       "notes": "Did not beat the accepted runtime 2 full validation."
     }
   },
+  "syncAfterSweep": {
+    "screenConfig": {
+      "tensorSplit": "1/1/1/0.05",
+      "promptTokens": 0,
+      "outputTokens": 128,
+      "repeats": 2,
+      "tsv": "/home/steve/bench-results/qwen36-q4_0-gguf/quad-assist-refresh-20260507/syncafter-sweep/q4-quad-assist005-syncafter-sweep-p0n128-20260507T015609Z.tsv"
+    },
+    "shortDecodeResults": [
+      {
+        "syncAfter": 0,
+        "tokSOut": 43.065947,
+        "json": "/home/steve/bench-results/qwen36-q4_0-gguf/quad-assist-refresh-20260507/syncafter-sweep/q4-quad-assist005-sync0-p0n128-20260507T015609Z.jsonl"
+      },
+      {
+        "syncAfter": 1,
+        "tokSOut": 42.750153,
+        "json": "/home/steve/bench-results/qwen36-q4_0-gguf/quad-assist-refresh-20260507/syncafter-sweep/q4-quad-assist005-sync1-p0n128-20260507T015609Z.jsonl"
+      },
+      {
+        "syncAfter": 2,
+        "tokSOut": 43.222829,
+        "json": "/home/steve/bench-results/qwen36-q4_0-gguf/quad-assist-refresh-20260507/syncafter-sweep/q4-quad-assist005-sync2-p0n128-20260507T015609Z.jsonl"
+      },
+      {
+        "syncAfter": 3,
+        "tokSOut": 43.208886,
+        "json": "/home/steve/bench-results/qwen36-q4_0-gguf/quad-assist-refresh-20260507/syncafter-sweep/q4-quad-assist005-sync3-p0n128-20260507T015609Z.jsonl"
+      },
+      {
+        "syncAfter": 4,
+        "tokSOut": 43.081701,
+        "json": "/home/steve/bench-results/qwen36-q4_0-gguf/quad-assist-refresh-20260507/syncafter-sweep/q4-quad-assist005-sync4-p0n128-20260507T015609Z.jsonl"
+      }
+    ],
+    "conclusion": "Keep GGML_SYCL_COMM_SYNC_AFTER=2. sync_after=3 is effectively tied on the short screen but not clearly better."
+  },
   "comparisons": {
     "olderFourCardAssistTokSOut": 39.204149,
     "equalFourCardTokSOut": 34.929313,

@@ -1567,6 +1567,16 @@ Goal: improve quality-preserving Q4_0 performance without power-limit changes.
    - decision:
      - keep the submitted runtime `2` full result (`44.087560 tok/s`) as the validated four-card setting;
      - short decode screens are useful for gross regressions but not reliable for tiny subgroup-runtime differences.
+79. 2026-05-07 Q4_0 four-card `GGML_SYCL_COMM_SYNC_AFTER` sweep:
+   - short decode sweep on the accepted split `1/1/1/0.05`, `p0/n128/r2`:
+     - `sync_after=0`: `43.065947 tok/s`;
+     - `sync_after=1`: `42.750153 tok/s`;
+     - `sync_after=2`: `43.222829 tok/s`;
+     - `sync_after=3`: `43.208886 tok/s`;
+     - `sync_after=4`: `43.081701 tok/s`;
+   - decision:
+     - keep `GGML_SYCL_COMM_SYNC_AFTER=2`;
+     - `3` is effectively tied on the short screen but not clearly better, so it does not justify a full validation yet.
 
 ## Success Criteria
 

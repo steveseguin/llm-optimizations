@@ -87,6 +87,20 @@ I also screened `GGML_SYCL_REORDER_MMVQ_SUBGROUPS_RUNTIME` on the accepted split
 
 The short-screen winner, runtime `1`, failed to beat the submitted runtime `2` result on a full validation: `p512/n512/r3` produced prompt `114.726410 tok/s`, decode `43.721328 tok/s`, computed total `63.314138 tok/s`. Keep runtime `2` as the validated four-card setting for now.
 
+## Sync-After Sweep
+
+I screened `GGML_SYCL_COMM_SYNC_AFTER` on the accepted split:
+
+| sync_after | tok/s out |
+| --- | ---: |
+| `0` | 43.065947 |
+| `1` | 42.750153 |
+| `2` | 43.222829 |
+| `3` | 43.208886 |
+| `4` | 43.081701 |
+
+`2` remains the best short-screen value, with `3` effectively tied but not clearly better. Keep `GGML_SYCL_COMM_SYNC_AFTER=2`.
+
 ## Artifacts
 
 - Short screen JSON: `/home/steve/bench-results/qwen36-q4_0-gguf/quad-assist-refresh-20260507/q4-quad-assist005-rms-stack-p0n128-20260507T013139Z.jsonl`
@@ -95,3 +109,4 @@ The short-screen winner, runtime `1`, failed to beat the submitted runtime `2` r
 - `0.08` full validation JSON: `/home/steve/bench-results/qwen36-q4_0-gguf/quad-assist-refresh-20260507/q4-quad-assist008-rms-stack-p512n512-20260507T014421Z.jsonl`
 - Subgroup runtime sweep TSV: `/home/steve/bench-results/qwen36-q4_0-gguf/quad-assist-refresh-20260507/subgroup-sweep/q4-quad-assist005-subgroup-sweep-p0n128-20260507T014750Z.tsv`
 - Runtime `1` full validation JSON: `/home/steve/bench-results/qwen36-q4_0-gguf/quad-assist-refresh-20260507/q4-quad-assist005-sg1-rms-stack-p512n512-20260507T015242Z.jsonl`
+- Sync-after sweep TSV: `/home/steve/bench-results/qwen36-q4_0-gguf/quad-assist-refresh-20260507/syncafter-sweep/q4-quad-assist005-syncafter-sweep-p0n128-20260507T015609Z.tsv`
