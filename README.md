@@ -47,6 +47,7 @@ Reproducibility notes, benchmark payloads, and local patches from the Intel Arc 
 - `notes/2026-05-07-q4-quad-assist-refresh.md`: current best four-card Q4_0 assist split refresh after the guard fix.
 - `notes/2026-05-07-q4-root-residual-tp3.md`: three-card Q4_0 TP3 root-residual performance ceiling, now annotated as not currently quality-cleared after the later token/logit failure.
 - `notes/2026-05-07-q4-fused-beta-alpha-experimental.md`: flat-layout Qwen35 fused `ssm_beta`/`ssm_alpha` GGUF experiment, quality-cleared with root-residual disabled.
+- `notes/2026-05-07-model-retention-cleanup.md`: model-tree cleanup record and current keep set.
 - `data/qwen36-fp8-32k-tp4-vs-pp2-20260506.json`: post-reboot Q4 sanity plus FP8 32k-context TP4 vs TP2/PP2 validation.
 - `data/q4-esimd-blockscales-20260506.json`: structured ESIMD block-loaded scale metadata screen.
 - `data/q4-active-device-row-split-20260506.json`: structured active-device row-split patch validation and negative row-split smoke.
