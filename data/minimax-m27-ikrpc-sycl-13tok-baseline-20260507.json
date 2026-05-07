@@ -1,0 +1,102 @@
+{
+  "date_utc": "2026-05-07",
+  "model": {
+    "hf_id": "unsloth/MiniMax-M2.7-GGUF",
+    "base_hf_id_for_localmaxxing": "unsloth/MiniMax-M2.7",
+    "local_path": "/home/steve/models/minimax-m2.7-ud-iq4_xs-gguf/UD-IQ4_XS/MiniMax-M2.7-UD-IQ4_XS-00001-of-00004.gguf",
+    "quantization": "UD-IQ4_XS",
+    "model_type": "minimax-m2 230B.A10B IQ4_XS - 4.25 bpw",
+    "model_size_bytes": 108405492736,
+    "n_params": 228689764864
+  },
+  "hardware": {
+    "gpu": "Intel Arc Pro B70 32GB",
+    "gpu_count": 4,
+    "cpu": "AMD EPYC 9015 8-Core Processor",
+    "os": "Ubuntu 24.04.4 LTS"
+  },
+  "engine": {
+    "name": "ik_llama.cpp",
+    "commit": "9a26522",
+    "backend": "SYCL RPC over Level Zero",
+    "worker_build": "/home/steve/src/ik_llama.cpp/build-sycl-rpc-b70",
+    "client_build": "/home/steve/src/ik_llama.cpp/build-rpc-client-cpu"
+  },
+  "best_result": {
+    "label": "ik-rpc-quad-layer-ts0-1111-nofmoe-nommad-syclmultiadd-rtr1-t4-p0n64-nkvo1",
+    "tok_s_out": 13.754201,
+    "tok_s_total": 13.754201,
+    "prompt_tokens": 0,
+    "output_tokens": 64,
+    "context_length": 64,
+    "peak_vram_gb_per_card": 26.4,
+    "jsonl": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/ik-rpc-quad-layer-ts0-1111-nofmoe-nommad-syclmultiadd-rtr1-t4-p0n64-nkvo1-20260507T185647Z.jsonl",
+    "localmaxxing_id": "cmovvoo6f00f5p1017yeb7kxd"
+  },
+  "best_command": "GGML_DISABLE_FUSED_RMS_NORM=1 GGML_DISABLE_FUSED_MUL_UNARY=1 /home/steve/src/ik_llama.cpp/build-rpc-client-cpu/bin/llama-bench -m /home/steve/models/minimax-m2.7-ud-iq4_xs-gguf/UD-IQ4_XS/MiniMax-M2.7-UD-IQ4_XS-00001-of-00004.gguf -rpc '127.0.0.1:50100|0,127.0.0.1:50101|0,127.0.0.1:50102|0,127.0.0.1:50103|0' -p 0 -n 64 -r 1 -ngl 99 -sm layer -ts 0/1/1/1/1 -fa 0 -nkvo 1 -ub 32 -ctk f16 -ctv f16 -t 4 -w 0 -mmp 1 -rtr 1 -fmoe 0 -no-mmad 1 -v -o json",
+  "sweep": [
+    {
+      "label": "p0n16-cpukv-norepack",
+      "tok_s_out": 9.977498
+    },
+    {
+      "label": "p0n64-gpukv",
+      "tok_s_out": 11.353396
+    },
+    {
+      "label": "p0n64-cpukv-norepack-t8",
+      "tok_s_out": 12.564798
+    },
+    {
+      "label": "p0n64-rtr1-t8",
+      "tok_s_out": 13.465415
+    },
+    {
+      "label": "p0n64-rtr1-t16",
+      "tok_s_out": 12.826655
+    },
+    {
+      "label": "p0n64-rtr1-t4",
+      "tok_s_out": 13.754201
+    },
+    {
+      "label": "p0n64-rtr1-t2",
+      "tok_s_out": 13.671846
+    },
+    {
+      "label": "p0n64-rtr1-t4-ub64",
+      "tok_s_out": 13.690724
+    },
+    {
+      "label": "p0n64-rtr1-t4-ub16",
+      "tok_s_out": 13.65025
+    },
+    {
+      "label": "p0n64-fused-mulmultiadd-rtr1-t4-ub32",
+      "tok_s_out": 12.330226,
+      "note": "Experimental fused SYCL MUL_MULTI_ADD regressed versus decomposed mul + MULTI_ADD."
+    }
+  ],
+  "patches": [
+    "patches/ik-llama-minimax-rpc-sycl-20260507.patch"
+  ],
+  "blocked_or_negative": [
+    {
+      "flag": "-fa 1",
+      "failure": "FLASH_ATTN_EXT unsupported in SYCL RPC worker"
+    },
+    {
+      "flag": "-sm graph",
+      "failure": "attempted about 34 GB allocation on one B70"
+    },
+    {
+      "flag": "-fmoe 1 -no-mmad 1",
+      "failure": "MOE_FUSED_UP_GATE unsupported in SYCL RPC worker"
+    }
+  ],
+  "next_steps": [
+    "Implement SYCL MOE_FUSED_UP_GATE for MiniMax/Qwen-style fused expert up-gate.",
+    "Replace the naive SYCL MUL_MULTI_ADD with a layout-aware fused expert combine kernel.",
+    "Rebenchmark fused MoE after MOE_FUSED_UP_GATE support; target >30 tok/s."
+  ]
+}

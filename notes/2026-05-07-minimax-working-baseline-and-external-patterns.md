@@ -8,6 +8,25 @@
 - Build: `/home/steve/src/llama.cpp-q4-b70/build-sycl-2026-bmg-g31`
 - Hardware: 4x Intel Arc Pro B70 32GB, Level Zero `1.15.37833+4`
 
+## 2026-05-07 Update: RPC Baseline Supersedes This Layer-Split Diagnostic
+
+The direct llama.cpp SYCL layer-split diagnostic below remains useful as a failure record, but it is no longer the best MiniMax path. The current working direction is `ik_llama.cpp` with one RPC worker process per B70, which bypasses the single-process Level Zero/SYCL aggregate allocation ceiling.
+
+Current best:
+
+```text
+13.754201 tok/s, p0/n64, 4x B70, UD-IQ4_XS, ik_llama.cpp RPC+SYCL
+LocalMaxxing: cmovvoo6f00f5p1017yeb7kxd
+```
+
+Detailed repro:
+
+```text
+notes/2026-05-07-minimax-ikrpc-sycl-13tok-baseline.md
+data/minimax-m27-ikrpc-sycl-13tok-baseline-20260507.json
+patches/ik-llama-minimax-rpc-sycl-20260507.patch
+```
+
 ## External Patterns Worth Borrowing
 
 Official MiniMax guidance points at vLLM, not GGUF, and recommends tensor parallelism for 4 GPUs plus expert parallelism for 8 GPUs:
