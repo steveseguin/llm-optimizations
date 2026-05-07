@@ -63,6 +63,17 @@ Therefore the Linux target is not speculative: first reach `>=27 tok/s`, then `>
   - `3/1` and `1/3` run but are slower than `1/1`.
 - OpenVINO 2026.1 docs list an internal `GatedDeltaNet` operation, but the local OpenVINO 2026.1.2 source tree does not expose a matching implementation symbol under `src/`. This is worth investigating, but OpenVINO remains an R&D track until the recurrent Qwen3.6 path can stay on GPU.
 
+Latest 2026-05-07 Q4_0 follow-up:
+
+- Current best quality-preserving Q4_0 GGUF result is now TP3 at `50.808572 tok/s` decode and `80.501734 tok/s` total for 512 prompt / 512 output. The only new enabled flag versus the guard-fix stack is `GGML_SYCL_COMM_FUSEADD_ROOT_RESIDUAL=1`.
+- This keeps the same Q4_0 weights, f16 KV cache, flash attention, Q8 activation cache, fused MMVQ2, fused MMVQ2+SwiGLU, fused RMS_NORM+MUL, fused allreduce+ADD, fused final GET_ROWS, single-kernel allreduce, no speculative decoding, no sampling change, and no power-limit change.
+- Four-card assist did not benefit from the same full validation: `GGML_SYCL_COMM_FUSEADD_ROOT_RESIDUAL=1` reached `43.884730 tok/s`, below the accepted `44.087560 tok/s`.
+- Negative screens from the same pass:
+  - forced Q4_1 MMVQ path: `42.344754 tok/s` versus default Q4_1 DMMV `42.552518 tok/s`;
+  - Q8-cache-off `MUL_MAT+allreduce+ADD` diagnostic: `41.707508 tok/s` versus Q8-cache-on control `42.732977 tok/s`;
+  - root skip / root rotation around the four-card assist layout were not durable wins.
+- A `llama-cli` text smoke for the TP3 root-residual flag was inconclusive because the corrected command hung and generated a large repeated stdout file. Before upstreaming this flag, add a lower-overhead token/logit correctness harness.
+
 ## Quality Constraints
 
 - Do not count INT4 AutoRound, Q4_K_M, Q8 KV, or draft/speculative approximations as equivalent to the Q4_0 GGUF baseline unless they are explicitly marked as separate quality tradeoff results.
