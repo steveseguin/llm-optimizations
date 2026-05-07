@@ -60,7 +60,23 @@ The detailed annotated payload returned HTTP 500, matching the previous llama.cp
 
 This is the new best submitted four-card Q4_0 result. It proves the current fused stack and guard fix make the assist split viable again, but it still trails TP3. Four-card Q4_0 remains an investigation path; the next useful work is reducing communication and launch overhead rather than moving more rows onto the fourth GPU.
 
+## Split Sweep
+
+I screened nearby fourth-card weights with `p0/n128/r2`:
+
+| Split | tok/s out |
+| --- | ---: |
+| `1/1/1/0.02` | 42.819726 |
+| `1/1/1/0.05` | 42.785891 |
+| `1/1/1/0.08` | 43.058166 |
+| `1/1/1/0.12` | 42.159686 |
+| `1/1/1/0.20` | 41.091157 |
+
+The short-screen winner, `1/1/1/0.08`, did not beat the submitted `0.05` result on a full validation: `p512/n512/r3` produced prompt `117.366467 tok/s`, decode `43.929404 tok/s`, computed total `63.930204 tok/s`. Keep `1/1/1/0.05` as the validated four-card config.
+
 ## Artifacts
 
 - Short screen JSON: `/home/steve/bench-results/qwen36-q4_0-gguf/quad-assist-refresh-20260507/q4-quad-assist005-rms-stack-p0n128-20260507T013139Z.jsonl`
 - Full validation JSON: `/home/steve/bench-results/qwen36-q4_0-gguf/quad-assist-refresh-20260507/q4-quad-assist005-rms-stack-p512n512-20260507T013303Z.jsonl`
+- Split sweep TSV: `/home/steve/bench-results/qwen36-q4_0-gguf/quad-assist-refresh-20260507/split-sweep/q4-quad-assist-split-sweep-p0n128-20260507T013824Z.tsv`
+- `0.08` full validation JSON: `/home/steve/bench-results/qwen36-q4_0-gguf/quad-assist-refresh-20260507/q4-quad-assist008-rms-stack-p512n512-20260507T014421Z.jsonl`

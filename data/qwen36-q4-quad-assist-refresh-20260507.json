@@ -79,6 +79,54 @@
       }
     }
   ],
+  "splitSweep": {
+    "screenConfig": {
+      "promptTokens": 0,
+      "outputTokens": 128,
+      "repeats": 2,
+      "tsv": "/home/steve/bench-results/qwen36-q4_0-gguf/quad-assist-refresh-20260507/split-sweep/q4-quad-assist-split-sweep-p0n128-20260507T013824Z.tsv"
+    },
+    "shortDecodeResults": [
+      {
+        "tensorSplit": "1/1/1/0.02",
+        "tokSOut": 42.819726,
+        "json": "/home/steve/bench-results/qwen36-q4_0-gguf/quad-assist-refresh-20260507/split-sweep/q4-quad-assist0p02-p0n128-20260507T013824Z.jsonl"
+      },
+      {
+        "tensorSplit": "1/1/1/0.05",
+        "tokSOut": 42.785891,
+        "json": "/home/steve/bench-results/qwen36-q4_0-gguf/quad-assist-refresh-20260507/split-sweep/q4-quad-assist0p05-p0n128-20260507T013824Z.jsonl"
+      },
+      {
+        "tensorSplit": "1/1/1/0.08",
+        "tokSOut": 43.058166,
+        "json": "/home/steve/bench-results/qwen36-q4_0-gguf/quad-assist-refresh-20260507/split-sweep/q4-quad-assist0p08-p0n128-20260507T013824Z.jsonl"
+      },
+      {
+        "tensorSplit": "1/1/1/0.12",
+        "tokSOut": 42.159686,
+        "json": "/home/steve/bench-results/qwen36-q4_0-gguf/quad-assist-refresh-20260507/split-sweep/q4-quad-assist0p12-p0n128-20260507T013824Z.jsonl"
+      },
+      {
+        "tensorSplit": "1/1/1/0.20",
+        "tokSOut": 41.091157,
+        "json": "/home/steve/bench-results/qwen36-q4_0-gguf/quad-assist-refresh-20260507/split-sweep/q4-quad-assist0p20-p0n128-20260507T013824Z.jsonl"
+      }
+    ],
+    "fullValidationOfShortWinner": {
+      "tensorSplit": "1/1/1/0.08",
+      "promptTokens": 512,
+      "outputTokens": 512,
+      "repeats": 3,
+      "tokSPrompt": 117.366467,
+      "tokSOut": 43.929404,
+      "tokSTotal": 63.9302037049128,
+      "json": "/home/steve/bench-results/qwen36-q4_0-gguf/quad-assist-refresh-20260507/q4-quad-assist008-rms-stack-p512n512-20260507T014421Z.jsonl",
+      "log": "/home/steve/bench-results/qwen36-q4_0-gguf/quad-assist-refresh-20260507/q4-quad-assist008-rms-stack-p512n512-20260507T014421Z.log",
+      "submittedToLocalMaxxing": false,
+      "notes": "Did not beat the accepted 1/1/1/0.05 full validation."
+    }
+  },
   "comparisons": {
     "olderFourCardAssistTokSOut": 39.204149,
     "equalFourCardTokSOut": 34.929313,

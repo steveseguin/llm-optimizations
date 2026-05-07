@@ -1543,6 +1543,19 @@ Goal: improve quality-preserving Q4_0 performance without power-limit changes.
      - this is the new best submitted four-card Q4_0 result;
      - it proves the guard fix and current fused stack make the four-card assist layout viable again;
      - four-card Q4_0 is still not the production speed path until it beats TP3, so next 4x work should target communication/launch reduction rather than more equal sharding.
+77. 2026-05-07 Q4_0 four-card assist split sweep:
+   - short decode sweep, `p0/n128/r2`, same current stack and device order:
+     - `1/1/1/0.02`: `42.819726 tok/s`;
+     - `1/1/1/0.05`: `42.785891 tok/s`;
+     - `1/1/1/0.08`: `43.058166 tok/s`;
+     - `1/1/1/0.12`: `42.159686 tok/s`;
+     - `1/1/1/0.20`: `41.091157 tok/s`;
+   - full validation for the short-screen winner `1/1/1/0.08`:
+     - `p512/n512/r3`: prompt `117.366467 tok/s`, decode `43.929404 tok/s`, computed total `63.930204 tok/s`;
+   - decision:
+     - keep the submitted `1/1/1/0.05` result as the validated four-card config (`44.087560 tok/s`);
+     - the viable fourth-card assist range is very small, and heavier fourth-card weights regress quickly;
+     - do not submit the `0.08` result to LocalMaxxing because it is a negative validation against the accepted `0.05` run.
 
 ## Success Criteria
 
