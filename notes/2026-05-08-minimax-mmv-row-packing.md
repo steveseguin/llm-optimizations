@@ -49,6 +49,18 @@ Additional row-packing variants did not beat generic Y=2:
 
 Conclusion: Y=2 is the current B70 setting for this path. More row packing appears to increase variance and does not improve steady decode.
 
+## Microbatch Sweep
+
+With Y=2 held fixed, `-ub 64` is a tiny local win over `-ub 32`, while `-ub 128` is neutral/slower:
+
+| Variant | tok/s | samples | status |
+| --- | ---: | --- | --- |
+| `-ub 64`, r5 | 17.559741 | 17.3921, 17.6070, 17.6027, 17.5936, 17.6033 | local best, not submitted because delta is tiny |
+| `-ub 64`, r3 | 17.560269 | 17.4253, 17.6356, 17.6199 | confirms direction |
+| `-ub 128`, r3 | 17.502587 | 17.3805, 17.6000, 17.5272 | not better |
+
+Use `-ub 64` for the next GGUF MiniMax sweeps, but keep the public LocalMaxxing p0/n64 record at `17.547020 tok/s` until a larger improvement clears the noise floor.
+
 ## Timing Delta
 
 Short op-timing runs show the direction of the win:
@@ -107,6 +119,8 @@ llama-bench \
 - Runtime MMV8 negative: `/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/minimax-fast-mmid-mmv-runtime8-r3-p0n64-20260508T131435Z.jsonl`
 - Runtime MMV2 + MoE4 negative: `/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/minimax-fast-mmid-mmv2-moe4-r3-p0n64-20260508T132138Z.jsonl`
 - Context run: `/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/minimax-fast-mmid-mmv-runtime2-r3-p512n128-20260508T133014Z.jsonl`
+- Microbatch `-ub 64` local best: `/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/minimax-fast-mmid-mmv-runtime2-ub64-r5-p0n64-20260508T135521Z.jsonl`
+- Microbatch `-ub 128` neutral: `/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/minimax-fast-mmid-mmv-runtime2-ub128-r3-p0n64-20260508T134833Z.jsonl`
 - Correctness smoke: `/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/correctness/mmv-y2-smoke-20260508T125856Z`
 - LocalMaxxing payload: `/home/steve/bench-results/localmaxxing-minimax-m27-fast-mmid-mmv-y2-20260508.payload.json`
 - LocalMaxxing response: `/home/steve/bench-results/localmaxxing-minimax-m27-fast-mmid-mmv-y2-20260508.response.json`

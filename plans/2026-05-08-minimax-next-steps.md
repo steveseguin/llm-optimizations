@@ -44,6 +44,7 @@ Elementwise fused-op fixes are not enough. Fused RMSNorm is functional but neutr
    - Prefer producer-side fusion into KV writes over standalone copy kernels, because the tested MiniMax CPY fast path regressed.
 3. GGUF row packing:
    - Keep `GGML_SYCL_MMV_Y_RUNTIME=2` as the current MiniMax GGUF performance setting. A deterministic 16-token generation smoke matched default row grouping byte-for-byte.
+   - Use `-ub 64` for local follow-up sweeps; it produced a tiny local best of `17.559741 tok/s` but was not submitted because the delta over `-ub 32` is too small.
    - Treat runtime/compile-time Y=4 and runtime Y=8 as neutral/negative for now. Compile-time MMV4 produced `17.191979 tok/s`; runtime MMV8 produced `17.238444 tok/s`.
    - Treat MoE-specific Y=4 as negative for now. `GGML_SYCL_MMV_Y_RUNTIME=2` plus `GGML_SYCL_MOE_IQ4_XS_MMV_Y=4` produced `17.232041 tok/s`.
 4. GGUF graph split:
