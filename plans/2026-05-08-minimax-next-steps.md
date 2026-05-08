@@ -47,6 +47,8 @@ Elementwise fused-op fixes are not enough. Fused RMSNorm is functional but neutr
    - Keep `GGML_SYCL_MMV_Y_RUNTIME=2` as the current MiniMax GGUF performance setting. A deterministic 16-token generation smoke matched default row grouping byte-for-byte.
    - Use `-ub 64`; it combined with fused RMSNorm to produce the current `17.697772 tok/s` high.
    - Keep fused RMSNorm enabled for now. The current r5 run and deterministic generation smoke both cleared.
+   - Use `-sas 1` only as a local sweep option for now. It reached `17.718033 tok/s`, but the delta is too small for a separate public record.
+   - Keep `-t 4` and `-rtr 1`; `-t 8` and `-rtr 0` did not improve.
    - Treat runtime/compile-time Y=4 and runtime Y=8 as neutral/negative for now. Compile-time MMV4 produced `17.191979 tok/s`; runtime MMV8 produced `17.238444 tok/s`.
    - Treat MoE-specific Y=4 as negative for now. `GGML_SYCL_MMV_Y_RUNTIME=2` plus `GGML_SYCL_MOE_IQ4_XS_MMV_Y=4` produced `17.232041 tok/s`.
 4. GGUF graph split:

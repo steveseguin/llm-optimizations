@@ -107,6 +107,18 @@ Tried enabling the SYCL DNN path by removing `GGML_SYCL_DISABLE_DNN=1` from the 
 
 This is slower/noisier than the DNN-disabled `-ub 64` runs. Keep `GGML_SYCL_DISABLE_DNN=1` in the MiniMax GGUF recipe.
 
+## Scheduler And Host Thread Sweep
+
+`-sas 1` is a small local positive but not enough to submit as a separate public row:
+
+| Variant | tok/s | samples | status |
+| --- | ---: | --- | --- |
+| `-sas 1 -t 4`, r5 | 17.718033 | 17.5327, 17.7945, 17.7565, 17.7508, 17.7557 | local best, not submitted; tiny delta |
+| `-sas 1 -t 8`, r3 | 17.691594 | 17.5640, 17.7566, 17.7542 | no better than `-t 4` |
+| `-rtr 0 -t 4`, r3 | 17.659099 | 17.4545, 17.7551, 17.7676 | runtime repack still preferred |
+
+Use `-sas 1` opportunistically for local sweeps, but keep public records anchored on larger changes until the delta is above the noise floor. Keep `-t 4` and `-rtr 1`.
+
 ## Timing Delta
 
 Short op-timing runs show the direction of the win:
@@ -171,6 +183,9 @@ llama-bench \
 - Microbatch `-ub 128` neutral: `/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/minimax-fast-mmid-mmv-runtime2-ub128-r3-p0n64-20260508T134833Z.jsonl`
 - Flash attention failure: `/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/minimax-fast-mmid-mmv-runtime2-ub64-fa1-r3-p512n128-20260508T140323Z.log`
 - DNN-enabled negative: `/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/minimax-fast-mmid-mmv-runtime2-dnnon-ub64-r3-p0n64-20260508T141516Z.jsonl`
+- Runtime repack off: `/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/minimax-fusedrms-mmv-y2-ub64-rtr0-r3-p0n64-20260508T145807Z.jsonl`
+- Async scheduler local best: `/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/minimax-fusedrms-mmv-y2-ub64-sas1-r5-p0n64-20260508T151206Z.jsonl`
+- Async scheduler with `-t 8`: `/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/minimax-fusedrms-mmv-y2-ub64-sas1-t8-r3-p0n64-20260508T151907Z.jsonl`
 - Correctness smoke: `/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/correctness/mmv-y2-smoke-20260508T125856Z`
 - LocalMaxxing payload: `/home/steve/bench-results/localmaxxing-minimax-m27-fast-mmid-mmv-y2-20260508.payload.json`
 - LocalMaxxing response: `/home/steve/bench-results/localmaxxing-minimax-m27-fast-mmid-mmv-y2-20260508.response.json`

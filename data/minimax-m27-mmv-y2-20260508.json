@@ -130,6 +130,30 @@
     "sourceJson": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/minimax-fast-mmid-mmv-runtime2-dnnon-ub64-r3-p0n64-20260508T141516Z.jsonl",
     "recommendation": "Keep GGML_SYCL_DISABLE_DNN=1 in the current MiniMax GGUF recipe."
   },
+  "schedulerSweep": [
+    {
+      "variant": "-sas 1 -t 4",
+      "tokSOut": 17.718033,
+      "samplesTokSOut": [17.5327, 17.7945, 17.7565, 17.7508, 17.7557],
+      "sourceJson": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/minimax-fusedrms-mmv-y2-ub64-sas1-r5-p0n64-20260508T151206Z.jsonl",
+      "localmaxxingSubmitted": false,
+      "notes": "Tiny local best; not submitted because the delta over the submitted fused-RMS row is inside noise."
+    },
+    {
+      "variant": "-sas 1 -t 8",
+      "tokSOut": 17.691594,
+      "samplesTokSOut": [17.564, 17.7566, 17.7542],
+      "sourceJson": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/minimax-fusedrms-mmv-y2-ub64-sas1-t8-r3-p0n64-20260508T151907Z.jsonl",
+      "localmaxxingSubmitted": false
+    },
+    {
+      "variant": "-rtr 0 -sas 0 -t 4",
+      "tokSOut": 17.659099,
+      "samplesTokSOut": [17.4545, 17.7551, 17.7676],
+      "sourceJson": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/minimax-fusedrms-mmv-y2-ub64-rtr0-r3-p0n64-20260508T145807Z.jsonl",
+      "localmaxxingSubmitted": false
+    }
+  ],
   "commandSnippet": "GGML_SYCL_FAST_MUL_MAT_ID_IQ4_XS=1 GGML_SYCL_MMV_Y_RUNTIME=2 GGML_SYCL_DISABLE_DNN=1 llama-bench -m MiniMax-M2.7-UD-IQ4_XS-00001-of-00004.gguf -rpc 127.0.0.1:50100|0,127.0.0.1:50101|0,127.0.0.1:50102|0,127.0.0.1:50103|0 -p 0 -n 64 -r 5 -ngl 99 -sm layer -ts 1/1/1/1 -fa 0 -nkvo 0 -ub 64 -ctk f16 -ctv f16 -t 4 -w 0 -mmp 1 -rtr 1 -fmoe 1 -no-mmad 0 -muge 1 -sas 0 -o json",
   "files": {
     "sourceJson": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/minimax-fast-mmid-mmv-runtime2-fusedrms-ub64-r5-p0n64-20260508T143014Z.jsonl",
