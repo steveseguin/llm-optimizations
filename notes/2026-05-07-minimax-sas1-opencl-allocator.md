@@ -91,3 +91,22 @@ OpenCL is not currently a practical MiniMax answer on this 16 GB RAM host. It ca
 2. Treat `-sas 1` as the current default for MiniMax RPC layer runs.
 3. Do not use `-no-ooae 1` for this path.
 4. For >30 tok/s, the next real work is still code-level expert/tensor parallelism: either an RPC split-buffer implementation or a direct graph split allocator that avoids Level Zero single-process aggregate mapping limits.
+
+## Candidate Non-GGUF Path: Lasimeri AutoRound INT4
+
+Model: `Lasimeri/MiniMax-M2.7-int4-AutoRound`
+
+Initial read:
+
+- Format is safetensors, not GGUF; repo size is about 121 GB.
+- Quantization is W4A16, group size 128, symmetric INT4 weights with FP16/BF16 activations.
+- The model card says the MoE gate layers are left full precision.
+- The quantization config says `iters=0`, so this is RTN-style AutoRound rather than a fully optimized iterative calibration run.
+- Suggested runtime is vLLM or SGLang with tensor parallelism; neither stack is installed on this host yet.
+
+Assessment:
+
+- Worth testing because vLLM has native MiniMax-M2 and tensor/expert-parallel execution paths, which is closer to the architecture we need than llama.cpp RPC layer splitting.
+- Not a proven quality upgrade over `UD-IQ4_XS`; `iters=0` is a quality caveat.
+- Not a drop-in replacement for the current GGUF path; it requires installing a PyTorch XPU/vLLM or SGLang XPU stack and likely downloading to the external 4 TB drive or freeing internal storage.
+- It may be too tight for 4x32 GB at long context because the checkpoint is 121 GB before runtime/KV/cache overhead, but a short-context load test is still valuable.
