@@ -1,0 +1,59 @@
+{
+  "date": "2026-05-08",
+  "host": {
+    "os": "Ubuntu 24.04.4 LTS",
+    "gpu": "Intel Arc Pro B70",
+    "gpu_count": 4,
+    "vram_gb_each": 32,
+    "cpu": "AMD EPYC 9015"
+  },
+  "model": {
+    "hf_id": "unsloth/MiniMax-M2.7-GGUF",
+    "variant": "UD-IQ4_XS",
+    "path": "/home/steve/models/minimax-m2.7-ud-iq4_xs-gguf/UD-IQ4_XS/MiniMax-M2.7-UD-IQ4_XS-00001-of-00004.gguf"
+  },
+  "source_patch": {
+    "path": "patches/ik-llama-minimax-rpc-device-map-and-graphsplit-20260508.patch",
+    "env_flags": [
+      "GGML_MINIMAX_NO_DEFER_REDUCE",
+      "GGML_RPC_REDUCE_MIRROR"
+    ],
+    "notes": [
+      "Default-off diagnostic path.",
+      "Disables MiniMax deferred reductions across nonlinear graph boundaries.",
+      "Mirrors materialized client-side reductions back to source shards so downstream per-device branches can consume full activations.",
+      "Fixes get_input_tensor_sm_graph() to return the materialized reduce tensor for non-deferred reductions."
+    ]
+  },
+  "runs": [
+    {
+      "label": "rpc-graph-nodefer-mirror-inputfix-p0n1",
+      "status": "completed",
+      "split_mode": "graph",
+      "tensor_split": "1/1/1/1",
+      "prompt_tokens": 0,
+      "output_tokens": 1,
+      "repeat_count": 1,
+      "tok_s_out": 2.033524,
+      "avg_ns": 491757254,
+      "flags": "-p 0 -n 1 -r 1 -ngl 99 -sm graph -ts 1/1/1/1 -fa 0 -nkvo 0 -ub 32 -ctk f16 -ctv f16 -t 4 -w 0 -mmp 1 -rtr 1 -fmoe 1 -no-mmad 0 -muge 1 -sas 0",
+      "env": "GGML_MINIMAX_NO_DEFER_REDUCE=1 GGML_RPC_REDUCE_MIRROR=1 GGML_DISABLE_FUSED_RMS_NORM=1 GGML_DISABLE_FUSED_MUL_UNARY=1",
+      "json": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/rpc-graph-nodefer-mirror-inputfix-p0n1-20260508T063928Z.jsonl",
+      "localmaxxing": "not_submitted_diagnostic_only"
+    },
+    {
+      "label": "rpc-graph-nodefer-mirror-pre-inputfix",
+      "status": "failed_worker_socket",
+      "observed_splits": 745,
+      "log": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/rpc-graph-nodefer-mirror-p0n1-20260508T063533Z.log",
+      "interpretation": "The first attempt showed the split count and then failed because downstream graph nodes still consumed per-device partials from non-deferred reduce outputs."
+    }
+  ],
+  "comparison": {
+    "current_valid_layer_tok_s_out": 16.383602,
+    "current_valid_layer_localmaxxing_id": "cmowft2hr000oo3019is4snoq",
+    "branch_fused_graph_tok_s_out": 5.639884,
+    "branch_fused_graph_note": "Faster than the corrected graph smoke but not promoted because deferred reductions cross nonlinear boundaries."
+  },
+  "conclusion": "Quality-correct MiniMax graph/tensor parallelism needs real reduce/broadcast before nonlinear layer boundaries. The current client-side RPC reduce/mirror path proves correctness-oriented dataflow but is far too slow for steady-state decode."
+}

@@ -452,7 +452,7 @@ index 97c7481..9492431 100644
                      ptr += tensor_size(split->inputs[j]);
                  }
 diff --git a/ggml/src/ggml-rpc.cpp b/ggml/src/ggml-rpc.cpp
-index cfb0f94..7c38ca6 100644
+index cfb0f94..cf58e12 100644
 --- a/ggml/src/ggml-rpc.cpp
 +++ b/ggml/src/ggml-rpc.cpp
 @@ -53,6 +53,7 @@ typedef int sockfd_t;
@@ -988,7 +988,7 @@ index cfb0f94..7c38ca6 100644
  static ggml_backend_buffer_t ggml_backend_rpc_buffer_type_alloc_buffer(ggml_backend_buffer_type_t buft, size_t size) {
      ggml_backend_rpc_buffer_type_context* buft_ctx = (ggml_backend_rpc_buffer_type_context*)buft->context;
      rpc_msg_alloc_buffer_req request = { buft_ctx->device, size };
-@@ -874,11 +1358,112 @@ static void serialize_graph(uint32_t device, const ggml_cgraph* cgraph, std::vec
+@@ -874,11 +1358,134 @@ static void serialize_graph(uint32_t device, const ggml_cgraph* cgraph, std::vec
      memcpy(out_tensors, tensors.data(), n_tensors * sizeof(rpc_tensor));
  }
  
@@ -1032,6 +1032,10 @@ index cfb0f94..7c38ca6 100644
 +    const int n_src = dst->op_params[1];
 +    const size_t nbytes = ggml_nbytes(dst);
 +    const int64_t nelem = ggml_nelements(dst);
++    static const bool mirror_reduce = []() {
++        const char * env = getenv("GGML_RPC_REDUCE_MIRROR");
++        return env && strcmp(env, "0") != 0;
++    }();
 +
 +    switch (dst->type) {
 +        case GGML_TYPE_F32: {
@@ -1046,11 +1050,20 @@ index cfb0f94..7c38ca6 100644
 +                GGML_ASSERT(ggml_are_same_shape(src, dst));
 +                GGML_ASSERT(ggml_is_contiguous(src));
 +                ggml_backend_tensor_get(src, tmp.data(), 0, nbytes);
-+                for (int64_t j = 0; j < nelem; ++j) {
-+                    accum[j] += tmp[j];
-+                }
++            for (int64_t j = 0; j < nelem; ++j) {
++                accum[j] += tmp[j];
 +            }
-+            ggml_backend_tensor_set(dst, accum.data(), 0, nbytes);
++        }
++            if (mirror_reduce) {
++                for (int i = 0; i < n_src; ++i) {
++                    ggml_tensor * src = dst->src[i];
++                    if (src) {
++                        ggml_backend_tensor_set(src, accum.data(), 0, nbytes);
++                    }
++                }
++            } else {
++                ggml_backend_tensor_set(dst, accum.data(), 0, nbytes);
++            }
 +            return GGML_STATUS_SUCCESS;
 +        }
 +        case GGML_TYPE_F16: {
@@ -1073,7 +1086,16 @@ index cfb0f94..7c38ca6 100644
 +            for (int64_t j = 0; j < nelem; ++j) {
 +                out[j] = ggml_fp32_to_fp16(accum[j]);
 +            }
-+            ggml_backend_tensor_set(dst, out.data(), 0, nbytes);
++            if (mirror_reduce) {
++                for (int i = 0; i < n_src; ++i) {
++                    ggml_tensor * src = dst->src[i];
++                    if (src) {
++                        ggml_backend_tensor_set(src, out.data(), 0, nbytes);
++                    }
++                }
++            } else {
++                ggml_backend_tensor_set(dst, out.data(), 0, nbytes);
++            }
 +            return GGML_STATUS_SUCCESS;
 +        }
 +        default:
@@ -1102,7 +1124,7 @@ index cfb0f94..7c38ca6 100644
      if (reuse) {
          rpc_msg_graph_recompute_req request;
          request.device = rpc_ctx->device;
-@@ -886,7 +1471,6 @@ static enum ggml_status ggml_backend_rpc_graph_compute(ggml_backend_t backend, g
+@@ -886,7 +1493,6 @@ static enum ggml_status ggml_backend_rpc_graph_compute(ggml_backend_t backend, g
          bool status = send_rpc_cmd(sock, RPC_CMD_GRAPH_RECOMPUTE, &request, sizeof(request));
          RPC_STATUS_ASSERT(status);
      } else {
@@ -1110,7 +1132,7 @@ index cfb0f94..7c38ca6 100644
          std::vector<uint8_t> input;
          serialize_graph(rpc_ctx->device, cgraph, input);
          auto sock = get_socket(rpc_ctx->endpoint);
-@@ -904,12 +1488,23 @@ GGML_CALL static bool ggml_backend_rpc_supports_op(ggml_backend_t backend, const
+@@ -904,12 +1510,23 @@ GGML_CALL static bool ggml_backend_rpc_supports_op(ggml_backend_t backend, const
  }
  
  GGML_CALL static bool ggml_backend_rpc_supports_buft(ggml_backend_t backend, ggml_backend_buffer_type_t buft) {
@@ -1138,7 +1160,7 @@ index cfb0f94..7c38ca6 100644
  }
  
  static ggml_backend_i ggml_backend_rpc_interface = {
-@@ -968,6 +1563,58 @@ GGML_API GGML_CALL ggml_backend_buffer_type_t ggml_backend_rpc_buffer_type(const
+@@ -968,6 +1585,58 @@ GGML_API GGML_CALL ggml_backend_buffer_type_t ggml_backend_rpc_buffer_type(const
      return buft;
  }
  
@@ -1197,7 +1219,7 @@ index cfb0f94..7c38ca6 100644
  // backend registry
  GGML_CALL static ggml_backend_t ggml_backend_reg_rpc_init(const char* params, void* user_data) {
      auto rpc_ctx = (ggml_backend_rpc_buffer_type_context *) user_data;
-@@ -1002,6 +1649,7 @@ GGML_CALL ggml_backend_t ggml_backend_rpc_init(const char * endpoint, uint32_t d
+@@ -1002,6 +1671,7 @@ GGML_CALL ggml_backend_t ggml_backend_rpc_init(const char * endpoint, uint32_t d
          /* .device   = */ device,
          /* .name     = */ dev_name,
          /* .gc       = */ {},
@@ -1205,7 +1227,7 @@ index cfb0f94..7c38ca6 100644
      };
  
      ggml_backend_t backend = new ggml_backend {
-@@ -1236,6 +1884,17 @@ ggml_tensor * rpc_server::deserialize_tensor(struct ggml_context * ctx, const rp
+@@ -1236,6 +1906,17 @@ ggml_tensor * rpc_server::deserialize_tensor(struct ggml_context * ctx, const rp
          uint64_t buffer_start = (uint64_t) ggml_backend_buffer_get_base(result->buffer);
          uint64_t buffer_size = (uint64_t) ggml_backend_buffer_get_size(result->buffer);
          GGML_ASSERT(tensor->data + tensor_size >= tensor->data); // check for overflow
@@ -1223,7 +1245,7 @@ index cfb0f94..7c38ca6 100644
          GGML_ASSERT(tensor->data >= buffer_start && tensor->data + tensor_size <= buffer_start + buffer_size);
      }
  
-@@ -1251,6 +1910,11 @@ ggml_tensor * rpc_server::deserialize_tensor(struct ggml_context * ctx, const rp
+@@ -1251,6 +1932,11 @@ ggml_tensor * rpc_server::deserialize_tensor(struct ggml_context * ctx, const rp
  
  
  bool rpc_server::set_tensor(const std::vector<uint8_t>& input) {
@@ -1235,7 +1257,7 @@ index cfb0f94..7c38ca6 100644
      // serialization format: | rpc_tensor | offset (8 bytes) | data (size bytes) |
      if (input.size() < sizeof(rpc_tensor) + sizeof(uint64_t)) {
          return false;
-@@ -1274,6 +1938,15 @@ bool rpc_server::set_tensor(const std::vector<uint8_t>& input) {
+@@ -1274,6 +1960,15 @@ bool rpc_server::set_tensor(const std::vector<uint8_t>& input) {
          return false;
      }
      LOG_DBG("[%s] buffer: %p, data: %p, offset: %" PRIu64 ", size: %zu\n", __func__, (void*)tensor->buffer, tensor->data, offset, size);
@@ -1251,7 +1273,7 @@ index cfb0f94..7c38ca6 100644
  
      // sanitize tensor->data
      {
-@@ -1281,8 +1954,10 @@ bool rpc_server::set_tensor(const std::vector<uint8_t>& input) {
+@@ -1281,8 +1976,10 @@ bool rpc_server::set_tensor(const std::vector<uint8_t>& input) {
          const size_t p1 = p0 + ggml_backend_buffer_get_size(tensor->buffer);
  
          if (in_tensor->data + offset < p0 || in_tensor->data + offset >= p1 || size >(p1 - in_tensor->data - offset)) {
@@ -1264,7 +1286,7 @@ index cfb0f94..7c38ca6 100644
              return false;
          }
      }
-@@ -1299,6 +1974,11 @@ bool rpc_server::set_tensor(const std::vector<uint8_t>& input) {
+@@ -1299,6 +1996,11 @@ bool rpc_server::set_tensor(const std::vector<uint8_t>& input) {
          printf("[%s] saved to '%s'\n", __func__, cache_file.c_str());
      }
      ggml_backend_tensor_set(tensor, data, offset, size);
@@ -1276,7 +1298,7 @@ index cfb0f94..7c38ca6 100644
      return true;
  }
  
-@@ -1365,6 +2045,11 @@ bool rpc_server::set_tensor_hash(const rpc_msg_set_tensor_hash_req& request, rpc
+@@ -1365,6 +2067,11 @@ bool rpc_server::set_tensor_hash(const rpc_msg_set_tensor_hash_req& request, rpc
  }
  
  bool rpc_server::init_tensor(const rpc_msg_init_tensor_req& request) {
@@ -1288,7 +1310,7 @@ index cfb0f94..7c38ca6 100644
      struct ggml_init_params params {
          /*.mem_size   =*/ ggml_tensor_overhead(),
              /*.mem_buffer =*/ NULL,
-@@ -1383,7 +2068,22 @@ bool rpc_server::init_tensor(const rpc_msg_init_tensor_req& request) {
+@@ -1383,7 +2090,22 @@ bool rpc_server::init_tensor(const rpc_msg_init_tensor_req& request) {
      // Call the backend's buffer_init_tensor function
      ggml_backend_buffer_t buffer = tensor->buffer;
      if (buffer && buffer->iface.init_tensor) {
@@ -2706,7 +2728,7 @@ index c0ece49..2325e30 100644
  #endif
 -
 diff --git a/src/graphs/build_minimaxm2.cpp b/src/graphs/build_minimaxm2.cpp
-index 07497c7..352097f 100644
+index 07497c7..7ce1a89 100644
 --- a/src/graphs/build_minimaxm2.cpp
 +++ b/src/graphs/build_minimaxm2.cpp
 @@ -2,6 +2,9 @@
@@ -2727,7 +2749,7 @@ index 07497c7..352097f 100644
  
          cur = inpL;
  
-@@ -49,11 +53,34 @@ ggml_cgraph* llm_build_context::build_minimaxm2() {
+@@ -49,11 +53,38 @@ ggml_cgraph* llm_build_context::build_minimaxm2() {
              GGML_ASSERT(wq->n_device == q_norm->n_device && wq->n_device == k_norm->n_device && wq->n_device == attn_norm->n_device);
              auto kl = (ggml_split_tensor_t *)kv_self.k_l[il]->extra;
              auto vl = (ggml_split_tensor_t *)kv_self.v_l[il]->extra;
@@ -2735,6 +2757,10 @@ index 07497c7..352097f 100644
              GGML_ASSERT(wq->n_device == kl->n_device && wq->n_device == vl->n_device);
 +            static const bool graph_branch_ffn = []() {
 +                const char * env = getenv("GGML_MINIMAX_GRAPH_BRANCH_FFN");
++                return env && strcmp(env, "0") != 0;
++            }();
++            static const bool no_defer_reduce = []() {
++                const char * env = getenv("GGML_MINIMAX_NO_DEFER_REDUCE");
 +                return env && strcmp(env, "0") != 0;
 +            }();
 +
@@ -2762,7 +2788,7 @@ index 07497c7..352097f 100644
              bool input_added = false;
              for (int id = 0; id < n_device; ++id) {
                  if (!wq->splits[id]) continue;
-@@ -146,16 +173,43 @@ ggml_cgraph* llm_build_context::build_minimaxm2() {
+@@ -146,16 +177,43 @@ ggml_cgraph* llm_build_context::build_minimaxm2() {
                               ggml_row_size( vl->splits[id]->type, n_embd_head_v), 0);
                  cb(v, "v", il_id);
  
@@ -2813,7 +2839,7 @@ index 07497c7..352097f 100644
  
                  if (il == n_layer - 1 && n_tokens > 1 && inp_out_ids) {
                      cur = ggml_get_rows(ctx0, cur, inp_out_ids);
-@@ -178,13 +232,55 @@ ggml_cgraph* llm_build_context::build_minimaxm2() {
+@@ -178,13 +236,57 @@ ggml_cgraph* llm_build_context::build_minimaxm2() {
                  if (cur->ne[1] > 32 && lctx.cparams.reduce_type != GGML_TYPE_F32) {
                      cur = ggml_cast(ctx0, cur, lctx.cparams.reduce_type);
                  }
@@ -2858,7 +2884,7 @@ index 07497c7..352097f 100644
 -            cb(cur, "attn_combined", il);
 +            if (graph_branch_ffn) {
 +                cur = ggml_reduce(ctx0, branch_ffn.data(), n_device, GGML_OP_ADD);
-+                if (il < n_layer - 1) {
++                if (!no_defer_reduce && il < n_layer - 1) {
 +                    cur->op_params[3] = 1;
 +                }
 +                cb(cur, "moe_ffn_combined", il);
@@ -2868,13 +2894,15 @@ index 07497c7..352097f 100644
 +                ffn_already_built = true;
 +            } else {
 +                cur = ggml_reduce(ctx0, attn.data(), n_device, GGML_OP_ADD);
-+                cur->op_params[3] = 1;
++                if (!no_defer_reduce) {
++                    cur->op_params[3] = 1;
++                }
 +                cb(cur, "attn_combined", il);
 +            }
  
          } else {
              cur = llm_build_norm(ctx0, inpL, hparams, model.layers[il].attn_norm, NULL, LLM_NORM_RMS, cb, il);
-@@ -238,17 +334,19 @@ ggml_cgraph* llm_build_context::build_minimaxm2() {
+@@ -238,17 +340,19 @@ ggml_cgraph* llm_build_context::build_minimaxm2() {
              cb(cur, "ffn_inp", il);
          }
  
@@ -2906,7 +2934,7 @@ index 07497c7..352097f 100644
          cur = lctx.cvec.apply_to(ctx0, cur, il);
          cb(cur, "l_out", il);
 diff --git a/src/llama-build-context.cpp b/src/llama-build-context.cpp
-index 9a3c245..063933b 100644
+index 9a3c245..73d3a50 100644
 --- a/src/llama-build-context.cpp
 +++ b/src/llama-build-context.cpp
 @@ -9,6 +9,8 @@
@@ -2918,15 +2946,26 @@ index 9a3c245..063933b 100644
  
  uint32_t llm_build_context::llama_kv_qnext_state_slots(const llama_kv_cache & kv_self) {
      uint32_t n_slots = 0;
-@@ -706,7 +708,7 @@ ggml_tensor * llm_build_context::get_input_tensor_sm_graph(ggml_context * ctx, g
+@@ -697,6 +699,9 @@ ggml_tensor * llm_build_context::llm_build_norm(
+ ggml_tensor * llm_build_context::get_input_tensor_sm_graph(ggml_context * ctx, ggml_tensor * input, int id) {
+     auto cur = input;
+     if (input->op == GGML_OP_REDUCE) {
++        if (input->op_params[3] != 1) {
++            return input;
++        }
+         auto view_src = input->view_src;
+         GGML_ASSERT(view_src);
+         cur = input->src[id];
+@@ -706,9 +711,6 @@ ggml_tensor * llm_build_context::get_input_tensor_sm_graph(ggml_context * ctx, g
              input->src[id] = cur;
              input->op_params[4] |= (1u << id);
          }
 -        else if (cur == view_src) {
-+        else if (cur == view_src && input->op_params[3] != 1) {
-             cur = input;
-         }
+-            cur = input;
+-        }
      }
+     return cur;
+ }
 @@ -771,7 +773,11 @@ ggml_tensor * llm_build_context::llm_build_ffn(
              if (!split_u) continue;
              auto cur = get_input_tensor_sm_graph(ctx, input, id);
@@ -2953,7 +2992,7 @@ index 9a3c245..063933b 100644
              cur->op_params[GGML_MAX_OP_PARAMS / sizeof(int32_t) - 1] = 0xff;
          }
          GGML_ASSERT(!split_gate_inp_b  || split_gate_inp_b->splits[id]);
-@@ -1512,13 +1522,38 @@ llm_expert_gating_func_type   gating_op,
+@@ -1512,13 +1522,42 @@ llm_expert_gating_func_type   gating_op,
      }
      GGML_ASSERT(last_id >= 0);
      if (add_input) {
@@ -2974,7 +3013,11 @@ index 9a3c245..063933b 100644
 +        }
 +    }
 +
-+    const bool defer_reduce = il < (int) lctx.model.hparams.n_layer - 1;
++    static const bool no_defer_reduce = []() {
++        const char * env = getenv("GGML_MINIMAX_NO_DEFER_REDUCE");
++        return env && strcmp(env, "0") != 0;
++    }();
++    const bool defer_reduce = !no_defer_reduce && il < (int) lctx.model.hparams.n_layer - 1;
 +    if (defer_reduce) {
 +        for (int id = 0; id < n_device; ++id) {
 +            if (results[id]) {

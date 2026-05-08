@@ -43,6 +43,7 @@ MiniMax M2.7 UD-IQ4_XS path:
 - Current MiniMax best: `16.384 tok/s` for `p0/n64/r3` after the corrected RPC device map and `-nkvo 0`, with conservative SYCL `MOE_FUSED_UP_GATE`, fused MoE, merged gate/up experts (`-muge 1`), and experimental SYCL `MUL_MULTI_ADD`. LocalMaxxing `cmowft2hr000oo3019is4snoq`.
 - Direct single-process SYCL MiniMax is blocked on a regular SYCL model-buffer allocation during `llm_load_tensors`. Even an uneven split plus `-b 512` fails on a 19.028 GB allocation on GPU0 despite full reported VRAM. The process-per-GPU RPC layout remains the valid path until regular model buffers can be chunked or routed through the split/pool allocator.
 - Layer placement is only a small/noisy lever: one-repeat `p0/n64` sweep topped out at `16.358 tok/s` with `-ts 0.8/1.05/1.05/1.1`, below the existing `16.384 tok/s` three-repeat best.
+- Quality-correct MiniMax graph mode now executes with forced real reductions at nonlinear boundaries, but it is diagnostic only: `GGML_MINIMAX_NO_DEFER_REDUCE=1` plus `GGML_RPC_REDUCE_MIRROR=1` reached only `2.034 tok/s` for a one-token smoke. The earlier faster branch-fused graph path remains unpromoted because deferred reductions can cross RMSNorm/router/MoE and change the math.
 
 INT4 AutoRound path:
 
@@ -78,7 +79,7 @@ vLLM/XPU FP8 work:
 - Multi-card Q4_0 improves through async tensor copies, direct allreduce, Q8 activation caching, graph fusions, fused small projections, and safe allreduce+ADD scheduling. Root-residual fused allreduce+ADD is a promising performance ceiling but is not quality-cleared until its ordering hazard with meta allreduce-add is fixed. Four-card scaling still regresses because each token pays many small 20 KiB reductions and narrower row shards lose matvec efficiency.
 - Timing hooks show synchronized allreduce cost rises sharply with GPU count: roughly `1.718 ms/token` on 2 GPUs, `5.732 ms/token` on 3 GPUs, and `10.605 ms/token` on 4 GPUs for the same reduction pattern.
 - Four-GPU root/order/topology sweeps are not enough; the next useful work is reducing the number of reductions or fusing delayed reductions through safe graph regions.
-- MiniMax M2.7 is now past the pure-capacity stage by using one RPC process per B70. The working baseline is 16.384 tok/s, but the >30 tok/s target likely requires true graph/tensor/expert parallelism or replacing the conservative SYCL `MOE_FUSED_UP_GATE` decomposition and naive fused `MUL_MULTI_ADD` attempt with a layout-aware active-expert combine kernel.
+- MiniMax M2.7 is now past the pure-capacity stage by using one RPC process per B70. The working baseline is 16.384 tok/s. The quality-correct graph diagnostic shows real reduce/broadcast must happen before nonlinear boundaries, and the current client-side RPC implementation is too slow. The >30 tok/s target likely requires improving layer-mode local kernels, implementing a lower-overhead active-expert combine path, or designing graph/tensor parallelism around a much cheaper collective.
 
 ## Current Next Steps
 
@@ -88,4 +89,4 @@ vLLM/XPU FP8 work:
 4. Use static FP8 TP4 with patched XPU FA2 as the best high-fidelity four-card path for now.
 5. Keep PP2 x TP2 as a capacity fallback for larger models, not a speed path for Qwen3.6 27B.
 6. Mine Intel `llm-scaler` for reduce-scatter/all-gather, fused output-kernel, Gated DeltaNet, and speculative/MTP ideas, but do not assume it will run directly on Arc/B70.
-7. For MiniMax, keep the process-per-GPU RPC layout as the capacity baseline while turning the newly working SYCL fused-MoE path into a lower-level active-expert kernel and investigating quality-correct graph/tensor/expert parallelism. Direct SYCL needs chunked regular model-buffer allocation before it is usable.
+7. For MiniMax, keep the process-per-GPU RPC layout as the capacity baseline while turning the newly working SYCL fused-MoE path into a lower-level active-expert kernel. Treat naive graph split as diagnostic until reduce/broadcast can move off the host-mediated RPC path. Direct SYCL needs chunked regular model-buffer allocation before it is usable.
