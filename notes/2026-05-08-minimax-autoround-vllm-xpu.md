@@ -243,13 +243,24 @@ patches/vllm-minimax-qknorm-passmanager-xpu-guard-20260508.patch
 
 Interpretation: QK-norm fusion is not currently a MiniMax/XPU speed path. The guard patch prevents a crash, but a useful optimization needs an XPU implementation of `minimax_allreduce_rms_qk` or an equivalent fused collective+RMS kernel.
 
+Eager-mode check:
+
+```text
+p64/n16, TP4, pidfd, P2P=1, --enforce-eager:
+56.113901 total tok/s, 11.22 output tok/s
+log: /home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p64n16-20260508T175150Z.log
+json: /home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p64n16-20260508T175150Z.json
+```
+
+Interpretation: negative. Upstream Intel wNa16 docs recommend eager in some contexts, but for this MiniMax AutoRound TP4 path it disables torch.compile/CUDAGraphs and regresses versus the compiled `pidfd/P2P=1` p64 smoke (`68.171339` total, `13.63` output).
+
 ## Open Items
 
 - Submit useful AutoRound results as diagnostic records, while keeping the current GGUF path as the higher-performance MiniMax route.
 - Keep `CCL_ZE_IPC_EXCHANGE=pidfd` as the current vLLM/XPU default; sockets is slower in the p64 smoke and earlier p512 run.
 - Keep `CCL_TOPO_P2P_ACCESS=1`; `0` was slightly slower in the p64 smoke. Treat `CCL_TOPO_FABRIC_VERTEX_CONNECTION_CHECK=0` as neutral/diagnostic because it improved p512 output only from `19.85` to `19.89` tok/s while overriding topology validation.
 - Treat `VLLM_XPU_ENABLE_XPU_GRAPH=1` as negative for TP4 MiniMax AutoRound until vLLM can capture communication ops or split capture around collectives.
-- Try `--enforce-eager` if the compiled path keeps failing; upstream Intel quantization docs currently recommend eager for wNa16.
+- Treat `--enforce-eager` as negative for this path unless the compiled path starts failing; it regressed p64/n16 to `56.113901` total tok/s and `11.22` output tok/s.
 - Treat `--compilation-config '{"mode":3,"pass_config":{"fuse_minimax_qk_norm":true}}'` as blocked on XPU because this build lacks `torch.ops._C.minimax_allreduce_rms_qk`; implement or port that fused op before retesting for speed.
 - Add or tune a B70 MoE config file for `E=256,N=384,device_name=Intel(R)_Graphics_[0xe223],dtype=int4_w4a16.json`; an AMD-derived seed regressed to `1.73` output tok/s on p64/n16.
 - Consider moving the AutoRound model to NVMe if iteration time, not decode speed, becomes the limiting factor.

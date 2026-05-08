@@ -128,6 +128,21 @@
       "interpretation": "Neutral diagnostic. p512 output is only 0.04 tok/s above the accepted pidfd result, so this was not promoted or submitted."
     },
     {
+      "name": "p64_n16_pidfd_p2p1_enforce_eager",
+      "prompt_tokens": 64,
+      "output_tokens": 16,
+      "context_length": 512,
+      "tensor_parallel": 4,
+      "ccl_ze_ipc_exchange": "pidfd",
+      "ccl_topo_p2p_access": 1,
+      "enforce_eager": true,
+      "tok_s_total": 56.113901,
+      "tok_s_output": 11.22,
+      "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p64n16-20260508T175150Z.log",
+      "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p64n16-20260508T175150Z.json",
+      "interpretation": "Negative. Eager mode disables torch.compile and regresses versus the compiled pidfd/P2P=1 path."
+    },
+    {
       "name": "p64_n16_amd_moe_seed_rejected",
       "prompt_tokens": 64,
       "output_tokens": 16,
@@ -181,6 +196,6 @@
     "Tune or supply a B70 int4_w4a16 MoE config for E=256,N=384; AMD-derived seeds were rejected or slower.",
     "Implement or port an XPU equivalent of minimax_allreduce_rms_qk before retesting MiniMax QK norm fusion.",
     "Keep pidfd IPC and P2P=1 as defaults. Treat P2P=0 as negative and topology-check disable as neutral diagnostic.",
-    "Keep GGUF RPC+SYCL as the faster current MiniMax path until AutoRound exceeds it."
+    "Treat enforce-eager as negative for MiniMax AutoRound unless compiled mode starts failing."
   ]
 }

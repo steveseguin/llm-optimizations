@@ -41,7 +41,7 @@ Elementwise fused-op fixes are not enough. Fused RMSNorm is functional but neutr
    - Keep `CCL_ZE_IPC_EXCHANGE=pidfd`, `CCL_ATL_TRANSPORT=ofi` as the current best XPU env. `pidfd` produced `19.85` output tok/s and `99.231127` total tok/s at p512/n128, LocalMaxxing `cmox6tys30085ml0125gihg18`.
    - Compare `CCL_TOPO_P2P_ACCESS=1` and `0` if the model gets through load.
    - If TP4 fails in kernels, capture the exact unsupported op and inspect vLLM/INC/AutoRound dispatch.
-   - Try `--enforce-eager` if the compiled path fails; current Intel wNa16 vLLM docs recommend eager for Intel GPU/CPU.
+   - Treat `--enforce-eager` as negative while compiled mode works; it regressed p64/n16 to `56.113901` total tok/s and `11.22` output tok/s.
    - Treat MiniMax QK-norm compile fusion as blocked on this XPU build. The flag is accepted, but `torch.ops._C.minimax_allreduce_rms_qk` is absent; the pass-manager crash was patched locally in `patches/vllm-minimax-qknorm-passmanager-xpu-guard-20260508.patch`.
    - Treat `VLLM_XPU_ENABLE_XPU_GRAPH=1` as negative for this TP4 path because vLLM disables graph capture around communication ops.
    - Treat `CCL_TOPO_P2P_ACCESS=0` as negative; p64/n16 with `pidfd` fell to `62.410028` total tok/s and `12.48` output tok/s versus `68.171339` and `13.63` with P2P=1.
