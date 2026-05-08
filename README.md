@@ -17,8 +17,9 @@ Reproducibility notes, benchmark payloads, and local patches from the Intel Arc 
 - FP8 MTP with a hybrid static target plus dynamic block-FP8 `mtp.safetensors` now loads cleanly with an opt-in local vLLM patch, but the corrected MTP path is too slow (`2.36 tok/s` eager smoke, `1.84 tok/s` compiled smoke) and is not a LocalMaxxing result.
 - Earlier strongest raw speed result was an INT4 AutoRound model variant, not the Q4_0 GGUF. It improves speed substantially but has quantization quality tradeoffs relative to FP8/BF16.
 - 2026-05-05 follow-ups were negative: Q4 small-F32 allreduce regressed, FP8 TP2/PP2 was not competitive for batch-1 speed, the oneCCL topology override regressed, and MiniMax `MUL_MAT_ID` masking only moved the failure to coarse buffer allocation.
-- MiniMax M2.7 UD-IQ4_XS now has a valid four-B70 working baseline and a first fused-MoE SYCL improvement. The original process-per-GPU RPC+SYCL baseline reached 13.754 tok/s for `p0/n64`; the current best is 13.990 tok/s with local SYCL `MOE_FUSED_UP_GATE`, merged gate/up expert tensors (`-muge 1`), runtime repack, CPU KV, and experimental SYCL `MUL_MULTI_ADD`. This bypasses the single-process Level Zero aggregate allocation ceiling, but it is still well short of the >30 tok/s target. LocalMaxxing accepted the current best as `cmovxb67400g6p10100by6frn`.
-- The next MiniMax performance blocker is no longer unsupported fused up-gate dispatch; it is fused expert throughput. The first SYCL `MOE_FUSED_UP_GATE` implementation internally reuses `MUL_MAT_ID` and then applies gate activation/multiply, so it is a correctness/scheduling unlock rather than the final low-level kernel. The next step is a layout-aware fused active-expert matvec/combine path that avoids repeated temporary buffers and per-expert tiny launches.
+- MiniMax M2.7 UD-IQ4_XS now has a valid four-B70 working baseline and a first KV-offload improvement. The original process-per-GPU RPC+SYCL baseline reached 13.754 tok/s for `p0/n64`; the current best is 16.384 tok/s with the corrected RPC device map, `-nkvo 0`, local SYCL `MOE_FUSED_UP_GATE`, merged gate/up expert tensors (`-muge 1`), runtime repack, and experimental SYCL `MUL_MULTI_ADD`. LocalMaxxing accepted this result as `cmowft2hr000oo3019is4snoq`.
+- MiniMax direct single-process SYCL is still blocked: even an uneven split fails in `llm_load_tensors` on a 19.028 GB regular SYCL model-buffer allocation on GPU0. The current RPC-worker layout remains useful because it avoids that large single-process buffer path. A layer-placement sweep topped out at 16.358 tok/s, so placement is not the route to the >30 tok/s target.
+- The next MiniMax performance blocker is true speed parallelism rather than capacity. Valid layer mode has only five scheduler splits and largely marches through the four GPUs sequentially. The >30 tok/s path likely requires quality-correct graph/tensor/expert parallelism, lower-overhead cross-device reductions, or a layout-aware active-expert kernel.
 
 ## Layout
 
@@ -50,6 +51,7 @@ Reproducibility notes, benchmark payloads, and local patches from the Intel Arc 
 - `notes/2026-05-07-q4-fused-beta-alpha-experimental.md`: flat-layout Qwen35 fused `ssm_beta`/`ssm_alpha` GGUF experiment, quality-cleared with root-residual disabled.
 - `notes/2026-05-07-model-retention-cleanup.md`: model-tree cleanup record and current keep set.
 - `notes/2026-05-07-minimax-ikrpc-sycl-13tok-baseline.md`: ik_llama.cpp RPC+SYCL process-per-GPU baseline that reached 13.754 tok/s on MiniMax M2.7 UD-IQ4_XS.
+- `notes/2026-05-08-minimax-direct-sycl-and-placement.md`: direct-SYCL allocation blocker and MiniMax RPC layer-placement sweep.
 - `data/qwen36-fp8-32k-tp4-vs-pp2-20260506.json`: post-reboot Q4 sanity plus FP8 32k-context TP4 vs TP2/PP2 validation.
 - `data/q4-esimd-blockscales-20260506.json`: structured ESIMD block-loaded scale metadata screen.
 - `data/q4-active-device-row-split-20260506.json`: structured active-device row-split patch validation and negative row-split smoke.
@@ -67,6 +69,7 @@ Reproducibility notes, benchmark payloads, and local patches from the Intel Arc 
 - `data/qwen36-q4-root-residual-tp3-20260507.json`: structured root-residual TP3 performance ceiling, negative follow-up screens, LocalMaxxing IDs, and later correctness correction.
 - `data/qwen36-q4-fused-beta-alpha-20260507.json`: structured flat-layout fused beta-alpha GGUF experiment data and final no-root correctness/performance validation.
 - `data/minimax-m27-ikrpc-sycl-13tok-baseline-20260507.json`: structured MiniMax RPC+SYCL result table, command, source patches, LocalMaxxing ID, and next blockers.
+- `data/minimax-m27-direct-sycl-placement-20260508.json`: structured direct-SYCL allocation failures and layer-placement sweep.
 - `scripts/bench-qwen36-q4_0-gguf-vulkan-matrix.sh`: Q4_0 GGUF Vulkan benchmark sweep harness.
 - `scripts/bench-qwen36-q4_0-gguf-sycl-matrix.sh`: Q4_0 GGUF SYCL benchmark sweep harness.
 - `scripts/bench-qwen36-b70-single-mtp.sh`: single-B70 vLLM INT4 MTP benchmark wrapper.

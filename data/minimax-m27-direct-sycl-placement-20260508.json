@@ -1,0 +1,93 @@
+{
+  "date": "2026-05-08",
+  "host": {
+    "os": "Ubuntu 24.04.4 LTS",
+    "gpu": "Intel Arc Pro B70",
+    "gpu_count": 4,
+    "vram_gb_each": 32,
+    "cpu": "AMD EPYC 9015"
+  },
+  "model": {
+    "hf_id": "unsloth/MiniMax-M2.7-GGUF",
+    "variant": "UD-IQ4_XS",
+    "path": "/home/steve/models/minimax-m2.7-ud-iq4_xs-gguf/UD-IQ4_XS/MiniMax-M2.7-UD-IQ4_XS-00001-of-00004.gguf"
+  },
+  "direct_sycl_attempts": [
+    {
+      "label": "direct-sycl-even",
+      "status": 134,
+      "tensor_split": "1/1/1/1",
+      "batch_size": 2048,
+      "failed_allocation_bytes": 27676983296,
+      "log": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/direct-sycl-layer-kvoffloadon-p0n16-20260508T055147Z.log",
+      "interpretation": "Single-process direct SYCL failed in llm_load_tensors on a large regular SYCL backend model-buffer allocation."
+    },
+    {
+      "label": "direct-sycl-uneven",
+      "status": 134,
+      "tensor_split": "0.7/1.1/1.1/1.1",
+      "batch_size": 2048,
+      "failed_allocation_bytes": 19027926016,
+      "log": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/direct-sycl-layer-uneven070111111-p0n16-20260508T055244Z.log",
+      "interpretation": "Uneven placement reduced the regular model-buffer allocation size but did not avoid the Level Zero allocation failure."
+    },
+    {
+      "label": "direct-sycl-uneven-b512",
+      "status": 134,
+      "tensor_split": "0.7/1.1/1.1/1.1",
+      "batch_size": 512,
+      "failed_allocation_bytes": 19027926016,
+      "log": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/direct-sycl-layer-b512-uneven070111111-p0n16-20260508T055408Z.log",
+      "interpretation": "Lowering llama-bench batch size did not change the failed regular model-buffer allocation."
+    }
+  ],
+  "rpc_layer_placement_sweep": {
+    "summary_tsv": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/rpc-layer-placement-sweep-r1-p0n64-20260508T055509Z.tsv",
+    "common_flags": "-p 0 -n 64 -r 1 -ngl 99 -sm layer -fa 0 -nkvo 0 -ub 32 -ctk f16 -ctv f16 -t 4 -w 0 -mmp 1 -rtr 1 -fmoe 1 -no-mmad 0 -muge 1 -sas 0",
+    "results": [
+      {
+        "label": "even",
+        "tensor_split": "1/1/1/1",
+        "tok_s_out": 15.625353,
+        "json": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/rpc-layer-placement-even-r1-p0n64-20260508T055509Z.jsonl"
+      },
+      {
+        "label": "light0",
+        "tensor_split": "0.8/1.05/1.05/1.1",
+        "tok_s_out": 16.358185,
+        "json": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/rpc-layer-placement-light0-r1-p0n64-20260508T055509Z.jsonl"
+      },
+      {
+        "label": "heavy0",
+        "tensor_split": "1.15/1.0/1.0/0.85",
+        "tok_s_out": 16.222051,
+        "json": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/rpc-layer-placement-heavy0-r1-p0n64-20260508T055509Z.jsonl"
+      },
+      {
+        "label": "light3",
+        "tensor_split": "1.1/1.05/1.05/0.8",
+        "tok_s_out": 16.219277,
+        "json": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/rpc-layer-placement-light3-r1-p0n64-20260508T055509Z.jsonl"
+      },
+      {
+        "label": "heavy3",
+        "tensor_split": "0.85/1.0/1.0/1.15",
+        "tok_s_out": 16.260938,
+        "json": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/rpc-layer-placement-heavy3-r1-p0n64-20260508T055509Z.jsonl"
+      }
+    ],
+    "best_prior_valid_result": {
+      "tok_s_out": 16.383602,
+      "repeat_count": 3,
+      "tensor_split": "1/1/1/1",
+      "localmaxxing_id": "cmowft2hr000oo3019is4snoq",
+      "json": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/rpc-layer-devmapfix-kvoffloadon-r3-p0n64-20260508T044347Z.jsonl"
+    },
+    "conclusion": "Placement affects MiniMax layer-mode throughput only modestly. It did not produce a new valid result and is not the path to 30 tok/s."
+  },
+  "next_actions": [
+    "Keep RPC layer mode as the valid MiniMax baseline.",
+    "Treat direct SYCL as blocked on regular model-buffer allocation.",
+    "Focus future MiniMax speed work on quality-correct graph/tensor/expert parallelism and lower-level active-expert kernels."
+  ]
+}
