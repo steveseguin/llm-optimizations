@@ -50,6 +50,7 @@ Elementwise fused-op fixes are not enough. Fused RMSNorm is functional but neutr
    - Keep the hybrid B70 MoE config as the current best vLLM/XPU MiniMax setting. It uses tuned key `1` plus default prompt-size keys `64`, `256`, and `512`, and improved p512/n128 from `19.85` to `20.11` output tok/s (`100.538158` total), LocalMaxxing `cmox94fsm0095ml01tjeb20rr`.
    - Do not rely on the decode-only key `1` config by itself. It made the standalone MoE microbench slightly faster, but p64/n16 fell to `67.725172` total and `13.55` output tok/s because prompt shapes reused the decode config.
    - Retune larger prompt-size MoE configs only if microbench screening shows a stronger gain than default. The first B70 tune is a useful proof, but the remaining 30 tok/s gap is not just MoE tile selection.
+   - Treat `--enable-expert-parallel` as negative/blocked for 4x B70 single-session MiniMax. Untuned EP fell to `3.75` output tok/s on p64/n16; the EP-specific MoE tune improved the standalone `E=64,N=1536` kernel but OOMed during model initialization with the tuned config.
    - If TP4 OOMs or stalls, try reduced `max_model_len`, `max_num_batched_tokens`, and possibly TP2 just to isolate the failure mode.
 2. GGUF attention/KV:
    - Add op timing around attention-side `CPY`, `ROPE`, `SOFT_MAX`, and `MUL_MAT` nodes.

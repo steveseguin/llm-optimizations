@@ -296,11 +296,42 @@ LocalMaxxing: cmox94fsm0095ml01tjeb20rr
 
 Interpretation: small positive. This moves the current MiniMax AutoRound high from `19.85` to `20.11` output tok/s and from `99.231127` to `100.538158` total tok/s. It is not enough to explain the full gap to the 30 tok/s target, but it proves that B70-specific MoE configs are active and can move end-to-end throughput.
 
+## Expert Parallel Check
+
+vLLM exposes `--enable-expert-parallel`, and it is functional on this stack. With TP4 it shards MiniMax experts to `64` local / `256` global experts per rank:
+
+```text
+p64/n16, TP4, pidfd, P2P=1, --enable-expert-parallel:
+18.744070 total tok/s, 3.75 output tok/s
+log: /home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p64n16-20260508T183643Z.log
+json: /home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p64n16-20260508T183643Z.json
+```
+
+Interpretation: negative. EP greatly underperforms the TP4 non-EP path for batch-1 single-session decode. The likely bottleneck is all2all/expert-parallel scheduling overhead, not raw expert weight memory.
+
+An EP-specific `E=64,N=1536` pruned MoE tune did find a much faster standalone decode kernel:
+
+```text
+default EP M=1 MoE kernel: ~723 us
+tuned EP M=1 MoE kernel: ~277 us
+config: configs/vllm/minimax-m27-b70-int4-w4a16-moe-ep-negative-20260508.json
+```
+
+However, the model-level run with that EP config failed during initialization:
+
+```text
+torch.OutOfMemoryError: XPU out of memory. Tried to allocate 144.00 MiB.
+log: /home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p64n16-20260508T184915Z.log
+```
+
+Interpretation: blocked/negative. Do not spend more full model-load cycles on EP for 4x B70 single-session MiniMax until the all2all cost and tuned-config memory behavior are understood.
+
 ## Open Items
 
 - Continue submitting useful AutoRound records. Current best is `cmox94fsm0095ml01tjeb20rr` with the hybrid B70 MoE config.
 - Keep `CCL_ZE_IPC_EXCHANGE=pidfd` as the current vLLM/XPU default; sockets is slower in the p64 smoke and earlier p512 run.
 - Keep `CCL_TOPO_P2P_ACCESS=1`; `0` was slightly slower in the p64 smoke. Treat `CCL_TOPO_FABRIC_VERTEX_CONNECTION_CHECK=0` as neutral/diagnostic because it improved p512 output only from `19.85` to `19.89` tok/s while overriding topology validation.
+- Treat `--enable-expert-parallel` as negative/blocked for TP4 single-session MiniMax on B70. Untuned EP p64/n16 reached only `3.75` output tok/s, and the tuned EP config OOMed during model initialization.
 - Treat `VLLM_XPU_ENABLE_XPU_GRAPH=1` as negative for TP4 MiniMax AutoRound until vLLM can capture communication ops or split capture around collectives.
 - Treat `--enforce-eager` as negative for this path unless the compiled path starts failing; it regressed p64/n16 to `56.113901` total tok/s and `11.22` output tok/s.
 - Treat `--compilation-config '{"mode":3,"pass_config":{"fuse_minimax_qk_norm":true}}'` as blocked on XPU because this build lacks `torch.ops._C.minimax_allreduce_rms_qk`; implement or port that fused op before retesting for speed.

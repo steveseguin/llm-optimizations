@@ -87,6 +87,7 @@ Reproducibility notes, benchmark payloads, and local patches from the Intel Arc 
 - `data/minimax-m27-fused-rmsnorm-sycl-20260508.json`: structured MiniMax fused RMSNorm implementation result.
 - `data/minimax-m27-autoround-vllm-xpu-20260508.json`: structured MiniMax AutoRound INT4 vLLM/XPU bring-up result and remaining MoE tuning blocker.
 - `configs/vllm/minimax-m27-b70-int4-w4a16-moe-hybrid-20260508.json`: hybrid B70 MoE config for MiniMax AutoRound vLLM/XPU, tuned key `1` plus default prompt-size keys.
+- `configs/vllm/minimax-m27-b70-int4-w4a16-moe-ep-negative-20260508.json`: expert-parallel MiniMax MoE config retained as a negative/blocked result after EP underperformed and the tuned-config run OOMed.
 - `scripts/bench-qwen36-q4_0-gguf-vulkan-matrix.sh`: Q4_0 GGUF Vulkan benchmark sweep harness.
 - `scripts/bench-qwen36-q4_0-gguf-sycl-matrix.sh`: Q4_0 GGUF SYCL benchmark sweep harness.
 - `scripts/bench-qwen36-b70-single-mtp.sh`: single-B70 vLLM INT4 MTP benchmark wrapper.
