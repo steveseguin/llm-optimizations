@@ -21,6 +21,7 @@ Reproducibility notes, benchmark payloads, and local patches from the Intel Arc 
 - MiniMax direct single-process SYCL is still blocked: even an uneven split fails in `llm_load_tensors` on a 19.028 GB regular SYCL model-buffer allocation on GPU0. The current RPC-worker layout remains useful because it avoids that large single-process buffer path. A layer-placement sweep topped out at 16.358 tok/s, so placement is not the route to the >30 tok/s target.
 - MiniMax quality-correct graph/tensor mode now executes with default-off `GGML_MINIMAX_NO_DEFER_REDUCE=1` and `GGML_RPC_REDUCE_MIRROR=1`, but it is diagnostic only: the one-token smoke reached 2.034 tok/s after forcing real reductions at nonlinear boundaries. The faster branch-fused graph path is not promoted because deferred partial reductions can cross RMSNorm/router/MoE boundaries and change the math.
 - MiniMax layer-mode knob screens did not find a new speed path: client `-t` is not limiting, `-fa 1` and fused RMSNorm currently abort in the SYCL RPC worker due unsupported ops, disabling fused MMAD/MoE is slower, same-type contiguous copy memcpy is neutral, and an 8-expert `MUL_MULTI_ADD` unroll regressed and was removed.
+- MiniMax CPY tracing found three repeated per-layer copy shapes. A default-off shape-specific copy fast path for those shapes regressed to 12.732 tok/s, so future CPY work should fuse producer kernels into KV/cache writes rather than replacing the copy op with standalone kernels.
 - The next MiniMax performance blocker is true speed parallelism rather than capacity. Valid layer mode has only five scheduler splits and largely marches through the four GPUs sequentially. The >30 tok/s path likely requires quality-correct graph/tensor/expert parallelism, lower-overhead cross-device reductions, or a layout-aware active-expert kernel.
 
 ## Layout
@@ -56,6 +57,7 @@ Reproducibility notes, benchmark payloads, and local patches from the Intel Arc 
 - `notes/2026-05-08-minimax-direct-sycl-and-placement.md`: direct-SYCL allocation blocker and MiniMax RPC layer-placement sweep.
 - `notes/2026-05-08-minimax-correct-graph-reduce.md`: quality-correct MiniMax graph reduce diagnostic and why host-mediated reduce/broadcast is too slow.
 - `notes/2026-05-08-minimax-layer-knob-and-kernel-screens.md`: MiniMax layer-mode runtime knob, unsupported-op, and small-kernel screens.
+- `notes/2026-05-08-minimax-cpy-shape-trace.md`: MiniMax SYCL `CPY` shape trace and negative shape-specific copy fast path.
 - `data/qwen36-fp8-32k-tp4-vs-pp2-20260506.json`: post-reboot Q4 sanity plus FP8 32k-context TP4 vs TP2/PP2 validation.
 - `data/q4-esimd-blockscales-20260506.json`: structured ESIMD block-loaded scale metadata screen.
 - `data/q4-active-device-row-split-20260506.json`: structured active-device row-split patch validation and negative row-split smoke.
@@ -76,6 +78,7 @@ Reproducibility notes, benchmark payloads, and local patches from the Intel Arc 
 - `data/minimax-m27-direct-sycl-placement-20260508.json`: structured direct-SYCL allocation failures and layer-placement sweep.
 - `data/minimax-m27-correct-graph-reduce-20260508.json`: structured corrected MiniMax graph reduce diagnostic.
 - `data/minimax-m27-layer-knob-and-kernel-screens-20260508.json`: structured MiniMax layer-mode knob and kernel screens.
+- `data/minimax-m27-cpy-shape-trace-20260508.json`: structured MiniMax `CPY` shape trace and negative fast-path test.
 - `scripts/bench-qwen36-q4_0-gguf-vulkan-matrix.sh`: Q4_0 GGUF Vulkan benchmark sweep harness.
 - `scripts/bench-qwen36-q4_0-gguf-sycl-matrix.sh`: Q4_0 GGUF SYCL benchmark sweep harness.
 - `scripts/bench-qwen36-b70-single-mtp.sh`: single-B70 vLLM INT4 MTP benchmark wrapper.

@@ -45,6 +45,7 @@ MiniMax M2.7 UD-IQ4_XS path:
 - Layer placement is only a small/noisy lever: one-repeat `p0/n64` sweep topped out at `16.358 tok/s` with `-ts 0.8/1.05/1.05/1.1`, below the existing `16.384 tok/s` three-repeat best.
 - Quality-correct MiniMax graph mode now executes with forced real reductions at nonlinear boundaries, but it is diagnostic only: `GGML_MINIMAX_NO_DEFER_REDUCE=1` plus `GGML_RPC_REDUCE_MIRROR=1` reached only `2.034 tok/s` for a one-token smoke. The earlier faster branch-fused graph path remains unpromoted because deferred reductions can cross RMSNorm/router/MoE and change the math.
 - Layer-mode follow-up screens were negative: `-t` sweep topped out at `16.307 tok/s`, `-fa 1` aborts on unsupported `FLASH_ATTN_EXT`, fused RMSNorm aborts on unsupported `FUSED_RMS_NORM`, disabling fused MMAD/MoE is slower at p0/n64, same-type contiguous copy memcpy is neutral, and an 8-expert `MUL_MULTI_ADD` unroll regressed to `13.823 tok/s` and was removed.
+- CPY tracing shows MiniMax repeats three copy shapes per layer: f32-to-f32 row-strided, contiguous f32-to-f16, and `ne0=1` strided f32-to-f16. A default-off standalone shape-specific copy fast path regressed to `12.732 tok/s`, so the next copy-related attempt should fuse producer kernels into KV/cache writes instead of replacing `CPY` with separate kernels.
 
 INT4 AutoRound path:
 

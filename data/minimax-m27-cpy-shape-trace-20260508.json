@@ -1,0 +1,65 @@
+{
+  "date": "2026-05-08",
+  "host": {
+    "os": "Ubuntu 24.04.4 LTS",
+    "gpu": "Intel Arc Pro B70",
+    "gpu_count": 4,
+    "vram_gb_each": 32,
+    "cpu": "AMD EPYC 9015"
+  },
+  "model": {
+    "hf_id": "unsloth/MiniMax-M2.7-GGUF",
+    "variant": "UD-IQ4_XS",
+    "path": "/home/steve/models/minimax-m2.7-ud-iq4_xs-gguf/UD-IQ4_XS/MiniMax-M2.7-UD-IQ4_XS-00001-of-00004.gguf"
+  },
+  "trace": {
+    "env": "GGML_SYCL_CPY_TRACE=1",
+    "run": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/rpc-layer-cpytrace-r1-p0n1-20260508T084403Z.jsonl",
+    "worker_logs": [
+      "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/rpc-b70-0.log",
+      "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/rpc-b70-1.log",
+      "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/rpc-b70-2.log",
+      "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/rpc-b70-3.log"
+    ],
+    "unique_shapes": [
+      {
+        "count": 62,
+        "src_type": "f32",
+        "dst_type": "f32",
+        "ne": [128, 48, 1, 1],
+        "src_nb": [4, 512, 512, 24576],
+        "dst_nb": [4, 24576, 24576, 24576],
+        "bytes": 24576,
+        "contiguous": "1/1"
+      },
+      {
+        "count": 62,
+        "src_type": "f32",
+        "dst_type": "f16",
+        "ne": [128, 8, 1, 1],
+        "src_nb": [4, 512, 4096, 4096],
+        "dst_nb": [2, 256, 2048, 2048],
+        "bytes": 4096,
+        "contiguous": "1/1"
+      },
+      {
+        "count": 62,
+        "src_type": "f32",
+        "dst_type": "f16",
+        "ne": [1, 1024, 1, 1],
+        "src_nb": [4096, 4, 4096, 4096],
+        "dst_nb": [2, 64, 65536, 65536],
+        "bytes": 4096,
+        "contiguous": "1/0"
+      }
+    ]
+  },
+  "fast_path_test": {
+    "env": "GGML_SYCL_CPY_MINIMAX_FAST=1",
+    "status": "negative_default_off",
+    "tok_s_out": 12.732294,
+    "json": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/rpc-layer-cpy-minimax-fast-r1-p0n64-20260508T085250Z.jsonl",
+    "conclusion": "Shape-specific standalone copy kernels regressed. Future work should fuse producers into KV/cache writes or specialize the existing generic copy path more carefully."
+  },
+  "localmaxxing": "not_submitted_negative_diagnostic"
+}
