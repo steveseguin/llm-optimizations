@@ -326,9 +326,23 @@ log: /home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-auto
 
 Interpretation: blocked/negative. Do not spend more full model-load cycles on EP for 4x B70 single-session MiniMax until the all2all cost and tuned-config memory behavior are understood.
 
+## Chunked Prefill Knob
+
+The current p512/n128 high uses `--max-num-batched-tokens 1024`. Reducing that to `512` with the same hybrid B70 MoE config regressed badly:
+
+```text
+p512/n128, TP4, pidfd, P2P=1, hybrid B70 MoE config, max_num_batched_tokens=512:
+67.835347 total tok/s, 13.57 output tok/s
+log: /home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n128-20260508T185133Z.log
+json: /home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n128-20260508T185133Z.json
+```
+
+Interpretation: negative. Keep `MAX_BATCHED_TOKENS=1024` for the p512/n128 MiniMax AutoRound benchmark shape.
+
 ## Open Items
 
 - Continue submitting useful AutoRound records. Current best is `cmox94fsm0095ml01tjeb20rr` with the hybrid B70 MoE config.
+- Keep `MAX_BATCHED_TOKENS=1024` for p512/n128; `512` is a large regression with the current hybrid MoE config.
 - Keep `CCL_ZE_IPC_EXCHANGE=pidfd` as the current vLLM/XPU default; sockets is slower in the p64 smoke and earlier p512 run.
 - Keep `CCL_TOPO_P2P_ACCESS=1`; `0` was slightly slower in the p64 smoke. Treat `CCL_TOPO_FABRIC_VERTEX_CONNECTION_CHECK=0` as neutral/diagnostic because it improved p512 output only from `19.85` to `19.89` tok/s while overriding topology validation.
 - Treat `--enable-expert-parallel` as negative/blocked for TP4 single-session MiniMax on B70. Untuned EP p64/n16 reached only `3.75` output tok/s, and the tuned EP config OOMed during model initialization.
