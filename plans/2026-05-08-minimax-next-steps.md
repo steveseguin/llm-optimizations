@@ -38,7 +38,7 @@ Elementwise fused-op fixes are not enough. Fused RMSNorm is functional but neutr
    - Current model path: `/mnt/corsair-external/llm-models/minimax-m2.7-int4-autoround`.
    - Preserve the local patch in `patches/vllm-inc-xpu-autoround-fusedmoe-wna16-20260508.patch`.
    - Use the repaired vLLM env at `/home/steve/.venvs/vllm-xpu` until the source checkout and installed package can be cleanly rebuilt.
-   - Start with llm-scaler-style XPU env: `VLLM_WORKER_MULTIPROC_METHOD=spawn`, `CCL_ZE_IPC_EXCHANGE=pidfd`, `CCL_ATL_TRANSPORT=ofi`.
+   - Keep `CCL_ZE_IPC_EXCHANGE=pidfd`, `CCL_ATL_TRANSPORT=ofi` as the current best XPU env. `pidfd` produced `19.85` output tok/s and `99.231127` total tok/s at p512/n128, LocalMaxxing `cmox6tys30085ml0125gihg18`.
    - Compare `CCL_TOPO_P2P_ACCESS=1` and `0` if the model gets through load.
    - If TP4 fails in kernels, capture the exact unsupported op and inspect vLLM/INC/AutoRound dispatch.
    - Try `--enforce-eager` if the compiled path fails; current Intel wNa16 vLLM docs recommend eager for Intel GPU/CPU.

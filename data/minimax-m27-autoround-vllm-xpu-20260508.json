@@ -52,7 +52,36 @@
       "localmaxxing_id": "cmox4zohw0077ml01czu880bz",
       "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n128-20260508T162541Z.log",
       "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n128-20260508T162541Z.json",
-      "interpretation": "Valid but slower than current GGUF MiniMax p512/n128 decode. vLLM warns that no B70-specific int4_w4a16 MoE config exists for E=256,N=384, so it uses default MoE config."
+      "interpretation": "Valid but superseded by the pidfd IPC run later the same day. vLLM warns that no B70-specific int4_w4a16 MoE config exists for E=256,N=384, so it uses default MoE config."
+    },
+    {
+      "name": "p64_n16_pidfd_ipc",
+      "prompt_tokens": 64,
+      "output_tokens": 16,
+      "context_length": 512,
+      "tensor_parallel": 4,
+      "ccl_ze_ipc_exchange": "pidfd",
+      "tok_s_total": 68.171339,
+      "tok_s_output": 13.63,
+      "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p64n16-20260508T171257Z.log",
+      "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p64n16-20260508T171257Z.json",
+      "interpretation": "Positive short smoke. pidfd avoids the sockets override and improves p64/n16 throughput."
+    },
+    {
+      "name": "p512_n128_pidfd_ipc",
+      "prompt_tokens": 512,
+      "output_tokens": 128,
+      "context_length": 2048,
+      "tensor_parallel": 4,
+      "ccl_ze_ipc_exchange": "pidfd",
+      "tok_s_total": 99.231127,
+      "tok_s_output": 19.85,
+      "peak_model_load_gb_per_gpu": 28.11,
+      "available_kv_cache_gb_per_gpu": 1.02,
+      "localmaxxing_id": "cmox6tys30085ml0125gihg18",
+      "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n128-20260508T171955Z.log",
+      "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n128-20260508T171955Z.json",
+      "interpretation": "Current best MiniMax AutoRound vLLM/XPU result. It beats the previous AutoRound p512 run and the current GGUF p512 decode figure, but still uses default MoE config, so B70 MoE tuning remains open."
     },
     {
       "name": "p64_n16_amd_moe_seed_rejected",
@@ -107,7 +136,7 @@
   "next_steps": [
     "Tune or supply a B70 int4_w4a16 MoE config for E=256,N=384; AMD-derived seeds were rejected or slower.",
     "Implement or port an XPU equivalent of minimax_allreduce_rms_qk before retesting MiniMax QK norm fusion.",
-    "Compare XPU graph, CCL IPC, and topology settings.",
+    "Keep pidfd IPC as the default, and continue topology setting comparisons.",
     "Keep GGUF RPC+SYCL as the faster current MiniMax path until AutoRound exceeds it."
   ]
 }

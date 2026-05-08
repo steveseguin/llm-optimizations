@@ -127,7 +127,24 @@ log: /home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-auto
 json: /home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n128-20260508T162541Z.json
 ```
 
-Interpretation: AutoRound is now viable but not yet competitive with the current GGUF record (`17.693021` decode tok/s at p512/n128). The log warns that vLLM is using the default MoE config because there is no B70-specific `E=256,N=384,dtype=int4_w4a16` config. That is the next optimization target.
+Interpretation: AutoRound is now viable. This first p512 run was below the GGUF record (`17.693021` decode tok/s at p512/n128), but it was later superseded by the `pidfd` IPC result below. The log warns that vLLM is using the default MoE config because there is no B70-specific `E=256,N=384,dtype=int4_w4a16` config. That remains the next optimization target.
+
+`pidfd` oneCCL IPC:
+
+```text
+p64/n16, TP4, max_model_len=512, CCL_ZE_IPC_EXCHANGE=pidfd:
+68.171339 total tok/s, 13.63 output tok/s
+log: /home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p64n16-20260508T171257Z.log
+json: /home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p64n16-20260508T171257Z.json
+
+p512/n128, TP4, max_model_len=2048, CCL_ZE_IPC_EXCHANGE=pidfd:
+99.231127 total tok/s, 19.85 output tok/s
+log: /home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n128-20260508T171955Z.log
+json: /home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n128-20260508T171955Z.json
+LocalMaxxing: cmox6tys30085ml0125gihg18
+```
+
+Interpretation: `pidfd` is the current vLLM/XPU MiniMax AutoRound default. It beats the earlier sockets/default p512 AutoRound run (`13.45` output tok/s) and the current GGUF p512 decode result (`17.693` output tok/s), while using the same AutoRound W4A16 weights and no power-limit changes. The wrapper default was changed to `CCL_IPC=pidfd`.
 
 AMD-derived MoE config seed:
 
@@ -202,7 +219,7 @@ Interpretation: QK-norm fusion is not currently a MiniMax/XPU speed path. The gu
 ## Open Items
 
 - Submit useful AutoRound results as diagnostic records, while keeping the current GGUF path as the higher-performance MiniMax route.
-- Compare `CCL_ZE_IPC_EXCHANGE=sockets` versus `pidfd`.
+- Keep `CCL_ZE_IPC_EXCHANGE=pidfd` as the current vLLM/XPU default; sockets is slower in the p64 smoke and earlier p512 run.
 - Compare `CCL_TOPO_P2P_ACCESS=1` versus `0` and, only as a diagnostic, `CCL_TOPO_FABRIC_VERTEX_CONNECTION_CHECK=0`.
 - Treat `VLLM_XPU_ENABLE_XPU_GRAPH=1` as negative for TP4 MiniMax AutoRound until vLLM can capture communication ops or split capture around collectives.
 - Try `--enforce-eager` if the compiled path keeps failing; upstream Intel quantization docs currently recommend eager for wNa16.
