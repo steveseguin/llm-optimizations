@@ -190,9 +190,29 @@
       "patch": "patches/vllm-minimax-qknorm-passmanager-xpu-guard-20260508.patch",
       "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p64n16-20260508T170331Z.log",
       "interpretation": "Blocked. vLLM accepts the pass flag, but this XPU build lacks torch.ops._C.minimax_allreduce_rms_qk. The first attempt also hit a pass-manager import guard bug, now patched locally."
+    },
+    {
+      "name": "p512_n128_pidfd_hybrid_moe_config",
+      "prompt_tokens": 512,
+      "output_tokens": 128,
+      "context_length": 2048,
+      "tensor_parallel": 4,
+      "ccl_ze_ipc_exchange": "pidfd",
+      "ccl_topo_p2p_access": 1,
+      "tuned_config": "configs/vllm/minimax-m27-b70-int4-w4a16-moe-hybrid-20260508.json",
+      "tok_s_total": 100.538158,
+      "tok_s_output": 20.11,
+      "peak_model_load_gb_per_gpu": 28.11,
+      "localmaxxing_id": "cmox94fsm0095ml01tjeb20rr",
+      "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n128-20260508T182318Z.log",
+      "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n128-20260508T182318Z.json",
+      "localmaxxing_payload": "data/localmaxxing-minimax-m27-autoround-hybrid-moe-p512n128-20260508.payload.json",
+      "localmaxxing_response": "data/localmaxxing-responses/minimax-m27-autoround-hybrid-moe-p512n128-20260508.response.json",
+      "interpretation": "Current best MiniMax AutoRound vLLM/XPU result. A hybrid B70 MoE config uses the pruned tuned M=1 int4_w4a16 config for decode and default prompt-size entries for 64/256/512, improving p512/n128 from 19.85 to 20.11 output tok/s and 99.231127 to 100.538158 total tok/s."
     }
   ],
   "next_steps": [
+    "Retune larger MiniMax MoE prompt sizes only if the microbench shows a stronger gain than default; the first hybrid config is a small positive but not enough to reach 30 tok/s.",
     "Tune or supply a B70 int4_w4a16 MoE config for E=256,N=384; AMD-derived seeds were rejected or slower.",
     "Implement or port an XPU equivalent of minimax_allreduce_rms_qk before retesting MiniMax QK norm fusion.",
     "Keep pidfd IPC and P2P=1 as defaults. Treat P2P=0 as negative and topology-check disable as neutral diagnostic.",

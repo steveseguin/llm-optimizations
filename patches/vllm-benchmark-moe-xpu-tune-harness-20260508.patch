@@ -1,0 +1,179 @@
+diff --git a/benchmarks/kernels/benchmark_moe.py b/benchmarks/kernels/benchmark_moe.py
+index 65bc38c6c..3e69e927c 100644
+--- a/benchmarks/kernels/benchmark_moe.py
++++ b/benchmarks/kernels/benchmark_moe.py
+@@ -31,6 +31,7 @@ from vllm.model_executor.layers.fused_moe.fused_moe import *
+ from vllm.model_executor.layers.fused_moe.triton_deep_gemm_moe import (
+     TritonOrDeepGemmExperts,
+ )
++from vllm.platforms import current_platform
+ from vllm.transformers_utils.config import get_config
+ from vllm.triton_utils import triton
+ from vllm.utils.argparse_utils import FlexibleArgumentParser
+@@ -306,34 +307,54 @@ def benchmark_config(
+     run()
+     torch.accelerator.synchronize()
+ 
+-    # Capture 10 invocations with CUDA graph
+-    graph = torch.cuda.CUDAGraph()
+-    with torch.cuda.graph(graph):
+-        for _ in range(10):
+-            run()
+-    torch.accelerator.synchronize()
++    if current_platform.is_cuda():
++        # Capture 10 invocations with CUDA graph.
++        graph = torch.cuda.CUDAGraph()
++        with torch.cuda.graph(graph):
++            for _ in range(10):
++                run()
++        torch.accelerator.synchronize()
+ 
+-    # Warmup
++        # Warmup.
++        for _ in range(5):
++            graph.replay()
++        torch.accelerator.synchronize()
++
++        start_event = torch.Event(enable_timing=True)
++        end_event = torch.Event(enable_timing=True)
++
++        latencies: list[float] = []
++        for i in range(num_iters):
++            prepare(i)
++            torch.accelerator.synchronize()
++
++            start_event.record()
++            graph.replay()
++            end_event.record()
++            end_event.synchronize()
++            latencies.append(start_event.elapsed_time(end_event))
++        avg = sum(latencies) / (num_iters * 10) * 1000  # us
++        graph.reset()
++        return avg
++
++    # XPU graph capture for collectives/MoE is not available in this stack.
++    # Use synchronized eager timing so the same tuning harness can still rank
++    # Triton configs on Intel GPUs.
+     for _ in range(5):
+-        graph.replay()
++        run()
+     torch.accelerator.synchronize()
+ 
+-    start_event = torch.Event(enable_timing=True)
+-    end_event = torch.Event(enable_timing=True)
+-
+-    latencies: list[float] = []
++    latencies_us: list[float] = []
+     for i in range(num_iters):
+         prepare(i)
+         torch.accelerator.synchronize()
+ 
+-        start_event.record()
+-        graph.replay()
+-        end_event.record()
+-        end_event.synchronize()
+-        latencies.append(start_event.elapsed_time(end_event))
+-    avg = sum(latencies) / (num_iters * 10) * 1000  # us
+-    graph.reset()
+-    return avg
++        start = time.perf_counter()
++        for _ in range(10):
++            run()
++        torch.accelerator.synchronize()
++        latencies_us.append((time.perf_counter() - start) * 1_000_000 / 10)
++    return sum(latencies_us) / len(latencies_us)
+ 
+ 
+ def get_rocm_tuning_space(use_fp16):
+@@ -423,6 +444,23 @@ def prune_rocm_search_space(
+     return search_space
+ 
+ 
++def prune_xpu_search_space(num_tokens, search_space, topk):
++    # MiniMax single-request decode reaches the MoE kernel as a very small
++    # routed-token GEMM. Large BLOCK_SIZE_M/GROUP_SIZE_M candidates compile and
++    # run, but make the search take hours while being poor fits for M=1 decode.
++    m_routed = num_tokens * topk
++    pruned_configs = []
++    for config in search_space:
++        block_m = config["BLOCK_SIZE_M"]
++        group_m = config["GROUP_SIZE_M"]
++        if m_routed * 2 < block_m and block_m != 16:
++            continue
++        if group_m * block_m > m_routed and group_m != 1:
++            continue
++        pruned_configs.append(config)
++    return pruned_configs
++
++
+ # The following code is inspired by ROCm/Triton GEMM tuning script:
+ # https://github.com/ROCm/triton/blob/triton-mlir/scripts/amd/gemm/tune_gemm.py#L89
+ def prune_rocm_configs(M, N, K, configs, is_fp16=True):
+@@ -522,13 +560,19 @@ def merge_unique_dicts(list1, list2):
+ @ray.remote(num_gpus=1)
+ class BenchmarkWorker:
+     def __init__(self, seed: int) -> None:
+-        torch.set_default_device("cuda")
+-        set_random_seed(seed)
+-        self.seed = seed
+         # Get the device ID to allocate tensors and kernels
+         # on the respective GPU. This is required for Ray to work
+         # correctly with multi-GPU tuning on the ROCm platform.
+-        self.device_id = int(ray.get_gpu_ids()[0])
++        gpu_ids = ray.get_gpu_ids()
++        self.device_id = int(gpu_ids[0]) if gpu_ids else 0
++        device_type = current_platform.device_type
++        torch.set_default_device(f"{device_type}:{self.device_id}")
++        try:
++            torch.accelerator.set_device_index(self.device_id)
++        except AttributeError:
++            pass
++        set_random_seed(seed)
++        self.seed = seed
+ 
+     def benchmark(
+         self,
+@@ -938,8 +982,17 @@ def main(args: argparse.Namespace):
+         os.environ["ROCR_VISIBLE_DEVICES"] = val
+         del os.environ["HIP_VISIBLE_DEVICES"]
+ 
+-    ray.init()
+-    num_gpus = int(ray.available_resources()["GPU"])
++    ray_init_kwargs: dict[str, Any] = {}
++    requested_gpus = int(os.environ.get("VLLM_MOE_BENCH_NUM_GPUS", "0"))
++    if requested_gpus > 0:
++        ray_init_kwargs["num_gpus"] = requested_gpus
++    ray.init(**ray_init_kwargs)
++    num_gpus = int(ray.available_resources().get("GPU", 0))
++    if num_gpus <= 0:
++        raise RuntimeError(
++            "Ray did not expose any GPU resources. On XPU, set "
++            "VLLM_MOE_BENCH_NUM_GPUS to the number of Intel GPUs to use."
++        )
+     workers = [BenchmarkWorker.remote(args.seed) for _ in range(num_gpus)]
+ 
+     def _distribute(method: str, inputs: list[Any]) -> list[Any]:
+@@ -968,6 +1021,23 @@ def main(args: argparse.Namespace):
+             # only SPLIT_K=1 is used at runtime, so fix it during tuning.
+             for cfg in search_space:
+                 cfg["SPLIT_K"] = 1
++        if current_platform.is_xpu() and os.environ.get(
++            "VLLM_MOE_TUNE_XPU_PRUNE", "1"
++        ) != "0":
++            if len(batch_sizes) == 1:
++                before_prune = len(search_space)
++                search_space = prune_xpu_search_space(
++                    batch_sizes[0], search_space, topk
++                )
++                print(
++                    f"Pruned XPU search space from {before_prune} "
++                    f"to {len(search_space)} configurations."
++                )
++            else:
++                print(
++                    "Skipping XPU search-space prune because multiple batch "
++                    "sizes are being tuned in one run."
++                )
+         print(f"Start tuning over {len(search_space)} configurations...")
+         if use_deep_gemm:
+             raise ValueError(

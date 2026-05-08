@@ -175,6 +175,7 @@ Model: `MiniMaxAI/MiniMax-M2.7`, local Unsloth GGUF `MiniMax-M2.7-UD-IQ4_XS-0000
 | `llamacpp-minimax-m27-ud-iq4_xs-rpc-layer-fusedrms-mmv-y2-ub64-p512-n128-r3` | `cmox1gcxl0049ml01kiijqbpo` | 4 | 512 | 128 | 17.693 | 38.489 |
 | `vllm-minimax-m27-autoround-int4-xpu-tp4-p512-n128` | `cmox4zohw0077ml01czu880bz` | 4 | 512 | 128 | 13.450 | 67.259 |
 | `vllm-minimax-m27-autoround-int4-xpu-tp4-p512-n128-pidfd` | `cmox6tys30085ml0125gihg18` | 4 | 512 | 128 | 19.850 | 99.231 |
+| `vllm-minimax-m27-autoround-int4-xpu-tp4-p512-n128-hybrid-moe` | `cmox94fsm0095ml01tjeb20rr` | 4 | 512 | 128 | 20.110 | 100.538 |
 
 Note: This is a diagnostic baseline, not an optimized all-GPU result. It uses llama.cpp layer split with `-ncmoe 56`, which CPU-maps the first 56 of 62 MoE expert layers and leaves only the final 6 expert layers GPU-resident on SYCL3. It was submitted because it is the first reproducible MiniMax completion on the 4x B70 system and records the current gap. LocalMaxxing's command parser misread `-t 8` as sampler temperature; the run is `llama-bench`, so sampling temperature is not meaningful here.
 
@@ -196,6 +197,8 @@ Note: `cmox1gcxl0049ml01kiijqbpo` is the same current best GGUF stack at `p512/n
 
 Note: `cmox4zohw0077ml01czu880bz` is a diagnostic vLLM/XPU TP4 result using `Lasimeri/MiniMax-M2.7-int4-AutoRound` but submitted under base model `MiniMaxAI/MiniMax-M2.7` because LocalMaxxing's HF lookup rejected the quant repo. Unpatched vLLM/INC XPU fell back to unquantized `FusedMoE` and OOMed; the local experimental INC patch routes AutoRound `FusedMoE` through `MoeWNA16Config`, allowing the model to load at about 28.11 GiB/card and generate. It is slower than the current GGUF result, and the log identifies the next blocker: missing B70 tuned MoE config for `E=256,N=384,dtype=int4_w4a16`.
 
-Note: `cmox6tys30085ml0125gihg18` is the current best vLLM/XPU MiniMax AutoRound result. It uses the same local INC `FusedMoE` WNA16 patch as `cmox4zohw0077ml01czu880bz`, but switches `CCL_ZE_IPC_EXCHANGE` from sockets to `pidfd`. At p512/n128 it reached `19.85` output tok/s and `99.231127` total tok/s, ahead of the current MiniMax GGUF p512 decode result. The log still reports missing B70 tuned MoE config for `E=256,N=384,dtype=int4_w4a16`, so this is not the ceiling.
+Note: `cmox6tys30085ml0125gihg18` was the first strong vLLM/XPU MiniMax AutoRound result. It uses the same local INC `FusedMoE` WNA16 patch as `cmox4zohw0077ml01czu880bz`, but switches `CCL_ZE_IPC_EXCHANGE` from sockets to `pidfd`. At p512/n128 it reached `19.85` output tok/s and `99.231127` total tok/s, ahead of the current MiniMax GGUF p512 decode result. It was later superseded by the hybrid B70 MoE config result `cmox94fsm0095ml01tjeb20rr`.
+
+Note: `cmox94fsm0095ml01tjeb20rr` is the current best MiniMax AutoRound vLLM/XPU result. It adds a hybrid B70 MoE config in `configs/vllm/minimax-m27-b70-int4-w4a16-moe-hybrid-20260508.json`: tuned key `1` for decode and default prompt-size keys `64`, `256`, and `512`. The accepted LocalMaxxing row omits `backend=xpu` because the API currently rejects that backend enum; XPU/Level Zero details are retained in `engineFlags.extraFlags` and in the archived payload/response files.
 
 Not submitted: `GGML_SYCL_MOE_UP_GATE_PAIR_DOT=1` paired up/gate dot loop for MiniMax `MOE_FUSED_UP_GATE` produced `16.840924 tok/s` with high variance (`15.8979`, `17.3159`, `17.3090`). This was neutral/slower than `cmowt5ciy00d0o201f1mcrg3q`, so it remains a negative/noise experiment rather than a public benchmark result.

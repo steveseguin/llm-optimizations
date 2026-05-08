@@ -86,6 +86,7 @@ Reproducibility notes, benchmark payloads, and local patches from the Intel Arc 
 - `data/minimax-m27-cpy-shape-trace-20260508.json`: structured MiniMax `CPY` shape trace and negative fast-path test.
 - `data/minimax-m27-fused-rmsnorm-sycl-20260508.json`: structured MiniMax fused RMSNorm implementation result.
 - `data/minimax-m27-autoround-vllm-xpu-20260508.json`: structured MiniMax AutoRound INT4 vLLM/XPU bring-up result and remaining MoE tuning blocker.
+- `configs/vllm/minimax-m27-b70-int4-w4a16-moe-hybrid-20260508.json`: hybrid B70 MoE config for MiniMax AutoRound vLLM/XPU, tuned key `1` plus default prompt-size keys.
 - `scripts/bench-qwen36-q4_0-gguf-vulkan-matrix.sh`: Q4_0 GGUF Vulkan benchmark sweep harness.
 - `scripts/bench-qwen36-q4_0-gguf-sycl-matrix.sh`: Q4_0 GGUF SYCL benchmark sweep harness.
 - `scripts/bench-qwen36-b70-single-mtp.sh`: single-B70 vLLM INT4 MTP benchmark wrapper.
@@ -118,6 +119,7 @@ Reproducibility notes, benchmark payloads, and local patches from the Intel Arc 
 - `patches/vllm-xpu-qwen35-gdn-spec-fallback-contiguous-state.patch`: XPU Gated DeltaNet speculative metadata/fallback patch used by the n-gram runs.
 - `patches/vllm-inc-xpu-autoround-fusedmoe-wna16-20260508.patch`: experimental vLLM patch that lets INC/AutoRound XPU quantization apply WNA16 MoE quantization to MiniMax `FusedMoE` layers instead of falling back to unquantized MoE.
 - `patches/vllm-minimax-qknorm-passmanager-xpu-guard-20260508.patch`: guard patch so enabling MiniMax QK-norm fusion on XPU does not crash when the fused Lamport op is absent.
+- `patches/vllm-benchmark-moe-xpu-tune-harness-20260508.patch`: local vLLM MoE benchmark harness patch for XPU/Ray device exposure, XPU eager timing, and pruned small-M decode tuning.
 
 ## Notes
 

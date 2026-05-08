@@ -1,0 +1,36 @@
+{
+  "hfId": "MiniMaxAI/MiniMax-M2.7",
+  "modelRevision": "main",
+  "hardware": {
+    "hwClass": "DISCRETE_GPU",
+    "gpuName": "Intel Arc Pro B70",
+    "gpuCount": 4,
+    "vramGb": 32,
+    "cpu": "AMD EPYC 9015",
+    "ramGb": 16,
+    "os": "Ubuntu 24.04.4"
+  },
+  "engineName": "vllm",
+  "engineVersion": "0.20.1-local",
+  "quantization": "INT4 AutoRound W4A16",
+  "promptTokens": 512,
+  "outputTokens": 128,
+  "contextLength": 2048,
+  "batchSize": 1,
+  "tokSOut": 20.11,
+  "tokSTotal": 100.53815829779805,
+  "peakVramGb": 28.11,
+  "notes": "Lasimeri/MiniMax-M2.7-int4-AutoRound target weights submitted under base MiniMaxAI/MiniMax-M2.7 because quant repo lookup previously failed. 4x Intel Arc Pro B70 TP4, local vLLM INC/XPU FusedMoE WNA16 patch, CCL_ZE_IPC_EXCHANGE=pidfd, hybrid B70 MoE config: tuned M=1 int4_w4a16 plus default prompt-size keys 64/256/512. No power-limit changes.",
+  "engineFlags": {
+    "commandSnippet": "VLLM_TUNED_CONFIG_FOLDER=/home/steve/bench-results/minimax-m2.7-autoround-vllm/moe-config-hybrid-m1-default-prefill CCL_ZE_IPC_EXCHANGE=pidfd CCL_TOPO_P2P_ACCESS=1 vllm bench throughput --backend vllm --model /mnt/corsair-external/llm-models/minimax-m2.7-int4-autoround --tokenizer /mnt/corsair-external/llm-models/minimax-m2.7-int4-autoround --trust-remote-code --dtype bfloat16 --tensor-parallel-size 4 --distributed-executor-backend mp --max-model-len 2048 --max-num-batched-tokens 1024 --max-num-seqs 1 --dataset-name random --random-input-len 512 --random-output-len 128 --random-range-ratio 0 --num-prompts 1 --disable-log-stats",
+    "tensorParallel": 4,
+    "gpuLayers": 0,
+    "flashAttn": true,
+    "contextLength": 2048,
+    "attentionBackend": "flash_attn",
+    "concurrency": 1,
+    "extraFlags": "XPU/Level Zero, vLLM local INC FusedMoE WNA16 patch, VLLM_TUNED_CONFIG_FOLDER hybrid B70 MoE config, CCL_ATL_TRANSPORT=ofi, CCL_ZE_IPC_EXCHANGE=pidfd, CCL_TOPO_P2P_ACCESS=1, VLLM_XPU_ENABLE_XPU_GRAPH=0",
+    "engineQuant": "inc",
+    "gpuMemUtil": 0.9
+  }
+}

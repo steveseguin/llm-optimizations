@@ -254,13 +254,55 @@ json: /home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-aut
 
 Interpretation: negative. Upstream Intel wNa16 docs recommend eager in some contexts, but for this MiniMax AutoRound TP4 path it disables torch.compile/CUDAGraphs and regresses versus the compiled `pidfd/P2P=1` p64 smoke (`68.171339` total, `13.63` output).
 
+## B70 MoE Config Tune
+
+The vLLM MoE tuning harness was CUDA-centric: Ray did not expose Intel XPUs as GPU resources, workers defaulted to `cuda`, and timing relied on CUDA graph capture. A local harness patch adds:
+
+```text
+patches/vllm-benchmark-moe-xpu-tune-harness-20260508.patch
+```
+
+The patch lets XPU users set `VLLM_MOE_BENCH_NUM_GPUS=4`, uses `current_platform.device_type`, falls back to synchronized eager timing for XPU, and prunes single-batch XPU decode shapes. The unpruned `M=1` tune had 1,920 configs and reached an hours-long ETA; the pruned decode tune cut that to 96 configs and completed in `57.93s`.
+
+Generated B70 config:
+
+```text
+configs/vllm/minimax-m27-b70-int4-w4a16-moe-hybrid-20260508.json
+```
+
+The file is deliberately hybrid:
+
+- key `1`: tuned B70 decode config, `BLOCK_SIZE_M=16`, `BLOCK_SIZE_N=64`, `BLOCK_SIZE_K=128`, `GROUP_SIZE_M=1`, `num_warps=4`, `num_stages=4`, `SPLIT_K=1`
+- keys `64`, `256`, `512`: default vLLM prompt-size config, `BLOCK_SIZE_M=64`, `GROUP_SIZE_M=1`, `SPLIT_K=1`
+
+The decode-only config was valid but slightly slower end-to-end on p64/n16 because vLLM reused key `1` for prompt shapes:
+
+```text
+p64/n16, TP4, pidfd, P2P=1, tuned key 1 only:
+67.725172 total tok/s, 13.55 output tok/s
+log: /home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p64n16-20260508T181416Z.log
+json: /home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p64n16-20260508T181416Z.json
+```
+
+The hybrid config improved the real p512/n128 benchmark:
+
+```text
+p512/n128, TP4, pidfd, P2P=1, hybrid B70 MoE config:
+100.538158 total tok/s, 20.11 output tok/s
+log: /home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n128-20260508T182318Z.log
+json: /home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n128-20260508T182318Z.json
+LocalMaxxing: cmox94fsm0095ml01tjeb20rr
+```
+
+Interpretation: small positive. This moves the current MiniMax AutoRound high from `19.85` to `20.11` output tok/s and from `99.231127` to `100.538158` total tok/s. It is not enough to explain the full gap to the 30 tok/s target, but it proves that B70-specific MoE configs are active and can move end-to-end throughput.
+
 ## Open Items
 
-- Submit useful AutoRound results as diagnostic records, while keeping the current GGUF path as the higher-performance MiniMax route.
+- Continue submitting useful AutoRound records. Current best is `cmox94fsm0095ml01tjeb20rr` with the hybrid B70 MoE config.
 - Keep `CCL_ZE_IPC_EXCHANGE=pidfd` as the current vLLM/XPU default; sockets is slower in the p64 smoke and earlier p512 run.
 - Keep `CCL_TOPO_P2P_ACCESS=1`; `0` was slightly slower in the p64 smoke. Treat `CCL_TOPO_FABRIC_VERTEX_CONNECTION_CHECK=0` as neutral/diagnostic because it improved p512 output only from `19.85` to `19.89` tok/s while overriding topology validation.
 - Treat `VLLM_XPU_ENABLE_XPU_GRAPH=1` as negative for TP4 MiniMax AutoRound until vLLM can capture communication ops or split capture around collectives.
 - Treat `--enforce-eager` as negative for this path unless the compiled path starts failing; it regressed p64/n16 to `56.113901` total tok/s and `11.22` output tok/s.
 - Treat `--compilation-config '{"mode":3,"pass_config":{"fuse_minimax_qk_norm":true}}'` as blocked on XPU because this build lacks `torch.ops._C.minimax_allreduce_rms_qk`; implement or port that fused op before retesting for speed.
-- Add or tune a B70 MoE config file for `E=256,N=384,device_name=Intel(R)_Graphics_[0xe223],dtype=int4_w4a16.json`; an AMD-derived seed regressed to `1.73` output tok/s on p64/n16.
+- Retune larger MiniMax MoE prompt sizes only if the microbench shows a stronger gain than default. The first hybrid config is a small positive but not a path to 30 tok/s by itself.
 - Consider moving the AutoRound model to NVMe if iteration time, not decode speed, becomes the limiting factor.

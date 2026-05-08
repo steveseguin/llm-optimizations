@@ -47,6 +47,9 @@ Elementwise fused-op fixes are not enough. Fused RMSNorm is functional but neutr
    - Treat `CCL_TOPO_P2P_ACCESS=0` as negative; p64/n16 with `pidfd` fell to `62.410028` total tok/s and `12.48` output tok/s versus `68.171339` and `13.63` with P2P=1.
    - Treat `CCL_TOPO_FABRIC_VERTEX_CONNECTION_CHECK=0` as neutral diagnostic; p512/n128 reached `19.89` output tok/s versus `19.85` without the override, too small to promote.
    - Treat the AMD Instinct int4 W4A16 MoE tuned config as a negative seed for B70. The raw file failed on unsupported `matrix_instr_nonkdim`; stripping that key completed p64/n16 but regressed to `8.632747` total tok/s and `1.73` output tok/s.
+   - Keep the hybrid B70 MoE config as the current best vLLM/XPU MiniMax setting. It uses tuned key `1` plus default prompt-size keys `64`, `256`, and `512`, and improved p512/n128 from `19.85` to `20.11` output tok/s (`100.538158` total), LocalMaxxing `cmox94fsm0095ml01tjeb20rr`.
+   - Do not rely on the decode-only key `1` config by itself. It made the standalone MoE microbench slightly faster, but p64/n16 fell to `67.725172` total and `13.55` output tok/s because prompt shapes reused the decode config.
+   - Retune larger prompt-size MoE configs only if microbench screening shows a stronger gain than default. The first B70 tune is a useful proof, but the remaining 30 tok/s gap is not just MoE tile selection.
    - If TP4 OOMs or stalls, try reduced `max_model_len`, `max_num_batched_tokens`, and possibly TP2 just to isolate the failure mode.
 2. GGUF attention/KV:
    - Add op timing around attention-side `CPY`, `ROPE`, `SOFT_MAX`, and `MUL_MAT` nodes.
