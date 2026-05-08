@@ -31,6 +31,19 @@
     "samplesTokSOut": [17.3265, 17.6006, 17.6046, 17.6047, 17.5987],
     "stddevTokSOut": 0.123299
   },
+  "contextRun": {
+    "localmaxxingId": "cmowyq5tu001jml01b470i75g",
+    "promptTokens": 512,
+    "outputTokens": 128,
+    "promptTokS": 50.905433,
+    "promptSamplesTokS": [46.127, 53.2923, 53.297],
+    "outputTokS": 17.515510,
+    "outputSamplesTokS": [17.42, 17.5591, 17.5674],
+    "tokSTotal": 36.85431292616281,
+    "sourceJson": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/minimax-fast-mmid-mmv-runtime2-r3-p512n128-20260508T133014Z.jsonl",
+    "payload": "/home/steve/bench-results/localmaxxing-minimax-m27-mmv-y2-p512n128-20260508.payload.json",
+    "response": "/home/steve/bench-results/localmaxxing-minimax-m27-mmv-y2-p512n128-20260508.response.json"
+  },
   "comparison": {
     "sameBuildControlTokS": 17.198973,
     "sameBuildImprovementPct": 2.02,

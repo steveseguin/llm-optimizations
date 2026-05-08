@@ -11,6 +11,8 @@ LocalMaxxing: cmowx1t6z000mml01v111mzvl
 
 This builds on the default-off `GGML_SYCL_FAST_MUL_MAT_ID_IQ4_XS=1` path and adds runtime MMV row packing with `GGML_SYCL_MMV_Y_RUNTIME=2`. Same-build r5 control was `17.198973 tok/s`; runtime MMV Y=2 was `17.547020 tok/s`. A synthetic IQ4_XS `MUL_MAT_ID` probe produced identical SYCL checksums and first outputs with fast MMID on versus off; a manual dequantized oracle showed the SYCL path is close (`nmse=1.44e-05`) while the CPU graph path diverges in this synthetic case.
 
+The same stack at `p512/n128/r3` produced `50.905433 tok/s` prompt and `17.515510 tok/s` decode, LocalMaxxing `cmowyq5tu001jml01b470i75g`. Decode throughput is essentially unchanged at 512 context, so the next MiniMax work should stay focused on decode-side matvec/MoE scheduling.
+
 ## Active Work
 
 1. Keep the MiniMax AutoRound INT4 safetensors download running on `/mnt/corsair-external`.

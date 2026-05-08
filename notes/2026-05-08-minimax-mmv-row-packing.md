@@ -29,6 +29,15 @@ Comparison:
 
 This is a `2.02%` gain versus the same-build r5 control and a `1.22%` gain versus the prior submitted MiniMax high. It is not the step-change needed to reach the 30 tok/s target, but it is a repeatable software-only improvement.
 
+Context check:
+
+```text
+p512/n128/r3: prompt 50.905433 tok/s, decode 17.515510 tok/s, total 36.854313 tok/s
+LocalMaxxing: cmowyq5tu001jml01b470i75g
+```
+
+The decode rate is effectively the same as p0/n64. This points back to decode-side matvec/MoE scheduling rather than prompt setup as the limiting factor for this GGUF path.
+
 ## Follow-up Row-Pack Sweep
 
 Additional row-packing variants did not beat generic Y=2:
@@ -97,6 +106,7 @@ llama-bench \
 - Compile-time MMV2 confirmation: `/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/minimax-fast-mmid-mmv2-r5-p0n64-20260508T115654Z.jsonl`
 - Runtime MMV8 negative: `/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/minimax-fast-mmid-mmv-runtime8-r3-p0n64-20260508T131435Z.jsonl`
 - Runtime MMV2 + MoE4 negative: `/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/minimax-fast-mmid-mmv2-moe4-r3-p0n64-20260508T132138Z.jsonl`
+- Context run: `/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/minimax-fast-mmid-mmv-runtime2-r3-p512n128-20260508T133014Z.jsonl`
 - Correctness smoke: `/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/correctness/mmv-y2-smoke-20260508T125856Z`
 - LocalMaxxing payload: `/home/steve/bench-results/localmaxxing-minimax-m27-fast-mmid-mmv-y2-20260508.payload.json`
 - LocalMaxxing response: `/home/steve/bench-results/localmaxxing-minimax-m27-fast-mmid-mmv-y2-20260508.response.json`
