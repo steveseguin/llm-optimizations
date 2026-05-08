@@ -78,6 +78,16 @@ GGML_ASSERT(ok) failed
 
 Status: blocked/negative. Keep MiniMax GGUF on `-fa 0` for now. A real flash-attention win would require implementing `FLASH_ATTN_EXT` for the SYCL/RPC path or adding a safe backend fallback instead of aborting the worker.
 
+## DNN Check
+
+Tried enabling the SYCL DNN path by removing `GGML_SYCL_DISABLE_DNN=1` from the RPC worker environment while keeping Y=2 and `-ub 64`:
+
+```text
+17.213021 tok/s, p0/n64/r3, samples 16.5780, 17.5222, 17.5389
+```
+
+This is slower/noisier than the DNN-disabled `-ub 64` runs. Keep `GGML_SYCL_DISABLE_DNN=1` in the MiniMax GGUF recipe.
+
 ## Timing Delta
 
 Short op-timing runs show the direction of the win:
@@ -139,6 +149,7 @@ llama-bench \
 - Microbatch `-ub 64` local best: `/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/minimax-fast-mmid-mmv-runtime2-ub64-r5-p0n64-20260508T135521Z.jsonl`
 - Microbatch `-ub 128` neutral: `/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/minimax-fast-mmid-mmv-runtime2-ub128-r3-p0n64-20260508T134833Z.jsonl`
 - Flash attention failure: `/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/minimax-fast-mmid-mmv-runtime2-ub64-fa1-r3-p512n128-20260508T140323Z.log`
+- DNN-enabled negative: `/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/minimax-fast-mmid-mmv-runtime2-dnnon-ub64-r3-p0n64-20260508T141516Z.jsonl`
 - Correctness smoke: `/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/correctness/mmv-y2-smoke-20260508T125856Z`
 - LocalMaxxing payload: `/home/steve/bench-results/localmaxxing-minimax-m27-fast-mmid-mmv-y2-20260508.payload.json`
 - LocalMaxxing response: `/home/steve/bench-results/localmaxxing-minimax-m27-fast-mmid-mmv-y2-20260508.response.json`

@@ -62,3 +62,4 @@ Elementwise fused-op fixes are not enough. Fused RMSNorm is functional but neutr
 - Runtime `GGML_SYCL_MMV_Y_RUNTIME=8`: `17.238444 tok/s`, samples `16.6394`, `17.5203`, `17.5557`. This did not beat Y=2.
 - Runtime `GGML_SYCL_MMV_Y_RUNTIME=2` plus `GGML_SYCL_MOE_IQ4_XS_MMV_Y=4`: `17.232041 tok/s`, samples `16.6258`, `17.5346`, `17.5357`. This did not beat generic Y=2.
 - Flash attention `-fa 1` on the MiniMax 512/128 context run aborted worker 0 with unsupported `FLASH_ATTN_EXT`, so current valid runs stay on `-fa 0`.
+- DNN-enabled RPC workers produced `17.213021 tok/s`, below DNN-disabled `-ub 64`; keep `GGML_SYCL_DISABLE_DNN=1`.
