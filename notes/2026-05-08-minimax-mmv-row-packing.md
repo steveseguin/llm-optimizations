@@ -33,8 +33,8 @@ The current high is a `2.90%` gain versus the same-build default-MMV control and
 Context check:
 
 ```text
-p512/n128/r3: prompt 50.905433 tok/s, decode 17.515510 tok/s, total 36.854313 tok/s
-LocalMaxxing: cmowyq5tu001jml01b470i75g
+p512/n128/r3: prompt 54.506141 tok/s, decode 17.693021 tok/s, total 38.489462 tok/s
+LocalMaxxing: cmox1gcxl0049ml01kiijqbpo
 ```
 
 The decode rate is effectively the same as p0/n64. This points back to decode-side matvec/MoE scheduling rather than prompt setup as the limiting factor for this GGUF path.
@@ -164,7 +164,8 @@ llama-bench \
 - Compile-time MMV2 confirmation: `/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/minimax-fast-mmid-mmv2-r5-p0n64-20260508T115654Z.jsonl`
 - Runtime MMV8 negative: `/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/minimax-fast-mmid-mmv-runtime8-r3-p0n64-20260508T131435Z.jsonl`
 - Runtime MMV2 + MoE4 negative: `/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/minimax-fast-mmid-mmv2-moe4-r3-p0n64-20260508T132138Z.jsonl`
-- Context run: `/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/minimax-fast-mmid-mmv-runtime2-r3-p512n128-20260508T133014Z.jsonl`
+- Superseded context run: `/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/minimax-fast-mmid-mmv-runtime2-r3-p512n128-20260508T133014Z.jsonl`
+- Current context run: `/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/minimax-fast-mmid-mmv-runtime2-fusedrms-ub64-r3-p512n128-20260508T144635Z.jsonl`
 - Microbatch `-ub 64` local best: `/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/minimax-fast-mmid-mmv-runtime2-ub64-r5-p0n64-20260508T135521Z.jsonl`
 - Fused RMSNorm current high: `/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/minimax-fast-mmid-mmv-runtime2-fusedrms-ub64-r5-p0n64-20260508T143014Z.jsonl`
 - Microbatch `-ub 128` neutral: `/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/minimax-fast-mmid-mmv-runtime2-ub128-r3-p0n64-20260508T134833Z.jsonl`

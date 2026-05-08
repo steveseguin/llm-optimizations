@@ -172,6 +172,7 @@ Model: `MiniMaxAI/MiniMax-M2.7`, local Unsloth GGUF `MiniMax-M2.7-UD-IQ4_XS-0000
 | `llamacpp-minimax-m27-ud-iq4_xs-rpc-layer-fast-mmid-mmv-y2-p0-n64-r5` | `cmowx1t6z000mml01v111mzvl` | 4 | 0 | 64 | 17.547 | 17.547 |
 | `llamacpp-minimax-m27-ud-iq4_xs-rpc-layer-fast-mmid-mmv-y2-p512-n128-r3` | `cmowyq5tu001jml01b470i75g` | 4 | 512 | 128 | 17.516 | 36.854 |
 | `llamacpp-minimax-m27-ud-iq4_xs-rpc-layer-fusedrms-mmv-y2-ub64-p0-n64-r5` | `cmox103ol0040ml019yzs6gvs` | 4 | 0 | 64 | 17.698 | 17.698 |
+| `llamacpp-minimax-m27-ud-iq4_xs-rpc-layer-fusedrms-mmv-y2-ub64-p512-n128-r3` | `cmox1gcxl0049ml01kiijqbpo` | 4 | 512 | 128 | 17.693 | 38.489 |
 
 Note: This is a diagnostic baseline, not an optimized all-GPU result. It uses llama.cpp layer split with `-ncmoe 56`, which CPU-maps the first 56 of 62 MoE expert layers and leaves only the final 6 expert layers GPU-resident on SYCL3. It was submitted because it is the first reproducible MiniMax completion on the 4x B70 system and records the current gap. LocalMaxxing's command parser misread `-t 8` as sampler temperature; the run is `llama-bench`, so sampling temperature is not meaningful here.
 
@@ -188,5 +189,7 @@ Note: `cmowx1t6z000mml01v111mzvl` adds `GGML_SYCL_MMV_Y_RUNTIME=2` runtime row p
 Note: `cmowyq5tu001jml01b470i75g` is the same MiniMax fast-MMID + MMV Y=2 stack at a 512-token prompt and 128-token decode window. Prompt throughput was `50.905433 tok/s`; decode throughput was `17.515510 tok/s`, so the decode bottleneck is essentially unchanged at this context length while prefill is faster. `tokSTotal=36.854313` was computed from prompt and decode timings.
 
 Note: `cmox103ol0040ml019yzs6gvs` is the current best MiniMax GGUF result. It keeps fast IQ4_XS `MUL_MAT_ID`, `GGML_SYCL_MMV_Y_RUNTIME=2`, DNN disabled, and `-ub 64`, but stops forcing `GGML_DISABLE_FUSED_RMS_NORM=1`. The r5 samples were `17.5369`, `17.7524`, `17.7386`, `17.7282`, `17.7328`. A deterministic 16-token greedy generation smoke matched the prior fused-RMS-disabled Y=2 baseline byte-for-byte, so this is currently marked quality-preserving for the benchmark scope.
+
+Note: `cmox1gcxl0049ml01kiijqbpo` is the same current best GGUF stack at `p512/n128/r3`. Prompt throughput was `54.506141 tok/s`; decode throughput was `17.693021 tok/s`; total throughput was `38.489462 tok/s`. It supersedes the earlier context datapoint `cmowyq5tu001jml01b470i75g`.
 
 Not submitted: `GGML_SYCL_MOE_UP_GATE_PAIR_DOT=1` paired up/gate dot loop for MiniMax `MOE_FUSED_UP_GATE` produced `16.840924 tok/s` with high variance (`15.8979`, `17.3159`, `17.3090`). This was neutral/slower than `cmowt5ciy00d0o201f1mcrg3q`, so it remains a negative/noise experiment rather than a public benchmark result.
