@@ -61,6 +61,23 @@ With Y=2 held fixed, `-ub 64` is a tiny local win over `-ub 32`, while `-ub 128`
 
 Use `-ub 64` for the next GGUF MiniMax sweeps, but keep the public LocalMaxxing p0/n64 record at `17.547020 tok/s` until a larger improvement clears the noise floor.
 
+## Flash Attention Check
+
+Tried enabling flash attention on the same 512/128 context run:
+
+```text
+-fa 1 -ub 64
+```
+
+The RPC worker aborted during graph execution:
+
+```text
+ggml_backend_sycl_graph_compute: error: op not supported fa-0 (FLASH_ATTN_EXT)
+GGML_ASSERT(ok) failed
+```
+
+Status: blocked/negative. Keep MiniMax GGUF on `-fa 0` for now. A real flash-attention win would require implementing `FLASH_ATTN_EXT` for the SYCL/RPC path or adding a safe backend fallback instead of aborting the worker.
+
 ## Timing Delta
 
 Short op-timing runs show the direction of the win:
@@ -121,6 +138,7 @@ llama-bench \
 - Context run: `/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/minimax-fast-mmid-mmv-runtime2-r3-p512n128-20260508T133014Z.jsonl`
 - Microbatch `-ub 64` local best: `/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/minimax-fast-mmid-mmv-runtime2-ub64-r5-p0n64-20260508T135521Z.jsonl`
 - Microbatch `-ub 128` neutral: `/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/minimax-fast-mmid-mmv-runtime2-ub128-r3-p0n64-20260508T134833Z.jsonl`
+- Flash attention failure: `/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/minimax-fast-mmid-mmv-runtime2-ub64-fa1-r3-p512n128-20260508T140323Z.log`
 - Correctness smoke: `/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/correctness/mmv-y2-smoke-20260508T125856Z`
 - LocalMaxxing payload: `/home/steve/bench-results/localmaxxing-minimax-m27-fast-mmid-mmv-y2-20260508.payload.json`
 - LocalMaxxing response: `/home/steve/bench-results/localmaxxing-minimax-m27-fast-mmid-mmv-y2-20260508.response.json`

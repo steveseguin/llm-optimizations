@@ -42,6 +42,7 @@ Elementwise fused-op fixes are not enough. Fused RMSNorm is functional but neutr
 2. GGUF attention/KV:
    - Add op timing around attention-side `CPY`, `ROPE`, `SOFT_MAX`, and `MUL_MAT` nodes.
    - Prefer producer-side fusion into KV writes over standalone copy kernels, because the tested MiniMax CPY fast path regressed.
+   - Keep `-fa 0` for current MiniMax GGUF runs. `-fa 1` aborts the SYCL/RPC worker with unsupported `FLASH_ATTN_EXT`; implementing that op or a safe fallback is a larger follow-up.
 3. GGUF row packing:
    - Keep `GGML_SYCL_MMV_Y_RUNTIME=2` as the current MiniMax GGUF performance setting. A deterministic 16-token generation smoke matched default row grouping byte-for-byte.
    - Use `-ub 64` for local follow-up sweeps; it produced a tiny local best of `17.559741 tok/s` but was not submitted because the delta over `-ub 32` is too small.
@@ -60,3 +61,4 @@ Elementwise fused-op fixes are not enough. Fused RMSNorm is functional but neutr
 - Compile-time `GGML_SYCL_MMV_Y=4`: `17.191979 tok/s`, samples `16.5850`, `17.4923`, `17.4986`. This was not better than MMV Y=2 and was not submitted.
 - Runtime `GGML_SYCL_MMV_Y_RUNTIME=8`: `17.238444 tok/s`, samples `16.6394`, `17.5203`, `17.5557`. This did not beat Y=2.
 - Runtime `GGML_SYCL_MMV_Y_RUNTIME=2` plus `GGML_SYCL_MOE_IQ4_XS_MMV_Y=4`: `17.232041 tok/s`, samples `16.6258`, `17.5346`, `17.5357`. This did not beat generic Y=2.
+- Flash attention `-fa 1` on the MiniMax 512/128 context run aborted worker 0 with unsupported `FLASH_ATTN_EXT`, so current valid runs stay on `-fa 0`.
