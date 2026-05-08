@@ -132,5 +132,26 @@
     "No expert dropping or smart expert reduction.",
     "No power-limit changes."
   ],
+  "timingProbeKqvOffloadOn": {
+    "label": "layer mode p0/n1 with GGML_SYCL_OP_TIMING=1 and -nkvo 0",
+    "warning": "Timing mode synchronizes every SYCL op and is not a valid throughput result.",
+    "tokSOutWithTiming": 3.802188,
+    "json": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/op-timing-kvoffloadon-20260508T053128Z/layer-kvoffloadon-p0n1.jsonl",
+    "workerTotalsMs": {
+      "rpc-b70-0": 60.418,
+      "rpc-b70-1": 62.087,
+      "rpc-b70-2": 64.27,
+      "rpc-b70-3": 64.093
+    },
+    "topBuckets": [
+      "MUL_MAT",
+      "MOE_FUSED_UP_GATE",
+      "ROPE",
+      "CPY",
+      "SOFT_MAX",
+      "MUL_MAT_ID"
+    ],
+    "interpretation": "The synchronized p0/n1 kernel mix is very similar to the older -nkvo 1 timing. The p0/n64 throughput gain from -nkvo 0 likely comes from placement/copy behavior over sustained decode rather than a different single-token kernel profile."
+  },
   "conclusion": "After fixing RPC device mapping and using -ts 1/1/1/1, enabling K/Q/V offload with -nkvo 0 improves MiniMax UD-IQ4_XS p0/n64 from 14.292387 tok/s to 16.383602 tok/s on 4x B70 without a model-quality tradeoff. Follow-up public flags did not beat the r3 best: ubatch was flat, scheduler async and rope cache were slower, q8 K+V failed, and q8 K/F16 V regressed badly."
 }

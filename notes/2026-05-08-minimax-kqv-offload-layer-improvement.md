@@ -60,6 +60,17 @@ The earlier `-nkvo 0` attempts were not meaningful because they were made around
 
 The timing probe from the previous note showed attention decode and KV movement as major layer-mode costs. This result confirms that the K/Q/V placement flag was leaving performance on the table.
 
+An updated `GGML_SYCL_OP_TIMING=1` probe on the `-nkvo 0` path still shows the same synchronized p0/n1 kernel shape:
+
+```text
+rpc-b70-0 total_ms=60.418
+rpc-b70-1 total_ms=62.087
+rpc-b70-2 total_ms=64.270
+rpc-b70-3 total_ms=64.093
+```
+
+Top buckets remain attention `MUL_MAT`, `MOE_FUSED_UP_GATE`, `ROPE`, `CPY`, and `SOFT_MAX`. So `-nkvo 0` improves real p0/n64 throughput without making p0/n1 synchronized kernel attribution look fundamentally different.
+
 ## Next
 
 1. Treat `16.383602 tok/s` as the current MiniMax UD-IQ4_XS 4x-B70 baseline.
