@@ -1,0 +1,44 @@
+{
+  "date": "2026-05-08",
+  "host": {
+    "os": "Ubuntu 24.04.4 LTS",
+    "gpu": "Intel Arc Pro B70",
+    "gpu_count": 4,
+    "vram_gb_each": 32,
+    "cpu": "AMD EPYC 9015"
+  },
+  "model": {
+    "hf_id": "unsloth/MiniMax-M2.7-GGUF",
+    "variant": "UD-IQ4_XS",
+    "path": "/home/steve/models/minimax-m2.7-ud-iq4_xs-gguf/UD-IQ4_XS/MiniMax-M2.7-UD-IQ4_XS-00001-of-00004.gguf"
+  },
+  "patch": {
+    "snapshot": "patches/ik-llama-minimax-rpc-device-map-and-graphsplit-20260508.patch",
+    "implemented": "SYCL RPC worker support for GGML_OP_FUSED_RMS_NORM with f32 input and f32 weight."
+  },
+  "runs": [
+    {
+      "label": "fused-rms-smoke",
+      "status": "completed",
+      "prompt_tokens": 0,
+      "output_tokens": 1,
+      "tok_s_out": 3.018596,
+      "json": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/rpc-layer-fused-rms-smoke-r1-p0n1-20260508T090419Z.jsonl"
+    },
+    {
+      "label": "fused-rms-speed-screen",
+      "status": "completed",
+      "prompt_tokens": 0,
+      "output_tokens": 64,
+      "repeat_count": 1,
+      "tok_s_out": 16.308342,
+      "json": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/rpc-layer-fused-rms-r1-p0n64-20260508T091104Z.jsonl"
+    }
+  ],
+  "comparison": {
+    "current_valid_best_tok_s_out": 16.383602,
+    "current_valid_best_localmaxxing_id": "cmowft2hr000oo3019is4snoq",
+    "conclusion": "Fused RMSNorm now works but does not beat the validated disabled-fused-RMS path."
+  },
+  "localmaxxing": "not_submitted_no_new_best"
+}
