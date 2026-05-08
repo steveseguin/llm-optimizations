@@ -1,5 +1,7 @@
 # 2026-05-07 MiniMax SAS1 and OpenCL Allocator Follow-Up
 
+Update, 2026-05-08: the `-ts 0/1/1/1/1` command below depended on pre-fix RPC layer-mode device-index behavior. After fixing the mapping from `default_layer_device` indexes through `model.devices`, the corrected four-B70 tensor split is `-ts 1/1/1/1`. See `notes/2026-05-08-minimax-rpc-device-mapfix.md`.
+
 ## Result
 
 - Model: `unsloth/MiniMax-M2.7-GGUF`, `UD-IQ4_XS`

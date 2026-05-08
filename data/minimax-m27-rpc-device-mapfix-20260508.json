@@ -1,0 +1,99 @@
+{
+  "date": "2026-05-08",
+  "model": {
+    "hfId": "unsloth/MiniMax-M2.7",
+    "ggufRepo": "unsloth/MiniMax-M2.7-GGUF",
+    "quantization": "UD-IQ4_XS",
+    "localPath": "/home/steve/models/minimax-m2.7-ud-iq4_xs-gguf/UD-IQ4_XS/MiniMax-M2.7-UD-IQ4_XS-00001-of-00004.gguf",
+    "type": "minimax-m2 230B.A10B IQ4_XS - 4.25 bpw"
+  },
+  "hardware": {
+    "gpu": "Intel Arc Pro B70 32GB",
+    "gpuCount": 4,
+    "cpu": "AMD EPYC 9015 8-Core Processor",
+    "ramGb": 16,
+    "os": "Ubuntu 24.04.4 LTS",
+    "driver": "Level Zero 1.15.37833+4 / OpenCL NEO 26.14.37833.4"
+  },
+  "engine": {
+    "name": "ik_llama.cpp",
+    "reportedBuildCommit": "9a26522",
+    "backend": "RPC client plus four SYCL Level Zero rpc-server workers",
+    "patch": "patches/ik-llama-minimax-rpc-device-map-and-graphsplit-20260508.patch"
+  },
+  "rootCause": {
+    "summary": "RPC layer-mode placement stored an index into model.devices but called llama_default_buffer_type_offload with the raw index. In an RPC-only client this can mismatch memory accounting and actual target devices. After fixing the mapping, the old -ts 0/1/1/1/1 command is wrong for four RPC devices and can overload one B70; use -ts 1/1/1/1 for all four B70s.",
+    "fixedFiles": [
+      "src/llama.cpp"
+    ]
+  },
+  "runs": [
+    {
+      "label": "old split string after map fix",
+      "commandTail": "-p 0 -n 1 -r 1 -ngl 99 -sm layer -ts 0/1/1/1/1 -fa 0 -nkvo 1 -ub 32 -ctk f16 -ctv f16 -t 4 -rtr 1 -fmoe 1 -no-mmad 0 -muge 1 -sas 1",
+      "result": "failed",
+      "failure": "B70 worker allocation failure; old split skips a B70 instead of the removed CPU pseudo-device after the map fix.",
+      "log": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/rpc-layer-device-mapfix-smoke-p0n1-20260508T024109Z.log"
+    },
+    {
+      "label": "corrected split smoke",
+      "commandTail": "-p 0 -n 1 -r 1 -ngl 99 -sm layer -ts 1/1/1/1/0 -fa 0 -nkvo 1 -ub 32 -ctk f16 -ctv f16 -t 4 -rtr 1 -fmoe 1 -no-mmad 0 -muge 1 -sas 1",
+      "tokSOut": 4.957283,
+      "json": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/rpc-layer-devmapfix-ts11110-smoke-p0n1-20260508T024200Z.jsonl"
+    },
+    {
+      "label": "corrected split sas1",
+      "commandTail": "-p 0 -n 64 -r 1 -ngl 99 -sm layer -ts 1/1/1/1 -fa 0 -nkvo 1 -ub 32 -ctk f16 -ctv f16 -t 4 -rtr 1 -fmoe 1 -no-mmad 0 -muge 1 -sas 1",
+      "tokSOut": 14.034271,
+      "json": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/rpc-layer-devmapfix-ts11110-p0n64-20260508T024858Z.jsonl"
+    },
+    {
+      "label": "corrected split no fused MMAD",
+      "commandTail": "-p 0 -n 64 -r 1 -ngl 99 -sm layer -ts 1/1/1/1 -fa 0 -nkvo 1 -ub 32 -ctk f16 -ctv f16 -t 4 -rtr 1 -fmoe 1 -no-mmad 1 -muge 1 -sas 1",
+      "tokSOut": 13.836317,
+      "json": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/rpc-layer-devmapfix-ts1111-nommad1-p0n64-20260508T025610Z.jsonl"
+    },
+    {
+      "label": "corrected split sas0",
+      "commandTail": "-p 0 -n 64 -r 1 -ngl 99 -sm layer -ts 1/1/1/1 -fa 0 -nkvo 1 -ub 32 -ctk f16 -ctv f16 -t 4 -rtr 1 -fmoe 1 -no-mmad 0 -muge 1 -sas 0",
+      "tokSOut": 14.127082,
+      "json": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/rpc-layer-devmapfix-ts1111-sas0-p0n64-20260508T030302Z.jsonl"
+    },
+    {
+      "label": "corrected split t1",
+      "commandTail": "-p 0 -n 64 -r 1 -ngl 99 -sm layer -ts 1/1/1/1 -fa 0 -nkvo 1 -ub 32 -ctk f16 -ctv f16 -t 1 -rtr 1 -fmoe 1 -no-mmad 0 -muge 1 -sas 0",
+      "tokSOut": 13.994563,
+      "json": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/rpc-layer-devmapfix-ts1111-t1-sas0-p0n64-20260508T030954Z.jsonl"
+    },
+    {
+      "label": "corrected split t8",
+      "commandTail": "-p 0 -n 64 -r 1 -ngl 99 -sm layer -ts 1/1/1/1 -fa 0 -nkvo 1 -ub 32 -ctk f16 -ctv f16 -t 8 -rtr 1 -fmoe 1 -no-mmad 0 -muge 1 -sas 0",
+      "tokSOut": 13.976345,
+      "json": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/rpc-layer-devmapfix-ts1111-t8-sas0-p0n64-20260508T031640Z.jsonl"
+    },
+    {
+      "label": "corrected split no merged up gate",
+      "commandTail": "-p 0 -n 64 -r 1 -ngl 99 -sm layer -ts 1/1/1/1 -fa 0 -nkvo 1 -ub 32 -ctk f16 -ctv f16 -t 4 -rtr 1 -fmoe 1 -no-mmad 0 -muge 0 -sas 0",
+      "tokSOut": 13.826424,
+      "json": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/rpc-layer-devmapfix-ts1111-muge0-sas0-p0n64-20260508T032328Z.jsonl"
+    },
+    {
+      "label": "corrected best r3",
+      "commandTail": "-p 0 -n 64 -r 3 -ngl 99 -sm layer -ts 1/1/1/1 -fa 0 -nkvo 1 -ub 32 -ctk f16 -ctv f16 -t 4 -rtr 1 -fmoe 1 -no-mmad 0 -muge 1 -sas 0",
+      "tokSOut": 14.292387,
+      "stddevTokSOut": 0.362999,
+      "samplesTokSOut": [13.8745, 14.4737, 14.529],
+      "json": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/rpc-layer-devmapfix-best-r3-p0n64-20260508T032753Z.jsonl"
+    }
+  ],
+  "localmaxxing": {
+    "status": "queued",
+    "reason": "localmaxxing.com returned Cloudflare 522 for detailed and reduced POSTs; GET /api/leaderboard also timed out.",
+    "detailedResponse": "/home/steve/bench-results/localmaxxing-minimax-m27-corrected-rpcsplit-20260508T033529Z.json",
+    "reducedResponse": "/home/steve/bench-results/localmaxxing-minimax-m27-corrected-rpcsplit-reduced-20260508T033713Z.json"
+  },
+  "qualityNotes": [
+    "All accepted runs are quality-preserving: no speculative decoding, no smart expert reduction, no expert dropping, no power-limit changes.",
+    "The Lasimeri INT4 AutoRound checkpoint is W4A16 and potentially useful for vLLM/SGLang, but its model card says iters=0/RTN; treat it as a speed-path candidate, not a guaranteed quality-equivalent replacement for UD-IQ4_XS."
+  ]
+}
