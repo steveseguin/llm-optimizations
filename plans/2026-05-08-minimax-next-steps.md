@@ -42,7 +42,8 @@ Elementwise fused-op fixes are not enough. Fused RMSNorm is functional but neutr
    - Prefer producer-side fusion into KV writes over standalone copy kernels, because the tested MiniMax CPY fast path regressed.
 3. GGUF row packing:
    - Keep `GGML_SYCL_MMV_Y_RUNTIME=2` as the current MiniMax GGUF performance setting. A deterministic 16-token generation smoke matched default row grouping byte-for-byte.
-   - Treat runtime/compile-time Y=4 as neutral for now; compile-time MMV4 produced `17.191979 tok/s`, below Y=2.
+   - Treat runtime/compile-time Y=4 and runtime Y=8 as neutral/negative for now. Compile-time MMV4 produced `17.191979 tok/s`; runtime MMV8 produced `17.238444 tok/s`.
+   - Treat MoE-specific Y=4 as negative for now. `GGML_SYCL_MMV_Y_RUNTIME=2` plus `GGML_SYCL_MOE_IQ4_XS_MMV_Y=4` produced `17.232041 tok/s`.
 4. GGUF graph split:
    - Revisit quality-correct graph reduce only if we can avoid host-mediated reduce/broadcast. The correct path works but is too slow.
    - Investigate device-side mirrored reduce for the exact nonlinear boundaries in MiniMax rather than broad deferred reductions.
@@ -54,3 +55,5 @@ Elementwise fused-op fixes are not enough. Fused RMSNorm is functional but neutr
 
 - `GGML_SYCL_MOE_UP_GATE_PAIR_DOT=1`, paired IQ4_XS up/gate dot loop for MiniMax `MOE_FUSED_UP_GATE`: `16.840924 tok/s`, samples `15.8979`, `17.3159`, `17.3090`. This is neutral/slower than the `17.335655 tok/s` fast-MMID baseline, so it was not submitted to LocalMaxxing.
 - Compile-time `GGML_SYCL_MMV_Y=4`: `17.191979 tok/s`, samples `16.5850`, `17.4923`, `17.4986`. This was not better than MMV Y=2 and was not submitted.
+- Runtime `GGML_SYCL_MMV_Y_RUNTIME=8`: `17.238444 tok/s`, samples `16.6394`, `17.5203`, `17.5557`. This did not beat Y=2.
+- Runtime `GGML_SYCL_MMV_Y_RUNTIME=2` plus `GGML_SYCL_MOE_IQ4_XS_MMV_Y=4`: `17.232041 tok/s`, samples `16.6258`, `17.5346`, `17.5357`. This did not beat generic Y=2.

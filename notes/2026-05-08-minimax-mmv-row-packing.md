@@ -29,6 +29,17 @@ Comparison:
 
 This is a `2.02%` gain versus the same-build r5 control and a `1.22%` gain versus the prior submitted MiniMax high. It is not the step-change needed to reach the 30 tok/s target, but it is a repeatable software-only improvement.
 
+## Follow-up Row-Pack Sweep
+
+Additional row-packing variants did not beat generic Y=2:
+
+| Variant | tok/s | samples | interpretation |
+| --- | ---: | --- | --- |
+| `GGML_SYCL_MMV_Y_RUNTIME=8` | 17.238444 | 16.6394, 17.5203, 17.5557 | first repeat regressed, later repeats only tied the Y=2 cluster |
+| `GGML_SYCL_MMV_Y_RUNTIME=2`, `GGML_SYCL_MOE_IQ4_XS_MMV_Y=4` | 17.232041 | 16.6258, 17.5346, 17.5357 | MoE-specific Y=4 did not improve over generic Y=2 |
+
+Conclusion: Y=2 is the current B70 setting for this path. More row packing appears to increase variance and does not improve steady decode.
+
 ## Timing Delta
 
 Short op-timing runs show the direction of the win:
@@ -84,6 +95,8 @@ llama-bench \
 - Main result: `/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/minimax-fast-mmid-mmv-runtime2-r5-p0n64-20260508T124605Z.jsonl`
 - Same-build control: `/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/minimax-fast-mmid-control-r5-p0n64-20260508T120407Z.jsonl`
 - Compile-time MMV2 confirmation: `/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/minimax-fast-mmid-mmv2-r5-p0n64-20260508T115654Z.jsonl`
+- Runtime MMV8 negative: `/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/minimax-fast-mmid-mmv-runtime8-r3-p0n64-20260508T131435Z.jsonl`
+- Runtime MMV2 + MoE4 negative: `/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/minimax-fast-mmid-mmv2-moe4-r3-p0n64-20260508T132138Z.jsonl`
 - Correctness smoke: `/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/correctness/mmv-y2-smoke-20260508T125856Z`
 - LocalMaxxing payload: `/home/steve/bench-results/localmaxxing-minimax-m27-fast-mmid-mmv-y2-20260508.payload.json`
 - LocalMaxxing response: `/home/steve/bench-results/localmaxxing-minimax-m27-fast-mmid-mmv-y2-20260508.response.json`
@@ -91,5 +104,6 @@ llama-bench \
 ## Next
 
 - Keep `GGML_SYCL_MMV_Y_RUNTIME=2` as the default MiniMax GGUF test setting for now. A deterministic generation smoke matched byte-for-byte against default row grouping.
-- Keep `GGML_SYCL_MMV_Y_RUNTIME=4` marked neutral for now. Compile-time MMV4 produced `17.191979 tok/s`, not a win.
+- Keep `GGML_SYCL_MMV_Y_RUNTIME=4` and `8` marked neutral/negative for now. Compile-time MMV4 produced `17.191979 tok/s`; runtime MMV8 produced `17.238444 tok/s`.
+- Keep MoE-specific `GGML_SYCL_MOE_IQ4_XS_MMV_Y=4` marked negative; it produced `17.232041 tok/s` with generic MMV Y=2.
 - Continue toward vLLM/XPU AutoRound INT4 TP4, since GGUF row packing is now delivering single-digit-percent gains rather than the larger improvement needed for the 30 tok/s goal.
