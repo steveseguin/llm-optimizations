@@ -15,8 +15,8 @@ The same stack at `p512/n128/r3` produced `54.506141 tok/s` prompt and `17.69302
 
 ## Active Work
 
-1. Keep the MiniMax AutoRound INT4 safetensors download running on `/mnt/corsair-external`.
-2. When download completes, test vLLM/XPU TP4 with `Lasimeri/MiniMax-M2.7-int4-AutoRound`.
+1. MiniMax AutoRound INT4 safetensors are downloaded on `/mnt/corsair-external/llm-models/minimax-m2.7-int4-autoround`.
+2. Continue vLLM/XPU TP4 bring-up with `Lasimeri/MiniMax-M2.7-int4-AutoRound`. The first blocker was an unquantized XPU MoE fallback; the local experimental INC patch now routes MiniMax `FusedMoE` through WNA16 and fits the model at about 28.1 GiB/card. The current work item is proving generation after repairing vLLM package-version skew in the active environment.
 3. Keep `GGML_SYCL_MMV_Y_RUNTIME=2`, `-ub 64`, DNN disabled, and fused RMSNorm enabled as the default GGUF test setting; deterministic generation smokes matched earlier baselines byte-for-byte.
 4. Investigate the CPU backend IQ4_XS `MUL_MAT_ID` mismatch against the manual dequantized oracle.
 5. Continue using GGUF RPC+SYCL layer mode as the reproducible fallback while searching for a better all-GPU path.
@@ -35,9 +35,15 @@ Elementwise fused-op fixes are not enough. Fused RMSNorm is functional but neutr
 
 1. vLLM AutoRound INT4:
    - Try TP4 on all B70s first.
+   - Current model path: `/mnt/corsair-external/llm-models/minimax-m2.7-int4-autoround`.
+   - Preserve the local patch in `patches/vllm-inc-xpu-autoround-fusedmoe-wna16-20260508.patch`.
+   - Use the repaired vLLM env at `/home/steve/.venvs/vllm-xpu` until the source checkout and installed package can be cleanly rebuilt.
    - Start with llm-scaler-style XPU env: `VLLM_WORKER_MULTIPROC_METHOD=spawn`, `CCL_ZE_IPC_EXCHANGE=pidfd`, `CCL_ATL_TRANSPORT=ofi`.
    - Compare `CCL_TOPO_P2P_ACCESS=1` and `0` if the model gets through load.
-   - If TP4 fails due quantized MoE/XPU support, capture the exact unsupported op and inspect vLLM/INC/AutoRound dispatch.
+   - If TP4 fails in kernels, capture the exact unsupported op and inspect vLLM/INC/AutoRound dispatch.
+   - Try `--enforce-eager` if the compiled path fails; current Intel wNa16 vLLM docs recommend eager for Intel GPU/CPU.
+   - Try MiniMax QK-norm compile fusion if this build exposes it: `--compilation-config '{"mode":3,"pass_config":{"fuse_minimax_qk_norm":true}}'`.
+   - Treat the AMD Instinct int4 W4A16 MoE tuned config as a negative seed for B70. The raw file failed on unsupported `matrix_instr_nonkdim`; stripping that key completed p64/n16 but regressed to `8.632747` total tok/s and `1.73` output tok/s.
    - If TP4 OOMs or stalls, try reduced `max_model_len`, `max_num_batched_tokens`, and possibly TP2 just to isolate the failure mode.
 2. GGUF attention/KV:
    - Add op timing around attention-side `CPY`, `ROPE`, `SOFT_MAX`, and `MUL_MAT` nodes.

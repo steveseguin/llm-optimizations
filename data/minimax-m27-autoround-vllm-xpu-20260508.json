@@ -1,0 +1,87 @@
+{
+  "date": "2026-05-08",
+  "model": {
+    "hf_id": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+    "base_hf_id": "MiniMaxAI/MiniMax-M2.7",
+    "quantization": "INT4 AutoRound W4A16",
+    "model_path": "/mnt/corsair-external/llm-models/minimax-m2.7-int4-autoround"
+  },
+  "hardware": {
+    "gpu": "Intel Arc Pro B70",
+    "gpu_count": 4,
+    "vram_gb_per_gpu": 32,
+    "cpu": "AMD EPYC 9015",
+    "ram_gb": 16,
+    "os": "Ubuntu 24.04.4"
+  },
+  "software": {
+    "engine": "vllm",
+    "engine_version": "0.20.1-local",
+    "backend": "xpu",
+    "venv": "/home/steve/.venvs/vllm-xpu",
+    "source": "/home/steve/src/vllm",
+    "patch": "patches/vllm-inc-xpu-autoround-fusedmoe-wna16-20260508.patch",
+    "wrapper": "scripts/bench-vllm-minimax-autoround-xpu.sh"
+  },
+  "repairs": [
+    "Routed INC AutoRound XPU FusedMoE layers through MoeWNA16Config to avoid unquantized-MoE OOM.",
+    "Installed Python 3.12 headers for Triton Intel launcher compilation.",
+    "Copied source-matched vLLM v1 scheduler/request files into the active venv to repair package skew."
+  ],
+  "results": [
+    {
+      "name": "proof_of_life_p64_n16",
+      "prompt_tokens": 64,
+      "output_tokens": 16,
+      "context_length": 512,
+      "tensor_parallel": 4,
+      "tok_s_total": 46.059135,
+      "tok_s_output_log": 9.21,
+      "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-inc-xpu-moe-wna16-requestfix-tp4-p64n16-20260508T161843Z.log",
+      "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-inc-xpu-moe-wna16-requestfix-tp4-p64n16-20260508T161843Z.json"
+    },
+    {
+      "name": "p512_n128_default_moe_config",
+      "prompt_tokens": 512,
+      "output_tokens": 128,
+      "context_length": 2048,
+      "tensor_parallel": 4,
+      "tok_s_total": 67.259054,
+      "tok_s_output": 13.45,
+      "peak_model_load_gb_per_gpu": 28.11,
+      "localmaxxing_id": "cmox4zohw0077ml01czu880bz",
+      "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n128-20260508T162541Z.log",
+      "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n128-20260508T162541Z.json",
+      "interpretation": "Valid but slower than current GGUF MiniMax p512/n128 decode. vLLM warns that no B70-specific int4_w4a16 MoE config exists for E=256,N=384, so it uses default MoE config."
+    },
+    {
+      "name": "p64_n16_amd_moe_seed_rejected",
+      "prompt_tokens": 64,
+      "output_tokens": 16,
+      "context_length": 512,
+      "tensor_parallel": 4,
+      "config_source": "E=384,N=256,device_name=AMD_Instinct_MI355_OAM,dtype=int4_w4a16.json renamed to the B70 E=256,N=384 filename",
+      "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p64n16-20260508T163648Z.log",
+      "interpretation": "The config loader used the external file, but Triton rejected the AMD-only matrix_instr_nonkdim meta parameter on XPU."
+    },
+    {
+      "name": "p64_n16_amd_moe_seed_stripped",
+      "prompt_tokens": 64,
+      "output_tokens": 16,
+      "context_length": 512,
+      "tensor_parallel": 4,
+      "tok_s_total": 8.632747,
+      "tok_s_output": 1.73,
+      "config_source": "Same AMD-derived config with matrix_instr_nonkdim removed",
+      "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p64n16-20260508T164639Z.log",
+      "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p64n16-20260508T164639Z.json",
+      "interpretation": "Completed but regressed badly versus the default MoE config smoke, so this seed should not be promoted."
+    }
+  ],
+  "next_steps": [
+    "Tune or supply a B70 int4_w4a16 MoE config for E=256,N=384; AMD-derived seeds were rejected or slower.",
+    "Test MiniMax QK norm fusion after the baseline is stable.",
+    "Compare XPU graph, CCL IPC, and topology settings.",
+    "Keep GGUF RPC+SYCL as the faster current MiniMax path until AutoRound exceeds it."
+  ]
+}

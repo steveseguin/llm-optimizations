@@ -17,13 +17,14 @@ Reproducibility notes, benchmark payloads, and local patches from the Intel Arc 
 - FP8 MTP with a hybrid static target plus dynamic block-FP8 `mtp.safetensors` now loads cleanly with an opt-in local vLLM patch, but the corrected MTP path is too slow (`2.36 tok/s` eager smoke, `1.84 tok/s` compiled smoke) and is not a LocalMaxxing result.
 - Earlier strongest raw speed result was an INT4 AutoRound model variant, not the Q4_0 GGUF. It improves speed substantially but has quantization quality tradeoffs relative to FP8/BF16.
 - 2026-05-05 follow-ups were negative: Q4 small-F32 allreduce regressed, FP8 TP2/PP2 was not competitive for batch-1 speed, the oneCCL topology override regressed, and MiniMax `MUL_MAT_ID` masking only moved the failure to coarse buffer allocation.
-- MiniMax M2.7 UD-IQ4_XS now has a valid four-B70 working baseline and a first KV-offload improvement. The original process-per-GPU RPC+SYCL baseline reached 13.754 tok/s for `p0/n64`; the current best is 16.384 tok/s with the corrected RPC device map, `-nkvo 0`, local SYCL `MOE_FUSED_UP_GATE`, merged gate/up expert tensors (`-muge 1`), runtime repack, and experimental SYCL `MUL_MULTI_ADD`. LocalMaxxing accepted this result as `cmowft2hr000oo3019is4snoq`.
+- MiniMax M2.7 UD-IQ4_XS now has a valid four-B70 RPC+SYCL layer-mode path. The original process-per-GPU baseline reached 13.754 tok/s for `p0/n64`; the current GGUF best is 17.697772 tok/s with corrected RPC device mapping, `-nkvo 0`, fast IQ4_XS `MUL_MAT_ID`, runtime MMV row packing (`GGML_SYCL_MMV_Y_RUNTIME=2`), `-ub 64`, fused RMSNorm enabled, DNN disabled, and merged gate/up expert tensors (`-muge 1`). LocalMaxxing accepted this as `cmox103ol0040ml019yzs6gvs`; the same stack at p512/n128 reached 54.506 prompt tok/s and 17.693 decode tok/s as `cmox1gcxl0049ml01kiijqbpo`.
 - MiniMax direct single-process SYCL is still blocked: even an uneven split fails in `llm_load_tensors` on a 19.028 GB regular SYCL model-buffer allocation on GPU0. The current RPC-worker layout remains useful because it avoids that large single-process buffer path. A layer-placement sweep topped out at 16.358 tok/s, so placement is not the route to the >30 tok/s target.
 - MiniMax quality-correct graph/tensor mode now executes with default-off `GGML_MINIMAX_NO_DEFER_REDUCE=1` and `GGML_RPC_REDUCE_MIRROR=1`, but it is diagnostic only: the one-token smoke reached 2.034 tok/s after forcing real reductions at nonlinear boundaries. The faster branch-fused graph path is not promoted because deferred partial reductions can cross RMSNorm/router/MoE boundaries and change the math.
 - MiniMax layer-mode knob screens did not find a new speed path: client `-t` is not limiting, `-fa 1` currently aborts in the SYCL RPC worker due unsupported `FLASH_ATTN_EXT`, disabling fused MMAD/MoE is slower, oneDNN enabled is slower, same-type contiguous copy memcpy is neutral, and an 8-expert `MUL_MULTI_ADD` unroll regressed and was removed.
 - MiniMax CPY tracing found three repeated per-layer copy shapes. A default-off shape-specific copy fast path for those shapes regressed to 12.732 tok/s, so future CPY work should fuse producer kernels into KV/cache writes rather than replacing the copy op with standalone kernels.
 - MiniMax SYCL RPC worker now implements `FUSED_RMS_NORM`, converting a previous unsupported-op abort into a valid path. It reached 16.308 tok/s at p0/n64/r1, so it is functional but not a speed record.
 - The next MiniMax performance blocker is true speed parallelism rather than capacity. Valid layer mode has only five scheduler splits and largely marches through the four GPUs sequentially. The >30 tok/s path likely requires quality-correct graph/tensor/expert parallelism, lower-overhead cross-device reductions, or a layout-aware active-expert kernel.
+- MiniMax AutoRound INT4 safetensors now load and generate through vLLM/XPU TP4 after the local INC `FusedMoE` to `MoeWNA16Config` patch and targeted vLLM package-skew repairs. The first p512/n128 measurement is 13.45 output tok/s, below the GGUF path, and the log shows the next bottleneck: no B70-specific tuned MoE config for `E=256,N=384,dtype=int4_w4a16`. An AMD-derived config seed was accepted only after stripping an unsupported key, but it regressed to 1.73 output tok/s on p64/n16.
 
 ## Layout
 
@@ -60,6 +61,7 @@ Reproducibility notes, benchmark payloads, and local patches from the Intel Arc 
 - `notes/2026-05-08-minimax-layer-knob-and-kernel-screens.md`: MiniMax layer-mode runtime knob, unsupported-op, and small-kernel screens.
 - `notes/2026-05-08-minimax-cpy-shape-trace.md`: MiniMax SYCL `CPY` shape trace and negative shape-specific copy fast path.
 - `notes/2026-05-08-minimax-fused-rmsnorm-sycl.md`: MiniMax SYCL RPC worker `FUSED_RMS_NORM` implementation and speed screen.
+- `notes/2026-05-08-minimax-autoround-vllm-xpu.md`: MiniMax AutoRound INT4 vLLM/XPU bring-up, including the quantized-MoE fit patch and remaining blockers.
 - `data/qwen36-fp8-32k-tp4-vs-pp2-20260506.json`: post-reboot Q4 sanity plus FP8 32k-context TP4 vs TP2/PP2 validation.
 - `data/q4-esimd-blockscales-20260506.json`: structured ESIMD block-loaded scale metadata screen.
 - `data/q4-active-device-row-split-20260506.json`: structured active-device row-split patch validation and negative row-split smoke.
@@ -82,11 +84,13 @@ Reproducibility notes, benchmark payloads, and local patches from the Intel Arc 
 - `data/minimax-m27-layer-knob-and-kernel-screens-20260508.json`: structured MiniMax layer-mode knob and kernel screens.
 - `data/minimax-m27-cpy-shape-trace-20260508.json`: structured MiniMax `CPY` shape trace and negative fast-path test.
 - `data/minimax-m27-fused-rmsnorm-sycl-20260508.json`: structured MiniMax fused RMSNorm implementation result.
+- `data/minimax-m27-autoround-vllm-xpu-20260508.json`: structured MiniMax AutoRound INT4 vLLM/XPU bring-up result and remaining MoE tuning blocker.
 - `scripts/bench-qwen36-q4_0-gguf-vulkan-matrix.sh`: Q4_0 GGUF Vulkan benchmark sweep harness.
 - `scripts/bench-qwen36-q4_0-gguf-sycl-matrix.sh`: Q4_0 GGUF SYCL benchmark sweep harness.
 - `scripts/bench-qwen36-b70-single-mtp.sh`: single-B70 vLLM INT4 MTP benchmark wrapper.
 - `scripts/bench-qwen36-b70-tp2.sh`: dual-B70 vLLM TP2 benchmark wrapper.
 - `scripts/bench-vllm-qwen36-fp8.sh`: reusable Qwen3.6 FP8 vLLM latency wrapper with TP/PP/speculative knobs.
+- `scripts/bench-vllm-minimax-autoround-xpu.sh`: reusable MiniMax M2.7 AutoRound INT4 vLLM/XPU throughput wrapper for TP4 B70 bring-up.
 - `scripts/add-qwen35-fused-ba-gguf.py`: experimental augmented-GGUF generator that adds fused Qwen35 `ssm_ba` tensors from separate alpha/beta tensors.
 - `scripts/submit_localmaxxing_results.py`: LocalMaxxing submission helper. Requires `LMX_API_KEY` in the environment; no API key is stored in this repo.
 - `benchmarks/b70_xccl_allreduce_bench.py`: XPU all-reduce/P2P microbenchmark.
@@ -111,6 +115,7 @@ Reproducibility notes, benchmark payloads, and local patches from the Intel Arc 
 - `patches/vllm-xpu-force-graph-with-comm-experiment.patch`: failed TP2 graph-capture experiment knob retained as a negative result.
 - `patches/vllm-xpu-fa2-compressed-tensors-scalar-scales.patch`: vLLM compressed-tensors singleton attention scale fix for Intel XPU FlashAttention2.
 - `patches/vllm-xpu-qwen35-gdn-spec-fallback-contiguous-state.patch`: XPU Gated DeltaNet speculative metadata/fallback patch used by the n-gram runs.
+- `patches/vllm-inc-xpu-autoround-fusedmoe-wna16-20260508.patch`: experimental vLLM patch that lets INC/AutoRound XPU quantization apply WNA16 MoE quantization to MiniMax `FusedMoE` layers instead of falling back to unquantized MoE.
 
 ## Notes
 

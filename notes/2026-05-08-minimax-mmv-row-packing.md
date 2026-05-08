@@ -151,7 +151,6 @@ ONEAPI_DEVICE_SELECTOR=level_zero:<id> \
 UR_L0_ENABLE_RELAXED_ALLOCATION_LIMITS=1 \
 ZES_ENABLE_SYSMAN=1 \
 GGML_SYCL_DISABLE_DNN=1 \
-GGML_DISABLE_FUSED_RMS_NORM=1 \
 GGML_SYCL_FAST_MUL_MAT_ID_IQ4_XS=1 \
 GGML_SYCL_MMV_Y_RUNTIME=2 \
 rpc-server --device SYCL0 --host 127.0.0.1 --port <50100+id>
@@ -160,12 +159,11 @@ rpc-server --device SYCL0 --host 127.0.0.1 --port <50100+id>
 Client:
 
 ```bash
-GGML_DISABLE_FUSED_RMS_NORM=1 \
 llama-bench \
   -m MiniMax-M2.7-UD-IQ4_XS-00001-of-00004.gguf \
   -rpc '127.0.0.1:50100|0,127.0.0.1:50101|0,127.0.0.1:50102|0,127.0.0.1:50103|0' \
   -p 0 -n 64 -r 5 -ngl 99 -sm layer -ts 1/1/1/1 \
-  -fa 0 -nkvo 0 -ub 32 -ctk f16 -ctv f16 -t 4 -w 0 -mmp 1 \
+  -fa 0 -nkvo 0 -ub 64 -ctk f16 -ctv f16 -t 4 -w 0 -mmp 1 \
   -rtr 1 -fmoe 1 -no-mmad 0 -muge 1 -sas 0 -o json
 ```
 

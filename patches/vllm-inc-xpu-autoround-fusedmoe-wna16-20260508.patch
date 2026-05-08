@@ -1,0 +1,33 @@
+diff --git a/vllm/model_executor/layers/quantization/inc.py b/vllm/model_executor/layers/quantization/inc.py
+index 4457555c0..62794613d 100644
+--- a/vllm/model_executor/layers/quantization/inc.py
++++ b/vllm/model_executor/layers/quantization/inc.py
+@@ -413,6 +413,8 @@ class INCConfig(QuantizationConfig):
+         return None
+ 
+     def apply_xpu_w4a16_quant_layer(self, layer, prefix: str):
++        from vllm.model_executor.layers.fused_moe import FusedMoE
++
+         weight_bits, group_size, sym = self.get_layer_config(layer, prefix)
+ 
+         if not self.check_quantized(weight_bits):
+@@ -430,6 +432,19 @@ class INCConfig(QuantizationConfig):
+             raise NotImplementedError(
+                 "INC W4A16 on XPU only supports symmetric quantization for now."
+             )
++        if isinstance(layer, FusedMoE):
++            from vllm.model_executor.layers.quantization.moe_wna16 import (
++                MoeWNA16Config,
++            )
++
++            config = {
++                "quant_method": "gptq",
++                "bits": weight_bits,
++                "group_size": group_size,
++                "sym": sym,
++                "lm_head": False,
++            }
++            return MoeWNA16Config.from_config(config).get_quant_method(layer, prefix)
+         if isinstance(layer, (LinearBase, ParallelLMHead)):
+             return INCXPULinearMethod(
+                 weight_bits=weight_bits,
