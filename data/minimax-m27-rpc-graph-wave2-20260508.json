@@ -1,0 +1,64 @@
+{
+  "date": "2026-05-08",
+  "model": {
+    "hfId": "unsloth/MiniMax-M2.7",
+    "ggufRepo": "unsloth/MiniMax-M2.7-GGUF",
+    "quantization": "UD-IQ4_XS",
+    "localPath": "/home/steve/models/minimax-m2.7-ud-iq4_xs-gguf/UD-IQ4_XS/MiniMax-M2.7-UD-IQ4_XS-00001-of-00004.gguf"
+  },
+  "engine": {
+    "name": "ik_llama.cpp",
+    "reportedBuildCommit": "9a26522",
+    "backend": "RPC client plus four SYCL Level Zero rpc-server workers",
+    "patch": "patches/ik-llama-minimax-rpc-device-map-and-graphsplit-20260508.patch"
+  },
+  "patches": [
+    "RPC socket transactions now take a per-socket mutex, preventing concurrent command/response interleaving.",
+    "RPC graph cache access is protected by a mutex.",
+    "GGML_SCHED_ASYNC_WAVE=1 now copies split inputs serially, groups only distinct-backend splits with no intra-wave input dependency, runs graph compute in parallel, and serializes completion bookkeeping.",
+    "The older per-backend async path is renamed to GGML_SCHED_ASYNC_PER_BACKEND_UNSAFE to avoid accidental use."
+  ],
+  "baselineGraph": {
+    "label": "safe graph split before wave2",
+    "tokSOut": 3.813849,
+    "promptTokens": 0,
+    "outputTokens": 16,
+    "json": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/rpc-split-speed-p0n16-20260508T021258Z.jsonl",
+    "notes": "Graph split completed but was dominated by 503 split/RPC submissions."
+  },
+  "runs": [
+    {
+      "label": "wave2 p0/n1 smoke",
+      "commandTail": "GGML_SCHED_ASYNC_WAVE=1 GGML_SCHED_SPLIT_TRACE=1 ... -p 0 -n 1 -r 1 -ngl 99 -sm graph -ts 1/1/1/1 -fa 0 -nkvo 0 -ub 32 -t 4 -fmoe 1 -no-mmad 0 -muge 1 -sas 1",
+      "tokSOut": 2.059700,
+      "promptTokens": 0,
+      "outputTokens": 1,
+      "nSplits": 503,
+      "backendSplits": [125, 125, 125, 127, 1],
+      "json": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/rpc-split-wave2-kvoff-p0n1-20260508T035013Z.jsonl",
+      "log": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/rpc-split-wave2-kvoff-p0n1-20260508T035013Z.log"
+    },
+    {
+      "label": "wave2 p0/n16",
+      "commandTail": "GGML_SCHED_ASYNC_WAVE=1 ... -p 0 -n 16 -r 1 -ngl 99 -sm graph -ts 1/1/1/1 -fa 0 -nkvo 0 -ub 32 -t 4 -fmoe 1 -no-mmad 0 -muge 1 -sas 1",
+      "tokSOut": 3.920533,
+      "promptTokens": 0,
+      "outputTokens": 16,
+      "improvementVsBaselineGraphPct": 2.797,
+      "json": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/rpc-split-wave2-kvoff-p0n16-20260508T035319Z.jsonl",
+      "log": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/rpc-split-wave2-kvoff-p0n16-20260508T035319Z.log"
+    },
+    {
+      "label": "wave2 flash attention probe",
+      "commandTail": "GGML_SCHED_ASYNC_WAVE=1 ... -p 0 -n 16 -r 1 -ngl 99 -sm graph -ts 1/1/1/1 -fa 1 -nkvo 0 -ub 32 -t 4 -fmoe 1 -no-mmad 0 -muge 1 -sas 1",
+      "result": "failed",
+      "failure": "SYCL worker aborted: FLASH_ATTN_EXT unsupported in this RPC graph path.",
+      "log": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/rpc-split-wave2-fa1-p0n16-20260508T035658Z.log"
+    }
+  ],
+  "conclusion": "Wave2 makes graph split safe enough to run and gives a small positive p0/n16 gain, but graph mode remains much slower than the corrected layer baseline at 14.292 tok/s. The next meaningful graph work is to reduce the 503 split submissions by changing MiniMax graph construction, especially the cross-backend norm/setup dependency before per-device attention/MoE branches.",
+  "localmaxxing": {
+    "submitted": false,
+    "reason": "Not submitted because this is an experimental graph-path learning result and is far slower than the current corrected layer baseline. localmaxxing.com was also returning 522 earlier in this session."
+  }
+}

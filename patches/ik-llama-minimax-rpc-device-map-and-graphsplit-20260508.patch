@@ -173,10 +173,18 @@ index e5db37d..0d313a7 100644
  GGML_API GGML_CALL uint32_t ggml_backend_rpc_get_device_count(const char* endpoint);
  
 diff --git a/ggml/src/ggml-backend.cpp b/ggml/src/ggml-backend.cpp
-index 97c7481..1938714 100644
+index 97c7481..9492431 100644
 --- a/ggml/src/ggml-backend.cpp
 +++ b/ggml/src/ggml-backend.cpp
-@@ -1699,6 +1699,7 @@ static void ggml_backend_sched_split_graph(ggml_backend_sched_t sched, struct gg
+@@ -16,6 +16,7 @@
+ #include <chrono>
+ #include <barrier>
+ #include <thread>
++#include <unordered_map>
+ #ifdef GGML_USE_OPENMP
+ #include <omp.h>
+ #endif
+@@ -1699,6 +1700,7 @@ static void ggml_backend_sched_split_graph(ggml_backend_sched_t sched, struct gg
          split->i_start = 0;
          split->n_inputs = 0;
          int cur_backend_id = split->backend_id;
@@ -184,7 +192,7 @@ index 97c7481..1938714 100644
          for (; i < graph->n_nodes; i++) {
              struct ggml_tensor * node = graph->nodes[i];
  
-@@ -1721,6 +1722,9 @@ static void ggml_backend_sched_split_graph(ggml_backend_sched_t sched, struct gg
+@@ -1721,6 +1723,9 @@ static void ggml_backend_sched_split_graph(ggml_backend_sched_t sched, struct gg
                   node->op_params[GGML_MAX_OP_PARAMS / sizeof(int32_t) - 1] == 0xff) {
                  need_new_split = true;
              }
@@ -194,7 +202,7 @@ index 97c7481..1938714 100644
              else if (node_backend_id == cur_backend_id && split->n_inputs > 0) {
                  for (int j = 0; j < GGML_MAX_SRC; j++) {
                      struct ggml_tensor * src = node->src[j];
-@@ -1766,6 +1770,7 @@ static void ggml_backend_sched_split_graph(ggml_backend_sched_t sched, struct gg
+@@ -1766,6 +1771,7 @@ static void ggml_backend_sched_split_graph(ggml_backend_sched_t sched, struct gg
                  split->n_inputs = 0;
                  cur_backend_id = node_backend_id;
              }
@@ -202,7 +210,7 @@ index 97c7481..1938714 100644
  
              // find inputs that are not on the same backend
              for (int j = 0; j < GGML_MAX_SRC; j++) {
-@@ -2165,10 +2170,197 @@ static enum ggml_status ggml_backend_sched_compute_splits(ggml_backend_sched_t s
+@@ -2165,10 +2171,232 @@ static enum ggml_status ggml_backend_sched_compute_splits(ggml_backend_sched_t s
  
      for (auto & item : sched->needs_sync) item = true;
  
@@ -245,7 +253,7 @@ index 97c7481..1938714 100644
          for (auto & s : sched->statuses) s = GGML_STATUS_SUCCESS;
  
 +        static const bool async_per_backend = []() {
-+            const char * env = getenv("GGML_SCHED_ASYNC_PER_BACKEND");
++            const char * env = getenv("GGML_SCHED_ASYNC_PER_BACKEND_UNSAFE");
 +            return env && strcmp(env, "0") != 0;
 +        }();
 +        static const bool async_wave = []() {
@@ -253,19 +261,36 @@ index 97c7481..1938714 100644
 +            return env && strcmp(env, "0") != 0;
 +        }();
 +        if (async_wave) {
-+            auto eval_one = [sched] (ggml_backend_sched_split * split, int split_backend_id) {
-+                std::vector<int32_t> ids;
-+                std::vector<uint32_t> unique_ids;
-+                ggml_tensor * last_ids_tensor = nullptr;
-+                ggml_backend_t split_backend = sched->backends[split_backend_id];
-+
-+                ggml_backend_sched_copy_inputs(sched, split, sched->needs_sync, ids, unique_ids, last_ids_tensor);
-+
-+                sched->statuses[split_backend_id] = ggml_backend_sched_eval(sched, split_backend, split);
-+                if (sched->statuses[split_backend_id] != GGML_STATUS_SUCCESS) {
-+                    return;
++            std::unordered_map<const ggml_tensor *, int> producer_split;
++            producer_split.reserve(sched->n_splits * 8);
++            for (int si = 0; si < sched->n_splits; ++si) {
++                ggml_backend_sched_split * split = &sched->splits[si];
++                for (int ni = 0; ni < split->graph.n_nodes; ++ni) {
++                    producer_split[split->graph.nodes[ni]] = si;
 +                }
++            }
 +
++            auto produced_in_wave = [&producer_split] (const ggml_tensor * tensor, int wave_start, int wave_end) {
++                const ggml_tensor * key = tensor->view_src ? tensor->view_src : tensor;
++                auto it = producer_split.find(key);
++                return it != producer_split.end() && it->second >= wave_start && it->second < wave_end;
++            };
++
++            auto split_depends_on_wave = [&produced_in_wave] (const ggml_backend_sched_split & split, int wave_start, int wave_end) {
++                for (int j = 0; j < split.n_inputs; ++j) {
++                    if (produced_in_wave(split.inputs[j], wave_start, wave_end)) {
++                        return true;
++                    }
++                }
++                return false;
++            };
++
++            std::vector<int32_t> ids;
++            std::vector<uint32_t> unique_ids;
++            ggml_tensor * last_ids_tensor = nullptr;
++
++            auto copy_one = [sched, &ids, &unique_ids, &last_ids_tensor] (ggml_backend_sched_split * split, int split_backend_id) {
++                ggml_backend_sched_copy_inputs(sched, split, sched->needs_sync, ids, unique_ids, last_ids_tensor);
 +                if (split->n_inputs > 0 && !sched->own_cpy[split_backend_id]) {
 +                    sched->needs_sync[split_backend_id] = true;
 +                } else {
@@ -275,7 +300,14 @@ index 97c7481..1938714 100644
 +                        }
 +                    }
 +                }
++            };
 +
++            auto eval_one = [sched] (ggml_backend_sched_split * split, int split_backend_id) {
++                ggml_backend_t split_backend = sched->backends[split_backend_id];
++                sched->statuses[split_backend_id] = ggml_backend_sched_eval(sched, split_backend, split);
++            };
++
++            auto finish_one = [sched] (ggml_backend_sched_split * split, int split_backend_id) {
 +                if (split->graph.nodes[0]->op == GGML_OP_REDUCE) {
 +                    auto node = split->graph.nodes[0];
 +                    int n = node->op_params[1];
@@ -314,13 +346,21 @@ index 97c7481..1938714 100644
 +                    if (used[backend_id]) {
 +                        break;
 +                    }
++                    if (split_depends_on_wave(split, i, j)) {
++                        break;
++                    }
 +                    used[backend_id] = true;
 +                }
 +
 +                if (j == i + 1) {
++                    copy_one(&sched->splits[i], sched->splits[i].backend_id);
 +                    eval_one(&sched->splits[i], sched->splits[i].backend_id);
++                    finish_one(&sched->splits[i], sched->splits[i].backend_id);
 +                    ++i;
 +                } else {
++                    for (int k = i; k < j; ++k) {
++                        copy_one(&sched->splits[k], sched->splits[k].backend_id);
++                    }
 +                    std::vector<std::thread> wave_workers;
 +                    wave_workers.reserve(j - i);
 +                    for (int k = i; k < j; ++k) {
@@ -328,6 +368,9 @@ index 97c7481..1938714 100644
 +                    }
 +                    for (auto & worker : wave_workers) {
 +                        worker.join();
++                    }
++                    for (int k = i; k < j; ++k) {
++                        finish_one(&sched->splits[k], sched->splits[k].backend_id);
 +                    }
 +                    i = j;
 +                }
@@ -400,7 +443,7 @@ index 97c7481..1938714 100644
          int first_reduce = -1;
          bool work_done = false;
  #ifdef GGML_USE_OPENMP
-@@ -2594,6 +2786,7 @@ static void ggml_sched_prepare_graph(ggml_backend_sched_t sched) {
+@@ -2594,6 +2822,7 @@ static void ggml_sched_prepare_graph(ggml_backend_sched_t sched) {
                              if (node->src[l] && node->src[l]->data == input_cpy->data) node->src[l]->data = ptr;
                          }
                      }
@@ -409,10 +452,26 @@ index 97c7481..1938714 100644
                      ptr += tensor_size(split->inputs[j]);
                  }
 diff --git a/ggml/src/ggml-rpc.cpp b/ggml/src/ggml-rpc.cpp
-index cfb0f94..7197aa4 100644
+index cfb0f94..7c38ca6 100644
 --- a/ggml/src/ggml-rpc.cpp
 +++ b/ggml/src/ggml-rpc.cpp
-@@ -275,6 +275,23 @@ struct ggml_backend_rpc_buffer_context {
+@@ -53,6 +53,7 @@ typedef int sockfd_t;
+ // cross-platform socket
+ struct socket_t {
+     sockfd_t fd;
++    std::mutex mutex;
+     socket_t(sockfd_t fd) : fd(fd) {}
+     ~socket_t() {
+         LOG_DBG("[%s] closing socket %d\n", __func__, this->fd);
+@@ -263,6 +264,7 @@ struct ggml_backend_rpc_context {
+     uint32_t    device;
+     std::string name;
+     graph_cache gc;
++    std::mutex gc_mutex;
+ };
+ 
+ static std::unordered_map<std::string, ggml_backend_rpc_buffer_type_context*> rpc_server_map;
+@@ -275,6 +277,23 @@ struct ggml_backend_rpc_buffer_context {
      std::string name;
  };
  
@@ -436,7 +495,34 @@ index cfb0f94..7197aa4 100644
  // RPC helper functions
  
  // Computes FNV-1a hash of the data
-@@ -730,6 +747,465 @@ static std::string create_rpc_name(std::string endpoint, uint32_t device) {
+@@ -461,7 +480,7 @@ static bool parse_endpoint(const std::string & endpoint, std::string & host, int
+ 
+ // RPC request : | rpc_cmd (1 byte) | request_size (8 bytes) | request_data (request_size bytes) |
+ // No response
+-static bool send_rpc_cmd(const std::shared_ptr<socket_t> & sock, enum rpc_cmd cmd, const void * input, size_t input_size) {
++static bool send_rpc_cmd_unlocked(const std::shared_ptr<socket_t> & sock, enum rpc_cmd cmd, const void * input, size_t input_size) {
+     uint8_t cmd_byte = cmd;
+     if (!send_data(sock->fd, &cmd_byte, sizeof(cmd_byte))) {
+         return false;
+@@ -475,10 +494,16 @@ static bool send_rpc_cmd(const std::shared_ptr<socket_t> & sock, enum rpc_cmd cm
+     return true;
+ }
+ 
++static bool send_rpc_cmd(const std::shared_ptr<socket_t> & sock, enum rpc_cmd cmd, const void * input, size_t input_size) {
++    std::lock_guard<std::mutex> lock(sock->mutex);
++    return send_rpc_cmd_unlocked(sock, cmd, input, input_size);
++}
++
+ // RPC request : | rpc_cmd (1 byte) | request_size (8 bytes) | request_data (request_size bytes) |
+ // RPC response: | response_size (8 bytes) | response_data (response_size bytes) |
+ static bool send_rpc_cmd(const std::shared_ptr<socket_t> & sock, enum rpc_cmd cmd, const void * input, size_t input_size, void * output, size_t output_size) {
+-    if (!send_rpc_cmd(sock, cmd, input, input_size)) {
++    std::lock_guard<std::mutex> lock(sock->mutex);
++    if (!send_rpc_cmd_unlocked(sock, cmd, input, input_size)) {
+         return false;
+     }
+     // TODO: currently the output_size is always known, do we need support for commands with variable output size?
+@@ -730,6 +755,465 @@ static std::string create_rpc_name(std::string endpoint, uint32_t device) {
      return dev_name;
  }
  
@@ -902,7 +988,7 @@ index cfb0f94..7197aa4 100644
  static ggml_backend_buffer_t ggml_backend_rpc_buffer_type_alloc_buffer(ggml_backend_buffer_type_t buft, size_t size) {
      ggml_backend_rpc_buffer_type_context* buft_ctx = (ggml_backend_rpc_buffer_type_context*)buft->context;
      rpc_msg_alloc_buffer_req request = { buft_ctx->device, size };
-@@ -874,10 +1350,104 @@ static void serialize_graph(uint32_t device, const ggml_cgraph* cgraph, std::vec
+@@ -874,11 +1358,112 @@ static void serialize_graph(uint32_t device, const ggml_cgraph* cgraph, std::vec
      memcpy(out_tensors, tensors.data(), n_tensors * sizeof(rpc_tensor));
  }
  
@@ -1000,14 +1086,31 @@ index cfb0f94..7197aa4 100644
      ggml_backend_rpc_context* rpc_ctx = (ggml_backend_rpc_context*)backend->context;
  
      GGML_ASSERT(cgraph->n_nodes > 0);
+-    bool reuse = rpc_ctx->gc.is_cached(cgraph);
 +    if (ggml_tensor * reduce = ggml_backend_rpc_graph_single_reduce(cgraph)) {
 +        return ggml_backend_rpc_graph_compute_reduce(reduce);
 +    }
 +
-     bool reuse = rpc_ctx->gc.is_cached(cgraph);
++    bool reuse = false;
++    {
++        std::lock_guard<std::mutex> lock(rpc_ctx->gc_mutex);
++        reuse = rpc_ctx->gc.is_cached(cgraph);
++        if (!reuse) {
++            rpc_ctx->gc.add(cgraph);
++        }
++    }
      if (reuse) {
          rpc_msg_graph_recompute_req request;
-@@ -904,12 +1474,23 @@ GGML_CALL static bool ggml_backend_rpc_supports_op(ggml_backend_t backend, const
+         request.device = rpc_ctx->device;
+@@ -886,7 +1471,6 @@ static enum ggml_status ggml_backend_rpc_graph_compute(ggml_backend_t backend, g
+         bool status = send_rpc_cmd(sock, RPC_CMD_GRAPH_RECOMPUTE, &request, sizeof(request));
+         RPC_STATUS_ASSERT(status);
+     } else {
+-        rpc_ctx->gc.add(cgraph);
+         std::vector<uint8_t> input;
+         serialize_graph(rpc_ctx->device, cgraph, input);
+         auto sock = get_socket(rpc_ctx->endpoint);
+@@ -904,12 +1488,23 @@ GGML_CALL static bool ggml_backend_rpc_supports_op(ggml_backend_t backend, const
  }
  
  GGML_CALL static bool ggml_backend_rpc_supports_buft(ggml_backend_t backend, ggml_backend_buffer_type_t buft) {
@@ -1035,7 +1138,7 @@ index cfb0f94..7197aa4 100644
  }
  
  static ggml_backend_i ggml_backend_rpc_interface = {
-@@ -968,6 +1549,58 @@ GGML_API GGML_CALL ggml_backend_buffer_type_t ggml_backend_rpc_buffer_type(const
+@@ -968,6 +1563,58 @@ GGML_API GGML_CALL ggml_backend_buffer_type_t ggml_backend_rpc_buffer_type(const
      return buft;
  }
  
@@ -1094,7 +1197,15 @@ index cfb0f94..7197aa4 100644
  // backend registry
  GGML_CALL static ggml_backend_t ggml_backend_reg_rpc_init(const char* params, void* user_data) {
      auto rpc_ctx = (ggml_backend_rpc_buffer_type_context *) user_data;
-@@ -1236,6 +1869,17 @@ ggml_tensor * rpc_server::deserialize_tensor(struct ggml_context * ctx, const rp
+@@ -1002,6 +1649,7 @@ GGML_CALL ggml_backend_t ggml_backend_rpc_init(const char * endpoint, uint32_t d
+         /* .device   = */ device,
+         /* .name     = */ dev_name,
+         /* .gc       = */ {},
++        /* .gc_mutex = */ {},
+     };
+ 
+     ggml_backend_t backend = new ggml_backend {
+@@ -1236,6 +1884,17 @@ ggml_tensor * rpc_server::deserialize_tensor(struct ggml_context * ctx, const rp
          uint64_t buffer_start = (uint64_t) ggml_backend_buffer_get_base(result->buffer);
          uint64_t buffer_size = (uint64_t) ggml_backend_buffer_get_size(result->buffer);
          GGML_ASSERT(tensor->data + tensor_size >= tensor->data); // check for overflow
@@ -1112,7 +1223,7 @@ index cfb0f94..7197aa4 100644
          GGML_ASSERT(tensor->data >= buffer_start && tensor->data + tensor_size <= buffer_start + buffer_size);
      }
  
-@@ -1251,6 +1895,11 @@ ggml_tensor * rpc_server::deserialize_tensor(struct ggml_context * ctx, const rp
+@@ -1251,6 +1910,11 @@ ggml_tensor * rpc_server::deserialize_tensor(struct ggml_context * ctx, const rp
  
  
  bool rpc_server::set_tensor(const std::vector<uint8_t>& input) {
@@ -1124,7 +1235,7 @@ index cfb0f94..7197aa4 100644
      // serialization format: | rpc_tensor | offset (8 bytes) | data (size bytes) |
      if (input.size() < sizeof(rpc_tensor) + sizeof(uint64_t)) {
          return false;
-@@ -1274,6 +1923,15 @@ bool rpc_server::set_tensor(const std::vector<uint8_t>& input) {
+@@ -1274,6 +1938,15 @@ bool rpc_server::set_tensor(const std::vector<uint8_t>& input) {
          return false;
      }
      LOG_DBG("[%s] buffer: %p, data: %p, offset: %" PRIu64 ", size: %zu\n", __func__, (void*)tensor->buffer, tensor->data, offset, size);
@@ -1140,7 +1251,7 @@ index cfb0f94..7197aa4 100644
  
      // sanitize tensor->data
      {
-@@ -1281,8 +1939,10 @@ bool rpc_server::set_tensor(const std::vector<uint8_t>& input) {
+@@ -1281,8 +1954,10 @@ bool rpc_server::set_tensor(const std::vector<uint8_t>& input) {
          const size_t p1 = p0 + ggml_backend_buffer_get_size(tensor->buffer);
  
          if (in_tensor->data + offset < p0 || in_tensor->data + offset >= p1 || size >(p1 - in_tensor->data - offset)) {
@@ -1153,7 +1264,7 @@ index cfb0f94..7197aa4 100644
              return false;
          }
      }
-@@ -1299,6 +1959,11 @@ bool rpc_server::set_tensor(const std::vector<uint8_t>& input) {
+@@ -1299,6 +1974,11 @@ bool rpc_server::set_tensor(const std::vector<uint8_t>& input) {
          printf("[%s] saved to '%s'\n", __func__, cache_file.c_str());
      }
      ggml_backend_tensor_set(tensor, data, offset, size);
@@ -1165,7 +1276,7 @@ index cfb0f94..7197aa4 100644
      return true;
  }
  
-@@ -1365,6 +2030,11 @@ bool rpc_server::set_tensor_hash(const rpc_msg_set_tensor_hash_req& request, rpc
+@@ -1365,6 +2045,11 @@ bool rpc_server::set_tensor_hash(const rpc_msg_set_tensor_hash_req& request, rpc
  }
  
  bool rpc_server::init_tensor(const rpc_msg_init_tensor_req& request) {
@@ -1177,7 +1288,7 @@ index cfb0f94..7197aa4 100644
      struct ggml_init_params params {
          /*.mem_size   =*/ ggml_tensor_overhead(),
              /*.mem_buffer =*/ NULL,
-@@ -1383,7 +2053,22 @@ bool rpc_server::init_tensor(const rpc_msg_init_tensor_req& request) {
+@@ -1383,7 +2068,22 @@ bool rpc_server::init_tensor(const rpc_msg_init_tensor_req& request) {
      // Call the backend's buffer_init_tensor function
      ggml_backend_buffer_t buffer = tensor->buffer;
      if (buffer && buffer->iface.init_tensor) {
