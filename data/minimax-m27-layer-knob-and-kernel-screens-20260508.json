@@ -60,9 +60,15 @@
         "label": "no-mmad1-fmoe0",
         "flags": "-no-mmad 1 -fmoe 0 -muge 1",
         "tok_s_out": 16.166965
+      },
+      {
+        "label": "dnn-enabled",
+        "worker_env_delta": "GGML_SYCL_DISABLE_DNN unset",
+        "tok_s_out": 15.590120,
+        "json": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/rpc-layer-dnn-enabled-r1-p0n64-20260508T092014Z.jsonl"
       }
     ],
-    "conclusion": "Disabling fused MMAD or fused MoE is slower than the current validated path."
+    "conclusion": "Disabling fused MMAD or fused MoE is slower than the current validated path. Leaving oneDNN enabled is also slower for this MiniMax layer-mode path."
   },
   "kernel_screens": [
     {

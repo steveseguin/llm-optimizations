@@ -36,6 +36,7 @@ Candidate flag validation, p0/n64/r1:
 | `-no-mmad 1` | 16.111982 | slower |
 | `-fmoe 0` | 16.094589 | slower |
 | `-no-mmad 1 -fmoe 0` | 16.166965 | slower |
+| oneDNN enabled | 15.590120 | slower |
 
 The short p0/n16 screen showed some warmed-run noise, but p0/n64 ruled out those toggles as improvements.
 
@@ -77,4 +78,3 @@ The remaining likely layer-mode targets are not simple runtime toggles:
 1. Implement a row-contiguous SYCL copy path for strided KV/cache copies, with explicit shape tracing first so the optimization matches the actual hot `CPY` shapes.
 2. Improve `MOE_FUSED_UP_GATE` only after confirming whether the current direct merged `IQ4_XS` path is always taking the intended fast route.
 3. Treat FlashAttention and fused RMSNorm as unsupported-worker gaps, not optimization knobs, unless we implement those ops in the SYCL RPC worker.
-
