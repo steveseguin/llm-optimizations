@@ -9,13 +9,13 @@ Current valid MiniMax GGUF result:
 LocalMaxxing: cmowt5ciy00d0o201f1mcrg3q
 ```
 
-This enables the default-off `GGML_SYCL_FAST_MUL_MAT_ID_IQ4_XS=1` path for MiniMax expert-down `MUL_MAT_ID`. It improves the prior fused-mul-unary high of `16.404929 tok/s` by `5.67%`. A synthetic IQ4_XS `MUL_MAT_ID` probe produced identical SYCL checksums and first outputs with the fast path on versus off, but CPU-vs-SYCL mismatch exists with both paths and remains an open oracle issue.
+This enables the default-off `GGML_SYCL_FAST_MUL_MAT_ID_IQ4_XS=1` path for MiniMax expert-down `MUL_MAT_ID`. It improves the prior fused-mul-unary high of `16.404929 tok/s` by `5.67%`. A synthetic IQ4_XS `MUL_MAT_ID` probe produced identical SYCL checksums and first outputs with the fast path on versus off; a manual dequantized oracle showed the SYCL path is close (`nmse=1.44e-05`) while the CPU graph path diverges in this synthetic case.
 
 ## Active Work
 
 1. Keep the MiniMax AutoRound INT4 safetensors download running on `/mnt/corsair-external`.
 2. When download completes, test vLLM/XPU TP4 with `Lasimeri/MiniMax-M2.7-int4-AutoRound`.
-3. Investigate the CPU-vs-SYCL IQ4_XS `MUL_MAT_ID` mismatch with a smaller dequantized oracle before treating the fast path as upstream-ready.
+3. Investigate the CPU backend IQ4_XS `MUL_MAT_ID` mismatch against the manual dequantized oracle.
 4. Continue using GGUF RPC+SYCL layer mode as the reproducible fallback while searching for a better all-GPU path.
 
 ## Bottleneck Hypothesis

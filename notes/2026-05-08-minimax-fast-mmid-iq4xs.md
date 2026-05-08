@@ -24,7 +24,7 @@ This is a `5.67%` gain over the prior MiniMax high, without changing model weigh
 
 ## Validation
 
-Added `prototypes/minimax_mmid_iq4xs_check.cpp`, a small GGML probe that builds a synthetic IQ4_XS `ggml_mul_mat_id` graph and compares CPU against SYCL.
+Added `prototypes/minimax_mmid_iq4xs_check.cpp`, a small GGML probe that builds a synthetic IQ4_XS `ggml_mul_mat_id` graph and compares CPU and SYCL against a manual dequantized reference built from `ggml_internal_get_type_traits(GGML_TYPE_IQ4_XS).to_float`.
 
 The important A/B result is that fast path off and fast path on produced identical SYCL-side checksums and first outputs:
 
@@ -34,13 +34,20 @@ sycl_sumsq=220952.15214172262
 first=-4.7533946,-1.53130412,-4.87711143,1.29914367,-6.31177616,-9.72053337,1.87014472,-1.95123363
 ```
 
-The probe returns nonzero because CPU and SYCL disagree for this synthetic IQ4_XS `MUL_MAT_ID` case even when the fast path is disabled:
+The manual-reference comparison showed the SYCL result is close to the dequantized oracle with fast path off and on:
 
 ```text
-max_abs=4.48206 max_rel=822.229 nmse=0.031076
+sycl_ref_max_abs=0.0794775 sycl_ref_nmse=1.44346e-05
 ```
 
-Interpretation: the fast path appears to preserve the existing SYCL behavior. The CPU-vs-SYCL mismatch is a separate pre-existing oracle issue and should be investigated before treating this path as upstream-ready.
+The original CPU-vs-SYCL mismatch came from the CPU backend graph path for this synthetic `MUL_MAT_ID` case, not from the fast SYCL path:
+
+```text
+cpu_ref_max_abs=4.50142 cpu_ref_nmse=0.0288577
+sycl_cpu_max_abs=4.48206 sycl_cpu_nmse=0.031076
+```
+
+Interpretation: the fast path preserves the existing SYCL result and the SYCL result matches a manual dequantized oracle closely enough for this synthetic case. The remaining CPU graph mismatch should be tracked separately, but it no longer blocks using the fast path for this workload.
 
 ## Repro
 
@@ -93,6 +100,6 @@ GGML_SYCL_FAST_MUL_MAT_ID_IQ4_XS=1 \
 
 ## Next
 
-- Investigate the CPU-vs-SYCL IQ4_XS `MUL_MAT_ID` mismatch with a simpler dequantized oracle.
-- Keep the fast path default-off until the oracle question is resolved.
+- Investigate why CPU backend `MUL_MAT_ID` diverges from the manual IQ4_XS oracle in this synthetic case.
+- Consider promoting the fast path from hidden env var to an opt-in runtime flag once MiniMax generation-level validation is stable.
 - Continue the vLLM/XPU AutoRound INT4 path once the USB-hosted download finishes; it remains the most likely route to a larger MiniMax step-change.

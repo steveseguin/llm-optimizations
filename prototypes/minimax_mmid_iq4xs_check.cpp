@@ -79,6 +79,67 @@ static std::vector<float> read_output(const graph_case & gc) {
     return out;
 }
 
+struct diff_stats {
+    double max_abs = 0.0;
+    double max_rel = 0.0;
+    double nmse = 0.0;
+    double sum = 0.0;
+    double sumsq = 0.0;
+};
+
+static diff_stats compare_outputs(const std::vector<float> & ref, const std::vector<float> & got) {
+    diff_stats stats;
+    double se = 0.0;
+    double norm = 0.0;
+    for (size_t i = 0; i < ref.size(); ++i) {
+        const double a = ref[i];
+        const double b = got[i];
+        const double d = a - b;
+        se += d * d;
+        norm += a * a;
+        stats.sum += b;
+        stats.sumsq += b * b;
+        stats.max_abs = std::max(stats.max_abs, std::abs(d));
+        stats.max_rel = std::max(stats.max_rel, std::abs(d) / std::max(1e-9, std::abs(a)));
+    }
+    stats.nmse = se / std::max(norm, 1e-30);
+    return stats;
+}
+
+static std::vector<float> reference_mmid_iq4_xs(const std::vector<uint8_t> & qweights,
+                                                const std::vector<float> & b,
+                                                const std::vector<int32_t> & ids,
+                                                int n_mats, int n_used, int n_tokens, int m, int k) {
+    (void)n_mats;
+    const ggml_type_traits_t traits = ggml_internal_get_type_traits(GGML_TYPE_IQ4_XS);
+    if (!traits.to_float) {
+        std::fprintf(stderr, "IQ4_XS to_float unavailable\n");
+        std::exit(4);
+    }
+
+    const size_t row_size = ggml_row_size(GGML_TYPE_IQ4_XS, k);
+    std::vector<float> row((size_t)k);
+    std::vector<float> out((size_t)m * n_used * n_tokens);
+
+    for (int t = 0; t < n_tokens; ++t) {
+        for (int e = 0; e < n_used; ++e) {
+            const int expert = ids[(size_t)t * n_used + e];
+            const float * vec = b.data() + (size_t)k * (e + n_used * t);
+            for (int y = 0; y < m; ++y) {
+                const uint8_t * qrow = qweights.data() + row_size * ((size_t)expert * m + y);
+                traits.to_float(qrow, row.data(), k);
+                double acc = 0.0;
+                for (int x = 0; x < k; ++x) {
+                    acc += (double)row[x] * vec[x];
+                }
+                out[(size_t)y + (size_t)m * (e + n_used * t)] = (float)acc;
+            }
+        }
+    }
+
+    return out;
+}
+
 int main() {
     const ggml_type type_a = GGML_TYPE_IQ4_XS;
     const int n_mats = 8;
@@ -141,26 +202,20 @@ int main() {
 
     const auto cpu_out = read_output(cpu_case);
     const auto sycl_out = read_output(sycl_case);
-    double se = 0.0;
-    double norm = 0.0;
-    double sycl_sum = 0.0;
-    double sycl_sumsq = 0.0;
-    double max_abs = 0.0;
-    double max_rel = 0.0;
-    for (size_t i = 0; i < cpu_out.size(); ++i) {
-        const double a = cpu_out[i];
-        const double bval = sycl_out[i];
-        const double d = a - bval;
-        se += d * d;
-        norm += a * a;
-        sycl_sum += bval;
-        sycl_sumsq += bval * bval;
-        max_abs = std::max(max_abs, std::abs(d));
-        max_rel = std::max(max_rel, std::abs(d) / std::max(1e-9, std::abs(a)));
-    }
-    const double nmse = se / std::max(norm, 1e-30);
-    std::printf("backend=%s elements=%zu max_abs=%g max_rel=%g nmse=%g sycl_sum=%.17g sycl_sumsq=%.17g first=",
-                ggml_backend_name(sycl), cpu_out.size(), max_abs, max_rel, nmse, sycl_sum, sycl_sumsq);
+    const auto ref_out = reference_mmid_iq4_xs(weights_q, b, ids, n_mats, n_used, n_tokens, m, k);
+    const diff_stats cpu_vs_ref = compare_outputs(ref_out, cpu_out);
+    const diff_stats sycl_vs_ref = compare_outputs(ref_out, sycl_out);
+    const diff_stats sycl_vs_cpu = compare_outputs(cpu_out, sycl_out);
+
+    std::printf("backend=%s elements=%zu cpu_ref_max_abs=%g cpu_ref_max_rel=%g cpu_ref_nmse=%g "
+                "sycl_ref_max_abs=%g sycl_ref_max_rel=%g sycl_ref_nmse=%g "
+                "sycl_cpu_max_abs=%g sycl_cpu_max_rel=%g sycl_cpu_nmse=%g "
+                "sycl_sum=%.17g sycl_sumsq=%.17g first=",
+                ggml_backend_name(sycl), cpu_out.size(),
+                cpu_vs_ref.max_abs, cpu_vs_ref.max_rel, cpu_vs_ref.nmse,
+                sycl_vs_ref.max_abs, sycl_vs_ref.max_rel, sycl_vs_ref.nmse,
+                sycl_vs_cpu.max_abs, sycl_vs_cpu.max_rel, sycl_vs_cpu.nmse,
+                sycl_vs_ref.sum, sycl_vs_ref.sumsq);
     for (size_t i = 0; i < std::min<size_t>(8, sycl_out.size()); ++i) {
         std::printf("%s%.9g", i == 0 ? "" : ",", sycl_out[i]);
     }
@@ -171,5 +226,5 @@ int main() {
     ggml_backend_free(cpu);
     ggml_backend_free(sycl);
 
-    return nmse < 5e-4 ? 0 : 1;
+    return sycl_vs_ref.nmse < 5e-4 ? 0 : 1;
 }
