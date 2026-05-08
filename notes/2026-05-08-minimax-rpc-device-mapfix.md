@@ -2,7 +2,7 @@
 
 ## Summary
 
-The current valid MiniMax result is a corrected `4x B70` RPC layer-mode baseline:
+This note records the corrected `4x B70` RPC layer-mode baseline after fixing device mapping:
 
 - Model: `unsloth/MiniMax-M2.7-GGUF`, `UD-IQ4_XS`
 - Engine: `ik_llama.cpp` commit `9a26522` plus local B70/SYCL patches
@@ -10,6 +10,8 @@ The current valid MiniMax result is a corrected `4x B70` RPC layer-mode baseline
 - Corrected best: `14.292387 tok/s`, `p0/n64`, three repeats
 - Samples: `13.8745`, `14.4737`, `14.529` tok/s
 - LocalMaxxing: accepted, ID `cmowf7tgs000do301f1zd6jbr`, status `APPROVED`
+
+Superseded current best: `16.383602 tok/s` with `-nkvo 0`, recorded in `notes/2026-05-08-minimax-kqv-offload-layer-improvement.md`.
 
 This is quality-preserving: no speculative decoding, no smart expert reduction, no expert dropping, and no power-limit changes.
 
