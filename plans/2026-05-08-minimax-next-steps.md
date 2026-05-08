@@ -17,6 +17,7 @@ This enables the default-off `GGML_SYCL_FAST_MUL_MAT_ID_IQ4_XS=1` path for MiniM
 2. When download completes, test vLLM/XPU TP4 with `Lasimeri/MiniMax-M2.7-int4-AutoRound`.
 3. Investigate the CPU backend IQ4_XS `MUL_MAT_ID` mismatch against the manual dequantized oracle.
 4. Continue using GGUF RPC+SYCL layer mode as the reproducible fallback while searching for a better all-GPU path.
+5. Record negative GGUF kernel attempts when they rule out plausible optimizations.
 
 ## Bottleneck Hypothesis
 
@@ -31,6 +32,8 @@ Elementwise fused-op fixes are not enough. Fused RMSNorm is functional but neutr
 
 1. vLLM AutoRound INT4:
    - Try TP4 on all B70s first.
+   - Start with llm-scaler-style XPU env: `VLLM_WORKER_MULTIPROC_METHOD=spawn`, `CCL_ZE_IPC_EXCHANGE=pidfd`, `CCL_ATL_TRANSPORT=ofi`.
+   - Compare `CCL_TOPO_P2P_ACCESS=1` and `0` if the model gets through load.
    - If TP4 fails due quantized MoE/XPU support, capture the exact unsupported op and inspect vLLM/INC/AutoRound dispatch.
    - If TP4 OOMs or stalls, try reduced `max_model_len`, `max_num_batched_tokens`, and possibly TP2 just to isolate the failure mode.
 2. GGUF attention/KV:
@@ -42,3 +45,7 @@ Elementwise fused-op fixes are not enough. Fused RMSNorm is functional but neutr
 4. System RAM:
    - Extra RAM will help reduce load/cache churn and make vLLM experiments less fragile, but it is not expected to fix decode throughput alone.
    - Keep using the USB disk for large model downloads/caches instead of pressuring NVMe free space.
+
+## Negative/Neutral Results
+
+- `GGML_SYCL_MOE_UP_GATE_PAIR_DOT=1`, paired IQ4_XS up/gate dot loop for MiniMax `MOE_FUSED_UP_GATE`: `16.840924 tok/s`, samples `15.8979`, `17.3159`, `17.3090`. This is neutral/slower than the `17.335655 tok/s` fast-MMID baseline, so it was not submitted to LocalMaxxing.

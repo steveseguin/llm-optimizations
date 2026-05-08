@@ -19,6 +19,17 @@ vLLM's Intel quantization docs confirm AutoRound is intended to produce INT2/3/4
 
 Intel's LLM Scaler repo says it targets Arc Pro B60 and B70 and wraps standard frameworks such as vLLM, SGLang, ComfyUI, and Xinference. Treat it as a packaging and configuration reference first, not a new inference engine. Useful things to mine from it: XPU environment defaults, multi-GPU launch conventions, benchmark commands, and any CCL/Level Zero settings.
 
+The local llm-scaler clone at `/home/steve/src/llm-scaler` currently points to Intel's `intel/llm-scaler-vllm:0.14.0-b8.2.1` release family. The repo's public guidance is more validated around Ubuntu 25.04 than this Ubuntu 24.04 install, so for now use it as a reference for flags rather than replacing the local source-build stack. The flags worth carrying into vLLM/XPU tests are:
+
+```bash
+VLLM_WORKER_MULTIPROC_METHOD=spawn
+CCL_ZE_IPC_EXCHANGE=pidfd
+CCL_ATL_TRANSPORT=ofi
+CCL_TOPO_P2P_ACCESS=1   # compare against 0 for USM mode
+```
+
+For online quantization it also documents `VLLM_OFFLOAD_WEIGHTS_BEFORE_QUANT=1`, but the Lasimeri checkpoint is already AutoRound W4A16, so do not force `--quantization` unless autodetection fails.
+
 DevRadar's public MiniMax comparison gives rough external anchors: 4x RTX 4090 at `71.52 tok/s`, 4x RTX 5090 at `120.54 tok/s`, RTX PRO 6000 at `118.74 tok/s`, and DGX Spark at `24.41 tok/s`, all reportedly using UD-IQ3_XXS, 32k context, and 4096 max tokens. This is not directly comparable to our `17.335655 tok/s` UD-IQ4_XS p0/n64 decode test, but it supports the hypothesis that a better all-GPU/vLLM-style path should be able to beat the current GGUF RPC layer split.
 
 The MJPansa REAP variant is an 86 GiB pruned AutoRound W4A16 checkpoint with a clear quality caveat. It is interesting as a capacity/performance fallback if full MiniMax remains too slow, but it is not the same target quality as unpruned MiniMax M2.7.
@@ -29,4 +40,5 @@ The MJPansa REAP variant is an 86 GiB pruned AutoRound W4A16 checkpoint with a c
 - Test Lasimeri INT4 AutoRound in vLLM/XPU TP4 as soon as the USB download completes.
 - If the AutoRound path fails, inspect whether the failure is quant kernel, custom MiniMax modeling code, MoE/expert parallel, CCL, or XPU memory management.
 - Review Intel LLM Scaler configs before inventing more launch flags for vLLM/XPU.
+- Compare `CCL_TOPO_P2P_ACCESS=1` versus `0` for B70 TP4 once the AutoRound path gets past model load.
 - For future 8x B70 work, prioritize EP/DP+EP investigation over pure TP8.

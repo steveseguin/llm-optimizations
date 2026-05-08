@@ -22,6 +22,20 @@ Comparison:
 
 This is a `5.67%` gain over the prior MiniMax high, without changing model weights, quantization, KV dtype, sampler behavior, expert routing, or GPU power limits.
 
+## Follow-up: Paired Up/Gate Dot Attempt
+
+Tried an opt-in `GGML_SYCL_MOE_UP_GATE_PAIR_DOT=1` experiment that computes the MiniMax IQ4_XS MoE up and gate dot products in one loop inside `MOE_FUSED_UP_GATE`.
+
+Result:
+
+```text
+16.840924 tok/s, p0/n64/r3, samples 15.8979, 17.3159, 17.3090
+```
+
+This is neutral to slightly worse than the `17.335655 tok/s` fast-`MUL_MAT_ID` baseline. The later samples were close to baseline, but the average was lower and variance was higher, so this was not submitted to LocalMaxxing as an improvement.
+
+Interpretation: simply pairing the gate/up dot loops does not reduce the remaining `MOE_FUSED_UP_GATE` bucket enough to overcome added register pressure and instruction scheduling cost on B70. Keep this path default-off unless a later rewrite proves a clear win.
+
 ## Validation
 
 Added `prototypes/minimax_mmid_iq4xs_check.cpp`, a small GGML probe that builds a synthetic IQ4_XS `ggml_mul_mat_id` graph and compares CPU and SYCL against a manual dequantized reference built from `ggml_internal_get_type_traits(GGML_TYPE_IQ4_XS).to_float`.
@@ -102,4 +116,5 @@ GGML_SYCL_FAST_MUL_MAT_ID_IQ4_XS=1 \
 
 - Investigate why CPU backend `MUL_MAT_ID` diverges from the manual IQ4_XS oracle in this synthetic case.
 - Consider promoting the fast path from hidden env var to an opt-in runtime flag once MiniMax generation-level validation is stable.
+- Treat `GGML_SYCL_MOE_UP_GATE_PAIR_DOT=1` as a negative/noise experiment for now.
 - Continue the vLLM/XPU AutoRound INT4 path once the USB-hosted download finishes; it remains the most likely route to a larger MiniMax step-change.
