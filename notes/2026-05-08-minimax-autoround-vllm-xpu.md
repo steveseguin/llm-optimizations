@@ -146,6 +146,17 @@ LocalMaxxing: cmox6tys30085ml0125gihg18
 
 Interpretation: `pidfd` is the current vLLM/XPU MiniMax AutoRound default. It beats the earlier sockets/default p512 AutoRound run (`13.45` output tok/s) and the current GGUF p512 decode result (`17.693` output tok/s), while using the same AutoRound W4A16 weights and no power-limit changes. The wrapper default was changed to `CCL_IPC=pidfd`.
 
+P2P toggle check:
+
+```text
+p64/n16, TP4, CCL_ZE_IPC_EXCHANGE=pidfd, CCL_TOPO_P2P_ACCESS=0:
+62.410028 total tok/s, 12.48 output tok/s
+log: /home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p64n16-20260508T172901Z.log
+json: /home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p64n16-20260508T172901Z.json
+```
+
+Interpretation: keep `CCL_TOPO_P2P_ACCESS=1`. Setting it to `0` was slightly slower than the `pidfd` + P2P=1 p64 smoke (`68.171339` total tok/s, `13.63` output tok/s).
+
 AMD-derived MoE config seed:
 
 ```text
@@ -220,7 +231,7 @@ Interpretation: QK-norm fusion is not currently a MiniMax/XPU speed path. The gu
 
 - Submit useful AutoRound results as diagnostic records, while keeping the current GGUF path as the higher-performance MiniMax route.
 - Keep `CCL_ZE_IPC_EXCHANGE=pidfd` as the current vLLM/XPU default; sockets is slower in the p64 smoke and earlier p512 run.
-- Compare `CCL_TOPO_P2P_ACCESS=1` versus `0` and, only as a diagnostic, `CCL_TOPO_FABRIC_VERTEX_CONNECTION_CHECK=0`.
+- Keep `CCL_TOPO_P2P_ACCESS=1`; `0` was slightly slower in the p64 smoke. Only try `CCL_TOPO_FABRIC_VERTEX_CONNECTION_CHECK=0` as a diagnostic because it forces assumptions about XeLinks that the current PCIe topology does not report.
 - Treat `VLLM_XPU_ENABLE_XPU_GRAPH=1` as negative for TP4 MiniMax AutoRound until vLLM can capture communication ops or split capture around collectives.
 - Try `--enforce-eager` if the compiled path keeps failing; upstream Intel quantization docs currently recommend eager for wNa16.
 - Treat `--compilation-config '{"mode":3,"pass_config":{"fuse_minimax_qk_norm":true}}'` as blocked on XPU because this build lacks `torch.ops._C.minimax_allreduce_rms_qk`; implement or port that fused op before retesting for speed.
