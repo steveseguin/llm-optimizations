@@ -15,7 +15,7 @@ This builds on the default-off `GGML_SYCL_FAST_MUL_MAT_ID_IQ4_XS=1` path and add
 
 1. Keep the MiniMax AutoRound INT4 safetensors download running on `/mnt/corsair-external`.
 2. When download completes, test vLLM/XPU TP4 with `Lasimeri/MiniMax-M2.7-int4-AutoRound`.
-3. Add a generation/logit comparison for `GGML_SYCL_MMV_Y_RUNTIME=2` against the default row grouping.
+3. Keep `GGML_SYCL_MMV_Y_RUNTIME=2` as the default GGUF test setting; a deterministic generation smoke matched default row grouping byte-for-byte.
 4. Investigate the CPU backend IQ4_XS `MUL_MAT_ID` mismatch against the manual dequantized oracle.
 5. Continue using GGUF RPC+SYCL layer mode as the reproducible fallback while searching for a better all-GPU path.
 6. Record negative GGUF kernel attempts when they rule out plausible optimizations.
@@ -41,7 +41,7 @@ Elementwise fused-op fixes are not enough. Fused RMSNorm is functional but neutr
    - Add op timing around attention-side `CPY`, `ROPE`, `SOFT_MAX`, and `MUL_MAT` nodes.
    - Prefer producer-side fusion into KV writes over standalone copy kernels, because the tested MiniMax CPY fast path regressed.
 3. GGUF row packing:
-   - Keep `GGML_SYCL_MMV_Y_RUNTIME=2` as the current MiniMax GGUF performance setting after generation/logit validation.
+   - Keep `GGML_SYCL_MMV_Y_RUNTIME=2` as the current MiniMax GGUF performance setting. A deterministic 16-token generation smoke matched default row grouping byte-for-byte.
    - Treat runtime/compile-time Y=4 as neutral for now; compile-time MMV4 produced `17.191979 tok/s`, below Y=2.
 4. GGUF graph split:
    - Revisit quality-correct graph reduce only if we can avoid host-mediated reduce/broadcast. The correct path works but is too slow.

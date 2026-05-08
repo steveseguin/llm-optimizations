@@ -36,7 +36,7 @@
     "sameBuildImprovementPct": 2.02,
     "previousSubmittedHighTokS": 17.335655,
     "previousSubmittedImprovementPct": 1.22,
-    "qualityScope": "Scheduling/kernel row-packing change only. Same UD-IQ4_XS weights, F16 KV cache, sampler path, split mode, and no GPU power-limit changes."
+    "qualityScope": "Scheduling/kernel row-packing change only. Same UD-IQ4_XS weights, F16 KV cache, sampler path, split mode, and no GPU power-limit changes. A deterministic 16-token greedy generation smoke matched default row grouping byte-for-byte."
   },
   "timingDeltaMs": {
     "fastMmidBaseline": {
@@ -55,6 +55,7 @@
     "sourceJson": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/minimax-fast-mmid-mmv-runtime2-r5-p0n64-20260508T124605Z.jsonl",
     "sameBuildControlJson": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/minimax-fast-mmid-control-r5-p0n64-20260508T120407Z.jsonl",
     "compileTimeMmv2Json": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/minimax-fast-mmid-mmv2-r5-p0n64-20260508T115654Z.jsonl",
+    "correctnessSmokeDir": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/correctness/mmv-y2-smoke-20260508T125856Z",
     "payload": "/home/steve/bench-results/localmaxxing-minimax-m27-fast-mmid-mmv-y2-20260508.payload.json",
     "response": "/home/steve/bench-results/localmaxxing-minimax-m27-fast-mmid-mmv-y2-20260508.response.json"
   },

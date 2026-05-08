@@ -41,6 +41,17 @@ Short op-timing runs show the direction of the win:
 
 The largest remaining decode buckets are still dense matvec and fused MoE up/gate. Row packing helps both, but does not address the broader layer-mode scheduling and all-GPU graph-shape limits.
 
+## Correctness Smoke
+
+Ran a deterministic 16-token MiniMax generation through the RPC client with the default row grouping and with `GGML_SYCL_MMV_Y_RUNTIME=2`. Both used the same prompt, seed, F16 KV, layer split, fast-MMID setting, and greedy sampler. The generated stdout matched byte-for-byte:
+
+```text
+78e517594d13b4c3405739fda666369c2cfe6afaa111e1e75a0b5eb0a848d6fd  default.stdout
+78e517594d13b4c3405739fda666369c2cfe6afaa111e1e75a0b5eb0a848d6fd  y2.stdout
+```
+
+This is not a full-logit equivalence proof, but it is enough to mark the row-packing result as quality-preserving for the current benchmark scope. The only issue found was tool-side: `llama-cli --rpc` segfaulted when given the `llama-bench` style `host:port|device` string. Plain comma-separated RPC servers worked.
+
 ## Repro
 
 Workers:
@@ -73,11 +84,12 @@ llama-bench \
 - Main result: `/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/minimax-fast-mmid-mmv-runtime2-r5-p0n64-20260508T124605Z.jsonl`
 - Same-build control: `/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/minimax-fast-mmid-control-r5-p0n64-20260508T120407Z.jsonl`
 - Compile-time MMV2 confirmation: `/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/minimax-fast-mmid-mmv2-r5-p0n64-20260508T115654Z.jsonl`
+- Correctness smoke: `/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/correctness/mmv-y2-smoke-20260508T125856Z`
 - LocalMaxxing payload: `/home/steve/bench-results/localmaxxing-minimax-m27-fast-mmid-mmv-y2-20260508.payload.json`
 - LocalMaxxing response: `/home/steve/bench-results/localmaxxing-minimax-m27-fast-mmid-mmv-y2-20260508.response.json`
 
 ## Next
 
-- Try `GGML_SYCL_MMV_Y_RUNTIME=2` with a generation/logit comparison harness, then keep it as the default MiniMax GGUF test setting if output is unchanged.
+- Keep `GGML_SYCL_MMV_Y_RUNTIME=2` as the default MiniMax GGUF test setting for now. A deterministic generation smoke matched byte-for-byte against default row grouping.
 - Keep `GGML_SYCL_MMV_Y_RUNTIME=4` marked neutral for now. Compile-time MMV4 produced `17.191979 tok/s`, not a win.
 - Continue toward vLLM/XPU AutoRound INT4 TP4, since GGUF row packing is now delivering single-digit-percent gains rather than the larger improvement needed for the 30 tok/s goal.
