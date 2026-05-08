@@ -165,5 +165,8 @@ Model: `MiniMaxAI/MiniMax-M2.7`, local Unsloth GGUF `MiniMax-M2.7-UD-IQ4_XS-0000
 | Label | LocalMaxxing ID | GPUs | Input | Output | tok/s out | tok/s total |
 | --- | --- | ---: | ---: | ---: | ---: | ---: |
 | `llamacpp-minimax-m27-ud-iq4_xs-sycl-layer-ncmoe56-p0-n64` | `cmovgojv80008n501lupo67x6` | 4 | 0 | 64 | 0.472 | 0.472 |
+| `llamacpp-minimax-m27-ud-iq4_xs-rpc-layer-devmapfix-p0-n64-r3` | `cmowf7tgs000do301f1zd6jbr` | 4 | 0 | 64 | 14.292 | 14.292 |
 
 Note: This is a diagnostic baseline, not an optimized all-GPU result. It uses llama.cpp layer split with `-ncmoe 56`, which CPU-maps the first 56 of 62 MoE expert layers and leaves only the final 6 expert layers GPU-resident on SYCL3. It was submitted because it is the first reproducible MiniMax completion on the 4x B70 system and records the current gap. LocalMaxxing's command parser misread `-t 8` as sampler temperature; the run is `llama-bench`, so sampling temperature is not meaningful here.
+
+Note: `cmowf7tgs000do301f1zd6jbr` is the corrected post device-map-fix all-GPU layer result. It uses the process-per-GPU RPC+SYCL path with `-ts 1/1/1/1`, fused MoE, merged up/gate experts, fused MMAD, F16 KV, and no power-limit changes. The first retry after LocalMaxxing recovered returned HTTP 400 because the API now requires another metric alongside output tok/s; adding `tokSTotal=14.292387` was accepted.

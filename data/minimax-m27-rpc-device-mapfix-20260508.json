@@ -87,10 +87,13 @@
     }
   ],
   "localmaxxing": {
-    "status": "queued",
-    "reason": "localmaxxing.com returned Cloudflare 522 for detailed and reduced POSTs; GET /api/leaderboard also timed out.",
+    "status": "APPROVED",
+    "id": "cmowf7tgs000do301f1zd6jbr",
+    "reason": "Submitted after localmaxxing.com recovered; the API required tokSTotal in addition to tokSOut.",
     "detailedResponse": "/home/steve/bench-results/localmaxxing-minimax-m27-corrected-rpcsplit-20260508T033529Z.json",
-    "reducedResponse": "/home/steve/bench-results/localmaxxing-minimax-m27-corrected-rpcsplit-reduced-20260508T033713Z.json"
+    "reducedResponse": "/home/steve/bench-results/localmaxxing-minimax-m27-corrected-rpcsplit-reduced-20260508T033713Z.json",
+    "acceptedPayload": "/home/steve/bench-results/localmaxxing-minimax-m27-corrected-layer-20260508T043422Z.payload.json",
+    "acceptedResponse": "/home/steve/bench-results/localmaxxing-minimax-m27-corrected-layer-20260508T043422Z.response.json"
   },
   "qualityNotes": [
     "All accepted runs are quality-preserving: no speculative decoding, no smart expert reduction, no expert dropping, no power-limit changes.",

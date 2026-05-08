@@ -9,7 +9,7 @@ The current valid MiniMax result is a corrected `4x B70` RPC layer-mode baseline
 - Hardware: `4x Intel Arc Pro B70 32GB`, Ubuntu 24.04.4 LTS
 - Corrected best: `14.292387 tok/s`, `p0/n64`, three repeats
 - Samples: `13.8745`, `14.4737`, `14.529` tok/s
-- LocalMaxxing: queued; API returned Cloudflare `522` for both detailed and reduced POSTs
+- LocalMaxxing: accepted, ID `cmowf7tgs000do301f1zd6jbr`, status `APPROVED`
 
 This is quality-preserving: no speculative decoding, no smart expert reduction, no expert dropping, and no power-limit changes.
 
@@ -115,7 +115,6 @@ The `Lasimeri/MiniMax-M2.7-int4-AutoRound` checkpoint is worth trying later thro
 
 ## Next
 
-1. Retry the queued LocalMaxxing submission when the API responds.
-2. Keep the corrected layer baseline as the honest reproducible MiniMax number.
-3. Continue graph/expert split work, but focus on reducing the `503` split submissions or making independent per-device branches execute concurrently with correct dependencies.
-4. Defer vLLM/SGLang/AutoRound MiniMax until storage and host RAM are less likely to dominate the experiment.
+1. Keep the corrected layer baseline as the honest reproducible MiniMax number.
+2. Continue graph/expert split work, but focus on reducing the `503` split submissions or making independent per-device branches execute concurrently with correct dependencies.
+3. Defer vLLM/SGLang/AutoRound MiniMax until storage and host RAM are less likely to dominate the experiment.
