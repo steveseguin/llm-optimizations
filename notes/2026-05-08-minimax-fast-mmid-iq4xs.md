@@ -13,6 +13,13 @@ New current MiniMax GGUF high:
 LocalMaxxing: cmowt5ciy00d0o201f1mcrg3q
 ```
 
+Superseded later the same day by `GGML_SYCL_MMV_Y_RUNTIME=2` row packing:
+
+```text
+17.547020 tok/s, p0/n64/r5
+LocalMaxxing: cmowx1t6z000mml01v111mzvl
+```
+
 Comparison:
 
 | Variant | tok/s | samples |

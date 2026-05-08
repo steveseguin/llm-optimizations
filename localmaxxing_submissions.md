@@ -169,6 +169,7 @@ Model: `MiniMaxAI/MiniMax-M2.7`, local Unsloth GGUF `MiniMax-M2.7-UD-IQ4_XS-0000
 | `llamacpp-minimax-m27-ud-iq4_xs-rpc-layer-kqv-offload-p0-n64-r3` | `cmowft2hr000oo3019is4snoq` | 4 | 0 | 64 | 16.384 | 16.384 |
 | `llamacpp-minimax-m27-ud-iq4_xs-rpc-layer-fused-mul-unary-p0-n64-r3` | `cmowqyak0008co201oxuuzaid` | 4 | 0 | 64 | 16.405 | 16.405 |
 | `llamacpp-minimax-m27-ud-iq4_xs-rpc-layer-fast-mmid-p0-n64-r3` | `cmowt5ciy00d0o201f1mcrg3q` | 4 | 0 | 64 | 17.336 | 17.336 |
+| `llamacpp-minimax-m27-ud-iq4_xs-rpc-layer-fast-mmid-mmv-y2-p0-n64-r5` | `cmowx1t6z000mml01v111mzvl` | 4 | 0 | 64 | 17.547 | 17.547 |
 
 Note: This is a diagnostic baseline, not an optimized all-GPU result. It uses llama.cpp layer split with `-ncmoe 56`, which CPU-maps the first 56 of 62 MoE expert layers and leaves only the final 6 expert layers GPU-resident on SYCL3. It was submitted because it is the first reproducible MiniMax completion on the 4x B70 system and records the current gap. LocalMaxxing's command parser misread `-t 8` as sampler temperature; the run is `llama-bench`, so sampling temperature is not meaningful here.
 
@@ -179,5 +180,7 @@ Note: `cmowft2hr000oo3019is4snoq` keeps the same corrected layer split and quali
 Note: `cmowqyak0008co201oxuuzaid` adds quality-preserving SYCL RPC worker support for `GGML_OP_FUSED_MUL_UNARY` while keeping fused RMSNorm disabled because it was neutral/slower. Same-build A/B was `16.404929 tok/s` with fused mul unary enabled versus `16.374820 tok/s` with it disabled, so this is a small current high rather than a major optimization.
 
 Note: `cmowt5ciy00d0o201f1mcrg3q` enables the default-off `GGML_SYCL_FAST_MUL_MAT_ID_IQ4_XS=1` path for MiniMax expert-down `MUL_MAT_ID`. It improves the prior MiniMax high from `16.404929` to `17.335655 tok/s`. A synthetic IQ4_XS `MUL_MAT_ID` probe produced identical SYCL checksums and first outputs with fast path on versus off; a manual dequantized oracle showed the SYCL path is close (`nmse=1.44e-05`) while the CPU graph path diverges in this synthetic case.
+
+Note: `cmowx1t6z000mml01v111mzvl` adds `GGML_SYCL_MMV_Y_RUNTIME=2` runtime row packing for the SYCL MMVQ-style kernels on top of the fast-MMID MiniMax path. Same-build r5 control was `17.198973 tok/s`; runtime MMV Y=2 was `17.547020 tok/s`, with samples `17.3265`, `17.6006`, `17.6046`, `17.6047`, `17.5987`. This is a software-only scheduling/kernel change with the same UD-IQ4_XS weights, F16 KV, layer split, and no power-limit changes. LocalMaxxing rejected `backend=sycl-rpc`, so the record was submitted without a backend and the SYCL/RPC details are in notes and engine flags.
 
 Not submitted: `GGML_SYCL_MOE_UP_GATE_PAIR_DOT=1` paired up/gate dot loop for MiniMax `MOE_FUSED_UP_GATE` produced `16.840924 tok/s` with high variance (`15.8979`, `17.3159`, `17.3090`). This was neutral/slower than `cmowt5ciy00d0o201f1mcrg3q`, so it remains a negative/noise experiment rather than a public benchmark result.
