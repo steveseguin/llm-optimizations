@@ -1,6 +1,6 @@
 {
   "date": "2026-05-08",
-  "localmaxxingId": "cmowx1t6z000mml01v111mzvl",
+  "localmaxxingId": "cmox103ol0040ml019yzs6gvs",
   "status": "APPROVED",
   "model": {
     "hfId": "MiniMaxAI/MiniMax-M2.7",
@@ -26,10 +26,23 @@
     "promptTokens": 0,
     "outputTokens": 64,
     "contextLength": 2048,
+    "tokSOut": 17.697772,
+    "tokSTotal": 17.697772,
+    "samplesTokSOut": [17.5369, 17.7524, 17.7386, 17.7282, 17.7328],
+    "stddevTokSOut": 0.090407
+  },
+  "previousMmvY2Result": {
+    "localmaxxingId": "cmowx1t6z000mml01v111mzvl",
     "tokSOut": 17.547020,
-    "tokSTotal": 17.547020,
     "samplesTokSOut": [17.3265, 17.6006, 17.6046, 17.6047, 17.5987],
-    "stddevTokSOut": 0.123299
+    "sourceJson": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/minimax-fast-mmid-mmv-runtime2-r5-p0n64-20260508T124605Z.jsonl"
+  },
+  "fusedRmsRecheck": {
+    "enabled": true,
+    "sourceJson": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/minimax-fast-mmid-mmv-runtime2-fusedrms-ub64-r5-p0n64-20260508T143014Z.jsonl",
+    "correctnessSmokeDir": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/correctness/fused-rms-y2-smoke-20260508T143721Z",
+    "correctnessSha256": "78e517594d13b4c3405739fda666369c2cfe6afaa111e1e75a0b5eb0a848d6fd",
+    "recommendation": "Keep fused RMSNorm enabled in the current MiniMax GGUF recipe."
   },
   "contextRun": {
     "localmaxxingId": "cmowyq5tu001jml01b470i75g",
@@ -47,9 +60,9 @@
   "comparison": {
     "sameBuildControlTokS": 17.198973,
     "sameBuildImprovementPct": 2.02,
-    "previousSubmittedHighTokS": 17.335655,
-    "previousSubmittedImprovementPct": 1.22,
-    "qualityScope": "Scheduling/kernel row-packing change only. Same UD-IQ4_XS weights, F16 KV cache, sampler path, split mode, and no GPU power-limit changes. A deterministic 16-token greedy generation smoke matched default row grouping byte-for-byte."
+    "previousSubmittedHighTokS": 17.547020,
+    "previousSubmittedImprovementPct": 0.86,
+    "qualityScope": "Scheduling/kernel changes only. Same UD-IQ4_XS weights, F16 KV cache, sampler path, split mode, and no GPU power-limit changes. Deterministic 16-token greedy generation smokes matched the earlier baselines byte-for-byte."
   },
   "timingDeltaMs": {
     "fastMmidBaseline": {
@@ -110,14 +123,14 @@
     "sourceJson": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/minimax-fast-mmid-mmv-runtime2-dnnon-ub64-r3-p0n64-20260508T141516Z.jsonl",
     "recommendation": "Keep GGML_SYCL_DISABLE_DNN=1 in the current MiniMax GGUF recipe."
   },
-  "commandSnippet": "GGML_SYCL_FAST_MUL_MAT_ID_IQ4_XS=1 GGML_SYCL_MMV_Y_RUNTIME=2 GGML_SYCL_DISABLE_DNN=1 GGML_DISABLE_FUSED_RMS_NORM=1 llama-bench -m MiniMax-M2.7-UD-IQ4_XS-00001-of-00004.gguf -rpc 127.0.0.1:50100|0,127.0.0.1:50101|0,127.0.0.1:50102|0,127.0.0.1:50103|0 -p 0 -n 64 -r 5 -ngl 99 -sm layer -ts 1/1/1/1 -fa 0 -nkvo 0 -ub 32 -ctk f16 -ctv f16 -t 4 -w 0 -mmp 1 -rtr 1 -fmoe 1 -no-mmad 0 -muge 1 -sas 0 -o json",
+  "commandSnippet": "GGML_SYCL_FAST_MUL_MAT_ID_IQ4_XS=1 GGML_SYCL_MMV_Y_RUNTIME=2 GGML_SYCL_DISABLE_DNN=1 llama-bench -m MiniMax-M2.7-UD-IQ4_XS-00001-of-00004.gguf -rpc 127.0.0.1:50100|0,127.0.0.1:50101|0,127.0.0.1:50102|0,127.0.0.1:50103|0 -p 0 -n 64 -r 5 -ngl 99 -sm layer -ts 1/1/1/1 -fa 0 -nkvo 0 -ub 64 -ctk f16 -ctv f16 -t 4 -w 0 -mmp 1 -rtr 1 -fmoe 1 -no-mmad 0 -muge 1 -sas 0 -o json",
   "files": {
-    "sourceJson": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/minimax-fast-mmid-mmv-runtime2-r5-p0n64-20260508T124605Z.jsonl",
+    "sourceJson": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/minimax-fast-mmid-mmv-runtime2-fusedrms-ub64-r5-p0n64-20260508T143014Z.jsonl",
     "sameBuildControlJson": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/minimax-fast-mmid-control-r5-p0n64-20260508T120407Z.jsonl",
     "compileTimeMmv2Json": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/minimax-fast-mmid-mmv2-r5-p0n64-20260508T115654Z.jsonl",
     "correctnessSmokeDir": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/correctness/mmv-y2-smoke-20260508T125856Z",
-    "payload": "/home/steve/bench-results/localmaxxing-minimax-m27-fast-mmid-mmv-y2-20260508.payload.json",
-    "response": "/home/steve/bench-results/localmaxxing-minimax-m27-fast-mmid-mmv-y2-20260508.response.json"
+    "payload": "/home/steve/bench-results/localmaxxing-minimax-m27-fusedrms-mmv-y2-ub64-20260508.payload.json",
+    "response": "/home/steve/bench-results/localmaxxing-minimax-m27-fusedrms-mmv-y2-ub64-20260508.response.json"
   },
-  "notes": "Runtime MMV row grouping for SYCL MMVQ/MiniMax IQ4_XS kernels. Values are constrained to 1, 2, 4, or 8. Runtime value 2 reproduced the compile-time MMV_Y=2 direction and was submitted as a small software-only improvement."
+  "notes": "Current MiniMax GGUF recipe: fast IQ4_XS MUL_MAT_ID, runtime MMV row grouping Y=2, DNN disabled, fused RMSNorm enabled, ubatch 64. Runtime MMV values are constrained to 1, 2, 4, or 8. Runtime value 2 reproduced the compile-time MMV_Y=2 direction; fused RMSNorm became positive after the row-packing/ubatch changes."
 }

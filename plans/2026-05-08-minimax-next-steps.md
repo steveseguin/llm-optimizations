@@ -5,11 +5,11 @@
 Current valid MiniMax GGUF result:
 
 ```text
-17.547020 tok/s, 4x Intel Arc Pro B70, MiniMax-M2.7 UD-IQ4_XS GGUF, p0/n64/r5
-LocalMaxxing: cmowx1t6z000mml01v111mzvl
+17.697772 tok/s, 4x Intel Arc Pro B70, MiniMax-M2.7 UD-IQ4_XS GGUF, p0/n64/r5
+LocalMaxxing: cmox103ol0040ml019yzs6gvs
 ```
 
-This builds on the default-off `GGML_SYCL_FAST_MUL_MAT_ID_IQ4_XS=1` path and adds runtime MMV row packing with `GGML_SYCL_MMV_Y_RUNTIME=2`. Same-build r5 control was `17.198973 tok/s`; runtime MMV Y=2 was `17.547020 tok/s`. A synthetic IQ4_XS `MUL_MAT_ID` probe produced identical SYCL checksums and first outputs with fast MMID on versus off; a manual dequantized oracle showed the SYCL path is close (`nmse=1.44e-05`) while the CPU graph path diverges in this synthetic case.
+This builds on the default-off `GGML_SYCL_FAST_MUL_MAT_ID_IQ4_XS=1` path, runtime MMV row packing with `GGML_SYCL_MMV_Y_RUNTIME=2`, `-ub 64`, and fused RMSNorm enabled. Same-build r5 default-MMV control was `17.198973 tok/s`; current stack is `17.697772 tok/s`. A synthetic IQ4_XS `MUL_MAT_ID` probe produced identical SYCL checksums and first outputs with fast MMID on versus off; a manual dequantized oracle showed the SYCL path is close (`nmse=1.44e-05`) while the CPU graph path diverges in this synthetic case.
 
 The same stack at `p512/n128/r3` produced `50.905433 tok/s` prompt and `17.515510 tok/s` decode, LocalMaxxing `cmowyq5tu001jml01b470i75g`. Decode throughput is essentially unchanged at 512 context, so the next MiniMax work should stay focused on decode-side matvec/MoE scheduling.
 
@@ -17,7 +17,7 @@ The same stack at `p512/n128/r3` produced `50.905433 tok/s` prompt and `17.51551
 
 1. Keep the MiniMax AutoRound INT4 safetensors download running on `/mnt/corsair-external`.
 2. When download completes, test vLLM/XPU TP4 with `Lasimeri/MiniMax-M2.7-int4-AutoRound`.
-3. Keep `GGML_SYCL_MMV_Y_RUNTIME=2` as the default GGUF test setting; a deterministic generation smoke matched default row grouping byte-for-byte.
+3. Keep `GGML_SYCL_MMV_Y_RUNTIME=2`, `-ub 64`, DNN disabled, and fused RMSNorm enabled as the default GGUF test setting; deterministic generation smokes matched earlier baselines byte-for-byte.
 4. Investigate the CPU backend IQ4_XS `MUL_MAT_ID` mismatch against the manual dequantized oracle.
 5. Continue using GGUF RPC+SYCL layer mode as the reproducible fallback while searching for a better all-GPU path.
 6. Record negative GGUF kernel attempts when they rule out plausible optimizations.
@@ -45,7 +45,8 @@ Elementwise fused-op fixes are not enough. Fused RMSNorm is functional but neutr
    - Keep `-fa 0` for current MiniMax GGUF runs. `-fa 1` aborts the SYCL/RPC worker with unsupported `FLASH_ATTN_EXT`; implementing that op or a safe fallback is a larger follow-up.
 3. GGUF row packing:
    - Keep `GGML_SYCL_MMV_Y_RUNTIME=2` as the current MiniMax GGUF performance setting. A deterministic 16-token generation smoke matched default row grouping byte-for-byte.
-   - Use `-ub 64` for local follow-up sweeps; it produced a tiny local best of `17.559741 tok/s` but was not submitted because the delta over `-ub 32` is too small.
+   - Use `-ub 64`; it combined with fused RMSNorm to produce the current `17.697772 tok/s` high.
+   - Keep fused RMSNorm enabled for now. The current r5 run and deterministic generation smoke both cleared.
    - Treat runtime/compile-time Y=4 and runtime Y=8 as neutral/negative for now. Compile-time MMV4 produced `17.191979 tok/s`; runtime MMV8 produced `17.238444 tok/s`.
    - Treat MoE-specific Y=4 as negative for now. `GGML_SYCL_MMV_Y_RUNTIME=2` plus `GGML_SYCL_MOE_IQ4_XS_MMV_Y=4` produced `17.232041 tok/s`.
 4. GGUF graph split:

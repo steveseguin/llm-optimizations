@@ -15,19 +15,20 @@ This keeps the same MiniMax M2.7 UD-IQ4_XS GGUF weights, F16 KV cache, sampler p
 New current MiniMax GGUF high:
 
 ```text
-17.547020 tok/s, p0/n64/r5, 4x B70 RPC+SYCL layer split, F16 KV
-LocalMaxxing: cmowx1t6z000mml01v111mzvl
+17.697772 tok/s, p0/n64/r5, 4x B70 RPC+SYCL layer split, F16 KV
+LocalMaxxing: cmox103ol0040ml019yzs6gvs
 ```
 
 Comparison:
 
 | Variant | tok/s | samples |
 | --- | ---: | --- |
+| fused RMSNorm enabled + fast MMID + runtime `GGML_SYCL_MMV_Y_RUNTIME=2` + `-ub 64` | 17.697772 | 17.5369, 17.7524, 17.7386, 17.7282, 17.7328 |
 | fast MMID + runtime `GGML_SYCL_MMV_Y_RUNTIME=2` | 17.547020 | 17.3265, 17.6006, 17.6046, 17.6047, 17.5987 |
 | same-build control, default MMV row grouping | 17.198973 | 16.4378, 17.2950, 17.4133, 17.4222, 17.4266 |
 | previous LocalMaxxing high, fast MMID only | 17.335655 | 17.1807, 17.3988, 17.4275 |
 
-This is a `2.02%` gain versus the same-build r5 control and a `1.22%` gain versus the prior submitted MiniMax high. It is not the step-change needed to reach the 30 tok/s target, but it is a repeatable software-only improvement.
+The current high is a `2.90%` gain versus the same-build default-MMV control and a `1.19%` gain versus the initial Y=2 LocalMaxxing row. It is not the step-change needed to reach the 30 tok/s target, but it is a repeatable software-only improvement.
 
 Context check:
 
@@ -60,6 +61,24 @@ With Y=2 held fixed, `-ub 64` is a tiny local win over `-ub 32`, while `-ub 128`
 | `-ub 128`, r3 | 17.502587 | 17.3805, 17.6000, 17.5272 | not better |
 
 Use `-ub 64` for the next GGUF MiniMax sweeps, but keep the public LocalMaxxing p0/n64 record at `17.547020 tok/s` until a larger improvement clears the noise floor.
+
+## Fused RMSNorm Recheck
+
+Earlier fused RMSNorm was neutral/slower, but after the fast-MMID and MMV Y=2 changes it became a small win. Removing `GGML_DISABLE_FUSED_RMS_NORM=1` from both RPC workers and client produced:
+
+```text
+17.697772 tok/s, p0/n64/r5, samples 17.5369, 17.7524, 17.7386, 17.7282, 17.7328
+LocalMaxxing: cmox103ol0040ml019yzs6gvs
+```
+
+Correctness smoke against the fused-RMS-disabled Y=2 baseline matched byte-for-byte:
+
+```text
+78e517594d13b4c3405739fda666369c2cfe6afaa111e1e75a0b5eb0a848d6fd  y2.stdout
+78e517594d13b4c3405739fda666369c2cfe6afaa111e1e75a0b5eb0a848d6fd  fusedrms.stdout
+```
+
+Status: keep fused RMSNorm enabled for the current MiniMax GGUF recipe.
 
 ## Flash Attention Check
 
@@ -147,6 +166,7 @@ llama-bench \
 - Runtime MMV2 + MoE4 negative: `/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/minimax-fast-mmid-mmv2-moe4-r3-p0n64-20260508T132138Z.jsonl`
 - Context run: `/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/minimax-fast-mmid-mmv-runtime2-r3-p512n128-20260508T133014Z.jsonl`
 - Microbatch `-ub 64` local best: `/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/minimax-fast-mmid-mmv-runtime2-ub64-r5-p0n64-20260508T135521Z.jsonl`
+- Fused RMSNorm current high: `/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/minimax-fast-mmid-mmv-runtime2-fusedrms-ub64-r5-p0n64-20260508T143014Z.jsonl`
 - Microbatch `-ub 128` neutral: `/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/minimax-fast-mmid-mmv-runtime2-ub128-r3-p0n64-20260508T134833Z.jsonl`
 - Flash attention failure: `/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/minimax-fast-mmid-mmv-runtime2-ub64-fa1-r3-p512n128-20260508T140323Z.log`
 - DNN-enabled negative: `/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/minimax-fast-mmid-mmv-runtime2-dnnon-ub64-r3-p0n64-20260508T141516Z.jsonl`
@@ -156,7 +176,7 @@ llama-bench \
 
 ## Next
 
-- Keep `GGML_SYCL_MMV_Y_RUNTIME=2` as the default MiniMax GGUF test setting for now. A deterministic generation smoke matched byte-for-byte against default row grouping.
+- Keep `GGML_SYCL_MMV_Y_RUNTIME=2`, `-ub 64`, and fused RMSNorm enabled as the default MiniMax GGUF test setting for now. Deterministic generation smokes matched byte-for-byte against the earlier baselines.
 - Keep `GGML_SYCL_MMV_Y_RUNTIME=4` and `8` marked neutral/negative for now. Compile-time MMV4 produced `17.191979 tok/s`; runtime MMV8 produced `17.238444 tok/s`.
 - Keep MoE-specific `GGML_SYCL_MOE_IQ4_XS_MMV_Y=4` marked negative; it produced `17.232041 tok/s` with generic MMV Y=2.
 - Continue toward vLLM/XPU AutoRound INT4 TP4, since GGUF row packing is now delivering single-digit-percent gains rather than the larger improvement needed for the 30 tok/s goal.
