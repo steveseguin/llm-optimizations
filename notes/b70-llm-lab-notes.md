@@ -44,6 +44,7 @@ MiniMax M2.7 UD-IQ4_XS path:
 - Direct single-process SYCL MiniMax is blocked on a regular SYCL model-buffer allocation during `llm_load_tensors`. Even an uneven split plus `-b 512` fails on a 19.028 GB allocation on GPU0 despite full reported VRAM. The process-per-GPU RPC layout remains the valid path until regular model buffers can be chunked or routed through the split/pool allocator.
 - Layer placement is only a small/noisy lever: one-repeat `p0/n64` sweep topped out at `16.358 tok/s` with `-ts 0.8/1.05/1.05/1.1`, below the existing `16.384 tok/s` three-repeat best.
 - Quality-correct MiniMax graph mode now executes with forced real reductions at nonlinear boundaries, but it is diagnostic only: `GGML_MINIMAX_NO_DEFER_REDUCE=1` plus `GGML_RPC_REDUCE_MIRROR=1` reached only `2.034 tok/s` for a one-token smoke. The earlier faster branch-fused graph path remains unpromoted because deferred reductions can cross RMSNorm/router/MoE and change the math.
+- Layer-mode follow-up screens were negative: `-t` sweep topped out at `16.307 tok/s`, `-fa 1` aborts on unsupported `FLASH_ATTN_EXT`, fused RMSNorm aborts on unsupported `FUSED_RMS_NORM`, disabling fused MMAD/MoE is slower at p0/n64, same-type contiguous copy memcpy is neutral, and an 8-expert `MUL_MULTI_ADD` unroll regressed to `13.823 tok/s` and was removed.
 
 INT4 AutoRound path:
 
@@ -79,7 +80,7 @@ vLLM/XPU FP8 work:
 - Multi-card Q4_0 improves through async tensor copies, direct allreduce, Q8 activation caching, graph fusions, fused small projections, and safe allreduce+ADD scheduling. Root-residual fused allreduce+ADD is a promising performance ceiling but is not quality-cleared until its ordering hazard with meta allreduce-add is fixed. Four-card scaling still regresses because each token pays many small 20 KiB reductions and narrower row shards lose matvec efficiency.
 - Timing hooks show synchronized allreduce cost rises sharply with GPU count: roughly `1.718 ms/token` on 2 GPUs, `5.732 ms/token` on 3 GPUs, and `10.605 ms/token` on 4 GPUs for the same reduction pattern.
 - Four-GPU root/order/topology sweeps are not enough; the next useful work is reducing the number of reductions or fusing delayed reductions through safe graph regions.
-- MiniMax M2.7 is now past the pure-capacity stage by using one RPC process per B70. The working baseline is 16.384 tok/s. The quality-correct graph diagnostic shows real reduce/broadcast must happen before nonlinear boundaries, and the current client-side RPC implementation is too slow. The >30 tok/s target likely requires improving layer-mode local kernels, implementing a lower-overhead active-expert combine path, or designing graph/tensor parallelism around a much cheaper collective.
+- MiniMax M2.7 is now past the pure-capacity stage by using one RPC process per B70. The working baseline is 16.384 tok/s. The quality-correct graph diagnostic shows real reduce/broadcast must happen before nonlinear boundaries, and the current client-side RPC implementation is too slow. Simple runtime knobs did not move the layer path. The >30 tok/s target likely requires shape-specific layer kernels, implementing missing SYCL worker ops, or designing graph/tensor parallelism around a much cheaper collective.
 
 ## Current Next Steps
 

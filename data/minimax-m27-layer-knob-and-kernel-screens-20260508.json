@@ -1,0 +1,94 @@
+{
+  "date": "2026-05-08",
+  "host": {
+    "os": "Ubuntu 24.04.4 LTS",
+    "gpu": "Intel Arc Pro B70",
+    "gpu_count": 4,
+    "vram_gb_each": 32,
+    "cpu": "AMD EPYC 9015"
+  },
+  "model": {
+    "hf_id": "unsloth/MiniMax-M2.7-GGUF",
+    "variant": "UD-IQ4_XS",
+    "path": "/home/steve/models/minimax-m2.7-ud-iq4_xs-gguf/UD-IQ4_XS/MiniMax-M2.7-UD-IQ4_XS-00001-of-00004.gguf"
+  },
+  "reference": {
+    "tok_s_out": 16.383602,
+    "run": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/rpc-layer-devmapfix-kvoffloadon-r3-p0n64-20260508T044347Z.jsonl",
+    "localmaxxing_id": "cmowft2hr000oo3019is4snoq"
+  },
+  "thread_sweep_p0n64_r1": {
+    "summary_tsv": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/rpc-layer-thread-sweep-r1-p0n64-20260508T064813Z.tsv",
+    "results": [
+      { "threads": 1, "tok_s_out": 16.254063 },
+      { "threads": 2, "tok_s_out": 16.306743 },
+      { "threads": 4, "tok_s_out": 16.279345 },
+      { "threads": 8, "tok_s_out": 16.188375 }
+    ],
+    "conclusion": "Client CPU thread count is not the bottleneck."
+  },
+  "unsupported_flags": [
+    {
+      "label": "flash_attention",
+      "flag": "-fa 1",
+      "status": "worker_abort",
+      "log": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/rpc-layer-fa1-r1-p0n64-20260508T071459Z.log",
+      "worker_error": "op not supported fa-0 (FLASH_ATTN_EXT)"
+    },
+    {
+      "label": "fused_rmsnorm",
+      "env": "GGML_DISABLE_FUSED_RMS_NORM unset",
+      "status": "worker_abort",
+      "log": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/rpc-layer-fused-rmsmul-on-r1-p0n64-20260508T072228Z.log",
+      "worker_error": "op not supported attn_norm-0 (FUSED_RMS_NORM)"
+    }
+  ],
+  "existing_toggle_validation_p0n64_r1": {
+    "summary_tsv": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/rpc-layer-candidate-validate-r1-p0n64-20260508T075336Z.tsv",
+    "results": [
+      {
+        "label": "no-mmad1",
+        "flags": "-no-mmad 1 -fmoe 1 -muge 1",
+        "tok_s_out": 16.111982
+      },
+      {
+        "label": "fmoe0",
+        "flags": "-no-mmad 0 -fmoe 0 -muge 1",
+        "tok_s_out": 16.094589
+      },
+      {
+        "label": "no-mmad1-fmoe0",
+        "flags": "-no-mmad 1 -fmoe 0 -muge 1",
+        "tok_s_out": 16.166965
+      }
+    ],
+    "conclusion": "Disabling fused MMAD or fused MoE is slower than the current validated path."
+  },
+  "kernel_screens": [
+    {
+      "label": "same_type_contiguous_cpy_memcpy",
+      "env": "GGML_SYCL_CPY_MEMCPY_FAST=1",
+      "status": "retained_default_off",
+      "summary_tsv": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/rpc-layer-cpy-memcpy-fast-ab-r1-p0n64-20260508T081554Z.tsv",
+      "results": [
+        { "label": "off", "tok_s_out": 15.546598 },
+        { "label": "on", "tok_s_out": 15.591717 }
+      ],
+      "conclusion": "Neutral within noise; likely not hitting the dominant MiniMax CPY shape."
+    },
+    {
+      "label": "mul_multi_add_unroll8",
+      "env": "GGML_SYCL_MUL_MULTI_ADD_UNROLL8=1",
+      "status": "removed_after_test",
+      "tok_s_out": 13.822999,
+      "json": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/rpc-layer-mulmultiadd-unroll8-r1-p0n64-20260508T083220Z.jsonl",
+      "conclusion": "Regressed badly and can perturb the default device kernel, so it was removed."
+    }
+  ],
+  "localmaxxing": "not_submitted_no_new_valid_best",
+  "next_actions": [
+    "Trace actual MiniMax CPY shapes before implementing a row-copy fast path.",
+    "Verify MOE_FUSED_UP_GATE always takes the direct merged IQ4_XS path before changing it.",
+    "Do not use -fa 1 or fused RMSNorm until the SYCL RPC worker implements those ops."
+  ]
+}
