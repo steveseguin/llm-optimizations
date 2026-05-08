@@ -1,0 +1,48 @@
+{
+  "date": "2026-05-08",
+  "localmaxxingId": "cmowqyak0008co201oxuuzaid",
+  "status": "APPROVED",
+  "model": {
+    "hfId": "MiniMaxAI/MiniMax-M2.7",
+    "localGguf": "MiniMax-M2.7-UD-IQ4_XS-00001-of-00004.gguf",
+    "quantization": "UD-IQ4_XS"
+  },
+  "hardware": {
+    "hwClass": "DISCRETE_GPU",
+    "gpuName": "Intel Arc Pro B70",
+    "gpuCount": 4,
+    "vramGb": 32,
+    "cpu": "AMD EPYC 9015 8-Core Processor",
+    "ramGb": 16,
+    "os": "Ubuntu 24.04.4 LTS"
+  },
+  "engine": {
+    "engineName": "llama.cpp",
+    "engineVersion": "ik_llama.cpp 9a26522 + local RPC/SYCL fused-op patches",
+    "backendSubmitted": null,
+    "backendNote": "LocalMaxxing currently rejects xpu/sycl/rpc backend values; submitted without backend and recorded Level Zero/RPC details in engineFlags.extraFlags."
+  },
+  "metrics": {
+    "promptTokens": 0,
+    "outputTokens": 64,
+    "contextLength": 512,
+    "tokSOut": 16.404929,
+    "tokSTotal": 16.404929,
+    "samplesTokSOut": [16.2231, 16.507, 16.4847],
+    "stddevTokSOut": 0.157878
+  },
+  "abComparison": {
+    "sameBuildFusedMulUnaryOnTokS": 16.404929,
+    "sameBuildFusedMulUnaryOffTokS": 16.374820,
+    "previousBestTokS": 16.383602,
+    "interpretation": "Small quality-preserving improvement, but within normal MiniMax r3 variance. Keep support because it removes an unsupported-op gap and is not slower in r3."
+  },
+  "commandSnippet": "GGML_DISABLE_FUSED_RMS_NORM=1 llama-bench -m MiniMax-M2.7-UD-IQ4_XS-00001-of-00004.gguf -rpc 127.0.0.1:50100|0,127.0.0.1:50101|0,127.0.0.1:50102|0,127.0.0.1:50103|0 -p 0 -n 64 -r 3 -ngl 99 -sm layer -ts 1/1/1/1 -fa 0 -nkvo 0 -ub 32 -ctk f16 -ctv f16 -t 4 -w 0 -mmp 1 -rtr 1 -fmoe 1 -no-mmad 0 -muge 1 -sas 0 -o json",
+  "files": {
+    "sourceJson": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/rpc-layer-fused-mul-unary-r3-p0n64-20260508T094720Z.jsonl",
+    "abBaselineJson": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/rpc-layer-disable-fused-mul-unary-r3-p0n64-20260508T095410Z.jsonl",
+    "payload": "/home/steve/bench-results/localmaxxing-minimax-m27-fused-mul-unary-20260508.payloads.json",
+    "response": "/home/steve/bench-results/localmaxxing-minimax-m27-fused-mul-unary-20260508.response.json"
+  },
+  "notes": "Adds SYCL RPC worker support for GGML_OP_FUSED_MUL_UNARY. The implementation supports f32 same-shape GELU/RELU/SILU and f32 row-gate SILU/SIGMOID, matching the CPU op patterns MiniMax uses. Fused RMSNorm remains disabled because it was functional but neutral/slower. This does not change weights, quantization, KV dtype, sampler, or expert selection."
+}
