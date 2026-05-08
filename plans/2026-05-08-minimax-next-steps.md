@@ -5,21 +5,22 @@
 Current valid MiniMax GGUF result:
 
 ```text
-16.404929 tok/s, 4x Intel Arc Pro B70, MiniMax-M2.7 UD-IQ4_XS GGUF, p0/n64/r3
-LocalMaxxing: cmowqyak0008co201oxuuzaid
+17.335655 tok/s, 4x Intel Arc Pro B70, MiniMax-M2.7 UD-IQ4_XS GGUF, p0/n64/r3
+LocalMaxxing: cmowt5ciy00d0o201f1mcrg3q
 ```
 
-This is a small improvement over the prior `16.383602 tok/s` K/Q/V-offload result. It adds SYCL RPC support for `GGML_OP_FUSED_MUL_UNARY`; same-build A/B was `16.404929` on versus `16.374820` off. Treat this as slight/near-noise, not a major bottleneck fix.
+This enables the default-off `GGML_SYCL_FAST_MUL_MAT_ID_IQ4_XS=1` path for MiniMax expert-down `MUL_MAT_ID`. It improves the prior fused-mul-unary high of `16.404929 tok/s` by `5.67%`. A synthetic IQ4_XS `MUL_MAT_ID` probe produced identical SYCL checksums and first outputs with the fast path on versus off, but CPU-vs-SYCL mismatch exists with both paths and remains an open oracle issue.
 
 ## Active Work
 
 1. Keep the MiniMax AutoRound INT4 safetensors download running on `/mnt/corsair-external`.
 2. When download completes, test vLLM/XPU TP4 with `Lasimeri/MiniMax-M2.7-int4-AutoRound`.
-3. Continue using GGUF RPC+SYCL layer mode as the reproducible fallback while searching for a better all-GPU path.
+3. Investigate the CPU-vs-SYCL IQ4_XS `MUL_MAT_ID` mismatch with a smaller dequantized oracle before treating the fast path as upstream-ready.
+4. Continue using GGUF RPC+SYCL layer mode as the reproducible fallback while searching for a better all-GPU path.
 
 ## Bottleneck Hypothesis
 
-Elementwise fused-op fixes are not enough. Fused RMSNorm is functional but neutral/slower; fused mul unary is only a tiny gain. The remaining gap versus DGX GB10-class MiniMax numbers is more likely in:
+Elementwise fused-op fixes are not enough. Fused RMSNorm is functional but neutral/slower; fused mul unary is only a tiny gain. Fast IQ4_XS `MUL_MAT_ID` is a useful `5.67%` win, but the remaining gap versus DGX GB10-class MiniMax numbers is more likely in:
 
 - attention/KV cache scheduling and copies
 - MiniMax MoE routing/up-gate/down graph shape
@@ -41,4 +42,3 @@ Elementwise fused-op fixes are not enough. Fused RMSNorm is functional but neutr
 4. System RAM:
    - Extra RAM will help reduce load/cache churn and make vLLM experiments less fragile, but it is not expected to fix decode throughput alone.
    - Keep using the USB disk for large model downloads/caches instead of pressuring NVMe free space.
-

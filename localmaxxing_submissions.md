@@ -168,6 +168,7 @@ Model: `MiniMaxAI/MiniMax-M2.7`, local Unsloth GGUF `MiniMax-M2.7-UD-IQ4_XS-0000
 | `llamacpp-minimax-m27-ud-iq4_xs-rpc-layer-devmapfix-p0-n64-r3` | `cmowf7tgs000do301f1zd6jbr` | 4 | 0 | 64 | 14.292 | 14.292 |
 | `llamacpp-minimax-m27-ud-iq4_xs-rpc-layer-kqv-offload-p0-n64-r3` | `cmowft2hr000oo3019is4snoq` | 4 | 0 | 64 | 16.384 | 16.384 |
 | `llamacpp-minimax-m27-ud-iq4_xs-rpc-layer-fused-mul-unary-p0-n64-r3` | `cmowqyak0008co201oxuuzaid` | 4 | 0 | 64 | 16.405 | 16.405 |
+| `llamacpp-minimax-m27-ud-iq4_xs-rpc-layer-fast-mmid-p0-n64-r3` | `cmowt5ciy00d0o201f1mcrg3q` | 4 | 0 | 64 | 17.336 | 17.336 |
 
 Note: This is a diagnostic baseline, not an optimized all-GPU result. It uses llama.cpp layer split with `-ncmoe 56`, which CPU-maps the first 56 of 62 MoE expert layers and leaves only the final 6 expert layers GPU-resident on SYCL3. It was submitted because it is the first reproducible MiniMax completion on the 4x B70 system and records the current gap. LocalMaxxing's command parser misread `-t 8` as sampler temperature; the run is `llama-bench`, so sampling temperature is not meaningful here.
 
@@ -176,3 +177,5 @@ Note: `cmowf7tgs000do301f1zd6jbr` is the corrected post device-map-fix all-GPU l
 Note: `cmowft2hr000oo3019is4snoq` keeps the same corrected layer split and quality-preserving settings, but enables K/Q/V offload with `-nkvo 0`. KV remains F16, and the r3 samples were `16.2585`, `16.4391`, `16.4532` tok/s.
 
 Note: `cmowqyak0008co201oxuuzaid` adds quality-preserving SYCL RPC worker support for `GGML_OP_FUSED_MUL_UNARY` while keeping fused RMSNorm disabled because it was neutral/slower. Same-build A/B was `16.404929 tok/s` with fused mul unary enabled versus `16.374820 tok/s` with it disabled, so this is a small current high rather than a major optimization.
+
+Note: `cmowt5ciy00d0o201f1mcrg3q` enables the default-off `GGML_SYCL_FAST_MUL_MAT_ID_IQ4_XS=1` path for MiniMax expert-down `MUL_MAT_ID`. It improves the prior MiniMax high from `16.404929` to `17.335655 tok/s`. A synthetic IQ4_XS `MUL_MAT_ID` probe produced identical SYCL checksums and first outputs with fast path on versus off; the probe still shows a CPU-vs-SYCL mismatch even with the fast path disabled, so that oracle issue is tracked separately.
