@@ -98,6 +98,36 @@
       "interpretation": "Negative versus pidfd with CCL_TOPO_P2P_ACCESS=1. Keep P2P=1 as the wrapper default."
     },
     {
+      "name": "p64_n16_pidfd_p2p1_topology_check_disabled",
+      "prompt_tokens": 64,
+      "output_tokens": 16,
+      "context_length": 512,
+      "tensor_parallel": 4,
+      "ccl_ze_ipc_exchange": "pidfd",
+      "ccl_topo_p2p_access": 1,
+      "ccl_topo_fabric_vertex_connection_check": 0,
+      "tok_s_total": 71.18265,
+      "tok_s_output": 14.24,
+      "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p64n16-20260508T173644Z.log",
+      "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p64n16-20260508T173644Z.json",
+      "interpretation": "Positive tiny smoke, but this disables topology validation and needs a longer run."
+    },
+    {
+      "name": "p512_n128_pidfd_p2p1_topology_check_disabled",
+      "prompt_tokens": 512,
+      "output_tokens": 128,
+      "context_length": 2048,
+      "tensor_parallel": 4,
+      "ccl_ze_ipc_exchange": "pidfd",
+      "ccl_topo_p2p_access": 1,
+      "ccl_topo_fabric_vertex_connection_check": 0,
+      "tok_s_total": 99.459983,
+      "tok_s_output": 19.89,
+      "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n128-20260508T174346Z.log",
+      "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n128-20260508T174346Z.json",
+      "interpretation": "Neutral diagnostic. p512 output is only 0.04 tok/s above the accepted pidfd result, so this was not promoted or submitted."
+    },
+    {
       "name": "p64_n16_amd_moe_seed_rejected",
       "prompt_tokens": 64,
       "output_tokens": 16,
@@ -150,7 +180,7 @@
   "next_steps": [
     "Tune or supply a B70 int4_w4a16 MoE config for E=256,N=384; AMD-derived seeds were rejected or slower.",
     "Implement or port an XPU equivalent of minimax_allreduce_rms_qk before retesting MiniMax QK norm fusion.",
-    "Keep pidfd IPC and P2P=1 as defaults. Treat P2P=0 as negative.",
+    "Keep pidfd IPC and P2P=1 as defaults. Treat P2P=0 as negative and topology-check disable as neutral diagnostic.",
     "Keep GGUF RPC+SYCL as the faster current MiniMax path until AutoRound exceeds it."
   ]
 }

@@ -157,6 +157,22 @@ json: /home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-aut
 
 Interpretation: keep `CCL_TOPO_P2P_ACCESS=1`. Setting it to `0` was slightly slower than the `pidfd` + P2P=1 p64 smoke (`68.171339` total tok/s, `13.63` output tok/s).
 
+Topology-recognition diagnostic:
+
+```text
+p64/n16, TP4, pidfd, P2P=1, CCL_TOPO_FABRIC_VERTEX_CONNECTION_CHECK=0:
+71.182650 total tok/s, 14.24 output tok/s
+log: /home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p64n16-20260508T173644Z.log
+json: /home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p64n16-20260508T173644Z.json
+
+p512/n128, TP4, pidfd, P2P=1, CCL_TOPO_FABRIC_VERTEX_CONNECTION_CHECK=0:
+99.459983 total tok/s, 19.89 output tok/s
+log: /home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n128-20260508T174346Z.log
+json: /home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n128-20260508T174346Z.json
+```
+
+Interpretation: neutral diagnostic. It suppresses the PCIe topology check and slightly improves the short smoke, but the p512/n128 result is only `+0.04` output tok/s over the accepted `19.85` result. Keep the conservative default without this override unless repeated longer runs prove a stable gain.
+
 AMD-derived MoE config seed:
 
 ```text
@@ -231,7 +247,7 @@ Interpretation: QK-norm fusion is not currently a MiniMax/XPU speed path. The gu
 
 - Submit useful AutoRound results as diagnostic records, while keeping the current GGUF path as the higher-performance MiniMax route.
 - Keep `CCL_ZE_IPC_EXCHANGE=pidfd` as the current vLLM/XPU default; sockets is slower in the p64 smoke and earlier p512 run.
-- Keep `CCL_TOPO_P2P_ACCESS=1`; `0` was slightly slower in the p64 smoke. Only try `CCL_TOPO_FABRIC_VERTEX_CONNECTION_CHECK=0` as a diagnostic because it forces assumptions about XeLinks that the current PCIe topology does not report.
+- Keep `CCL_TOPO_P2P_ACCESS=1`; `0` was slightly slower in the p64 smoke. Treat `CCL_TOPO_FABRIC_VERTEX_CONNECTION_CHECK=0` as neutral/diagnostic because it improved p512 output only from `19.85` to `19.89` tok/s while overriding topology validation.
 - Treat `VLLM_XPU_ENABLE_XPU_GRAPH=1` as negative for TP4 MiniMax AutoRound until vLLM can capture communication ops or split capture around collectives.
 - Try `--enforce-eager` if the compiled path keeps failing; upstream Intel quantization docs currently recommend eager for wNa16.
 - Treat `--compilation-config '{"mode":3,"pass_config":{"fuse_minimax_qk_norm":true}}'` as blocked on XPU because this build lacks `torch.ops._C.minimax_allreduce_rms_qk`; implement or port that fused op before retesting for speed.
