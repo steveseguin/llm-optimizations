@@ -76,11 +76,37 @@
       "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p64n16-20260508T164639Z.log",
       "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p64n16-20260508T164639Z.json",
       "interpretation": "Completed but regressed badly versus the default MoE config smoke, so this seed should not be promoted."
+    },
+    {
+      "name": "p64_n16_xpu_graph_requested",
+      "prompt_tokens": 64,
+      "output_tokens": 16,
+      "context_length": 512,
+      "tensor_parallel": 4,
+      "xpu_graph_requested": true,
+      "xpu_graph_effective": false,
+      "tok_s_total": 18.149238,
+      "tok_s_output": 3.63,
+      "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p64n16-20260508T165550Z.log",
+      "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p64n16-20260508T165550Z.json",
+      "interpretation": "Not promoted. vLLM disables graph capture because XPU Graph does not support capture of communication ops on this TP4 path."
+    },
+    {
+      "name": "p64_n16_minimax_qk_norm_fusion_blocked",
+      "prompt_tokens": 64,
+      "output_tokens": 16,
+      "context_length": 512,
+      "tensor_parallel": 4,
+      "extra_args": "--compilation-config {\"mode\":3,\"pass_config\":{\"fuse_minimax_qk_norm\":true}}",
+      "fused_op_available": false,
+      "patch": "patches/vllm-minimax-qknorm-passmanager-xpu-guard-20260508.patch",
+      "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p64n16-20260508T170331Z.log",
+      "interpretation": "Blocked. vLLM accepts the pass flag, but this XPU build lacks torch.ops._C.minimax_allreduce_rms_qk. The first attempt also hit a pass-manager import guard bug, now patched locally."
     }
   ],
   "next_steps": [
     "Tune or supply a B70 int4_w4a16 MoE config for E=256,N=384; AMD-derived seeds were rejected or slower.",
-    "Test MiniMax QK norm fusion after the baseline is stable.",
+    "Implement or port an XPU equivalent of minimax_allreduce_rms_qk before retesting MiniMax QK norm fusion.",
     "Compare XPU graph, CCL IPC, and topology settings.",
     "Keep GGUF RPC+SYCL as the faster current MiniMax path until AutoRound exceeds it."
   ]

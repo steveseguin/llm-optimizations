@@ -157,13 +157,55 @@ json: /home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-aut
 
 Interpretation: the external config mechanism works, but AMD Instinct W4A16 MoE tiling is a poor seed for B70. Do not promote this config or run larger benchmarks with it. A real B70 tuning pass is still needed.
 
+XPU graph smoke:
+
+```text
+p64/n16, TP4, max_model_len=512, VLLM_XPU_ENABLE_XPU_GRAPH=1:
+18.149238 total tok/s, 3.63 output tok/s
+log: /home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p64n16-20260508T165550Z.log
+json: /home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p64n16-20260508T165550Z.json
+```
+
+This is not promoted. vLLM explicitly disables graph capture on this TP4 path:
+
+```text
+XPU Graph doesn't support capture communication ops, disabling cudagraph_mode.
+```
+
+MiniMax QK-norm fusion smoke:
+
+```text
+EXTRA_ARGS='--compilation-config {"mode":3,"pass_config":{"fuse_minimax_qk_norm":true}}'
+```
+
+The pass flag is accepted and vLLM logs `Enabled custom fusions: minimax_qk_norm`, but this build does not expose the fused Lamport op:
+
+```text
+hasattr(torch.ops._C, "minimax_allreduce_rms_qk") == False
+```
+
+The first run then failed with a pass-manager import guard issue:
+
+```text
+NameError: name 'MiniMaxQKNormPass' is not defined
+log: /home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p64n16-20260508T170331Z.log
+```
+
+Patch snapshot retained:
+
+```text
+patches/vllm-minimax-qknorm-passmanager-xpu-guard-20260508.patch
+```
+
+Interpretation: QK-norm fusion is not currently a MiniMax/XPU speed path. The guard patch prevents a crash, but a useful optimization needs an XPU implementation of `minimax_allreduce_rms_qk` or an equivalent fused collective+RMS kernel.
+
 ## Open Items
 
 - Submit useful AutoRound results as diagnostic records, while keeping the current GGUF path as the higher-performance MiniMax route.
 - Compare `CCL_ZE_IPC_EXCHANGE=sockets` versus `pidfd`.
 - Compare `CCL_TOPO_P2P_ACCESS=1` versus `0` and, only as a diagnostic, `CCL_TOPO_FABRIC_VERTEX_CONNECTION_CHECK=0`.
-- Try `VLLM_XPU_ENABLE_XPU_GRAPH=1` after basic generation is stable.
+- Treat `VLLM_XPU_ENABLE_XPU_GRAPH=1` as negative for TP4 MiniMax AutoRound until vLLM can capture communication ops or split capture around collectives.
 - Try `--enforce-eager` if the compiled path keeps failing; upstream Intel quantization docs currently recommend eager for wNa16.
-- Test `--compilation-config '{"mode":3,"pass_config":{"fuse_minimax_qk_norm":true}}'`. The installed vLLM package includes `MiniMaxQKNormPass`, so this is available after basic generation is stable.
+- Treat `--compilation-config '{"mode":3,"pass_config":{"fuse_minimax_qk_norm":true}}'` as blocked on XPU because this build lacks `torch.ops._C.minimax_allreduce_rms_qk`; implement or port that fused op before retesting for speed.
 - Add or tune a B70 MoE config file for `E=256,N=384,device_name=Intel(R)_Graphics_[0xe223],dtype=int4_w4a16.json`; an AMD-derived seed regressed to `1.73` output tok/s on p64/n16.
 - Consider moving the AutoRound model to NVMe if iteration time, not decode speed, becomes the limiting factor.

@@ -42,7 +42,8 @@ Elementwise fused-op fixes are not enough. Fused RMSNorm is functional but neutr
    - Compare `CCL_TOPO_P2P_ACCESS=1` and `0` if the model gets through load.
    - If TP4 fails in kernels, capture the exact unsupported op and inspect vLLM/INC/AutoRound dispatch.
    - Try `--enforce-eager` if the compiled path fails; current Intel wNa16 vLLM docs recommend eager for Intel GPU/CPU.
-   - Try MiniMax QK-norm compile fusion if this build exposes it: `--compilation-config '{"mode":3,"pass_config":{"fuse_minimax_qk_norm":true}}'`.
+   - Treat MiniMax QK-norm compile fusion as blocked on this XPU build. The flag is accepted, but `torch.ops._C.minimax_allreduce_rms_qk` is absent; the pass-manager crash was patched locally in `patches/vllm-minimax-qknorm-passmanager-xpu-guard-20260508.patch`.
+   - Treat `VLLM_XPU_ENABLE_XPU_GRAPH=1` as negative for this TP4 path because vLLM disables graph capture around communication ops.
    - Treat the AMD Instinct int4 W4A16 MoE tuned config as a negative seed for B70. The raw file failed on unsupported `matrix_instr_nonkdim`; stripping that key completed p64/n16 but regressed to `8.632747` total tok/s and `1.73` output tok/s.
    - If TP4 OOMs or stalls, try reduced `max_model_len`, `max_num_batched_tokens`, and possibly TP2 just to isolate the failure mode.
 2. GGUF attention/KV:

@@ -25,6 +25,7 @@ Reproducibility notes, benchmark payloads, and local patches from the Intel Arc 
 - MiniMax SYCL RPC worker now implements `FUSED_RMS_NORM`, converting a previous unsupported-op abort into a valid path. It reached 16.308 tok/s at p0/n64/r1, so it is functional but not a speed record.
 - The next MiniMax performance blocker is true speed parallelism rather than capacity. Valid layer mode has only five scheduler splits and largely marches through the four GPUs sequentially. The >30 tok/s path likely requires quality-correct graph/tensor/expert parallelism, lower-overhead cross-device reductions, or a layout-aware active-expert kernel.
 - MiniMax AutoRound INT4 safetensors now load and generate through vLLM/XPU TP4 after the local INC `FusedMoE` to `MoeWNA16Config` patch and targeted vLLM package-skew repairs. The first p512/n128 measurement is 13.45 output tok/s, below the GGUF path, and the log shows the next bottleneck: no B70-specific tuned MoE config for `E=256,N=384,dtype=int4_w4a16`. An AMD-derived config seed was accepted only after stripping an unsupported key, but it regressed to 1.73 output tok/s on p64/n16.
+- MiniMax AutoRound vLLM runtime toggles did not yet produce a speed path: `VLLM_XPU_ENABLE_XPU_GRAPH=1` is disabled by vLLM because TP4 communication ops cannot be captured, and MiniMax QK-norm fusion is blocked because this XPU build lacks `torch.ops._C.minimax_allreduce_rms_qk`.
 
 ## Layout
 
@@ -116,6 +117,7 @@ Reproducibility notes, benchmark payloads, and local patches from the Intel Arc 
 - `patches/vllm-xpu-fa2-compressed-tensors-scalar-scales.patch`: vLLM compressed-tensors singleton attention scale fix for Intel XPU FlashAttention2.
 - `patches/vllm-xpu-qwen35-gdn-spec-fallback-contiguous-state.patch`: XPU Gated DeltaNet speculative metadata/fallback patch used by the n-gram runs.
 - `patches/vllm-inc-xpu-autoround-fusedmoe-wna16-20260508.patch`: experimental vLLM patch that lets INC/AutoRound XPU quantization apply WNA16 MoE quantization to MiniMax `FusedMoE` layers instead of falling back to unquantized MoE.
+- `patches/vllm-minimax-qknorm-passmanager-xpu-guard-20260508.patch`: guard patch so enabling MiniMax QK-norm fusion on XPU does not crash when the fused Lamport op is absent.
 
 ## Notes
 
