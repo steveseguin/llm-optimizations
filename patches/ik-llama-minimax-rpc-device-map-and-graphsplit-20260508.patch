@@ -2706,18 +2706,63 @@ index c0ece49..2325e30 100644
  #endif
 -
 diff --git a/src/graphs/build_minimaxm2.cpp b/src/graphs/build_minimaxm2.cpp
-index 07497c7..0bea5d0 100644
+index 07497c7..352097f 100644
 --- a/src/graphs/build_minimaxm2.cpp
 +++ b/src/graphs/build_minimaxm2.cpp
-@@ -49,6 +49,7 @@ ggml_cgraph* llm_build_context::build_minimaxm2() {
+@@ -2,6 +2,9 @@
+ #include "../llama-model.h"
+ #include "../llama-context.h"
+ 
++#include <cstdlib>
++#include <cstring>
++
+ ggml_cgraph* llm_build_context::build_minimaxm2() {
+     ggml_cgraph * gf = ggml_new_graph_custom(ctx0, model.max_nodes(n_tokens), false);
+     const int64_t n_embd_head = hparams.n_embd_head_v(0);
+@@ -22,6 +25,7 @@ ggml_cgraph* llm_build_context::build_minimaxm2() {
+ 
+     for (int il = 0; il < n_layer; ++il) {
+         ggml_tensor* inpSA = inpL;
++        bool ffn_already_built = false;
+ 
+         cur = inpL;
+ 
+@@ -49,11 +53,34 @@ ggml_cgraph* llm_build_context::build_minimaxm2() {
              GGML_ASSERT(wq->n_device == q_norm->n_device && wq->n_device == k_norm->n_device && wq->n_device == attn_norm->n_device);
              auto kl = (ggml_split_tensor_t *)kv_self.k_l[il]->extra;
              auto vl = (ggml_split_tensor_t *)kv_self.v_l[il]->extra;
 +            GGML_ASSERT(kl && vl && "MiniMax-M2 graph/attention split requires split KV cache; remove -nkvo");
              GGML_ASSERT(wq->n_device == kl->n_device && wq->n_device == vl->n_device);
++            static const bool graph_branch_ffn = []() {
++                const char * env = getenv("GGML_MINIMAX_GRAPH_BRANCH_FFN");
++                return env && strcmp(env, "0") != 0;
++            }();
++
++            ggml_split_tensor_t * split_ffn_gate_inp = nullptr;
++            ggml_split_tensor_t * split_ffn_down_exps = nullptr;
++            ggml_split_tensor_t * split_ffn_exp_probs_b = nullptr;
++            ggml_split_tensor_t * split_ffn_up_gate_exps = nullptr;
++            if (graph_branch_ffn) {
++                split_ffn_gate_inp     = (ggml_split_tensor_t *) model.layers[il].ffn_gate_inp->extra;
++                split_ffn_down_exps    = (ggml_split_tensor_t *) model.layers[il].ffn_down_exps->extra;
++                split_ffn_exp_probs_b  = model.layers[il].ffn_exp_probs_b ? (ggml_split_tensor_t *) model.layers[il].ffn_exp_probs_b->extra : nullptr;
++                split_ffn_up_gate_exps = model.layers[il].ffn_up_gate_exps ? (ggml_split_tensor_t *) model.layers[il].ffn_up_gate_exps->extra : nullptr;
++                GGML_ASSERT(split_ffn_gate_inp && split_ffn_down_exps && split_ffn_up_gate_exps);
++                GGML_ASSERT(split_ffn_gate_inp->n_device == wq->n_device);
++                GGML_ASSERT(split_ffn_down_exps->n_device == wq->n_device);
++                GGML_ASSERT(split_ffn_up_gate_exps->n_device == wq->n_device);
++                GGML_ASSERT(!split_ffn_exp_probs_b || split_ffn_exp_probs_b->n_device == wq->n_device);
++            }
++
              int head_count    = 0;
              int head_count_kv = 0;
-@@ -146,16 +147,43 @@ ggml_cgraph* llm_build_context::build_minimaxm2() {
+             int n_device = wq->n_device;
+             std::vector<ggml_tensor *> attn(n_device, nullptr);
++            std::vector<ggml_tensor *> branch_ffn(graph_branch_ffn ? n_device : 0, nullptr);
+             bool input_added = false;
+             for (int id = 0; id < n_device; ++id) {
+                 if (!wq->splits[id]) continue;
+@@ -146,16 +173,43 @@ ggml_cgraph* llm_build_context::build_minimaxm2() {
                               ggml_row_size( vl->splits[id]->type, n_embd_head_v), 0);
                  cb(v, "v", il_id);
  
@@ -2768,15 +2813,98 @@ index 07497c7..0bea5d0 100644
  
                  if (il == n_layer - 1 && n_tokens > 1 && inp_out_ids) {
                      cur = ggml_get_rows(ctx0, cur, inp_out_ids);
-@@ -183,7 +211,7 @@ ggml_cgraph* llm_build_context::build_minimaxm2() {
+@@ -178,13 +232,55 @@ ggml_cgraph* llm_build_context::build_minimaxm2() {
+                 if (cur->ne[1] > 32 && lctx.cparams.reduce_type != GGML_TYPE_F32) {
+                     cur = ggml_cast(ctx0, cur, lctx.cparams.reduce_type);
+                 }
+-                ggml_build_forward_expand(gf, cur);
+-                attn[id] = cur;
++
++                if (graph_branch_ffn) {
++                    ggml_tensor * ffn_input = cur;
++                    ggml_tensor * ffn_cur = do_split_norm(ctx0, ffn_input, model.layers[il].ffn_norm,
++                            hparams, cb, id, il_id, false);
++
++                    ffn_cur = llm_build_moe_ffn(ctx0, lctx, ffn_cur,
++                            split_ffn_gate_inp->splits[id], nullptr,
++                            nullptr, nullptr,
++                            nullptr, nullptr,
++                            split_ffn_down_exps->splits[id], nullptr,
++                            split_ffn_exp_probs_b ? split_ffn_exp_probs_b->splits[id] : nullptr,
++                            n_expert, n_expert_used,
++                            LLM_FFN_SILU, true, false, 0.0f,
++                            (llm_expert_gating_func_type) hparams.expert_gating_func,
++                            cb, il_id, gf, false,
++                            split_ffn_up_gate_exps->splits[id], nullptr);
++                    cb(ffn_cur, "routed_out", il_id);
++
++                    if (ffn_cur->ne[1] > 32 && lctx.cparams.reduce_type != GGML_TYPE_F32) {
++                        ffn_cur = ggml_cast(ctx0, ffn_cur, lctx.cparams.reduce_type);
++                        cb(ffn_cur, "ffn_out_f16", il_id);
++                    }
++                    ffn_cur = ggml_add(ctx0, ffn_cur, ffn_input);
++                    cb(ffn_cur, "ffn_inp_added", il_id);
++
++                    ggml_build_forward_expand(gf, ffn_cur);
++                    branch_ffn[id] = ffn_cur;
++                } else {
++                    ggml_build_forward_expand(gf, cur);
++                    attn[id] = cur;
++                }
              }
  
-             cur = ggml_reduce(ctx0, attn.data(), n_device, GGML_OP_ADD);
+-            cur = ggml_reduce(ctx0, attn.data(), n_device, GGML_OP_ADD);
 -            ggml_build_forward_expand(gf, cur);
-+            cur->op_params[3] = 1;
-             cb(cur, "attn_combined", il);
+-            cb(cur, "attn_combined", il);
++            if (graph_branch_ffn) {
++                cur = ggml_reduce(ctx0, branch_ffn.data(), n_device, GGML_OP_ADD);
++                if (il < n_layer - 1) {
++                    cur->op_params[3] = 1;
++                }
++                cb(cur, "moe_ffn_combined", il);
++                if (il == n_layer - 1) {
++                    ggml_build_forward_expand(gf, cur);
++                }
++                ffn_already_built = true;
++            } else {
++                cur = ggml_reduce(ctx0, attn.data(), n_device, GGML_OP_ADD);
++                cur->op_params[3] = 1;
++                cb(cur, "attn_combined", il);
++            }
  
          } else {
+             cur = llm_build_norm(ctx0, inpL, hparams, model.layers[il].attn_norm, NULL, LLM_NORM_RMS, cb, il);
+@@ -238,17 +334,19 @@ ggml_cgraph* llm_build_context::build_minimaxm2() {
+             cb(cur, "ffn_inp", il);
+         }
+ 
+-        cur = llm_build_std_moe_ffn(ctx0, lctx, model.layers[il].ffn_norm, cur,
+-                model.layers[il].ffn_gate_inp,  nullptr,
+-                model.layers[il].ffn_up_exps,   nullptr,
+-                model.layers[il].ffn_gate_exps, nullptr,
+-                model.layers[il].ffn_down_exps, nullptr,
+-                model.layers[il].ffn_exp_probs_b,
+-                nullptr,  nullptr, nullptr,  nullptr, nullptr,  nullptr, // no shared experts
+-                n_expert, n_expert_used,
+-                LLM_FFN_SILU, true, false, 0.0f,
+-                (llm_expert_gating_func_type)hparams.expert_gating_func,
+-                LLM_FFN_SILU, cb, il, gf, true, model.layers[il].ffn_up_gate_exps);
++        if (!ffn_already_built) {
++            cur = llm_build_std_moe_ffn(ctx0, lctx, model.layers[il].ffn_norm, cur,
++                    model.layers[il].ffn_gate_inp,  nullptr,
++                    model.layers[il].ffn_up_exps,   nullptr,
++                    model.layers[il].ffn_gate_exps, nullptr,
++                    model.layers[il].ffn_down_exps, nullptr,
++                    model.layers[il].ffn_exp_probs_b,
++                    nullptr,  nullptr, nullptr,  nullptr, nullptr,  nullptr, // no shared experts
++                    n_expert, n_expert_used,
++                    LLM_FFN_SILU, true, false, 0.0f,
++                    (llm_expert_gating_func_type)hparams.expert_gating_func,
++                    LLM_FFN_SILU, cb, il, gf, true, model.layers[il].ffn_up_gate_exps);
++        }
+ 
+         cur = lctx.cvec.apply_to(ctx0, cur, il);
+         cb(cur, "l_out", il);
 diff --git a/src/llama-build-context.cpp b/src/llama-build-context.cpp
 index 9a3c245..063933b 100644
 --- a/src/llama-build-context.cpp

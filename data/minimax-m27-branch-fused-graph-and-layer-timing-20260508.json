@@ -1,0 +1,124 @@
+{
+  "date": "2026-05-08",
+  "model": {
+    "hfId": "unsloth/MiniMax-M2.7",
+    "ggufRepo": "unsloth/MiniMax-M2.7-GGUF",
+    "quantization": "UD-IQ4_XS",
+    "localPath": "/home/steve/models/minimax-m2.7-ud-iq4_xs-gguf/UD-IQ4_XS/MiniMax-M2.7-UD-IQ4_XS-00001-of-00004.gguf"
+  },
+  "hardware": {
+    "gpu": "Intel Arc Pro B70",
+    "gpuCount": 4,
+    "vramGbPerGpu": 32,
+    "os": "Ubuntu 24.04.4 LTS"
+  },
+  "engine": {
+    "name": "ik_llama.cpp",
+    "reportedBuildCommit": "9a26522",
+    "backend": "RPC client plus four SYCL Level Zero rpc-server workers",
+    "patch": "patches/ik-llama-minimax-rpc-device-map-and-graphsplit-20260508.patch"
+  },
+  "experiment": {
+    "name": "MiniMax graph branch fusion",
+    "env": {
+      "GGML_MINIMAX_GRAPH_BRANCH_FFN": "1"
+    },
+    "description": "Build each MiniMax graph-mode attention branch and MoE FFN branch together for the same device, reducing graph scheduler submissions."
+  },
+  "runs": [
+    {
+      "label": "graph wave2 baseline p0/n16",
+      "tokSOut": 3.920533,
+      "promptTokens": 0,
+      "outputTokens": 16,
+      "splitMode": "graph",
+      "schedulerSplits": 503,
+      "env": "GGML_SCHED_ASYNC_WAVE=1",
+      "json": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/rpc-split-wave2-kvoff-p0n16-20260508T035319Z.jsonl"
+    },
+    {
+      "label": "branch fused graph p0/n1 async off",
+      "tokSOut": 2.309728,
+      "promptTokens": 0,
+      "outputTokens": 1,
+      "splitMode": "graph",
+      "schedulerSplits": 251,
+      "commandTail": "GGML_MINIMAX_GRAPH_BRANCH_FFN=1 GGML_SCHED_SPLIT_TRACE=1 ... -p 0 -n 1 -r 1 -sm graph -ts 1/1/1/1 -sas 0",
+      "json": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/rpc-split-branchffn-p0n1-20260508T040720Z.jsonl",
+      "log": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/rpc-split-branchffn-p0n1-20260508T040720Z.log"
+    },
+    {
+      "label": "branch fused graph p0/n1 wave async",
+      "tokSOut": 4.593198,
+      "promptTokens": 0,
+      "outputTokens": 1,
+      "splitMode": "graph",
+      "schedulerSplits": 251,
+      "commandTail": "GGML_MINIMAX_GRAPH_BRANCH_FFN=1 GGML_SCHED_ASYNC_WAVE=1 GGML_SCHED_SPLIT_TRACE=1 ... -p 0 -n 1 -r 1 -sm graph -ts 1/1/1/1 -sas 1",
+      "json": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/rpc-split-branchffn-sas1-p0n1-20260508T041030Z.jsonl",
+      "log": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/rpc-split-branchffn-sas1-p0n1-20260508T041030Z.log"
+    },
+    {
+      "label": "branch fused graph p0/n16 wave async",
+      "tokSOut": 5.634358,
+      "promptTokens": 0,
+      "outputTokens": 16,
+      "splitMode": "graph",
+      "commandTail": "GGML_MINIMAX_GRAPH_BRANCH_FFN=1 GGML_SCHED_ASYNC_WAVE=1 ... -p 0 -n 16 -r 1 -sm graph -ts 1/1/1/1 -sas 1",
+      "json": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/rpc-split-branchffn-sas1-p0n16-20260508T041321Z.jsonl",
+      "log": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/rpc-split-branchffn-sas1-p0n16-20260508T041321Z.log"
+    },
+    {
+      "label": "branch fused graph p0/n64 wave async",
+      "tokSOut": 5.639884,
+      "promptTokens": 0,
+      "outputTokens": 64,
+      "splitMode": "graph",
+      "commandTail": "GGML_MINIMAX_GRAPH_BRANCH_FFN=1 GGML_SCHED_ASYNC_WAVE=1 ... -p 0 -n 64 -r 1 -sm graph -ts 1/1/1/1 -sas 1",
+      "json": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/rpc-split-branchffn-sas1-p0n64-20260508T041629Z.jsonl",
+      "log": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/rpc-split-branchffn-sas1-p0n64-20260508T041629Z.log"
+    },
+    {
+      "label": "branch fused graph p0/n64 async no wave",
+      "tokSOut": 5.39771,
+      "promptTokens": 0,
+      "outputTokens": 64,
+      "splitMode": "graph",
+      "commandTail": "GGML_MINIMAX_GRAPH_BRANCH_FFN=1 ... -p 0 -n 64 -r 1 -sm graph -ts 1/1/1/1 -sas 1",
+      "json": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/rpc-split-branchffn-sas1-nowave-p0n64-20260508T041948Z.jsonl",
+      "log": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/rpc-split-branchffn-sas1-nowave-p0n64-20260508T041948Z.log"
+    }
+  ],
+  "layerTimingProbe": {
+    "label": "layer mode p0/n1 with GGML_SYCL_OP_TIMING=1",
+    "warning": "Timing mode synchronizes every SYCL op and is not a valid throughput result.",
+    "tokSOutWithTiming": 3.834472,
+    "json": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/op-timing-20260508T042307Z/layer-p0n1.jsonl",
+    "logs": [
+      "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/op-timing-20260508T042307Z/rpc-b70-0.log",
+      "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/op-timing-20260508T042307Z/rpc-b70-1.log",
+      "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/op-timing-20260508T042307Z/rpc-b70-2.log",
+      "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/op-timing-20260508T042307Z/rpc-b70-3.log"
+    ],
+    "workerTotalsMs": {
+      "rpc-b70-0": 61.355,
+      "rpc-b70-1": 62.52,
+      "rpc-b70-2": 60.582,
+      "rpc-b70-3": 64.212
+    },
+    "aggregateOpTotalsMs": [
+      { "op": "MUL_MAT", "count": 435, "ms": 116.615 },
+      { "op": "MOE_FUSED_UP_GATE", "count": 62, "ms": 29.484 },
+      { "op": "ROPE", "count": 124, "ms": 25.804 },
+      { "op": "CPY", "count": 124, "ms": 24.384 },
+      { "op": "SOFT_MAX", "count": 62, "ms": 22.306 },
+      { "op": "MUL", "count": 249, "ms": 11.24 },
+      { "op": "MUL_MAT_ID", "count": 62, "ms": 7.581 }
+    ]
+  },
+  "conclusion": "The graph construction change halves split submissions and improves graph mode from about 3.92 tok/s to about 5.64 tok/s, but this remains much slower than the corrected 14.292 tok/s layer-mode baseline. The layer timing probe indicates the next useful MiniMax work should focus on attention decode matmuls, RoPE, KV cache copies, softmax, and MoE fused up/gate kernels.",
+  "localmaxxing": {
+    "submitted": false,
+    "reason": "Graph branch fusion is experimental and slower than the corrected layer baseline. Timing probe is not a valid throughput result."
+  }
+}
