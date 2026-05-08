@@ -35,6 +35,18 @@ GGML_DISABLE_FUSED_MUL_UNARY=1 \
 | `-nkvo 0`, r1 | `15.642624` | n/a | Clean smoke after device-map fix |
 | `-nkvo 0`, r3 | `16.383602` | `16.2585`, `16.4391`, `16.4532` | New best layer baseline |
 
+Follow-up sweep:
+
+| Config | tok/s | Outcome |
+| --- | ---: | --- |
+| `-nkvo 0 -ub 16 -sas 0` | `16.278826` | Flat vs best |
+| `-nkvo 0 -ub 32 -sas 0` | `16.282776` | Flat vs best |
+| `-nkvo 0 -ub 64 -sas 0` | `16.303453` | Flat vs best |
+| `-nkvo 0 -ub 64 -sas 1` | `16.237232` | Slower |
+| `-nkvo 0 -ctk q8_0 -ctv q8_0` | failed | Context creation failed |
+| `-nkvo 0 -ctk q8_0 -ctv f16` | `2.798544` | Severe regression; quality-tradeoff path closed |
+| `-nkvo 0 -rcache 1` | `16.181736` | Slower |
+
 Raw data:
 
 ```text
@@ -51,5 +63,6 @@ The timing probe from the previous note showed attention decode and KV movement 
 ## Next
 
 1. Treat `16.383602 tok/s` as the current MiniMax UD-IQ4_XS 4x-B70 baseline.
-2. Sweep `-nkvo 0` with a small set of otherwise low-risk flags: `-sas 1`, `-ub 16/64`, and possibly `-ctk q8_0 -ctv q8_0` as a quality-tradeoff experiment only.
+2. Keep `-ub 32`, `-sas 0`, F16 KV, and `-rcache 0`.
 3. Keep graph branch-fusion as diagnostic; it remains much slower than this layer path.
+4. Next deeper targets are code-level attention decode kernels and KV copy behavior, not public flags.

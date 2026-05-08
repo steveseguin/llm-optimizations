@@ -52,6 +52,78 @@
       "json": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/rpc-layer-devmapfix-kvoffloadon-r3-p0n64-20260508T044347Z.jsonl",
       "log": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/rpc-layer-devmapfix-kvoffloadon-r3-p0n64-20260508T044347Z.log",
       "localmaxxingId": "cmowft2hr000oo3019is4snoq"
+    },
+    {
+      "label": "K/Q/V offload ubatch sweep ub16 sas0",
+      "tokSOut": 16.278826,
+      "promptTokens": 0,
+      "outputTokens": 64,
+      "noKvOffload": false,
+      "kvCacheDtype": "f16",
+      "nUbatch": 16,
+      "schedulerAsync": false,
+      "json": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/rpc-layer-kvoffloadon-sas-ub-sweep-r1-20260508T045253Z.jsonl"
+    },
+    {
+      "label": "K/Q/V offload ubatch sweep ub32 sas0",
+      "tokSOut": 16.282776,
+      "promptTokens": 0,
+      "outputTokens": 64,
+      "noKvOffload": false,
+      "kvCacheDtype": "f16",
+      "nUbatch": 32,
+      "schedulerAsync": false,
+      "json": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/rpc-layer-kvoffloadon-sas-ub-sweep-r1-20260508T045253Z.jsonl"
+    },
+    {
+      "label": "K/Q/V offload ubatch sweep ub64 sas0",
+      "tokSOut": 16.303453,
+      "promptTokens": 0,
+      "outputTokens": 64,
+      "noKvOffload": false,
+      "kvCacheDtype": "f16",
+      "nUbatch": 64,
+      "schedulerAsync": false,
+      "json": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/rpc-layer-kvoffloadon-sas-ub-sweep-r1-20260508T045253Z.jsonl"
+    },
+    {
+      "label": "K/Q/V offload ub64 sas1",
+      "tokSOut": 16.237232,
+      "promptTokens": 0,
+      "outputTokens": 64,
+      "noKvOffload": false,
+      "kvCacheDtype": "f16",
+      "nUbatch": 64,
+      "schedulerAsync": true,
+      "json": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/rpc-layer-kvoffloadon-sas1-ub64-r1-20260508T050451Z.jsonl"
+    },
+    {
+      "label": "K/Q/V offload q8 K and q8 V",
+      "result": "failed",
+      "failure": "Context creation failed before decode.",
+      "noKvOffload": false,
+      "kvCacheDtype": "q8_0/q8_0",
+      "log": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/rpc-layer-kvoffloadon-q8kv-r1-p0n64-20260508T051138Z.log"
+    },
+    {
+      "label": "K/Q/V offload q8 K and f16 V",
+      "tokSOut": 2.798544,
+      "promptTokens": 0,
+      "outputTokens": 64,
+      "noKvOffload": false,
+      "kvCacheDtype": "q8_0/f16",
+      "json": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/rpc-layer-kvoffloadon-q8k-f16v-r1-p0n64-20260508T051605Z.jsonl",
+      "qualityTradeoff": true
+    },
+    {
+      "label": "K/Q/V offload with rope cache",
+      "tokSOut": 16.181736,
+      "promptTokens": 0,
+      "outputTokens": 64,
+      "noKvOffload": false,
+      "kvCacheDtype": "f16",
+      "ropeCache": true,
+      "json": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/rpc-layer-kvoffloadon-rcache1-r1-p0n64-20260508T052318Z.jsonl"
     }
   ],
   "qualityNotes": [
@@ -60,5 +132,5 @@
     "No expert dropping or smart expert reduction.",
     "No power-limit changes."
   ],
-  "conclusion": "After fixing RPC device mapping and using -ts 1/1/1/1, enabling K/Q/V offload with -nkvo 0 improves MiniMax UD-IQ4_XS p0/n64 from 14.292387 tok/s to 16.383602 tok/s on 4x B70 without a model-quality tradeoff."
+  "conclusion": "After fixing RPC device mapping and using -ts 1/1/1/1, enabling K/Q/V offload with -nkvo 0 improves MiniMax UD-IQ4_XS p0/n64 from 14.292387 tok/s to 16.383602 tok/s on 4x B70 without a model-quality tradeoff. Follow-up public flags did not beat the r3 best: ubatch was flat, scheduler async and rope cache were slower, q8 K+V failed, and q8 K/F16 V regressed badly."
 }
