@@ -110,3 +110,46 @@ Assessment:
 - Not a proven quality upgrade over `UD-IQ4_XS`; `iters=0` is a quality caveat.
 - Not a drop-in replacement for the current GGUF path; it requires installing a PyTorch XPU/vLLM or SGLang XPU stack and likely downloading to the external 4 TB drive or freeing internal storage.
 - It may be too tight for 4x32 GB at long context because the checkpoint is 121 GB before runtime/KV/cache overhead, but a short-context load test is still valuable.
+
+## Host RAM and Storage Guidance
+
+Current host RAM is the gating hardware constraint for the next runtime branches. The OpenCL direct graph path already showed high host-memory pressure and swap exhaustion on a 16 GB system, even though device allocation itself worked. A PyTorch XPU/vLLM/SGLang branch will also need enough host RAM for Python runtime overhead, weight metadata, graph compilation, and staging.
+
+Practical target:
+
+- `128 GB` system RAM: minimum useful target for OpenCL/vLLM/SGLang experiments.
+- `256 GB` system RAM: preferred target if we want to avoid host-memory noise while testing MiniMax and large AutoRound/safetensors checkpoints.
+
+Storage:
+
+- Root currently has about `75 GB` free, which is not enough for `Lasimeri/MiniMax-M2.7-int4-AutoRound` (`~121 GB`) plus runtime caches/build artifacts.
+- The USB 3 4 TB NTFS drive is acceptable for model parking, Hugging Face cache, and one-off safetensors downloads. It should not be formatted without explicit user approval.
+- A second NVMe is preferable for active model trees, vLLM/SGLang environments, source builds, and repeated load tests. Recommended free working space for this branch is at least `250 GB`, with `500 GB+` more comfortable.
+
+## Code Path Update: MiniMax Split-MoE Exists, RPC Split Buffer Does Not
+
+Relevant local files:
+
+- `src/graphs/build_minimaxm2.cpp`: MiniMax graph builder.
+- `src/llama-build-context.cpp`: generic MoE graph construction.
+- `src/llama-load-tensors.cpp`: split tensor creation and metadata.
+- `src/llama.cpp`: backend buffer type selection.
+- `ggml/src/ggml-rpc.cpp`: current RPC buffer implementation.
+- `ggml/src/ggml-sycl.cpp`: local SYCL split buffer implementation.
+
+Findings:
+
+- `llm_build_context::llm_build_std_moe_ffn()` already has a split expert path. If expert tensors have `ggml_split_tensor_t` metadata, it loops over devices, builds per-device routed expert work, and reduces outputs.
+- `create_tensors_helper::create_minimaxm2_tensors()` creates MiniMax expert tensors through the standard MoE tensor helpers, so the loader can prepare split expert tensors when the selected matrix buffer type is a split buffer.
+- `llama_default_buffer_type_split()` only returns CUDA/SYCL split buffer types. With RPC endpoints, it falls back to a normal RPC buffer type, so split-mode graph does not become a multi-RPC split-buffer graph.
+- `ggml-rpc.cpp` currently exposes a normal remote buffer with `alloc_buffer`, `set_tensor`, `get_tensor`, `copy_tensor`, and `graph_compute`, but no split buffer type.
+
+Current best implementation target:
+
+1. Add an RPC split buffer type in `ggml-rpc.cpp`, modeled on the local SYCL/CUDA split buffer interfaces.
+2. Allocate one remote buffer per RPC endpoint/device using existing `RPC_CMD_ALLOC_BUFFER`.
+3. In split-buffer `init_tensor`, attach per-endpoint split tensor views so `prepare_split_tensors()` and the MiniMax split-MoE graph can target separate RPC workers.
+4. In split-buffer `set_tensor`/`get_tensor`, slice rows/ranges into the per-endpoint remote buffers using existing RPC tensor transfer commands.
+5. Teach `llama_default_buffer_type_split()` to select the RPC split buffer type when multiple RPC endpoints are present.
+
+This is quality-preserving and directly targets the current bottleneck: it should let us keep one Level Zero process per B70 while using graph/expert splitting rather than layer-only RPC splitting.
