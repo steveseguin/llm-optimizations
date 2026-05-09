@@ -13,6 +13,7 @@ The unsigned llm-scaler INT4 tiny-MoE path is now the best MiniMax AutoRound TP4
 | unsigned llm-scaler decode-only | 512/256 | 33.033788 | 99.101363 | steady decode validation |
 | unsigned llm-scaler decode-only + FP32 route weights | 512/256 | 34.157842 | 102.473527 | avoids per-layer router-weight cast |
 | unsigned llm-scaler decode-only + PP2/TP2 | 512/256 | 17.550271 | 52.650812 | negative topology comparison |
+| unsigned llm-scaler decode-only + FP32 route weights + default CCL IPC | 512/256 | 34.578045 | 103.734136 | current best |
 
 Key log:
 
@@ -28,6 +29,9 @@ Throughput: 0.13 requests/s, 102.47 total tokens/s, 34.16 output tokens/s
 
 /home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp2-p512n256-20260509T111942Z.log
 Throughput: 0.07 requests/s, 52.65 total tokens/s, 17.55 output tokens/s
+
+/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n256-20260509T112853Z.log
+Throughput: 0.14 requests/s, 103.73 total tokens/s, 34.58 output tokens/s
 ```
 
 ## What Changed
@@ -43,6 +47,8 @@ The current patch does two narrower things:
 This keeps prompt/prefill on vLLM's normal W4A16 fused-experts path and swaps only the decode MoE work onto the faster ESIMD kernel.
 
 The `512/256` validation confirms the decode-side goal: when the fixed prefill cost is amortized over a longer generation window, single-session output throughput is above 30 tok/s. Removing the router-weight cast improved the same p512/n256 method from `33.033788` to `34.157842` output tok/s.
+
+Leaving `CCL_ZE_IPC_EXCHANGE` unset so oneCCL can use its default IPC exchange improved p512/n256 again to `34.578045` output tok/s. The benchmark wrapper now supports `CCL_IPC=default` for that behavior; the older default remains `pidfd` unless explicitly overridden.
 
 ## Correctness Boundary
 
@@ -105,6 +111,7 @@ LocalMaxxing:
 - `cmoxq7cww00i8ml019ihbeqc9`: p512/n256, `33.033788` output tok/s.
 - `cmoy8hs3n002smk01ksgcpavr`: p512/n256 with FP32 route weights, `34.157842` output tok/s.
 - `cmoy9exmf003lmk01d3it9cz2`: p512/n256 PP2/TP2 negative, `17.550271` output tok/s.
+- `cmoy9qat60040mk01l5y8n3al`: p512/n256 with default CCL IPC, `34.578045` output tok/s.
 
 ## Negative Follow-Up
 
