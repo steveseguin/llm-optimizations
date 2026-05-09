@@ -1,0 +1,62 @@
+{
+  "date": "2026-05-09",
+  "model": {
+    "hf_id": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+    "local_path": "/mnt/corsair-external/llm-models/minimax-m2.7-int4-autoround",
+    "quantization": "AutoRound INT4 W4A16",
+    "dtype": "float16"
+  },
+  "drafter": {
+    "hf_id": "MirecX/MiniMax-M2.7-L3H5-DFlash",
+    "local_path": "/mnt/corsair-external/llm-models/minimax-m2.7-l3h5-dflash",
+    "architecture": "DFlashDraftModel",
+    "reported_m_accept": 1.38,
+    "reported_params": "0.38B drafter-only",
+    "target_layer_ids": [2, 16, 30, 43, 57],
+    "num_speculative_tokens": 4,
+    "source_readme": "/mnt/corsair-external/llm-models/minimax-m2.7-l3h5-dflash/README.md"
+  },
+  "hardware": {
+    "gpu": "Intel Arc Pro B70",
+    "gpu_count": 4,
+    "vram_gb_per_gpu": 32,
+    "os": "Ubuntu 24.04.4 LTS"
+  },
+  "runtime": {
+    "engine": "vLLM",
+    "backend": "xpu",
+    "tensor_parallel": 4,
+    "use_llm_scaler_moe": true,
+    "xpu_graph": false,
+    "max_model_len": 512,
+    "max_num_batched_tokens": 256,
+    "max_num_seqs": 1,
+    "prompt_tokens": 64,
+    "requested_output_tokens": 16,
+    "command": "USE_LLM_SCALER_MOE=1 CCL_IPC=default XPU_GRAPH=0 DTYPE=float16 INPUT_LEN=64 OUTPUT_LEN=16 MAX_MODEL_LEN=512 MAX_BATCHED_TOKENS=256 MAX_NUM_SEQS=1 NUM_PROMPTS=1 TP=4 EXTRA_ARGS='--speculative-config {\"method\":\"dflash\",\"model\":\"/mnt/corsair-external/llm-models/minimax-m2.7-l3h5-dflash\",\"num_speculative_tokens\":4}' /home/steve/llm-optimizations-publish/scripts/bench-vllm-minimax-autoround-xpu.sh"
+  },
+  "observations": {
+    "target_loaded": true,
+    "drafter_loaded": true,
+    "auxiliary_layers_selected": [2, 16, 30, 43, 57],
+    "model_memory_gib": 28.41,
+    "available_kv_cache_gib": 0.26,
+    "gpu_kv_cache_tokens": 4032,
+    "backbone_compile_completed": true,
+    "drafter_compile_completed": true,
+    "first_request_completed": false,
+    "json_output_created": false,
+    "stall_message": "No available shared memory broadcast block found in 60 seconds",
+    "worker_state": "four workers busy during stalled generation; run stopped manually"
+  },
+  "artifacts": {
+    "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p64n16-20260509T185848Z.log",
+    "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p64n16-20260509T185848Z.json"
+  },
+  "throughput": null,
+  "localmaxxing": {
+    "submitted": false,
+    "reason": "No valid throughput metric was produced."
+  },
+  "conclusion": "DFlash loads and compiles, but the first MiniMax AutoRound TP4 XPU speculative request stalls before producing 16 tokens. Do not promote as a speed path on the current stack."
+}
