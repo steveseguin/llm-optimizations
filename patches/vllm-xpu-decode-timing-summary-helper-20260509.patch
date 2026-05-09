@@ -1,0 +1,125 @@
+diff --git a/vllm/utils/xpu_decode_timing.py b/vllm/utils/xpu_decode_timing.py
+new file mode 100644
+index 000000000..a03f5299e
+--- /dev/null
++++ b/vllm/utils/xpu_decode_timing.py
+@@ -0,0 +1,119 @@
++# SPDX-License-Identifier: Apache-2.0
++# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
++
++"""Small opt-in timing helper for local XPU decode diagnostics."""
++
++import os
++import time
++import atexit
++from collections import defaultdict
++from contextlib import contextmanager
++
++_ENABLED = os.environ.get("VLLM_XPU_DECODE_TIMING", "0") == "1"
++_SYNC = os.environ.get("VLLM_XPU_DECODE_TIMING_SYNC", "0") == "1"
++_RANK_FILTER = os.environ.get("VLLM_XPU_DECODE_TIMING_RANK")
++_SUMMARY = os.environ.get("VLLM_XPU_DECODE_TIMING_SUMMARY", "1") != "0"
++_PRINT_EVERY = max(
++    0, int(os.environ.get("VLLM_XPU_DECODE_TIMING_PRINT_EVERY", "0") or "0")
++)
++_STATS: dict[tuple[str, str], list[int]] = defaultdict(lambda: [0, 0, 0])
++_SUMMARY_PRINTED = False
++
++
++def _rank_label() -> str:
++    for name in ("LOCAL_RANK", "RANK", "VLLM_LOCAL_RANK", "VLLM_RANK"):
++        value = os.environ.get(name)
++        if value is not None:
++            return value
++    try:
++        import torch.distributed as dist
++
++        if dist.is_available() and dist.is_initialized():
++            return str(dist.get_rank())
++    except Exception:
++        pass
++    return f"pid{os.getpid()}"
++
++
++def _rank_enabled(rank: str) -> bool:
++    return _RANK_FILTER is None or _RANK_FILTER == rank
++
++
++def _sync_xpu() -> None:
++    if not _SYNC:
++        return
++    try:
++        import torch
++
++        if hasattr(torch, "xpu") and torch.xpu.is_available():
++            torch.xpu.synchronize()
++    except Exception:
++        pass
++
++
++def _is_compiling() -> bool:
++    try:
++        import torch
++
++        compiler = getattr(torch, "compiler", None)
++        if compiler is not None and compiler.is_compiling():
++            return True
++        dynamo = getattr(torch, "_dynamo", None)
++        return bool(dynamo is not None and dynamo.is_compiling())
++    except Exception:
++        return False
++
++
++def _print_summary() -> None:
++    global _SUMMARY_PRINTED
++    if not _ENABLED or not _SUMMARY or _SUMMARY_PRINTED or not _STATS:
++        return
++    _SUMMARY_PRINTED = True
++    rows = []
++    for (rank, label), (count, total_ns, max_ns) in _STATS.items():
++        rows.append((total_ns, rank, label, count, max_ns))
++    rows.sort(reverse=True)
++    print("[vllm-xpu-timing-summary] begin", flush=True)
++    for total_ns, rank, label, count, max_ns in rows:
++        avg_ns = total_ns / max(count, 1)
++        print(
++            "[vllm-xpu-timing-summary] "
++            f"rank={rank} label={label} count={count} "
++            f"total_ms={total_ns / 1e6:.6f} "
++            f"avg_ms={avg_ns / 1e6:.6f} "
++            f"max_ms={max_ns / 1e6:.6f}",
++            flush=True,
++        )
++    print("[vllm-xpu-timing-summary] end", flush=True)
++
++
++atexit.register(_print_summary)
++
++
++@contextmanager
++def timed_region(label: str):
++    if not _ENABLED or _is_compiling():
++        yield
++        return
++    rank = _rank_label()
++    if not _rank_enabled(rank):
++        yield
++        return
++    _sync_xpu()
++    start_ns = time.perf_counter_ns()
++    try:
++        yield
++    finally:
++        _sync_xpu()
++        elapsed_ns = time.perf_counter_ns() - start_ns
++        stat = _STATS[(rank, label)]
++        stat[0] += 1
++        stat[1] += elapsed_ns
++        stat[2] = max(stat[2], elapsed_ns)
++        if _PRINT_EVERY and stat[0] % _PRINT_EVERY == 0:
++            print(
++                "[vllm-xpu-timing] "
++                f"rank={rank} label={label} count={stat[0]} "
++                f"last_ms={elapsed_ns / 1e6:.6f}",
++                flush=True,
++            )

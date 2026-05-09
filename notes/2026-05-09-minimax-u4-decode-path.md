@@ -296,6 +296,59 @@ moe.llm_scaler_u4_bridge steady calls: about 0.018-0.022 ms
 
 This confirms the main remaining ceiling is inside the compiled model forward, not request scheduling or output postprocess.
 
+## Compiled Timing Summary Follow-Up
+
+I added an opt-in atexit summary to the timing helper so future profiling can
+summarize rank-local timing without printing every layer call:
+
+```text
+VLLM_XPU_DECODE_TIMING_SUMMARY=1
+VLLM_XPU_DECODE_TIMING_PRINT_EVERY=0
+```
+
+The first summary run was BF16 p512/n64 with synchronized rank-0 timing:
+
+```text
+/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n64-20260509T231814Z.log
+```
+
+It is diagnostic only because synchronization slows throughput, but the split
+is useful:
+
+| label | count | total ms | avg ms |
+| --- | ---: | ---: | ---: |
+| `runner.forward` | 64 | 3648.739 | 57.012 |
+| `moe.quant_apply` | 4154 | 1798.944 | 0.433 |
+| `moe.fused_experts_fallback` | 186 | 814.829 | 4.381 |
+| `moe.llm_scaler_u4_bridge` | 3968 | 600.819 | 0.151 |
+| `moe.router_select` | 4154 | 284.095 | 0.068 |
+| `runner.preprocess` | 66 | 76.845 | 1.164 |
+| `runner.postprocess` | 64 | 45.556 | 0.712 |
+
+The summary includes prefill and first-token outliers. The steady printed
+decode samples were more stable:
+
+```text
+runner.forward: about 45 ms/token
+moe.router_select: about 0.06 ms/layer
+moe.quant_apply: about 0.18 ms/layer
+moe.llm_scaler_u4_bridge: about 0.10 ms/layer
+```
+
+Since `moe.quant_apply` contains the bridge timing, the useful estimate is
+router plus quant/apply: about `0.24 ms/layer`, or about `15 ms/token` across
+62 layers under synchronized timing. That is now a large minority rather than
+the full decode cost. The remaining ceiling is outside the custom MoE bridge:
+attention/KV, Q/K RMS plus TP collectives, projections, and compiled graph
+boundaries.
+
+I also fixed the helper so `VLLM_XPU_DECODE_TIMING_PRINT_EVERY=0` now means
+summary-only instead of printing every call. Patch artifact:
+
+```text
+patches/vllm-xpu-decode-timing-summary-helper-20260509.patch
+```
+
 An eager-only timing pass exposes the Python-level model boundaries that torch.compile hides:
 
 ```text

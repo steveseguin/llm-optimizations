@@ -1,0 +1,133 @@
+{
+  "date": "2026-05-09",
+  "model": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+  "hardware": "4x Intel Arc Pro B70 32GB",
+  "engine": "vLLM XPU TP4 with llm-scaler unsigned-u4 MoE decode path",
+  "experiment": "Synchronized rank-0 compiled decode timing summary",
+  "purpose": "Separate the remaining MiniMax decode ceiling after the custom u4 MoE bridge from vLLM scheduler and MoE-specific overhead.",
+  "patches": {
+    "timing_summary_helper": "patches/vllm-xpu-decode-timing-summary-helper-20260509.patch",
+    "base_timing_patch": "patches/vllm-xpu-decode-timing-and-qk-contig-20260509.patch"
+  },
+  "runs": [
+    {
+      "name": "bf16_p512n128_sync_timing_rank0_print512",
+      "status": "pass_diagnostic",
+      "prompt_tokens": 512,
+      "output_tokens": 128,
+      "context_length": 2048,
+      "dtype": "bfloat16",
+      "tensor_parallel": 4,
+      "ccl_ipc": "pidfd",
+      "xpu_graph": false,
+      "timing": {
+        "sync": true,
+        "rank_filter": "0",
+        "print_every": 512,
+        "summary": false
+      },
+      "elapsed_s": 6.845797543996014,
+      "tok_s_total": 93.48801157014945,
+      "tok_s_out_convention": 18.697602314029888,
+      "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n128-20260509T230958Z.log",
+      "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n128-20260509T230958Z.json",
+      "finding": "Periodic MoE prints showed steady rank-0 router_select about 0.06 ms/layer, quant_apply about 0.18 ms/layer, and llm_scaler_u4_bridge about 0.10 ms/layer under synchronized timing."
+    },
+    {
+      "name": "bf16_p512n64_sync_timing_rank0_summary",
+      "status": "pass_diagnostic",
+      "prompt_tokens": 512,
+      "output_tokens": 64,
+      "context_length": 2048,
+      "dtype": "bfloat16",
+      "tensor_parallel": 4,
+      "ccl_ipc": "pidfd",
+      "xpu_graph": false,
+      "timing": {
+        "sync": true,
+        "rank_filter": "0",
+        "print_every": 0,
+        "summary": true,
+        "note": "This run accidentally printed every per-layer event before the PRINT_EVERY=0 helper bug was fixed, but the final summary is valid."
+      },
+      "elapsed_s": 4.440431598981377,
+      "tok_s_total": 129.71712032049606,
+      "tok_s_out_convention": 14.413014,
+      "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n64-20260509T231814Z.log",
+      "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n64-20260509T231814Z.json",
+      "summary_rank0": [
+        {
+          "label": "runner.forward",
+          "count": 64,
+          "total_ms": 3648.738588,
+          "avg_ms": 57.01154,
+          "max_ms": 570.419011
+        },
+        {
+          "label": "moe.quant_apply",
+          "count": 4154,
+          "total_ms": 1798.943517,
+          "avg_ms": 0.433063,
+          "max_ms": 237.833608
+        },
+        {
+          "label": "moe.fused_experts_fallback",
+          "count": 186,
+          "total_ms": 814.82942,
+          "avg_ms": 4.380803,
+          "max_ms": 175.304722
+        },
+        {
+          "label": "moe.llm_scaler_u4_bridge",
+          "count": 3968,
+          "total_ms": 600.818882,
+          "avg_ms": 0.151416,
+          "max_ms": 184.801687
+        },
+        {
+          "label": "moe.router_select",
+          "count": 4154,
+          "total_ms": 284.095185,
+          "avg_ms": 0.068391,
+          "max_ms": 18.548649
+        },
+        {
+          "label": "runner.preprocess",
+          "count": 66,
+          "total_ms": 76.845246,
+          "avg_ms": 1.164322,
+          "max_ms": 28.237674
+        },
+        {
+          "label": "runner.postprocess",
+          "count": 64,
+          "total_ms": 45.555619,
+          "avg_ms": 0.711807,
+          "max_ms": 4.269691
+        }
+      ],
+      "steady_state_samples": {
+        "runner_forward_ms": "about 45 ms/token after first-token outliers",
+        "router_select_ms_per_layer": "about 0.06",
+        "moe_quant_apply_ms_per_layer": "about 0.18",
+        "llm_scaler_bridge_ms_per_layer": "about 0.10"
+      }
+    }
+  ],
+  "interpretation": {
+    "not_a_leaderboard_result": "Synchronized timing intentionally distorts throughput.",
+    "moe_estimate": "Steady router_select plus quant_apply is roughly 0.24 ms per layer, or about 15 ms/token across 62 layers under synchronized timing. quant_apply includes the llm-scaler bridge.",
+    "remaining_ceiling": "Steady runner.forward is roughly 45 ms/token in this diagnostic, so the post-u4 remaining ceiling is mostly outside the custom MoE bridge: attention/KV, Q/K RMS plus TP collectives, projections, and compiled graph boundaries.",
+    "prefill_cost": "The p512/n64 summary still shows 186 fused_experts_fallback calls totaling 815 ms from prefill chunks. This is less important for long decode, but it matters for short-output measurements."
+  },
+  "localmaxxing": {
+    "submitted": false,
+    "reason": "Diagnostic timing run with synchronization overhead; not a valid throughput benchmark."
+  },
+  "next_steps": [
+    "Keep the timing helper summary patch for future diagnostics.",
+    "Do not spend more time optimizing the raw u4 matvec alone until attention/QK/TP boundaries are better understood.",
+    "Future high-value work is an XPU analogue of vLLM's CUDA minimax_allreduce_rms_qk, or a communicator-level fusion that removes Q/K variance allreduce plus RMS scheduling overhead.",
+    "More RAM or a second NVMe would not improve decode speed directly, but would shorten each MiniMax experiment by avoiding repeated 112 GB NTFS cold loads."
+  ]
+}
