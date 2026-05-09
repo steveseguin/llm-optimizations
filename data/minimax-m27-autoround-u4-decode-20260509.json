@@ -108,6 +108,22 @@
       "details": "Reached request processing at 0% and then worker processes terminated; vLLM reported RuntimeError: cancelled. No JSON throughput output.",
       "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n128-20260509T020356Z.log",
       "submitted": false
+    },
+    {
+      "label": "u4_decode_only_p512n256_ccl_fabric_vertex_override_negative",
+      "promptTokens": 512,
+      "outputTokens": 256,
+      "contextLength": 2048,
+      "tokSOut": 32.726761,
+      "tokSTotal": 98.180284,
+      "env": {
+        "CCL_TOPO_FABRIC_VERTEX_CONNECTION_CHECK": "0"
+      },
+      "outcome": "neutral/slower",
+      "details": "The oneCCL topology override was previously near-neutral and remains slightly slower with the faster u4 decode path. Keep default topology recognition.",
+      "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n256-20260509T023136Z.log",
+      "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n256-20260509T023136Z.json",
+      "submitted": false
     }
   ],
   "conclusion": "The useful MiniMax path is not n-gram speculation; it is reducing decode MoE cost. The unsigned llm-scaler tiny MoE decode path improves p512/n128 from 20.17 to 29.75 output tok/s, and p512/n256 reaches 33.03 output tok/s once prefill is better amortized. Speculative ngram_gpu remains blocked/negative on this TP4 XPU harness."

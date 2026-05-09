@@ -93,6 +93,10 @@ LocalMaxxing:
 - `cmoxptkfd00hsml01hf2ajhhp`: p512/n128, `29.74843` output tok/s.
 - `cmoxq7cww00i8ml019ihbeqc9`: p512/n256, `33.033788` output tok/s.
 
+## Negative Follow-Up
+
+`CCL_TOPO_FABRIC_VERTEX_CONNECTION_CHECK=0` was retested on the p512/n256 u4 decode path. It reached `32.726761` output tok/s and `98.180284` total tok/s, slightly below the default-topology `33.033788` output tok/s result. Keep default oneCCL topology recognition for this MiniMax path.
+
 ## Next Work
 
 The next useful optimization path is to reduce the remaining decode overhead around the same MiniMax MoE path:
