@@ -1,0 +1,98 @@
+{
+  "date": "2026-05-09",
+  "model": {
+    "hfId": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+    "localPath": "/mnt/corsair-external/llm-models/minimax-m2.7-int4-autoround",
+    "quantization": "INT4 AutoRound W4A16"
+  },
+  "hardware": {
+    "gpu": "Intel Arc Pro B70",
+    "gpuCount": 4,
+    "vramGbEach": 32,
+    "cpu": "AMD EPYC 9015",
+    "ramGb": 16,
+    "os": "Ubuntu 24.04.4 LTS"
+  },
+  "software": {
+    "engine": "vllm",
+    "engineVersion": "0.20.1-local",
+    "backend": "xpu",
+    "runtime": "Level Zero via Intel XPU stack",
+    "llmScalerPath": "/home/steve/src/llm-scaler/vllm/custom-esimd-kernels-vllm",
+    "vllmPath": "/home/steve/src/vllm"
+  },
+  "patches": [
+    "patches/llm-scaler-moe-int4-u4-bf16-decode-20260509.patch",
+    "patches/vllm-minimax-llm-scaler-u4-bf16-decode-20260509.patch"
+  ],
+  "localMaxxing": {
+    "submitted": true,
+    "id": "cmoyr84ol000rtl01o4z9fwdm",
+    "status": "APPROVED",
+    "payload": "data/localmaxxing-minimax-m27-autoround-u4-decode-bf16-p512n512-20260509.payload.json",
+    "response": "data/localmaxxing-submission-minimax-m27-autoround-bf16-u4-decode-20260509.json"
+  },
+  "results": [
+    {
+      "label": "bf16_fallback_before_scale_gate_fix",
+      "promptTokens": 512,
+      "outputTokens": 256,
+      "contextLength": 2048,
+      "dtype": "bfloat16",
+      "elapsedSeconds": 15.183608291030396,
+      "tokSOut": 16.860287429255543,
+      "tokSTotal": 50.58086228776663,
+      "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n256-20260509T191758Z.log",
+      "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n256-20260509T191758Z.json",
+      "notes": "No llm-scaler enable logs because BF16 scale tensors failed the previous FP16-only gate."
+    },
+    {
+      "label": "bf16_u4_decode_p512n256",
+      "promptTokens": 512,
+      "outputTokens": 256,
+      "contextLength": 2048,
+      "dtype": "bfloat16",
+      "elapsedSeconds": 7.600650811975356,
+      "tokSOut": 33.68132628809287,
+      "tokSTotal": 101.04397886427861,
+      "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n256-20260509T192643Z.log",
+      "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n256-20260509T192643Z.json",
+      "notes": "All 62 MoE layers enabled the BF16-capable llm-scaler u4 decode path."
+    },
+    {
+      "label": "bf16_u4_decode_p512n512",
+      "promptTokens": 512,
+      "outputTokens": 512,
+      "contextLength": 2048,
+      "dtype": "bfloat16",
+      "elapsedSeconds": 13.986128855962306,
+      "tokSOut": 36.60769933359607,
+      "tokSTotal": 73.21539866719213,
+      "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n512-20260509T193458Z.log",
+      "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n512-20260509T193458Z.json",
+      "notes": "Steady decode validation. About 1.4% behind the FP16 u4 p512/n512 reference."
+    }
+  ],
+  "referenceResults": [
+    {
+      "label": "fp16_u4_decode_reference_p512n512",
+      "promptTokens": 512,
+      "outputTokens": 512,
+      "contextLength": 2048,
+      "dtype": "float16",
+      "tokSOut": 37.136187,
+      "tokSTotal": 74.272373,
+      "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n512-20260509T114811Z.log"
+    }
+  ],
+  "command": "USE_LLM_SCALER_MOE=1 CCL_IPC=default XPU_GRAPH=0 DTYPE=bfloat16 INPUT_LEN=512 OUTPUT_LEN=512 MAX_MODEL_LEN=2048 MAX_BATCHED_TOKENS=1024 MAX_NUM_SEQS=1 NUM_PROMPTS=1 TP=4 /home/steve/llm-optimizations-publish/scripts/bench-vllm-minimax-autoround-xpu.sh",
+  "standaloneValidation": {
+    "bf16FakeLayerFinite": true,
+    "referenceCheck": {
+      "maxAbs": 0.001461,
+      "meanAbs": 0.000190,
+      "meanRel": 0.005335
+    }
+  },
+  "decision": "Promote the BF16-capable u4 decode patch as a valid quality-preserving improvement. Keep FP16 as the absolute AutoRound speed reference, but use BF16 when preserving model activation dtype matters."
+}

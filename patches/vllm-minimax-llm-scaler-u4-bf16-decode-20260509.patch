@@ -1,0 +1,138 @@
+diff --git a/vllm/model_executor/layers/quantization/moe_wna16.py b/vllm/model_executor/layers/quantization/moe_wna16.py
+index e5ef3f4c3..2d04faf75 100644
+--- a/vllm/model_executor/layers/quantization/moe_wna16.py
++++ b/vllm/model_executor/layers/quantization/moe_wna16.py
+@@ -1,11 +1,13 @@
+ # SPDX-License-Identifier: Apache-2.0
+ # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
+ 
++import os
+ from typing import Any
+ 
+ import torch
+ 
+ from vllm.distributed import get_tensor_model_parallel_rank, get_tp_group
++from vllm.logger import init_logger
+ from vllm.model_executor.layers.fused_moe.activation import MoEActivation
+ from vllm.model_executor.layers.fused_moe.config import (
+     FusedMoEQuantConfig,
+@@ -32,6 +34,9 @@ from vllm.model_executor.layers.quantization.utils.marlin_utils import (
+ )
+ from vllm.model_executor.utils import set_weight_attrs
+ from vllm.platforms import current_platform
++from vllm.utils.xpu_decode_timing import timed_region
++
++logger = init_logger(__name__)
+ 
+ 
+ class MoeWNA16Config(QuantizationConfig):
+@@ -362,6 +367,52 @@ class MoeWNA16Method(FusedMoEMethodBase):
+             block_shape=[0, layer.group_size],
+         )
+ 
++    def _llm_scaler_moe_requested(self) -> bool:
++        return os.environ.get("VLLM_XPU_USE_LLM_SCALER_MOE", "0") == "1"
++
++    def _can_use_llm_scaler_moe(self, layer: torch.nn.Module) -> bool:
++        return (
++            self._llm_scaler_moe_requested()
++            and current_platform.is_xpu()
++            and self.quant_config.weight_bits == 4
++            and not self.quant_config.has_zp
++            and getattr(layer, "expert_map", None) is None
++            and getattr(layer, "global_num_experts", None)
++            == getattr(layer, "local_num_experts", None)
++            and not getattr(layer, "apply_router_weight_on_input", False)
++            and getattr(layer, "group_size", None) == 128
++            and getattr(layer, "w13_qweight", None) is not None
++            and getattr(layer, "w2_qweight", None) is not None
++            and layer.w13_qweight.dtype == torch.uint8
++            and layer.w2_qweight.dtype == torch.uint8
++            and layer.w13_scales.dtype in (torch.float16, torch.bfloat16)
++            and layer.w2_scales.dtype in (torch.float16, torch.bfloat16)
++        )
++
++    def process_weights_after_loading(self, layer: torch.nn.Module) -> None:
++        if not self._can_use_llm_scaler_moe(layer):
++            return
++        if getattr(layer, "_llm_scaler_moe_u4_decode", False):
++            return
++
++        layer._llm_scaler_w13_scales = (
++            layer.w13_scales
++            if layer.w13_scales.dtype == torch.float16
++            else layer.w13_scales.to(torch.float16).contiguous()
++        )
++        layer._llm_scaler_w2_scales = (
++            layer.w2_scales
++            if layer.w2_scales.dtype == torch.float16
++            else layer.w2_scales.to(torch.float16).contiguous()
++        )
++        layer._llm_scaler_moe_u4_decode = True
++        logger.info_once(
++            "Enabled llm-scaler XPU INT4 MoE decode path for %s "
++            "(scale_dtype=%s)",
++            layer.layer_name,
++            layer.w13_scales.dtype,
++        )
++
+     def apply(
+         self,
+         layer: FusedMoE,
+@@ -376,18 +427,44 @@ class MoeWNA16Method(FusedMoEMethodBase):
+             f"Only SiLU activation is supported, not {layer.activation}."
+         )
+ 
+-        return fused_experts(
+-            x,
+-            layer.w13_qweight,
+-            layer.w2_qweight,
+-            topk_weights=topk_weights,
+-            topk_ids=topk_ids,
+-            inplace=not self.moe.disable_inplace,
+-            apply_router_weight_on_input=layer.apply_router_weight_on_input,
+-            global_num_experts=layer.global_num_experts,
+-            expert_map=layer.expert_map,
+-            quant_config=self.moe_quant_config,
+-        )
++        if (
++            getattr(layer, "_llm_scaler_moe_u4_decode", False)
++            and shared_experts_input is None
++            and x.dtype in (torch.float16, torch.bfloat16)
++            and x.shape[0] <= 4
++        ):
++            try:
++                from custom_esimd_kernels_vllm import (
++                    moe_forward_tiny_cutlass_nmajor_int4_u4,
++                )
++
++                with timed_region("moe.llm_scaler_u4_bridge"):
++                    return moe_forward_tiny_cutlass_nmajor_int4_u4(
++                        x,
++                        layer.w13_qweight,
++                        layer._llm_scaler_w13_scales,
++                        layer.w2_qweight,
++                        layer._llm_scaler_w2_scales,
++                        topk_weights.contiguous(),
++                        topk_ids.contiguous(),
++                    )
++            except Exception:
++                logger.exception("llm-scaler XPU INT4 MoE path failed")
++                raise
++
++        with timed_region("moe.fused_experts_fallback"):
++            return fused_experts(
++                x,
++                layer.w13_qweight,
++                layer.w2_qweight,
++                topk_weights=topk_weights,
++                topk_ids=topk_ids,
++                inplace=not self.moe.disable_inplace,
++                apply_router_weight_on_input=layer.apply_router_weight_on_input,
++                global_num_experts=layer.global_num_experts,
++                expert_map=layer.expert_map,
++                quant_config=self.moe_quant_config,
++            )
+ 
+     @staticmethod
+     def get_weight_loader(layer, weight_loader):

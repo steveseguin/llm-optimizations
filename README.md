@@ -27,6 +27,7 @@ Reproducibility notes, benchmark payloads, and local patches from the Intel Arc 
 - MiniMax AutoRound INT4 safetensors now load and generate through vLLM/XPU TP4 after the local INC `FusedMoE` to `MoeWNA16Config` patch and targeted vLLM package-skew repairs. Switching `CCL_ZE_IPC_EXCHANGE` from sockets to `pidfd` raised the p512/n128 result to 19.85 output tok/s and 99.231 total tok/s, accepted on LocalMaxxing as `cmox6tys30085ml0125gihg18`. The log still shows the next bottleneck: no B70-specific tuned MoE config for `E=256,N=384,dtype=int4_w4a16`. An AMD-derived config seed was accepted only after stripping an unsupported key, but it regressed to 1.73 output tok/s on p64/n16.
 - MiniMax AutoRound vLLM runtime toggles did not yet produce a speed path: `VLLM_XPU_ENABLE_XPU_GRAPH=1` is disabled by vLLM because TP4 communication ops cannot be captured, and MiniMax QK-norm fusion is blocked because this XPU build lacks `torch.ops._C.minimax_allreduce_rms_qk`.
 - MiniMax AutoRound's current best path is an experimental unsigned llm-scaler ESIMD INT4 MoE decode path in vLLM/XPU. It keeps prompt/prefill on vLLM fused experts and only routes tiny decode batches (`x.shape[0] <= 4`) through the custom raw-u4 kernel. The p512/n128 result improved from the FP16 baseline `20.17` output tok/s to `29.74843` output tok/s (`148.742151` total), and p512/n256 reached `33.033788` output tok/s once prefill was better amortized. No speculative decode, no expert dropping, and no power-limit change. LocalMaxxing accepted these as `cmoxptkfd00hsml01hf2ajhhp` and `cmoxq7cww00i8ml019ihbeqc9`. MiniMax `ngram_gpu` with the same decode path failed/stalled during generation, so speculation remains negative for this harness.
+- A BF16-capable version of the same MiniMax AutoRound u4 decode path now keeps hidden states in BF16 while still using the custom llm-scaler MoE decode kernels. It fixes the earlier BF16 fallback from `16.860287` to `33.681326` output tok/s at p512/n256, and reaches `36.607699` output tok/s at p512/n512, only about 1.4% behind the FP16 p512/n512 speed reference. LocalMaxxing accepted this BF16 result as `cmoyr84ol000rtl01o4z9fwdm`.
 - MiniMax DFlash speculative decoding is also negative on the current TP4 XPU stack. `MirecX/MiniMax-M2.7-L3H5-DFlash` loads, compiles, shares target embeddings/lm head, and selects the expected target taps `(2, 16, 30, 43, 57)`, but a p64/n16 smoke stalls at the first request and produces no JSON throughput. The drafter card reports `m_accept ~= 1.38`, already below expected break-even, so keep MiniMax optimization focused on non-speculative Q/K collective fusion and MoE decode work for now.
 
 ## Layout
@@ -68,6 +69,7 @@ Reproducibility notes, benchmark payloads, and local patches from the Intel Arc 
 - `notes/2026-05-09-minimax-u4-decode-path.md`: unsigned llm-scaler u4 MiniMax decode path, p512/n128 `29.74843` output tok/s result, and negative `ngram_gpu` follow-up.
 - `notes/2026-05-09-minimax-comm-and-ws-moe-followups.md`: oneCCL small-payload, MoERunner timing, direct-dispatch, and ESIMD work-sharing u4 follow-ups; all kept as diagnostics/negatives.
 - `notes/2026-05-09-minimax-dflash-speculative-blocker.md`: DFlash speculative drafter smoke; model loads and compiles, then stalls before producing a 16-token result.
+- `notes/2026-05-09-minimax-bf16-u4-decode.md`: BF16-capable MiniMax AutoRound u4 decode path; restores BF16 speed to near the FP16 reference without forcing FP16 hidden states.
 - `data/qwen36-fp8-32k-tp4-vs-pp2-20260506.json`: post-reboot Q4 sanity plus FP8 32k-context TP4 vs TP2/PP2 validation.
 - `data/q4-esimd-blockscales-20260506.json`: structured ESIMD block-loaded scale metadata screen.
 - `data/q4-active-device-row-split-20260506.json`: structured active-device row-split patch validation and negative row-split smoke.
@@ -94,6 +96,8 @@ Reproducibility notes, benchmark payloads, and local patches from the Intel Arc 
 - `data/minimax-m27-autoround-u4-decode-20260509.json`: structured unsigned llm-scaler u4 decode path result, patch references, LocalMaxxing payload, and negative speculative follow-up.
 - `data/minimax-m27-comm-direct-ws-followups-20260509.json`: structured oneCCL env, MoE timing, direct-dispatch, and work-sharing u4 follow-up outcomes.
 - `data/minimax-m27-dflash-speculative-blocker-20260509.json`: structured DFlash load/compile/smoke-stall result.
+- `data/minimax-m27-bf16-u4-decode-20260509.json`: structured BF16 u4 decode results and patch references.
+- `data/localmaxxing-submission-minimax-m27-autoround-bf16-u4-decode-20260509.json`: LocalMaxxing response for the BF16 u4 decode p512/n512 result.
 - `configs/vllm/minimax-m27-b70-int4-w4a16-moe-hybrid-20260508.json`: hybrid B70 MoE config for MiniMax AutoRound vLLM/XPU, tuned key `1` plus default prompt-size keys.
 - `configs/vllm/minimax-m27-b70-int4-w4a16-moe-ep-negative-20260508.json`: expert-parallel MiniMax MoE config retained as a negative/blocked result after EP underperformed and the tuned-config run OOMed.
 - `scripts/bench-qwen36-q4_0-gguf-vulkan-matrix.sh`: Q4_0 GGUF Vulkan benchmark sweep harness.
@@ -131,6 +135,8 @@ Reproducibility notes, benchmark payloads, and local patches from the Intel Arc 
 - `patches/vllm-benchmark-moe-xpu-tune-harness-20260508.patch`: local vLLM MoE benchmark harness patch for XPU/Ray device exposure, XPU eager timing, and pruned small-M decode tuning.
 - `patches/llm-scaler-moe-int4-u4-decode-20260509.patch`: llm-scaler MoE-only unsigned uint4 tiny decode kernel and Python binding.
 - `patches/vllm-minimax-llm-scaler-u4-decode-20260509.patch`: vLLM WNA16 MiniMax gate that enables the llm-scaler u4 path only for tiny FP16 decode batches.
+- `patches/llm-scaler-moe-int4-u4-bf16-decode-20260509.patch`: BF16-capable llm-scaler u4 decode kernel diff.
+- `patches/vllm-minimax-llm-scaler-u4-bf16-decode-20260509.patch`: vLLM WNA16 MiniMax gate update for BF16 decode activations and BF16 checkpoint scales.
 
 ## Notes
 

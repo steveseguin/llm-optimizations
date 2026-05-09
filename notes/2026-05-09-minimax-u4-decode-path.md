@@ -16,6 +16,8 @@ The unsigned llm-scaler INT4 tiny-MoE path is now the best MiniMax AutoRound TP4
 | unsigned llm-scaler decode-only + FP32 route weights + default CCL IPC | 512/256 | 34.578045 | 103.734136 | current best |
 | unsigned llm-scaler decode-only + default CCL IPC + `MAX_MODEL_LEN=1024` | 512/256 | 24.269656 | 72.808968 | negative compile-profile comparison |
 | unsigned llm-scaler decode-only + FP32 route weights + default CCL IPC | 512/512 | 37.136187 | 74.272373 | best steady-state decode validation |
+| unsigned llm-scaler decode-only + BF16 activations + default CCL IPC | 512/256 | 33.681326 | 101.043979 | quality-preserving BF16 validation |
+| unsigned llm-scaler decode-only + BF16 activations + default CCL IPC | 512/512 | 36.607699 | 73.215399 | near-FP16 steady decode validation |
 | unsigned llm-scaler decode-only + default CCL IPC + `MAX_MODEL_LEN=4096` | 512/512 | 29.787984 | 59.575969 | negative compile/KV-profile comparison |
 | unsigned llm-scaler decode-only + default CCL IPC + async engine | 512/512 | 36.807084 | 73.614167 | neutral/slightly slower |
 | unsigned llm-scaler decode-only + default CCL IPC + detokenize disabled | 512/512 | 37.124066 | 74.248133 | neutral; detokenization is not the bottleneck |
@@ -45,6 +47,9 @@ Throughput: 0.09 requests/s, 72.81 total tokens/s, 24.27 output tokens/s
 /home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n512-20260509T114811Z.log
 Throughput: 0.07 requests/s, 74.27 total tokens/s, 37.14 output tokens/s
 
+/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n512-20260509T193458Z.log
+Throughput: 0.07 requests/s, 73.22 total tokens/s, 36.61 output tokens/s
+
 /home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n256-20260509T141049Z.log
 Throughput: 0.13 requests/s, 98.17 total tokens/s, 32.72 output tokens/s
 ```
@@ -66,6 +71,8 @@ The `512/256` validation confirms the decode-side goal: when the fixed prefill c
 Leaving `CCL_ZE_IPC_EXCHANGE` unset so oneCCL can use its default IPC exchange improved p512/n256 again to `34.578045` output tok/s. The benchmark wrapper now supports `CCL_IPC=default` for that behavior; the older default remains `pidfd` unless explicitly overridden.
 
 The p512/n512 validation with the same default-IPC path reached `37.136187` output tok/s. That is the best current steady-state MiniMax AutoRound decode result and suggests the fixed prompt/setup portion is still materially affecting shorter p512/n128 and p512/n256 comparisons.
+
+The follow-up BF16 patch keeps MiniMax hidden states in BF16 while still using the llm-scaler u4 decode path. It fixes the earlier BF16 fallback from `16.860287` output tok/s to `33.681326` output tok/s at p512/n256, and reaches `36.607699` output tok/s at p512/n512. The focused write-up is `notes/2026-05-09-minimax-bf16-u4-decode.md`.
 
 ## Correctness Boundary
 
@@ -321,7 +328,7 @@ This is slower than the default-IPC p512/n256 baseline of `34.578045` output tok
 The next useful optimization path is to reduce the remaining decode overhead around the same MiniMax MoE path:
 
 - move more route/gather/top-k handling into the custom op so Python/vLLM glue does less per layer;
-- add a BF16-capable variant so the path can run without forcing FP16 activations;
+- keep the BF16-capable path available for quality-preserving runs; speed work should now target overhead outside the MoE matvec itself;
 - prototype an XPU equivalent of the CUDA-only MiniMax `minimax_allreduce_rms_qk` fusion, or at least fuse Q/K variance, small allreduce, and RMS scaling more tightly than the current PyTorch graph;
 - inspect TP4 allreduce/attention decode cost now that MoE is less dominant;
 - add cleaner per-rank/per-process timers around the custom MoE bridge and vLLM attention call sites, because the first kernel-only trace shows matvec wait is only part of the decode step;
