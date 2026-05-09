@@ -65,6 +65,7 @@ Reproducibility notes, benchmark payloads, and local patches from the Intel Arc 
 - `notes/2026-05-08-minimax-fused-rmsnorm-sycl.md`: MiniMax SYCL RPC worker `FUSED_RMS_NORM` implementation and speed screen.
 - `notes/2026-05-08-minimax-autoround-vllm-xpu.md`: MiniMax AutoRound INT4 vLLM/XPU bring-up, including the quantized-MoE fit patch and remaining blockers.
 - `notes/2026-05-09-minimax-u4-decode-path.md`: unsigned llm-scaler u4 MiniMax decode path, p512/n128 `29.74843` output tok/s result, and negative `ngram_gpu` follow-up.
+- `notes/2026-05-09-minimax-comm-and-ws-moe-followups.md`: oneCCL small-payload, MoERunner timing, direct-dispatch, and ESIMD work-sharing u4 follow-ups; all kept as diagnostics/negatives.
 - `data/qwen36-fp8-32k-tp4-vs-pp2-20260506.json`: post-reboot Q4 sanity plus FP8 32k-context TP4 vs TP2/PP2 validation.
 - `data/q4-esimd-blockscales-20260506.json`: structured ESIMD block-loaded scale metadata screen.
 - `data/q4-active-device-row-split-20260506.json`: structured active-device row-split patch validation and negative row-split smoke.
@@ -89,6 +90,7 @@ Reproducibility notes, benchmark payloads, and local patches from the Intel Arc 
 - `data/minimax-m27-fused-rmsnorm-sycl-20260508.json`: structured MiniMax fused RMSNorm implementation result.
 - `data/minimax-m27-autoround-vllm-xpu-20260508.json`: structured MiniMax AutoRound INT4 vLLM/XPU bring-up result and remaining MoE tuning blocker.
 - `data/minimax-m27-autoround-u4-decode-20260509.json`: structured unsigned llm-scaler u4 decode path result, patch references, LocalMaxxing payload, and negative speculative follow-up.
+- `data/minimax-m27-comm-direct-ws-followups-20260509.json`: structured oneCCL env, MoE timing, direct-dispatch, and work-sharing u4 follow-up outcomes.
 - `configs/vllm/minimax-m27-b70-int4-w4a16-moe-hybrid-20260508.json`: hybrid B70 MoE config for MiniMax AutoRound vLLM/XPU, tuned key `1` plus default prompt-size keys.
 - `configs/vllm/minimax-m27-b70-int4-w4a16-moe-ep-negative-20260508.json`: expert-parallel MiniMax MoE config retained as a negative/blocked result after EP underperformed and the tuned-config run OOMed.
 - `scripts/bench-qwen36-q4_0-gguf-vulkan-matrix.sh`: Q4_0 GGUF Vulkan benchmark sweep harness.

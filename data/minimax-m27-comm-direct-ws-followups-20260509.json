@@ -1,0 +1,70 @@
+{
+  "date": "2026-05-09",
+  "model": {
+    "hfId": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+    "localPath": "/mnt/corsair-external/llm-models/minimax-m2.7-int4-autoround",
+    "quantization": "int4 AutoRound"
+  },
+  "hardware": {
+    "gpu": "Intel Arc Pro B70",
+    "gpuCount": 4,
+    "vramGbPerGpu": 32,
+    "os": "Ubuntu 24.04"
+  },
+  "baseline": {
+    "bestP512N256OutputTokS": 34.578045,
+    "bestP512N512OutputTokS": 37.136187,
+    "localmaxxingId": "cmoyagit0004dmk014gk25e2k"
+  },
+  "allreduceProbe": {
+    "baselineLog": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/xccl-hidden-allreduce-pidfd-baseline-20260509T180129Z.log",
+    "variantsLog": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/xccl-hidden-allreduce-variants-20260509T180149Z.log",
+    "baselineHiddenFp16AvgMs": 0.014998,
+    "baselineHiddenFp32AvgMs": 0.015018,
+    "decision": "No oneCCL small-payload env variant beat the baseline enough to promote."
+  },
+  "moeTiming": {
+    "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n4-20260509T180217Z.log",
+    "selectExpertsDecodeMsPerLayer": "0.058-0.064",
+    "llmScalerU4BridgeDecodeMsPerLayer": "0.098-0.106",
+    "quantApplyDecodeMsPerLayer": "0.176-0.185",
+    "decision": "Router top-k is not the next best target."
+  },
+  "directTorchOp": {
+    "standaloneWrapperMs": 0.085629,
+    "standaloneDirectMs": 0.07945,
+    "p512n256OutputTokS": 33.62234350304682,
+    "restoredControlP512N256OutputTokS": 33.609758031151934,
+    "decision": "Do not promote; full model result is neutral/noisy."
+  },
+  "wsU4Kernel": {
+    "buildLog": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/build-moe-int4-u4-ws-20260509T183222Z.log",
+    "standalone": {
+      "m1ScalarMs": 0.174667,
+      "m1WsMs": 0.030994,
+      "m1MaxAbsDiff": 0.0000610352,
+      "m4ScalarMs": 0.295609,
+      "m4WsMs": 0.121688,
+      "m4MaxAbsDiff": 0.00195312
+    },
+    "realModel": {
+      "p512n256": {
+        "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n256-20260509T183428Z.log",
+        "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n256-20260509T183428Z.json",
+        "outputTokS": 31.654977483004174,
+        "totalTokS": 94.96493244901252
+      },
+      "p512n512": {
+        "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n512-20260509T184219Z.log",
+        "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n512-20260509T184219Z.json",
+        "outputTokS": 35.38912927376088,
+        "totalTokS": 70.77825854752176
+      }
+    },
+    "decision": "Do not promote. Active vLLM call site restored to scalar u4."
+  },
+  "localmaxxing": {
+    "submitted": false,
+    "reason": "Negative/diagnostic follow-up; current public best remains the previous scalar u4 submission."
+  }
+}
