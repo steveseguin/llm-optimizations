@@ -464,6 +464,17 @@ The integration is opt-in with `VLLM_XPU_USE_LLM_SCALER_MOE=1`. It signs the uin
 Full model results:
 
 ```text
+p1/n128, TP4, dtype=float16, VLLM_XPU_USE_LLM_SCALER_MOE=1:
+34.328763 total tok/s, 34.06 output tok/s
+log: /home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p1n128-20260509T012543Z.log
+json: /home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p1n128-20260509T012543Z.json
+LocalMaxxing: cmoxofv8h00h5ml01wu1uakhr
+
+p1/n128, TP4, dtype=float16, VLLM_XPU_USE_LLM_SCALER_MOE=0:
+22.486697 total tok/s, 22.31 output tok/s
+log: /home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p1n128-20260509T013243Z.log
+json: /home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p1n128-20260509T013243Z.json
+
 p512/n128, TP4, dtype=float16, VLLM_XPU_USE_LLM_SCALER_MOE=1:
 61.374542 total tok/s, 12.27 output tok/s
 log: /home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n128-20260509T010605Z.log
@@ -475,12 +486,12 @@ log: /home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-auto
 json: /home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n128-20260509T011343Z.json
 ```
 
-Interpretation: full-model negative as currently integrated. The low-level MoE kernel is promising, but the Python-level routed integration loses the end-to-end benchmark badly, likely because prefill routes through Python-side route/gather work and because the custom path cannot be used only for decode without changing the weight format. Do not enable `VLLM_XPU_USE_LLM_SCALER_MOE=1` for normal runs yet.
+Interpretation: decode positive, full-context negative as currently integrated. The p1/n128 isolation run improves output from `22.31` to `34.06` tok/s, proving the llm-scaler path can help decode. The p512/n128 run loses badly because prefill also routes through the prototype path. Do not enable `VLLM_XPU_USE_LLM_SCALER_MOE=1` for normal runs yet; use this result to justify a decode-only integration.
 
 Next useful llm-scaler work:
 
 - Add BF16 support to the tiny decode kernels or explicitly benchmark FP16 quality before relying on FP16.
-- Add an unsigned-uint4 variant so vLLM can keep its current weight format and use the custom path only for decode, while preserving the faster existing prefill path.
+- Add an unsigned-uint4 variant so vLLM can keep its current weight format and use the custom path only for decode, while preserving the faster existing prefill path. This is now justified by the `34.06` output tok/s p1/n128 result.
 - Move the exact N-major routed path into a proper C++/SYCL monolithic op to eliminate Python route/gather overhead for prompt sizes.
 - Re-test full p512/n128 only after one of those changes lands.
 

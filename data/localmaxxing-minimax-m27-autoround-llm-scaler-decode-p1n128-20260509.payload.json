@@ -1,0 +1,35 @@
+{
+  "hfId": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+  "modelRevision": "main",
+  "hardware": {
+    "hwClass": "DISCRETE_GPU",
+    "gpuName": "Intel Arc Pro B70",
+    "gpuCount": 4,
+    "vramGb": 32,
+    "cpu": "AMD EPYC 9015",
+    "ramGb": 16,
+    "os": "Ubuntu 24.04.4"
+  },
+  "engineName": "vllm",
+  "engineVersion": "0.20.1-local",
+  "quantization": "INT4 AutoRound W4A16",
+  "promptTokens": 1,
+  "outputTokens": 128,
+  "contextLength": 512,
+  "batchSize": 1,
+  "tokSOut": 34.06,
+  "tokSTotal": 34.328763,
+  "notes": "Decode-isolation experiment for MiniMax M2.7 AutoRound on 4x Arc Pro B70. Uses experimental llm-scaler ESIMD INT4 MoE path with FP16 activations and in-place signed compact int4 expert weights. Strong p1/n128 decode result, but not a default full-context setting yet: p512/n128 regressed because prefill also used this prototype path.",
+  "engineFlags": {
+    "commandSnippet": "VLLM_XPU_USE_LLM_SCALER_MOE=1 vllm bench throughput --backend vllm --model /mnt/corsair-external/llm-models/minimax-m2.7-int4-autoround --tokenizer /mnt/corsair-external/llm-models/minimax-m2.7-int4-autoround --trust-remote-code --dtype float16 --tensor-parallel-size 4 --distributed-executor-backend mp --max-model-len 512 --max-num-batched-tokens 256 --max-num-seqs 1 --dataset-name random --random-input-len 1 --random-output-len 128 --random-range-ratio 0 --num-prompts 1 --disable-log-stats",
+    "tensorParallel": 4,
+    "gpuLayers": 999,
+    "contextLength": 512,
+    "concurrency": 1,
+    "flashAttn": true,
+    "chunkedPrefill": true,
+    "prefillChunkSize": 256,
+    "contBatching": true,
+    "extraFlags": "XPU/Level Zero; experimental llm-scaler ESIMD INT4 MoE path; CCL_ZE_IPC_EXCHANGE=pidfd; CCL_TOPO_P2P_ACCESS=1; VLLM_XPU_ENABLE_XPU_GRAPH=0; VLLM_XPU_USE_LLM_SCALER_MOE=1; dtype=float16"
+  }
+}
