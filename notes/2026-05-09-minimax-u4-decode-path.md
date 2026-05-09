@@ -19,6 +19,7 @@ The unsigned llm-scaler INT4 tiny-MoE path is now the best MiniMax AutoRound TP4
 | unsigned llm-scaler decode-only + default CCL IPC + `MAX_MODEL_LEN=4096` | 512/512 | 29.787984 | 59.575969 | negative compile/KV-profile comparison |
 | unsigned llm-scaler decode-only + default CCL IPC + async engine | 512/512 | 36.807084 | 73.614167 | neutral/slightly slower |
 | unsigned llm-scaler decode-only + default CCL IPC + detokenize disabled | 512/512 | 37.124066 | 74.248133 | neutral; detokenization is not the bottleneck |
+| unsigned llm-scaler decode-only + default CCL IPC + XPU PIECEWISE graph + fixed 256 MiB KV | 512/256 | 32.723015 | 98.169045 | graph capture succeeds but is slower |
 
 Key log:
 
@@ -43,6 +44,9 @@ Throughput: 0.09 requests/s, 72.81 total tokens/s, 24.27 output tokens/s
 
 /home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n512-20260509T114811Z.log
 Throughput: 0.07 requests/s, 74.27 total tokens/s, 37.14 output tokens/s
+
+/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n256-20260509T141049Z.log
+Throughput: 0.13 requests/s, 98.17 total tokens/s, 32.72 output tokens/s
 ```
 
 ## What Changed
@@ -126,6 +130,7 @@ LocalMaxxing:
 - `cmoy9exmf003lmk01d3it9cz2`: p512/n256 PP2/TP2 negative, `17.550271` output tok/s.
 - `cmoy9qat60040mk01l5y8n3al`: p512/n256 with default CCL IPC, `34.578045` output tok/s.
 - `cmoyagit0004dmk014gk25e2k`: p512/n512 with default CCL IPC, `37.136187` output tok/s.
+- `cmoyfl7cm0057mk01suxo0glp`: p512/n256 with experimental XPU PIECEWISE graph and fixed 256 MiB KV, `32.723015` output tok/s; submitted as a negative/diagnostic learning result.
 
 ## Negative Follow-Up
 
@@ -203,6 +208,30 @@ AssertionError: assert isinstance(self.device_communicator, CudaCommunicator)
 ```
 
 This is a vLLM graph-capture integration blocker for TP on XPU/XCCL, not just a launch flag issue.
+
+A follow-up local graph experiment removed that first blocker by letting `GroupCoordinator.graph_capture` skip CUDA-only communicator capture for `XpuCommunicator` under `VLLM_XPU_GRAPH_NOOP_COMM_CAPTURE=1`. The next blocker was memory: at normal automatic KV sizing, XPU graph profiling estimated `1.15 GiB` graph memory and left only `0.05 GiB` available KV memory, below the `0.12 GiB` required for `max_model_len=2048`.
+
+The final graph experiment also made XPU follow the local code comment that says CUDA graph memory profiling should be skipped on XPU, and pinned KV cache manually:
+
+```text
+--kv-cache-memory-bytes 256M
+```
+
+That run captured PIECEWISE graphs successfully:
+
+```text
+Graph capturing finished in 9 secs, took 1.15 GiB
+GPU KV cache size: 4,224 tokens
+```
+
+But it was slower than the non-graph default-IPC baseline:
+
+```text
+/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n256-20260509T141049Z.log
+Throughput: 0.13 requests/s, 98.17 total tokens/s, 32.72 output tokens/s
+```
+
+Do not promote XPU graph mode for this MiniMax path yet. The patch is still useful as a reproducibility artifact because it proves PIECEWISE graph capture can be made to run on XPU TP4, but the capture overhead/shape currently loses to normal compiled eager execution.
 
 `--no-enable-prefix-caching` is neutral/slightly slower on p512/n256:
 

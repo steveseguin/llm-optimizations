@@ -484,6 +484,32 @@
       "details": "The local force-with-comm graph experiment reached PIECEWISE graph mode, then failed during graph memory profiling with an AssertionError because tensor-parallel graph_capture requires a CudaCommunicator. XPU/XCCL graph capture for TP needs a vLLM communicator integration change before this can be benchmarked."
     },
     {
+      "label": "u4_decode_only_default_ipc_xpu_graph_fixed_kv_p512n256_negative",
+      "promptTokens": 512,
+      "outputTokens": 256,
+      "contextLength": 2048,
+      "tokSOut": 32.723015,
+      "tokSTotal": 98.169045,
+      "elapsedSeconds": 7.823240025027189,
+      "peakVramGb": 28.11,
+      "env": {
+        "VLLM_XPU_ENABLE_XPU_GRAPH": "1",
+        "VLLM_XPU_FORCE_GRAPH_WITH_COMM": "1",
+        "VLLM_XPU_GRAPH_NOOP_COMM_CAPTURE": "1",
+        "CCL_ZE_IPC_EXCHANGE": "unset/default",
+        "CCL_TOPO_P2P_ACCESS": "1"
+      },
+      "extraArgs": "--kv-cache-memory-bytes 256M",
+      "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n256-20260509T141049Z.log",
+      "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n256-20260509T141049Z.json",
+      "patch": "patches/vllm-xpu-graph-noop-communicator-capture-20260509.patch",
+      "localmaxxingPayload": "data/localmaxxing-minimax-m27-autoround-xpu-graph-fixedkv-p512n256-20260509.payload.json",
+      "localmaxxingId": "cmoyfl7cm0057mk01suxo0glp",
+      "localmaxxingResponse": "/home/steve/bench-results/localmaxxing-minimax-m27-autoround-xpu-graph-fixedkv-p512n256-20260509.curl-response.txt",
+      "outcome": "negative/slower",
+      "details": "Two local vLLM graph experiments let XPU TP4 enter PIECEWISE graph mode: graph_capture skips CUDA-only communicator capture for XpuCommunicator under VLLM_XPU_GRAPH_NOOP_COMM_CAPTURE=1, and XPU follows the documented skip path for CUDA graph memory profiling. With KV pinned to 256 MiB, graph capture finished and used 1.15 GiB, but p512/n256 throughput fell below the non-graph default-IPC result of 34.578045 output tok/s. Do not promote XPU graph mode for this MiniMax path yet."
+    },
+    {
       "label": "u4_decode_only_default_ipc_no_prefix_cache_p512n256_neutral",
       "promptTokens": 512,
       "outputTokens": 256,
@@ -535,5 +561,5 @@
       "details": "The experiment precomputes FP16 copies of MiniMax gate weights after model load, computes router logits with FP16 linear, then casts logits back to FP32 for the existing top-k path. It regressed throughput substantially, so keep the default FP32 router."
     }
   ],
-  "conclusion": "The useful MiniMax path is reducing decode MoE and communication overhead rather than n-gram speculation. The unsigned llm-scaler tiny MoE decode path improves p512/n128 from 20.17 to 29.75 output tok/s, p512/n256 initially reached 33.03 output tok/s, removing the per-layer FP32-to-FP16 router-weight cast improved p512/n256 to 34.16 output tok/s, and leaving CCL_ZE_IPC_EXCHANGE at the oneCCL default improved it again to 34.58 output tok/s. A longer p512/n512 run with the same best path reached 37.14 output tok/s, making it the best current steady-state MiniMax AutoRound decode result. Speculative ngram_gpu remains blocked/negative on this TP4 XPU harness; PP2/TP2, CCL USM, MAX_MODEL_LEN=1024, MAX_MODEL_LEN=4096, and async-engine are negative/neutral. DCP is blocked by TP4 versus 8 KV heads, detokenization is not the bottleneck, XPU KV fp8_inc is unsupported, and built-in torch profiling stalls. Standalone pidfd XCCL allreduce is about 15 us at MiniMax hidden-state payload sizes, so the remaining bottleneck is not raw small allreduce latency alone."
+  "conclusion": "The useful MiniMax path is reducing decode MoE and communication overhead rather than n-gram speculation. The unsigned llm-scaler tiny MoE decode path improves p512/n128 from 20.17 to 29.75 output tok/s, p512/n256 initially reached 33.03 output tok/s, removing the per-layer FP32-to-FP16 router-weight cast improved p512/n256 to 34.16 output tok/s, and leaving CCL_ZE_IPC_EXCHANGE at the oneCCL default improved it again to 34.58 output tok/s. A longer p512/n512 run with the same best path reached 37.14 output tok/s, making it the best current steady-state MiniMax AutoRound decode result. Speculative ngram_gpu remains blocked/negative on this TP4 XPU harness; PP2/TP2, CCL USM, MAX_MODEL_LEN=1024, MAX_MODEL_LEN=4096, async-engine, XPU graph mode with fixed KV, Triton attention, block-size 128, and FP16 router are negative/neutral. DCP is blocked by TP4 versus 8 KV heads, detokenization is not the bottleneck, XPU KV fp8_inc is unsupported, and built-in torch profiling stalls. Standalone pidfd XCCL allreduce is about 15 us at MiniMax hidden-state payload sizes, so the remaining bottleneck is not raw small allreduce latency alone."
 }

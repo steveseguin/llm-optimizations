@@ -1,0 +1,54 @@
+diff --git a/vllm/distributed/parallel_state.py b/vllm/distributed/parallel_state.py
+index 58c49c09d..e4f08f0b2 100644
+--- a/vllm/distributed/parallel_state.py
++++ b/vllm/distributed/parallel_state.py
+@@ -25,6 +25,7 @@ If you only need to use the distributed environment without model/pipeline
+ 
+ import contextlib
+ import gc
++import os
+ import pickle
+ import weakref
+ from collections import namedtuple
+@@ -478,14 +479,26 @@ class GroupCoordinator:
+         )
+ 
+         if self.device_communicator is not None:
+-            assert isinstance(self.device_communicator, CudaCommunicator)
+-            ca_comm = self.device_communicator.ca_comm
++            if not isinstance(self.device_communicator, CudaCommunicator):
++                if os.environ.get("VLLM_XPU_GRAPH_NOOP_COMM_CAPTURE", "0") != "1":
++                    assert isinstance(self.device_communicator, CudaCommunicator)
++                logger.warning_once(
++                    "Skipping communicator graph-capture context for %s under "
++                    "VLLM_XPU_GRAPH_NOOP_COMM_CAPTURE=1.",
++                    type(self.device_communicator).__name__,
++                )
++                ca_comm = None
++            else:
++                ca_comm = self.device_communicator.ca_comm
+             if ca_comm is not None:
+                 maybe_ca_context = ca_comm.capture()  # type: ignore
+ 
+             from vllm._aiter_ops import rocm_aiter_ops
+ 
+-            if rocm_aiter_ops.is_enabled():
++            if (
++                isinstance(self.device_communicator, CudaCommunicator)
++                and rocm_aiter_ops.is_enabled()
++            ):
+                 aiter_ar = rocm_aiter_ops.get_aiter_allreduce()
+                 if aiter_ar is not None:
+                     maybe_aiter_context = aiter_ar.capture()  # type: ignore
+diff --git a/vllm/v1/worker/gpu_worker.py b/vllm/v1/worker/gpu_worker.py
+index 36dd5ed7f..56bdefea1 100644
+--- a/vllm/v1/worker/gpu_worker.py
++++ b/vllm/v1/worker/gpu_worker.py
+@@ -399,6 +399,7 @@ class Worker(WorkerBase):
+             cudagraph_memory_estimate = 0
+             if (
+                 not current_platform.is_rocm()
++                and not current_platform.is_xpu()
+                 and self.vllm_config.compilation_config.cudagraph_mode
+                 != CUDAGraphMode.NONE
+             ):
