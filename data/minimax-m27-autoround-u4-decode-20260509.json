@@ -212,7 +212,51 @@
       "localmaxxingResponse": "/home/steve/bench-results/localmaxxing-minimax-m27-autoround-u4-decode-default-ipc-p512n256-20260509.response.json",
       "change": "benchmark wrapper now supports CCL_IPC=default, which leaves CCL_ZE_IPC_EXCHANGE unset instead of forcing pidfd",
       "outcome": "improved/current best"
+    },
+    {
+      "label": "u4_decode_only_default_ipc_max_model_len_1024_p512n256_negative",
+      "promptTokens": 512,
+      "outputTokens": 256,
+      "contextLength": 1024,
+      "tokSOut": 24.269656,
+      "tokSTotal": 72.808968,
+      "enabledMoeLayers": 62,
+      "peakVramGb": 28.11,
+      "elapsedSeconds": 10.548151146038435,
+      "env": {
+        "CCL_ZE_IPC_EXCHANGE": "unset/default",
+        "CCL_TOPO_P2P_ACCESS": "1"
+      },
+      "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n256-20260509T113840Z.log",
+      "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n256-20260509T113840Z.json",
+      "localmaxxingPayload": "data/localmaxxing-minimax-m27-autoround-u4-decode-default-ipc-maxlen1024-p512n256-20260509.payload.json",
+      "submitted": false,
+      "change": "MAX_MODEL_LEN reduced from 2048 to 1024 while keeping the p512/n256 workload and default oneCCL IPC behavior",
+      "outcome": "negative/slower",
+      "details": "The smaller compile/KV profile was slower even though the request fits inside 1024 tokens. vLLM compiled a (1, 1024) range and reported only 0.56 GiB available KV cache memory after loading. Keep MAX_MODEL_LEN=2048 for this path."
+    },
+    {
+      "label": "u4_decode_only_default_ipc_p512n512",
+      "promptTokens": 512,
+      "outputTokens": 512,
+      "contextLength": 2048,
+      "tokSOut": 37.136187,
+      "tokSTotal": 74.272373,
+      "enabledMoeLayers": 62,
+      "peakVramGb": 28.11,
+      "elapsedSeconds": 13.787091423990205,
+      "env": {
+        "CCL_ZE_IPC_EXCHANGE": "unset/default",
+        "CCL_TOPO_P2P_ACCESS": "1"
+      },
+      "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n512-20260509T114811Z.log",
+      "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n512-20260509T114811Z.json",
+      "localmaxxingPayload": "data/localmaxxing-minimax-m27-autoround-u4-decode-default-ipc-p512n512-20260509.payload.json",
+      "localmaxxingId": "cmoyagit0004dmk014gk25e2k",
+      "localmaxxingResponse": "/home/steve/bench-results/localmaxxing-minimax-m27-autoround-u4-decode-default-ipc-p512n512-20260509.response.json",
+      "outcome": "improved/best steady-state decode validation",
+      "details": "Same TP4/default-IPC/u4 decode path as the p512/n256 current best, but with a longer generation window. Output throughput rose to 37.14 tok/s, showing the fixed prompt/setup portion is still diluting shorter-output measurements."
     }
   ],
-  "conclusion": "The useful MiniMax path is reducing decode MoE and communication overhead rather than n-gram speculation. The unsigned llm-scaler tiny MoE decode path improves p512/n128 from 20.17 to 29.75 output tok/s, p512/n256 initially reached 33.03 output tok/s, removing the per-layer FP32-to-FP16 router-weight cast improved p512/n256 to 34.16 output tok/s, and leaving CCL_ZE_IPC_EXCHANGE at the oneCCL default improved it again to 34.58 output tok/s. Speculative ngram_gpu remains blocked/negative on this TP4 XPU harness; PP2/TP2 and CCL USM are negative."
+  "conclusion": "The useful MiniMax path is reducing decode MoE and communication overhead rather than n-gram speculation. The unsigned llm-scaler tiny MoE decode path improves p512/n128 from 20.17 to 29.75 output tok/s, p512/n256 initially reached 33.03 output tok/s, removing the per-layer FP32-to-FP16 router-weight cast improved p512/n256 to 34.16 output tok/s, and leaving CCL_ZE_IPC_EXCHANGE at the oneCCL default improved it again to 34.58 output tok/s. A longer p512/n512 run with the same best path reached 37.14 output tok/s, making it the best current steady-state MiniMax AutoRound decode result. Speculative ngram_gpu remains blocked/negative on this TP4 XPU harness; PP2/TP2, CCL USM, and MAX_MODEL_LEN=1024 are negative."
 }

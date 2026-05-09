@@ -14,6 +14,8 @@ The unsigned llm-scaler INT4 tiny-MoE path is now the best MiniMax AutoRound TP4
 | unsigned llm-scaler decode-only + FP32 route weights | 512/256 | 34.157842 | 102.473527 | avoids per-layer router-weight cast |
 | unsigned llm-scaler decode-only + PP2/TP2 | 512/256 | 17.550271 | 52.650812 | negative topology comparison |
 | unsigned llm-scaler decode-only + FP32 route weights + default CCL IPC | 512/256 | 34.578045 | 103.734136 | current best |
+| unsigned llm-scaler decode-only + default CCL IPC + `MAX_MODEL_LEN=1024` | 512/256 | 24.269656 | 72.808968 | negative compile-profile comparison |
+| unsigned llm-scaler decode-only + FP32 route weights + default CCL IPC | 512/512 | 37.136187 | 74.272373 | best steady-state decode validation |
 
 Key log:
 
@@ -32,6 +34,12 @@ Throughput: 0.07 requests/s, 52.65 total tokens/s, 17.55 output tokens/s
 
 /home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n256-20260509T112853Z.log
 Throughput: 0.14 requests/s, 103.73 total tokens/s, 34.58 output tokens/s
+
+/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n256-20260509T113840Z.log
+Throughput: 0.09 requests/s, 72.81 total tokens/s, 24.27 output tokens/s
+
+/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n512-20260509T114811Z.log
+Throughput: 0.07 requests/s, 74.27 total tokens/s, 37.14 output tokens/s
 ```
 
 ## What Changed
@@ -49,6 +57,8 @@ This keeps prompt/prefill on vLLM's normal W4A16 fused-experts path and swaps on
 The `512/256` validation confirms the decode-side goal: when the fixed prefill cost is amortized over a longer generation window, single-session output throughput is above 30 tok/s. Removing the router-weight cast improved the same p512/n256 method from `33.033788` to `34.157842` output tok/s.
 
 Leaving `CCL_ZE_IPC_EXCHANGE` unset so oneCCL can use its default IPC exchange improved p512/n256 again to `34.578045` output tok/s. The benchmark wrapper now supports `CCL_IPC=default` for that behavior; the older default remains `pidfd` unless explicitly overridden.
+
+The p512/n512 validation with the same default-IPC path reached `37.136187` output tok/s. That is the best current steady-state MiniMax AutoRound decode result and suggests the fixed prompt/setup portion is still materially affecting shorter p512/n128 and p512/n256 comparisons.
 
 ## Correctness Boundary
 
@@ -112,6 +122,7 @@ LocalMaxxing:
 - `cmoy8hs3n002smk01ksgcpavr`: p512/n256 with FP32 route weights, `34.157842` output tok/s.
 - `cmoy9exmf003lmk01d3it9cz2`: p512/n256 PP2/TP2 negative, `17.550271` output tok/s.
 - `cmoy9qat60040mk01l5y8n3al`: p512/n256 with default CCL IPC, `34.578045` output tok/s.
+- `cmoyagit0004dmk014gk25e2k`: p512/n512 with default CCL IPC, `37.136187` output tok/s.
 
 ## Negative Follow-Up
 
@@ -134,6 +145,8 @@ No available shared memory broadcast block found in 60 seconds.
 The run was stopped without JSON throughput output. Keep `CCL_TOPO_P2P_ACCESS=1` for this MiniMax vLLM TP4 path.
 
 PP2 x TP2 was tested as a four-GPU layout that reduces tensor parallel degree from 4 to 2 while keeping model memory around `28.0 GiB` per card. It fits and runs, but p512/n256 drops to `17.550271` output tok/s. For batch-1 single-session latency, pipeline bubbles and larger per-rank work dominate any reduction in TP collective degree. Keep TP4/PP1 for this model.
+
+Reducing `MAX_MODEL_LEN` from `2048` to `1024` was also negative on the current best TP4/default-IPC path. The p512/n256 run dropped from `34.578045` to `24.269656` output tok/s even though the prompt plus output fits within 1024 tokens. vLLM compiled a `(1, 1024)` graph/range and reported only `0.56 GiB` available KV cache memory after loading; for this model, keep `MAX_MODEL_LEN=2048`.
 
 ## Next Work
 
