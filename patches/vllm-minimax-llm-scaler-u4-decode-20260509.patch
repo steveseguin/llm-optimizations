@@ -1,5 +1,5 @@
 diff --git a/vllm/model_executor/layers/quantization/moe_wna16.py b/vllm/model_executor/layers/quantization/moe_wna16.py
-index e5ef3f4c3..24871cb23 100644
+index e5ef3f4c3..e27f28c06 100644
 --- a/vllm/model_executor/layers/quantization/moe_wna16.py
 +++ b/vllm/model_executor/layers/quantization/moe_wna16.py
 @@ -1,11 +1,13 @@
@@ -86,8 +86,8 @@ index e5ef3f4c3..24871cb23 100644
 +                    layer.w13_scales,
 +                    layer.w2_qweight,
 +                    layer.w2_scales,
-+                    topk_weights.to(dtype=x.dtype).contiguous(),
-+                    topk_ids.to(torch.int32).contiguous(),
++                    topk_weights.contiguous(),
++                    topk_ids.contiguous(),
 +                )
 +            except Exception:
 +                logger.exception("llm-scaler XPU INT4 MoE path failed")

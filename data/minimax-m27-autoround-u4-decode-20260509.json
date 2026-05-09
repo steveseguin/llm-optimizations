@@ -124,7 +124,25 @@
       "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n256-20260509T023136Z.log",
       "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n256-20260509T023136Z.json",
       "submitted": false
+    },
+    {
+      "label": "u4_decode_only_fp32_route_weights_p512n256",
+      "promptTokens": 512,
+      "outputTokens": 256,
+      "contextLength": 2048,
+      "tokSOut": 34.157842,
+      "tokSTotal": 102.473527,
+      "enabledMoeLayers": 62,
+      "peakVramGb": 28.11,
+      "elapsedSeconds": 7.4946185780572705,
+      "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n256-20260509T105353Z.log",
+      "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n256-20260509T105353Z.json",
+      "localmaxxingPayload": "data/localmaxxing-minimax-m27-autoround-u4-decode-fp32-route-p512n256-20260509.payload.json",
+      "localmaxxingId": "cmoy8hs3n002smk01ksgcpavr",
+      "localmaxxingResponse": "/home/steve/bench-results/localmaxxing-minimax-m27-autoround-u4-decode-fp32-route-p512n256-20260509.response.json",
+      "change": "llm-scaler tiny u4 down kernel accepts FP32 topk route weights directly; vLLM bridge stops casting topk_weights to FP16 for every decode-layer call",
+      "outcome": "improved"
     }
   ],
-  "conclusion": "The useful MiniMax path is not n-gram speculation; it is reducing decode MoE cost. The unsigned llm-scaler tiny MoE decode path improves p512/n128 from 20.17 to 29.75 output tok/s, and p512/n256 reaches 33.03 output tok/s once prefill is better amortized. Speculative ngram_gpu remains blocked/negative on this TP4 XPU harness."
+  "conclusion": "The useful MiniMax path is reducing decode MoE cost rather than n-gram speculation. The unsigned llm-scaler tiny MoE decode path improves p512/n128 from 20.17 to 29.75 output tok/s, p512/n256 initially reached 33.03 output tok/s, and removing the per-layer FP32-to-FP16 router-weight cast improved p512/n256 again to 34.16 output tok/s. Speculative ngram_gpu remains blocked/negative on this TP4 XPU harness."
 }
