@@ -43,7 +43,7 @@ ok
 torch.Size([1, 256]) torch.float16 True
 ```
 
-MiniMax vLLM smoke and baseline also passed after the 2025.3 rebuild:
+MiniMax vLLM smoke and baseline also passed after the 2025.3 FP16 rebuild:
 
 | run | prompt/output | output tok/s | total tok/s | notes |
 | --- | ---: | ---: | ---: | --- |
@@ -60,10 +60,24 @@ failed fused-router experiment. Treat oneAPI 2026.0 as unsafe for this extension
 until the PyTorch XPU runtime moves to a compatible SYCL runtime or we verify a
 specific build/link setup that imports cleanly.
 
+The BF16-capable u4 extension also imports and executes cleanly when rebuilt
+with oneAPI 2025.3:
+
+```text
+from custom_esimd_kernels_vllm import moe_forward_tiny_cutlass_nmajor_int4_u4, moe_forward_tiny_cutlass_nmajor_int4_u4_ws
+ok
+
+torch.Size([1, 256]) torch.bfloat16 True
+```
+
+So the BF16 kernel specialization is not the cause of the import crash; the
+compiler/runtime pairing is.
+
 ## Logs
 
 ```text
 /home/steve/bench-results/minimax-m2.7-autoround-vllm/build-moe-int4-u4-fp16-oneapi2025-20260509T201900Z.log
+/home/steve/bench-results/minimax-m2.7-autoround-vllm/build-moe-int4-u4-oneapi2025-20260509T210013Z.log
 /home/steve/bench-results/minimax-m2.7-autoround-vllm/build-moe-int4-u4-fp16-restore-20260509T201658Z.log
 /home/steve/bench-results/minimax-m2.7-autoround-vllm/build-moe-int4-u4-bf16-restore-with-compat-20260509T201430Z.log
 /home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p1n8-20260509T202033Z.log
@@ -75,7 +89,5 @@ specific build/link setup that imports cleanly.
 
 ## TODO
 
-- Rebuild the BF16 u4 patch with oneAPI 2025.3 and verify whether the previous
-  BF16 path can be restored without the import crash.
 - Keep fused router/top-2 work default-off until it can import and smoke-test
   cleanly.

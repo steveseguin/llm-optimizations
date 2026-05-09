@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -eo pipefail
 
 SRC="${SRC:-/home/steve/src/llm-scaler/vllm/custom-esimd-kernels-vllm}"
 VENV="${VENV:-/home/steve/.venvs/vllm-xpu}"
