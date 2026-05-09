@@ -211,6 +211,63 @@
       "interpretation": "Current best MiniMax AutoRound vLLM/XPU result. A hybrid B70 MoE config uses the pruned tuned M=1 int4_w4a16 config for decode and default prompt-size entries for 64/256/512, improving p512/n128 from 19.85 to 20.11 output tok/s and 99.231127 to 100.538158 total tok/s."
     },
     {
+      "name": "p512_n128_fp16_baseline_no_llm_scaler",
+      "prompt_tokens": 512,
+      "output_tokens": 128,
+      "context_length": 2048,
+      "tensor_parallel": 4,
+      "ccl_ze_ipc_exchange": "pidfd",
+      "ccl_topo_p2p_access": 1,
+      "dtype": "float16",
+      "llm_scaler_moe": false,
+      "tok_s_total": 100.832219,
+      "tok_s_output": 20.17,
+      "localmaxxing_id": "cmoxnvmna00gmml01eqdyl428",
+      "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n128-20260509T011343Z.log",
+      "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n128-20260509T011343Z.json",
+      "localmaxxing_payload": "data/localmaxxing-minimax-m27-autoround-fp16-baseline-p512n128-20260509.payload.json",
+      "localmaxxing_response": "data/localmaxxing-responses/minimax-m27-autoround-fp16-baseline-p512n128-20260509.response.json",
+      "interpretation": "Neutral/slightly positive versus the BF16 hybrid result. vLLM casts the BF16 checkpoint to FP16 activations; this is a valid reproducibility point but not a meaningful new ceiling."
+    },
+    {
+      "name": "llm_scaler_moe_exact_shape_microbench",
+      "source": "/home/steve/src/llm-scaler/vllm/custom-esimd-kernels-vllm",
+      "shape": {
+        "hidden_size": 3072,
+        "intermediate_size_per_tp_rank": 384,
+        "num_experts": 256,
+        "top_k": 8,
+        "tensor_parallel": 4
+      },
+      "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/llm-scaler-minimax-routed-moe-vs-vllm-20260509T004707Z.log",
+      "latency_us": {
+        "bs1_vllm_fused_experts": 355.7,
+        "bs1_llm_scaler_cutlass_nmajor": 91.1,
+        "bs16_vllm_fused_experts": 1052.8,
+        "bs16_llm_scaler_cutlass_nmajor": 509.1,
+        "bs64_vllm_fused_experts": 3132.9,
+        "bs64_llm_scaler_cutlass_nmajor": 1033.8
+      },
+      "interpretation": "Strong microbench positive. The exact routed MoE path is faster than vLLM fused_experts for the MiniMax TP4 local shape, but it must be integrated below Python routing/gather before it helps the full model."
+    },
+    {
+      "name": "p512_n128_fp16_llm_scaler_moe_experimental",
+      "prompt_tokens": 512,
+      "output_tokens": 128,
+      "context_length": 2048,
+      "tensor_parallel": 4,
+      "ccl_ze_ipc_exchange": "pidfd",
+      "ccl_topo_p2p_access": 1,
+      "dtype": "float16",
+      "llm_scaler_moe": true,
+      "tok_s_total": 61.374542,
+      "tok_s_output": 12.27,
+      "patch": "patches/vllm-minimax-llm-scaler-moe-experimental-20260509.patch",
+      "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n128-20260509T010605Z.log",
+      "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n128-20260509T010605Z.json",
+      "interpretation": "Negative full-model result. The current opt-in Python-level integration regresses badly despite the positive microbench, likely due to prefill route/gather overhead and the inability to use it only for decode while preserving vLLM's unsigned weight format."
+    },
+    {
       "name": "p64_n16_enable_expert_parallel_default",
       "prompt_tokens": 64,
       "output_tokens": 16,
@@ -251,6 +308,73 @@
       "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n128-20260508T185133Z.log",
       "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n128-20260508T185133Z.json",
       "interpretation": "Negative. Reducing max_num_batched_tokens from 1024 to 512 with the hybrid B70 MoE config cut p512/n128 throughput from 20.11 to 13.57 output tok/s; keep 1024 for this benchmark shape."
+    },
+    {
+      "name": "p64_n16_ngram_speculative_decode",
+      "prompt_tokens": 64,
+      "output_tokens": 16,
+      "context_length": 512,
+      "tensor_parallel": 4,
+      "ccl_ze_ipc_exchange": "pidfd",
+      "ccl_topo_p2p_access": 1,
+      "tuned_config": "configs/vllm/minimax-m27-b70-int4-w4a16-moe-hybrid-20260508.json",
+      "speculative_config": {
+        "method": "ngram",
+        "num_speculative_tokens": 4,
+        "prompt_lookup_min": 2,
+        "prompt_lookup_max": 5
+      },
+      "tok_s_total": 11.287082,
+      "tok_s_output": 2.26,
+      "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p64n16-20260509T000544Z.log",
+      "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p64n16-20260509T000544Z.json",
+      "interpretation": "Negative. CPU n-gram speculation disabled async scheduling and was far slower than the non-speculative MiniMax AutoRound path; not submitted to LocalMaxxing."
+    },
+    {
+      "name": "p64_n16_ngram_gpu_speculative_decode",
+      "prompt_tokens": 64,
+      "output_tokens": 16,
+      "context_length": 512,
+      "tensor_parallel": 4,
+      "ccl_ze_ipc_exchange": "pidfd",
+      "ccl_topo_p2p_access": 1,
+      "tuned_config": "configs/vllm/minimax-m27-b70-int4-w4a16-moe-hybrid-20260508.json",
+      "speculative_config": {
+        "method": "ngram_gpu",
+        "num_speculative_tokens": 4,
+        "prompt_lookup_min": 2,
+        "prompt_lookup_max": 5
+      },
+      "tok_s_total": 15.728492,
+      "tok_s_output": 3.15,
+      "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p64n16-20260509T001359Z.log",
+      "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p64n16-20260509T001359Z.json",
+      "interpretation": "Negative. GPU n-gram speculation kept async scheduling but remained far slower than the non-speculative MiniMax AutoRound path; not submitted to LocalMaxxing."
+    },
+    {
+      "name": "native_mtp_checkpoint_check",
+      "native_mtp_available": false,
+      "model_config_use_mtp": true,
+      "num_mtp_modules": 3,
+      "mtp_weight_count_layers_62_to_64": 0,
+      "interpretation": "Blocked. The config advertises MTP, but the AutoRound checkpoint has no MTP layer tensors and this vLLM tree has no MiniMax MTP adapter."
+    },
+    {
+      "name": "llm_scaler_moe_int4_build_probe",
+      "source": "/home/steve/src/llm-scaler/vllm/custom-esimd-kernels-vllm",
+      "target_shape": {
+        "hidden_size": 3072,
+        "intermediate_size_sample": 256,
+        "intermediate_size_actual_tp4": 384,
+        "num_experts": 256,
+        "top_k": 8,
+        "tensor_parallel": 4
+      },
+      "oneapi_failed_version": "2026.0",
+      "oneapi_working_version": "2025.3.2",
+      "workaround": "-D__DPCPP_SYCL_EXTERNAL_LIBC=__DPCPP_SYCL_EXTERNAL",
+      "patched_file": "/home/steve/src/llm-scaler/vllm/custom-esimd-kernels-vllm/setup_moe_int4_only.py",
+      "interpretation": "Build issue resolved for the MoE-only extension by compiling with oneAPI 2025.3.2 and linking to the PyTorch XPU venv's libsycl.so.8. oneAPI 2026 either linked to libsycl.so.9 and crashed on launch or crashed when forced against libsycl.so.8."
     }
   ],
   "next_steps": [
@@ -260,6 +384,10 @@
     "Tune or supply a B70 int4_w4a16 MoE config for E=256,N=384; AMD-derived seeds were rejected or slower.",
     "Implement or port an XPU equivalent of minimax_allreduce_rms_qk before retesting MiniMax QK norm fusion.",
     "Keep pidfd IPC and P2P=1 as defaults. Treat P2P=0 as negative and topology-check disable as neutral diagnostic.",
-    "Treat enforce-eager as negative for MiniMax AutoRound unless compiled mode starts failing."
+    "Treat enforce-eager as negative for MiniMax AutoRound unless compiled mode starts failing.",
+    "Treat ngram and ngram_gpu speculative decode as negative for the current MiniMax single-session random benchmark.",
+    "Treat native MiniMax MTP as blocked until a checkpoint with MTP weights and a MiniMax MTP adapter are available.",
+    "Continue llm-scaler ESIMD INT4 MoE only below the Python-routing level. The exact microbench is positive, but the first full-model opt-in integration regressed to 12.27 output tok/s.",
+    "Add BF16 support, an unsigned-weight decode-only kernel, or a monolithic C++/SYCL N-major routed MoE op before retesting llm-scaler in the full MiniMax model."
   ]
 }

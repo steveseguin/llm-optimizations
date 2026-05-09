@@ -1,0 +1,103 @@
+diff --git a/vllm/custom-esimd-kernels-vllm/python/custom_esimd_kernels_vllm/__init__.py b/vllm/custom-esimd-kernels-vllm/python/custom_esimd_kernels_vllm/__init__.py
+index ad1bbb8..2956f87 100644
+--- a/vllm/custom-esimd-kernels-vllm/python/custom_esimd_kernels_vllm/__init__.py
++++ b/vllm/custom-esimd-kernels-vllm/python/custom_esimd_kernels_vllm/__init__.py
+@@ -1,19 +1,29 @@
++import importlib
++
+ import torch
+ 
++
++def _optional_import(name):
++    try:
++        return importlib.import_module(f"{__name__}.{name}")
++    except ImportError:
++        return None
++
++
+ # Core ESIMD kernels (4 compiled modules)
+-from custom_esimd_kernels_vllm import custom_esimd_kernels
+-from custom_esimd_kernels_vllm import custom_esimd_kernels_lgrf
+-from custom_esimd_kernels_vllm import custom_esimd_kernels_moe
+-from custom_esimd_kernels_vllm import custom_esimd_kernels_gemm
++custom_esimd_kernels = _optional_import("custom_esimd_kernels")
++custom_esimd_kernels_lgrf = _optional_import("custom_esimd_kernels_lgrf")
++custom_esimd_kernels_moe = _optional_import("custom_esimd_kernels_moe")
++custom_esimd_kernels_gemm = _optional_import("custom_esimd_kernels_gemm")
+ 
+-# Eagle kernels — registers torch.ops.eagle_ops.*
+-from custom_esimd_kernels_vllm import eagle_ops
++# Eagle kernels - registers torch.ops.eagle_ops.*
++eagle_ops = _optional_import("eagle_ops")
+ 
+-# MoE Batch kernels — registers torch.ops.moe_ops.*
+-from custom_esimd_kernels_vllm import moe_ops
++# MoE Batch kernels - registers torch.ops.moe_ops.*
++moe_ops = _optional_import("moe_ops")
+ 
+-# MoE INT4 Batch kernels — registers torch.ops.moe_int4_ops.*
+-from custom_esimd_kernels_vllm import moe_int4_ops
++# MoE INT4 Batch kernels - registers torch.ops.moe_int4_ops.*
++moe_int4_ops = _optional_import("moe_int4_ops")
+ 
+ from custom_esimd_kernels_vllm.ops import (
+     # Core ESIMD ops
+diff --git a/vllm/custom-esimd-kernels-vllm/python/custom_esimd_kernels_vllm/ops.py b/vllm/custom-esimd-kernels-vllm/python/custom_esimd_kernels_vllm/ops.py
+index 328d283..33f79ce 100644
+--- a/vllm/custom-esimd-kernels-vllm/python/custom_esimd_kernels_vllm/ops.py
++++ b/vllm/custom-esimd-kernels-vllm/python/custom_esimd_kernels_vllm/ops.py
+@@ -1062,7 +1062,11 @@ def moe_route_gather_int4(
+             pass
+     output = torch.zeros(n_tokens, route_output.shape[1], dtype=route_output.dtype,
+                          device=route_output.device)
+-    output.index_add_(0, sorted_rows, route_output * sorted_weights.unsqueeze(-1))
++    output.index_add_(
++        0,
++        sorted_rows,
++        route_output * sorted_weights.to(route_output.dtype).unsqueeze(-1),
++    )
+     return output
+ 
+ 
+diff --git a/vllm/custom-esimd-kernels-vllm/setup_moe_int4_only.py b/vllm/custom-esimd-kernels-vllm/setup_moe_int4_only.py
+index 8f992f3..7192240 100644
+--- a/vllm/custom-esimd-kernels-vllm/setup_moe_int4_only.py
++++ b/vllm/custom-esimd-kernels-vllm/setup_moe_int4_only.py
+@@ -13,6 +13,7 @@ root = Path(__file__).parent.resolve()
+ import torch
+ 
+ torch_include = str(Path(torch.__file__).parent / "include")
++venv_lib = str(Path(os.environ.get("VIRTUAL_ENV", "")) / "lib")
+ 
+ 
+ setup(
+@@ -31,6 +32,9 @@ setup(
+                 root / "csrc" / "xpu" / "esimd_kernels",
+                 root / "csrc",
+             ],
++            library_dirs=[
++                venv_lib,
++            ],
+             extra_compile_args={
+                 "cxx": ["-O3", "-std=c++20"],
+                 "sycl": [
+@@ -40,12 +44,16 @@ setup(
+                     "-fsycl-targets=spir64_gen",
+                     "-Xs",
+                     "-device bmg",
++                    "-D__DPCPP_SYCL_EXTERNAL_LIBC=__DPCPP_SYCL_EXTERNAL",
+                     f"-I{torch_include}",
+                 ],
+             },
+-            extra_link_args=["-Wl,-rpath,$ORIGIN/../../torch/lib"],
++            extra_link_args=[
++                f"-Wl,-rpath,{venv_lib}",
++                "-Wl,-rpath,$ORIGIN/../../torch/lib",
++            ],
+             py_limited_api=False,
+         )
+     ],
+     cmdclass={"build_ext": BuildExtension.with_options(use_ninja=True)},
+-)
+\ No newline at end of file
++)

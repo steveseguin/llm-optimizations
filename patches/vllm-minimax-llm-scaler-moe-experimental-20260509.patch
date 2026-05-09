@@ -1,0 +1,103 @@
+diff --git a/vllm/model_executor/layers/quantization/moe_wna16.py b/vllm/model_executor/layers/quantization/moe_wna16.py
+index e5ef3f4c3..b5ccdbaf7 100644
+--- a/vllm/model_executor/layers/quantization/moe_wna16.py
++++ b/vllm/model_executor/layers/quantization/moe_wna16.py
+@@ -1,11 +1,13 @@
+ # SPDX-License-Identifier: Apache-2.0
+ # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
+ 
++import os
+ from typing import Any
+ 
+ import torch
+ 
+ from vllm.distributed import get_tensor_model_parallel_rank, get_tp_group
++from vllm.logger import init_logger
+ from vllm.model_executor.layers.fused_moe.activation import MoEActivation
+ from vllm.model_executor.layers.fused_moe.config import (
+     FusedMoEQuantConfig,
+@@ -33,6 +35,8 @@ from vllm.model_executor.layers.quantization.utils.marlin_utils import (
+ from vllm.model_executor.utils import set_weight_attrs
+ from vllm.platforms import current_platform
+ 
++logger = init_logger(__name__)
++
+ 
+ class MoeWNA16Config(QuantizationConfig):
+     """Config class for MOE WNA16 (W8A16/W4A16) quantization."""
+@@ -362,6 +366,44 @@ class MoeWNA16Method(FusedMoEMethodBase):
+             block_shape=[0, layer.group_size],
+         )
+ 
++    def _llm_scaler_moe_requested(self) -> bool:
++        return os.environ.get("VLLM_XPU_USE_LLM_SCALER_MOE", "0") == "1"
++
++    def _can_use_llm_scaler_moe(self, layer: torch.nn.Module) -> bool:
++        return (
++            self._llm_scaler_moe_requested()
++            and current_platform.is_xpu()
++            and self.quant_config.weight_bits == 4
++            and not self.quant_config.has_zp
++            and getattr(layer, "expert_map", None) is None
++            and getattr(layer, "global_num_experts", None)
++            == getattr(layer, "local_num_experts", None)
++            and not getattr(layer, "apply_router_weight_on_input", False)
++            and getattr(layer, "group_size", None) == 128
++            and getattr(layer, "w13_qweight", None) is not None
++            and getattr(layer, "w2_qweight", None) is not None
++            and layer.w13_qweight.dtype == torch.uint8
++            and layer.w2_qweight.dtype == torch.uint8
++            and layer.w13_scales.dtype == torch.float16
++            and layer.w2_scales.dtype == torch.float16
++        )
++
++    def process_weights_after_loading(self, layer: torch.nn.Module) -> None:
++        if not self._can_use_llm_scaler_moe(layer):
++            return
++        if getattr(layer, "_llm_scaler_moe_weights_signed", False):
++            return
++
++        # llm-scaler/vllm_xpu_kernels grouped GEMM expects signed compact int4.
++        # For symmetric AutoRound/GPTQ uint4, this is a nibble-wise xor with 8.
++        with torch.no_grad():
++            layer.w13_qweight.data.bitwise_xor_(0x88)
++            layer.w2_qweight.data.bitwise_xor_(0x88)
++        layer._llm_scaler_moe_weights_signed = True
++        logger.info_once(
++            "Enabled llm-scaler XPU INT4 MoE path for %s", layer.layer_name
++        )
++
+     def apply(
+         self,
+         layer: FusedMoE,
+@@ -376,6 +418,30 @@ class MoeWNA16Method(FusedMoEMethodBase):
+             f"Only SiLU activation is supported, not {layer.activation}."
+         )
+ 
++        if (
++            getattr(layer, "_llm_scaler_moe_weights_signed", False)
++            and shared_experts_input is None
++            and x.dtype == torch.float16
++        ):
++            try:
++                from custom_esimd_kernels_vllm import (
++                    moe_forward_routed_cutlass_nmajor_int4,
++                )
++
++                return moe_forward_routed_cutlass_nmajor_int4(
++                    x,
++                    layer.w13_qweight,
++                    layer.w13_scales,
++                    layer.w2_qweight,
++                    layer.w2_scales,
++                    topk_weights.to(dtype=x.dtype).contiguous(),
++                    topk_ids.to(torch.int32).contiguous(),
++                    layer.global_num_experts,
++                )
++            except Exception:
++                logger.exception("llm-scaler XPU INT4 MoE path failed")
++                raise
++
+         return fused_experts(
+             x,
+             layer.w13_qweight,

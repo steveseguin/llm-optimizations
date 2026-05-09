@@ -296,6 +296,18 @@ LocalMaxxing: cmox94fsm0095ml01tjeb20rr
 
 Interpretation: small positive. This moves the current MiniMax AutoRound high from `19.85` to `20.11` output tok/s and from `99.231127` to `100.538158` total tok/s. It is not enough to explain the full gap to the 30 tok/s target, but it proves that B70-specific MoE configs are active and can move end-to-end throughput.
 
+FP16 baseline check:
+
+```text
+p512/n128, TP4, pidfd, P2P=1, dtype=float16, no llm-scaler custom path:
+100.832219 total tok/s, 20.17 output tok/s
+log: /home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n128-20260509T011343Z.log
+json: /home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n128-20260509T011343Z.json
+LocalMaxxing: cmoxnvmna00gmml01eqdyl428
+```
+
+Interpretation: neutral/slightly positive versus the BF16 hybrid run. vLLM logs `Casting torch.bfloat16 to torch.float16`, so this is an activation dtype change and should be recorded separately from the BF16 baseline. It does not materially change the MiniMax ceiling, but it is a valid reproducibility point.
+
 ## Expert Parallel Check
 
 vLLM exposes `--enable-expert-parallel`, and it is functional on this stack. With TP4 it shards MiniMax experts to `64` local / `256` global experts per rank:
@@ -339,12 +351,148 @@ json: /home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-aut
 
 Interpretation: negative. Keep `MAX_BATCHED_TOKENS=1024` for the p512/n128 MiniMax AutoRound benchmark shape.
 
+## Speculative Decode Checks
+
+MiniMax M2.7 advertises MTP in its config:
+
+```text
+model_type=minimax_m2
+use_mtp=True
+num_mtp_modules=3
+mtp_transformer_layers=1
+```
+
+The local AutoRound checkpoint does not include the extra MTP layer tensors that would be needed to run native MTP from this model:
+
+```bash
+jq -r '.weight_map | keys[]' /mnt/corsair-external/llm-models/minimax-m2.7-int4-autoround/model.safetensors.index.json | rg '^model\.layers\.(62|63|64)\.' | wc -l
+# 0
+```
+
+This vLLM tree also has MiniMax code to skip speculative-layer weights when loading the base model, but no MiniMax MTP draft-model adapter. Interpretation: do not spend more time on native MiniMax MTP with this AutoRound checkpoint. It needs a checkpoint that actually carries the MTP weights plus a vLLM adapter, or a separate draft model.
+
+N-gram speculation was tested through vLLM's `--speculative-config` path:
+
+```text
+p64/n16, TP4, hybrid B70 MoE config, method=ngram, num_speculative_tokens=4:
+11.287082 total tok/s, 2.26 output tok/s
+log: /home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p64n16-20260509T000544Z.log
+json: /home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p64n16-20260509T000544Z.json
+
+p64/n16, TP4, hybrid B70 MoE config, method=ngram_gpu, num_speculative_tokens=4:
+15.728492 total tok/s, 3.15 output tok/s
+log: /home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p64n16-20260509T001359Z.log
+json: /home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p64n16-20260509T001359Z.json
+```
+
+Interpretation: negative for the current random single-session throughput harness. The non-speculative p64 path was around `13.6` output tok/s and the current promoted p512/n128 high is `20.11` output tok/s; both n-gram variants are far slower. CPU n-gram also disables async scheduling in vLLM, and GPU n-gram keeps async scheduling but still loses badly. These were not submitted to LocalMaxxing.
+
+## llm-scaler INT4 MoE Kernel Path
+
+`llm-scaler` is still worth pursuing because it contains custom ESIMD INT4 MoE kernels for small INT4 MoE routing on Intel GPUs:
+
+```text
+/home/steve/src/llm-scaler/vllm/custom-esimd-kernels-vllm
+tests/test_moe_int4_kernel.py has "122B-A10B-TP4":
+hidden_size=3072, intermediate_size=256, num_experts=256, top_k=8
+```
+
+That sample is MiniMax-like but not exact. The actual AutoRound checkpoint is:
+
+```text
+hidden_size=3072
+intermediate_size=1536
+num_local_experts=256
+num_experts_per_tok=8
+```
+
+Under TP4, the local expert intermediate size is `384`, so the exact routed MoE microbench shape is `H=3072, D=384, E=256, top_k=8`.
+
+The full extension and the MoE-only extension initially failed under oneAPI 2026 because PyTorch's older bundled SYCL headers do not define `__DPCPP_SYCL_EXTERNAL_LIBC`, while oneAPI 2026's `sycl/stl_wrappers/cmath` expects it. A minimal compile probe proved this workaround:
+
+```text
+-D__DPCPP_SYCL_EXTERNAL_LIBC=__DPCPP_SYCL_EXTERNAL
+```
+
+Local patch applied:
+
+```text
+/home/steve/src/llm-scaler/vllm/custom-esimd-kernels-vllm/setup_moe_int4_only.py
+```
+
+oneAPI 2026 could build a MoE-only `.so`, but it either linked to `libsycl.so.9` and crashed on first XPU launch or linked to the PyTorch venv's `libsycl.so.8` and crashed at import. Installing the side-by-side oneAPI `2025.3.2` compiler fixed that ABI mismatch:
+
+```text
+icpx: Intel(R) oneAPI DPC++/C++ Compiler 2025.3.2
+extension NEEDED: libsycl.so.8
+RUNPATH: /home/steve/.venvs/vllm-xpu/lib
+```
+
+Smoke tests after the 2025.3.2 rebuild:
+
+```text
+moe_int4_ops import: pass
+router tiny launch: pass
+MiniMax-like full_int4 smoke bs=1,4,16: pass
+```
+
+Exact MiniMax TP4 routed MoE microbench:
+
+```text
+log: /home/steve/bench-results/minimax-m2.7-autoround-vllm/llm-scaler-minimax-routed-moe-vs-vllm-20260509T004707Z.log
+
+bs=1:  vLLM fused_experts 355.7 us, llm-scaler N-major 91.1 us
+bs=2:  vLLM fused_experts 338.9 us, llm-scaler N-major 158.7 us
+bs=4:  vLLM fused_experts 397.0 us, llm-scaler N-major 305.2 us
+bs=8:  vLLM fused_experts 743.2 us, llm-scaler N-major 380.2 us
+bs=16: vLLM fused_experts 1052.8 us, llm-scaler N-major 509.1 us
+bs=32: vLLM fused_experts 2437.4 us, llm-scaler N-major 726.7 us
+bs=64: vLLM fused_experts 3132.9 us, llm-scaler N-major 1033.8 us
+```
+
+Interpretation: strong microbench positive. The exact routed MoE path is 1.3x to 3.9x faster than vLLM's current W4A16 `fused_experts` microbench for the MiniMax TP4 local shape.
+
+Experimental vLLM integration:
+
+```text
+patches/vllm-minimax-llm-scaler-moe-experimental-20260509.patch
+patches/llm-scaler-moe-int4-only-oneapi-sycl-compat-20260509.patch
+```
+
+The integration is opt-in with `VLLM_XPU_USE_LLM_SCALER_MOE=1`. It signs the uint4 expert weights in place with nibble-wise `xor 0x88`, avoiding a duplicate copy of the 62-layer expert weights. It is restricted to FP16 scales/activations because the llm-scaler tiny decode kernel asserts `torch::kHalf`.
+
+Full model results:
+
+```text
+p512/n128, TP4, dtype=float16, VLLM_XPU_USE_LLM_SCALER_MOE=1:
+61.374542 total tok/s, 12.27 output tok/s
+log: /home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n128-20260509T010605Z.log
+json: /home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n128-20260509T010605Z.json
+
+p512/n128, TP4, dtype=float16, VLLM_XPU_USE_LLM_SCALER_MOE=0:
+100.832219 total tok/s, 20.17 output tok/s
+log: /home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n128-20260509T011343Z.log
+json: /home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n128-20260509T011343Z.json
+```
+
+Interpretation: full-model negative as currently integrated. The low-level MoE kernel is promising, but the Python-level routed integration loses the end-to-end benchmark badly, likely because prefill routes through Python-side route/gather work and because the custom path cannot be used only for decode without changing the weight format. Do not enable `VLLM_XPU_USE_LLM_SCALER_MOE=1` for normal runs yet.
+
+Next useful llm-scaler work:
+
+- Add BF16 support to the tiny decode kernels or explicitly benchmark FP16 quality before relying on FP16.
+- Add an unsigned-uint4 variant so vLLM can keep its current weight format and use the custom path only for decode, while preserving the faster existing prefill path.
+- Move the exact N-major routed path into a proper C++/SYCL monolithic op to eliminate Python route/gather overhead for prompt sizes.
+- Re-test full p512/n128 only after one of those changes lands.
+
 ## Open Items
 
 - Continue submitting useful AutoRound records. Current best is `cmox94fsm0095ml01tjeb20rr` with the hybrid B70 MoE config.
 - Keep `MAX_BATCHED_TOKENS=1024` for p512/n128; `512` is a large regression with the current hybrid MoE config.
 - Keep `CCL_ZE_IPC_EXCHANGE=pidfd` as the current vLLM/XPU default; sockets is slower in the p64 smoke and earlier p512 run.
 - Keep `CCL_TOPO_P2P_ACCESS=1`; `0` was slightly slower in the p64 smoke. Treat `CCL_TOPO_FABRIC_VERTEX_CONNECTION_CHECK=0` as neutral/diagnostic because it improved p512 output only from `19.85` to `19.89` tok/s while overriding topology validation.
+- Treat n-gram and GPU n-gram speculative decode as negative for the current MiniMax random single-session harness.
+- Treat native MiniMax MTP as blocked for this checkpoint because no MTP layer tensors are present.
+- Continue the llm-scaler ESIMD INT4 MoE path, but do not enable the current Python-level vLLM integration for production runs. The exact MoE microbench is strongly positive, while the full model path regresses to `12.27` output tok/s.
 - Treat `--enable-expert-parallel` as negative/blocked for TP4 single-session MiniMax on B70. Untuned EP p64/n16 reached only `3.75` output tok/s, and the tuned EP config OOMed during model initialization.
 - Treat `VLLM_XPU_ENABLE_XPU_GRAPH=1` as negative for TP4 MiniMax AutoRound until vLLM can capture communication ops or split capture around collectives.
 - Treat `--enforce-eager` as negative for this path unless the compiled path starts failing; it regressed p64/n16 to `56.113901` total tok/s and `11.22` output tok/s.
