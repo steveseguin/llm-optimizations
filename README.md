@@ -30,7 +30,8 @@ Reproducibility notes, benchmark payloads, and local patches from the Intel Arc 
 - A BF16-capable version of the same MiniMax AutoRound u4 decode path now keeps hidden states in BF16 while still using the custom llm-scaler MoE decode kernels. It fixes the earlier BF16 fallback from `16.860287` to `33.681326` output tok/s at p512/n256, and reaches `36.607699` output tok/s at p512/n512, only about 1.4% behind the FP16 p512/n512 speed reference. LocalMaxxing accepted this BF16 result as `cmoyr84ol000rtl01o4z9fwdm`.
 - MiniMax AutoRound llm-scaler INT4 extension builds must currently use oneAPI 2025.3 for the active PyTorch XPU `libsycl.so.8` runtime. Rebuilding with oneAPI 2026.0 produced a SYCL image-registration segfault on import. Rebuilding the FP16 u4 extension with oneAPI 2025.3 restored the p512/n512 baseline to `36.025` output tok/s. Follow-up toggles were negative: XPU graph requested was disabled for TP communication and fell to `29.562` output tok/s, `CCL_ZE_IPC_EXCHANGE=pidfd` was slightly slower at `35.534`, and `max_model_len=1024` fell to `28.909`.
 - A default-off MiniMax router-logits fusion now imports and passes standalone FP16/BF16 exact-match tests when built with oneAPI 2025.3, and a tiny p1/n8 vLLM smoke ran. The full p512/n512 TP4 run hung after prompt rendering with repeated shared-memory wait messages, so keep `VLLM_XPU_USE_LLM_SCALER_MOE_LOGITS` unset for real benchmarks.
-- MiniMax DFlash speculative decoding is also negative on the current TP4 XPU stack. `MirecX/MiniMax-M2.7-L3H5-DFlash` loads, compiles, shares target embeddings/lm head, and selects the expected target taps `(2, 16, 30, 43, 57)`, but a p64/n16 smoke stalls at the first request and produces no JSON throughput. The drafter card reports `m_accept ~= 1.38`, already below expected break-even, so keep MiniMax optimization focused on non-speculative Q/K collective fusion and MoE decode work for now.
+- MiniMax DFlash speculative decoding is negative on the current TP4 XPU stack. `MirecX/MiniMax-M2.7-L3H5-DFlash` loads, compiles, shares target embeddings/lm head, and selects the expected target taps `(2, 16, 30, 43, 57)`, but retries with `num_speculative_tokens=3` were blocked by KV memory pressure, one Level Zero `UR_RESULT_ERROR_DEVICE_LOST`, and a generation hang after KV allocation. The drafter card reports `m_accept ~= 1.38`, already below expected break-even, so keep MiniMax optimization focused on non-speculative Q/K collective fusion and MoE decode work for now.
+- MiniMax AutoRound EP with a non-local expert skip is functional but not useful yet. Keeping non-local expert ids as `-1` and skipping them inside the llm-scaler u4 kernels only moved a BF16 p1/n8 EP smoke from `16.795602` to `16.883004` total tok/s, far below the stable non-EP BF16 u4 p512/n512 result of `36.607699` output tok/s. Treat EP loss as communication/scheduler/all-to-all dominated until proven otherwise.
 
 ## Layout
 
@@ -74,6 +75,7 @@ Reproducibility notes, benchmark payloads, and local patches from the Intel Arc 
 - `notes/2026-05-09-minimax-bf16-u4-decode.md`: BF16-capable MiniMax AutoRound u4 decode path; restores BF16 speed to near the FP16 reference without forcing FP16 hidden states.
 - `notes/2026-05-09-minimax-oneapi-compiler-compat.md`: oneAPI 2025.3 compiler compatibility finding, FP16 u4 restore, and negative XPU graph / CCL IPC / context-size screens.
 - `notes/2026-05-09-minimax-router-logits-fusion-negative.md`: default-off fused top-2/router logits experiment; standalone math passes, full TP4 vLLM run hangs.
+- `notes/2026-05-09-minimax-ep-skip-and-dflash-update.md`: EP non-local expert skip smoke and updated DFlash speculative retry matrix; both negative for speed.
 - `data/qwen36-fp8-32k-tp4-vs-pp2-20260506.json`: post-reboot Q4 sanity plus FP8 32k-context TP4 vs TP2/PP2 validation.
 - `data/q4-esimd-blockscales-20260506.json`: structured ESIMD block-loaded scale metadata screen.
 - `data/q4-active-device-row-split-20260506.json`: structured active-device row-split patch validation and negative row-split smoke.
@@ -102,6 +104,7 @@ Reproducibility notes, benchmark payloads, and local patches from the Intel Arc 
 - `data/minimax-m27-dflash-speculative-blocker-20260509.json`: structured DFlash load/compile/smoke-stall result.
 - `data/minimax-m27-bf16-u4-decode-20260509.json`: structured BF16 u4 decode results and patch references.
 - `data/minimax-m27-autoround-oneapi2025-recovery-20260509.json`: structured compiler compatibility restore data and follow-up toggle results.
+- `data/minimax-m27-ep-skip-and-dflash-20260509.json`: structured EP skip and DFlash retry matrix.
 - `data/localmaxxing-submission-minimax-m27-autoround-bf16-u4-decode-20260509.json`: LocalMaxxing response for the BF16 u4 decode p512/n512 result.
 - `configs/vllm/minimax-m27-b70-int4-w4a16-moe-hybrid-20260508.json`: hybrid B70 MoE config for MiniMax AutoRound vLLM/XPU, tuned key `1` plus default prompt-size keys.
 - `configs/vllm/minimax-m27-b70-int4-w4a16-moe-ep-negative-20260508.json`: expert-parallel MiniMax MoE config retained as a negative/blocked result after EP underperformed and the tuned-config run OOMed.
@@ -143,6 +146,8 @@ Reproducibility notes, benchmark payloads, and local patches from the Intel Arc 
 - `patches/vllm-minimax-llm-scaler-u4-decode-20260509.patch`: vLLM WNA16 MiniMax gate that enables the llm-scaler u4 path only for tiny FP16 decode batches.
 - `patches/llm-scaler-moe-int4-u4-bf16-decode-20260509.patch`: BF16-capable llm-scaler u4 decode kernel diff.
 - `patches/vllm-minimax-llm-scaler-u4-bf16-decode-20260509.patch`: vLLM WNA16 MiniMax gate update for BF16 decode activations and BF16 checkpoint scales.
+- `patches/vllm-minimax-ep-u4-expert-map-skip-20260509.patch`: vLLM MiniMax WNA16/runner diff including the decode u4 bridge, router/logits gate, and EP non-local expert-map skip.
+- `patches/llm-scaler-minimax-ep-u4-skip-20260509.patch`: llm-scaler MiniMax u4 kernel diff including BF16/logits helpers and `expert < 0` skip handling.
 
 ## Notes
 

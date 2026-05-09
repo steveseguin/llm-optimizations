@@ -1,0 +1,160 @@
+{
+  "date": "2026-05-09",
+  "model": {
+    "hf_id": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+    "local_path": "/mnt/corsair-external/llm-models/minimax-m2.7-int4-autoround",
+    "quantization": "AutoRound INT4 W4A16"
+  },
+  "hardware": {
+    "gpu": "Intel Arc Pro B70",
+    "gpu_count": 4,
+    "vram_gb_per_gpu": 32,
+    "os": "Ubuntu 24.04.4 LTS"
+  },
+  "engine": {
+    "name": "vLLM",
+    "backend": "xpu",
+    "tensor_parallel": 4,
+    "patches": {
+      "vllm": "patches/vllm-minimax-ep-u4-expert-map-skip-20260509.patch",
+      "llm_scaler": "patches/llm-scaler-minimax-ep-u4-skip-20260509.patch"
+    }
+  },
+  "expert_parallel_skip": {
+    "goal": "Keep non-local EP expert ids as -1 and make the llm-scaler tiny u4 kernels skip those rows instead of remapping non-local experts to local expert 0.",
+    "conclusion": "Functional but not useful for speed. The skip path only improved a tiny EP p1/n8 smoke by about 0.5%, so the remaining EP loss is not dominated by wasted non-local expert GEMV work.",
+    "runs": [
+      {
+        "name": "ep_python_map_before_kernel_skip_p1n8",
+        "status": "pass_smoke",
+        "dtype": "bfloat16",
+        "prompt_tokens": 1,
+        "output_tokens": 8,
+        "context_length": 512,
+        "ccl_ipc": "pidfd",
+        "elapsed_s": 0.5358545570052229,
+        "tok_s_total": 16.79560224382356,
+        "tok_s_out_convention": 14.929423216732052,
+        "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p1n8-20260509T220433Z.log",
+        "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p1n8-20260509T220433Z.json"
+      },
+      {
+        "name": "ep_kernel_skip_negative_expert_p1n8",
+        "status": "pass_smoke",
+        "dtype": "bfloat16",
+        "prompt_tokens": 1,
+        "output_tokens": 8,
+        "context_length": 512,
+        "ccl_ipc": "pidfd",
+        "elapsed_s": 0.5330805010162294,
+        "tok_s_total": 16.88300356670896,
+        "tok_s_out_convention": 15.007115808168925,
+        "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p1n8-20260509T221627Z.log",
+        "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p1n8-20260509T221627Z.json"
+      }
+    ],
+    "comparison": {
+      "stable_non_ep_bf16_u4_p512n512_tok_s_out": 36.607699,
+      "stable_non_ep_fp16_u4_p512n512_tok_s_out": 37.136187,
+      "ep_result": "Far below the non-EP custom u4 decode path; do not promote EP until communication/scheduler overhead is solved."
+    }
+  },
+  "dflash_speculative": {
+    "drafter": {
+      "hf_id": "MirecX/MiniMax-M2.7-L3H5-DFlash",
+      "local_path": "/mnt/corsair-external/llm-models/minimax-m2.7-l3h5-dflash",
+      "architecture": "DFlashDraftModel",
+      "reported_m_accept": 1.38,
+      "target_layer_ids": [2, 16, 30, 43, 57]
+    },
+    "quality_note": "DFlash is target-verified speculative decoding. If it completes correctly, accepted tokens preserve target-model output quality. These B70 TP4 attempts did not produce a valid throughput run.",
+    "num_speculative_tokens_choice": "Retried with 3 speculative tokens because verifier rows are likely num_speculative_tokens + 1; this keeps the verifier at 4 rows, matching the current decode-only llm-scaler u4 bridge threshold.",
+    "conclusion": "Not viable on the current vLLM/XPU/Level Zero MiniMax path. Attempts were blocked by KV memory pressure, one Level Zero DEVICE_LOST event, and a generation hang after KV allocation.",
+    "attempts": [
+      {
+        "name": "dflash_p1n32_default_gpu_util_async",
+        "status": "fail_no_kv_memory",
+        "dtype": "bfloat16",
+        "prompt_tokens": 1,
+        "output_tokens": 32,
+        "num_speculative_tokens": 3,
+        "gpu_memory_utilization": "default",
+        "max_model_len": 512,
+        "max_num_batched_tokens": 256,
+        "async_scheduling": true,
+        "available_kv_cache_gib": -0.61,
+        "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p1n32-20260509T222426Z.log"
+      },
+      {
+        "name": "dflash_p1n32_gpu_util_0_98_async",
+        "status": "fail_startup_reservation",
+        "dtype": "bfloat16",
+        "prompt_tokens": 1,
+        "output_tokens": 32,
+        "num_speculative_tokens": 3,
+        "gpu_memory_utilization": 0.98,
+        "max_model_len": 512,
+        "max_num_batched_tokens": 256,
+        "async_scheduling": true,
+        "finding": "Requested utilization exceeded available free memory after model load.",
+        "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p1n32-20260509T223235Z.log"
+      },
+      {
+        "name": "dflash_p1n32_gpu_util_0_93_async",
+        "status": "fail_device_lost",
+        "dtype": "bfloat16",
+        "prompt_tokens": 1,
+        "output_tokens": 32,
+        "num_speculative_tokens": 3,
+        "gpu_memory_utilization": 0.93,
+        "max_model_len": 512,
+        "max_num_batched_tokens": 256,
+        "async_scheduling": true,
+        "available_kv_cache_gib": 0.23,
+        "gpu_kv_cache_tokens": 3648,
+        "error": "UR_RESULT_ERROR_DEVICE_LOST in WorkerAsyncOutputCopy",
+        "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p1n32-20260509T223320Z.log"
+      },
+      {
+        "name": "dflash_p1n32_gpu_util_0_93_no_async",
+        "status": "fail_no_kv_memory",
+        "dtype": "bfloat16",
+        "prompt_tokens": 1,
+        "output_tokens": 32,
+        "num_speculative_tokens": 3,
+        "gpu_memory_utilization": 0.93,
+        "max_model_len": 512,
+        "max_num_batched_tokens": 256,
+        "async_scheduling": false,
+        "available_kv_cache_gib": -0.29,
+        "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p1n32-20260509T224356Z.log"
+      },
+      {
+        "name": "dflash_p1n8_gpu_util_0_95_no_async_small_batch",
+        "status": "killed_generation_hang",
+        "dtype": "bfloat16",
+        "prompt_tokens": 1,
+        "output_tokens": 8,
+        "num_speculative_tokens": 3,
+        "gpu_memory_utilization": 0.95,
+        "max_model_len": 512,
+        "max_num_batched_tokens": 64,
+        "async_scheduling": false,
+        "available_kv_cache_gib": 0.36,
+        "gpu_kv_cache_tokens": 5696,
+        "finding": "Target and drafter loaded, KV cache allocated, then generation stayed at 0/1 prompts with workers busy until killed.",
+        "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p1n8-20260509T225220Z.log"
+      }
+    ]
+  },
+  "localmaxxing": {
+    "submitted": false,
+    "reason": "The EP skip result is a tiny smoke-only negative and DFlash produced no valid throughput result."
+  },
+  "next_steps": [
+    "Do not run more DFlash until a runtime or vLLM speculative-code change gives a new reason to retry.",
+    "Keep VLLM_XPU_USE_LLM_SCALER_MOE_LOGITS unset for real MiniMax benchmarks.",
+    "Return to the non-EP custom u4 decode path and profile MoE vs attention vs TP communication in a stable p512/n512 BF16 run.",
+    "Reduce iteration time by moving the AutoRound safetensors from the external NTFS drive to NVMe or by adding enough RAM for filesystem cache."
+  ]
+}
