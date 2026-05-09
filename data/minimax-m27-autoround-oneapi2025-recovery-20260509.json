@@ -1,0 +1,68 @@
+{
+  "date": "2026-05-09",
+  "model": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+  "hardware": "4x Intel Arc Pro B70 32GB",
+  "engine": "vLLM XPU with llm-scaler unsigned-u4 MoE decode patch",
+  "finding": "Build the llm-scaler INT4 extension with oneAPI 2025.3 for the active PyTorch XPU libsycl.so.8 runtime. oneAPI 2026.0-built extension images segfaulted at SYCL image registration on import.",
+  "build": {
+    "working_compiler_env": "/opt/intel/oneapi/compiler/2025.3/env/vars.sh",
+    "failed_compiler_env": "/opt/intel/oneapi/compiler/2026.0/env/vars.sh",
+    "script": "scripts/build-llm-scaler-moe-int4-xpu.sh",
+    "working_build_log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/build-moe-int4-u4-fp16-oneapi2025-20260509T201900Z.log"
+  },
+  "runs": [
+    {
+      "name": "fp16_u4_restored_baseline",
+      "prompt_tokens": 512,
+      "output_tokens": 512,
+      "context_length": 2048,
+      "xpu_graph": false,
+      "ccl_ipc": "default",
+      "elapsed_s": 14.21230979199754,
+      "tok_s_total": 72.05021667741713,
+      "tok_s_out": 36.025108338708565,
+      "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n512-20260509T202757Z.log",
+      "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n512-20260509T202757Z.json"
+    },
+    {
+      "name": "xpu_graph_requested_negative",
+      "prompt_tokens": 512,
+      "output_tokens": 512,
+      "context_length": 2048,
+      "xpu_graph": true,
+      "ccl_ipc": "default",
+      "elapsed_s": 17.319281799020246,
+      "tok_s_total": 59.12485355241046,
+      "tok_s_out": 29.56242677620523,
+      "notes": "vLLM disabled graph capture because TP communication ops are present.",
+      "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n512-20260509T203505Z.log",
+      "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n512-20260509T203505Z.json"
+    },
+    {
+      "name": "ccl_ipc_pidfd_negative",
+      "prompt_tokens": 512,
+      "output_tokens": 512,
+      "context_length": 2048,
+      "xpu_graph": false,
+      "ccl_ipc": "pidfd",
+      "elapsed_s": 14.408902395982295,
+      "tok_s_total": 71.06717582357466,
+      "tok_s_out": 35.53358791178733,
+      "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n512-20260509T204253Z.log",
+      "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n512-20260509T204253Z.json"
+    },
+    {
+      "name": "max_model_len_1024_negative",
+      "prompt_tokens": 512,
+      "output_tokens": 512,
+      "context_length": 1024,
+      "xpu_graph": false,
+      "ccl_ipc": "default",
+      "elapsed_s": 17.710530281008687,
+      "tok_s_total": 57.818709194611365,
+      "tok_s_out": 28.909354597305683,
+      "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n512-20260509T205002Z.log",
+      "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n512-20260509T205002Z.json"
+    }
+  ]
+}
