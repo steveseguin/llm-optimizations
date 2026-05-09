@@ -1,0 +1,69 @@
+{
+  "date": "2026-05-09",
+  "model": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+  "hardware": "4x Intel Arc Pro B70 32GB",
+  "engine": "vLLM XPU with llm-scaler unsigned-u4 MoE decode path",
+  "experiment": "Decode-only router-logits fusion for MiniMax M2.7 AutoRound INT4 MoE",
+  "conclusion": "Do not promote. The decode-only logits path is functional with pidfd IPC but is slower than the stable explicit-router u4 decode path.",
+  "patches": {
+    "vllm": "patches/vllm-minimax-router-logits-decodeonly-20260509.patch",
+    "llm_scaler": "patches/llm-scaler-minimax-u4-logits-20260509.patch"
+  },
+  "runs": [
+    {
+      "name": "decode_only_logits_default_ipc_p1n8",
+      "status": "killed_hang",
+      "prompt_tokens": 1,
+      "output_tokens": 8,
+      "context_length": 512,
+      "tp": 4,
+      "dtype": "float16",
+      "ccl_ipc": "default",
+      "xpu_graph": false,
+      "finding": "Rank 1 spun in libze_intel_gpu.so.1/urEventWait while peers waited.",
+      "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p1n8-20260509T212818Z.log"
+    },
+    {
+      "name": "decode_only_logits_pidfd_p1n8",
+      "status": "pass_smoke",
+      "prompt_tokens": 1,
+      "output_tokens": 8,
+      "context_length": 512,
+      "tp": 4,
+      "dtype": "float16",
+      "ccl_ipc": "pidfd",
+      "xpu_graph": false,
+      "elapsed_s": 0.49350876396056265,
+      "tok_s_total": 18.23675820419515,
+      "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p1n8-20260509T213628Z.log",
+      "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p1n8-20260509T213628Z.json"
+    },
+    {
+      "name": "decode_only_logits_pidfd_p512n512",
+      "status": "pass_negative",
+      "prompt_tokens": 512,
+      "output_tokens": 512,
+      "context_length": 2048,
+      "tp": 4,
+      "dtype": "float16",
+      "ccl_ipc": "pidfd",
+      "xpu_graph": false,
+      "elapsed_s": 14.530657930008601,
+      "tok_s_total": 70.47168854517201,
+      "tok_s_out_equal_prompt_output_convention": 35.235844272586005,
+      "baseline_best_tok_s_total": 73.215399,
+      "baseline_best_tok_s_out": 36.607699,
+      "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n512-20260509T214336Z.log",
+      "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n512-20260509T214336Z.json"
+    }
+  ],
+  "next_steps": [
+    "Keep VLLM_XPU_USE_LLM_SCALER_MOE_LOGITS unset for normal benchmarks.",
+    "Prioritize reducing TP/attention communication and model-load overhead before revisiting router fusion.",
+    "If revisited, profile per-layer timing around router_select, quant_apply, and the logits bridge to confirm whether router glue is large enough to justify a fused helper."
+  ],
+  "localmaxxing": {
+    "submitted": false,
+    "reason": "Valid negative experiment, but not a useful leaderboard result because it is slower than already-submitted stable u4 decode runs."
+  }
+}
