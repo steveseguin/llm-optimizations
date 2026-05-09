@@ -256,7 +256,90 @@
       "localmaxxingResponse": "/home/steve/bench-results/localmaxxing-minimax-m27-autoround-u4-decode-default-ipc-p512n512-20260509.response.json",
       "outcome": "improved/best steady-state decode validation",
       "details": "Same TP4/default-IPC/u4 decode path as the p512/n256 current best, but with a longer generation window. Output throughput rose to 37.14 tok/s, showing the fixed prompt/setup portion is still diluting shorter-output measurements."
+    },
+    {
+      "label": "u4_decode_only_default_ipc_dcp2_p512n512_blocked",
+      "promptTokens": 512,
+      "outputTokens": 512,
+      "contextLength": 2048,
+      "parallelism": {
+        "tensorParallel": 4,
+        "decodeContextParallel": 2
+      },
+      "outcome": "blocked",
+      "details": "vLLM rejects decode-context parallelism before model load for this MiniMax GQA/MQA config: tensor parallel size 4 must be greater than total num kv heads 8.",
+      "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n512-20260509T115732Z.log",
+      "submitted": false
+    },
+    {
+      "label": "u4_decode_only_default_ipc_max_model_len_4096_p512n512_negative",
+      "promptTokens": 512,
+      "outputTokens": 512,
+      "contextLength": 4096,
+      "tokSOut": 29.787984,
+      "tokSTotal": 59.575969,
+      "enabledMoeLayers": 62,
+      "peakVramGb": 28.11,
+      "elapsedSeconds": 17.188138523022644,
+      "env": {
+        "CCL_ZE_IPC_EXCHANGE": "unset/default",
+        "CCL_TOPO_P2P_ACCESS": "1"
+      },
+      "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n512-20260509T115815Z.log",
+      "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n512-20260509T115815Z.json",
+      "submitted": false,
+      "outcome": "negative/slower",
+      "details": "Increasing MAX_MODEL_LEN from 2048 to 4096 reduced p512/n512 output throughput. vLLM again reported only 0.56 GiB available KV cache memory, while the best MAX_MODEL_LEN=2048 run reported 1.02 GiB."
+    },
+    {
+      "label": "u4_decode_only_default_ipc_async_engine_p512n512_neutral",
+      "promptTokens": 512,
+      "outputTokens": 512,
+      "contextLength": 2048,
+      "tokSOut": 36.807084,
+      "tokSTotal": 73.614167,
+      "elapsedSeconds": 13.910365891002584,
+      "env": {
+        "CCL_ZE_IPC_EXCHANGE": "unset/default",
+        "CCL_TOPO_P2P_ACCESS": "1"
+      },
+      "extraArgs": "--async-engine",
+      "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n512-20260509T120721Z.log",
+      "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n512-20260509T120721Z.json",
+      "submitted": false,
+      "outcome": "neutral/slightly slower",
+      "details": "The async-engine benchmark path did not improve single-session p512/n512 throughput versus the default LLM benchmark path."
+    },
+    {
+      "label": "u4_decode_only_default_ipc_disable_detokenize_p512n512_neutral",
+      "promptTokens": 512,
+      "outputTokens": 512,
+      "contextLength": 2048,
+      "tokSOut": 37.124066,
+      "tokSTotal": 74.248133,
+      "elapsedSeconds": 13.791592606983613,
+      "env": {
+        "CCL_ZE_IPC_EXCHANGE": "unset/default",
+        "CCL_TOPO_P2P_ACCESS": "1"
+      },
+      "extraArgs": "--disable-detokenize",
+      "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n512-20260509T121428Z.log",
+      "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n512-20260509T121428Z.json",
+      "submitted": false,
+      "outcome": "neutral",
+      "details": "Disabling detokenization was effectively identical to the best p512/n512 result, so tokenizer/detokenizer overhead is not the bottleneck in this harness."
+    },
+    {
+      "label": "u4_decode_only_default_ipc_kv_fp8_inc_p512n512_blocked",
+      "promptTokens": 512,
+      "outputTokens": 512,
+      "contextLength": 2048,
+      "kvCacheDtype": "fp8_inc",
+      "outcome": "blocked",
+      "details": "vLLM accepted --kv-cache-dtype fp8_inc and logged the accuracy-warning path, but XPU worker initialization failed with Unsupported data type of kv cache: fp8_inc.",
+      "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n512-20260509T122140Z.log",
+      "submitted": false
     }
   ],
-  "conclusion": "The useful MiniMax path is reducing decode MoE and communication overhead rather than n-gram speculation. The unsigned llm-scaler tiny MoE decode path improves p512/n128 from 20.17 to 29.75 output tok/s, p512/n256 initially reached 33.03 output tok/s, removing the per-layer FP32-to-FP16 router-weight cast improved p512/n256 to 34.16 output tok/s, and leaving CCL_ZE_IPC_EXCHANGE at the oneCCL default improved it again to 34.58 output tok/s. A longer p512/n512 run with the same best path reached 37.14 output tok/s, making it the best current steady-state MiniMax AutoRound decode result. Speculative ngram_gpu remains blocked/negative on this TP4 XPU harness; PP2/TP2, CCL USM, and MAX_MODEL_LEN=1024 are negative."
+  "conclusion": "The useful MiniMax path is reducing decode MoE and communication overhead rather than n-gram speculation. The unsigned llm-scaler tiny MoE decode path improves p512/n128 from 20.17 to 29.75 output tok/s, p512/n256 initially reached 33.03 output tok/s, removing the per-layer FP32-to-FP16 router-weight cast improved p512/n256 to 34.16 output tok/s, and leaving CCL_ZE_IPC_EXCHANGE at the oneCCL default improved it again to 34.58 output tok/s. A longer p512/n512 run with the same best path reached 37.14 output tok/s, making it the best current steady-state MiniMax AutoRound decode result. Speculative ngram_gpu remains blocked/negative on this TP4 XPU harness; PP2/TP2, CCL USM, MAX_MODEL_LEN=1024, MAX_MODEL_LEN=4096, and async-engine are negative/neutral. DCP is blocked by TP4 versus 8 KV heads, detokenization is not the bottleneck, and XPU KV fp8_inc is unsupported in this stack."
 }

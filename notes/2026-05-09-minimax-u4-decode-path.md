@@ -16,6 +16,9 @@ The unsigned llm-scaler INT4 tiny-MoE path is now the best MiniMax AutoRound TP4
 | unsigned llm-scaler decode-only + FP32 route weights + default CCL IPC | 512/256 | 34.578045 | 103.734136 | current best |
 | unsigned llm-scaler decode-only + default CCL IPC + `MAX_MODEL_LEN=1024` | 512/256 | 24.269656 | 72.808968 | negative compile-profile comparison |
 | unsigned llm-scaler decode-only + FP32 route weights + default CCL IPC | 512/512 | 37.136187 | 74.272373 | best steady-state decode validation |
+| unsigned llm-scaler decode-only + default CCL IPC + `MAX_MODEL_LEN=4096` | 512/512 | 29.787984 | 59.575969 | negative compile/KV-profile comparison |
+| unsigned llm-scaler decode-only + default CCL IPC + async engine | 512/512 | 36.807084 | 73.614167 | neutral/slightly slower |
+| unsigned llm-scaler decode-only + default CCL IPC + detokenize disabled | 512/512 | 37.124066 | 74.248133 | neutral; detokenization is not the bottleneck |
 
 Key log:
 
@@ -147,6 +150,22 @@ The run was stopped without JSON throughput output. Keep `CCL_TOPO_P2P_ACCESS=1`
 PP2 x TP2 was tested as a four-GPU layout that reduces tensor parallel degree from 4 to 2 while keeping model memory around `28.0 GiB` per card. It fits and runs, but p512/n256 drops to `17.550271` output tok/s. For batch-1 single-session latency, pipeline bubbles and larger per-rank work dominate any reduction in TP collective degree. Keep TP4/PP1 for this model.
 
 Reducing `MAX_MODEL_LEN` from `2048` to `1024` was also negative on the current best TP4/default-IPC path. The p512/n256 run dropped from `34.578045` to `24.269656` output tok/s even though the prompt plus output fits within 1024 tokens. vLLM compiled a `(1, 1024)` graph/range and reported only `0.56 GiB` available KV cache memory after loading; for this model, keep `MAX_MODEL_LEN=2048`.
+
+Increasing `MAX_MODEL_LEN` from `2048` to `4096` was also negative for p512/n512. It produced `29.787984` output tok/s and `59.575969` total tok/s, with vLLM again reporting only `0.56 GiB` available KV cache memory. The current useful profile remains `MAX_MODEL_LEN=2048`, which reported `1.02 GiB` available KV cache memory and reached `37.136187` output tok/s.
+
+`--decode-context-parallel-size 2` is blocked for this four-GPU MiniMax run. vLLM rejects the config before model load:
+
+```text
+tensor parallel size 4 must be greater than total num kv heads 8 when enable decode context parallel for GQA/MQA
+```
+
+`--async-engine` is neutral/slightly negative at p512/n512: `36.807084` output tok/s versus `37.136187` for the default LLM benchmark path. `--disable-detokenize` is neutral at `37.124066` output tok/s, so detokenization overhead is not the meaningful bottleneck.
+
+`--kv-cache-dtype fp8_inc` is blocked on this XPU stack. vLLM accepts the argument and logs its accuracy warning, but worker initialization fails with:
+
+```text
+Unsupported data type of kv cache: fp8_inc
+```
 
 ## Next Work
 
