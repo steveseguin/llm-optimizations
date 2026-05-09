@@ -168,6 +168,28 @@
       "details": "USM mode reached model load and initial profiling/warmup, then repeatedly logged no available shared memory broadcast block for 60s intervals. Run was stopped; no JSON throughput output. Keep CCL_TOPO_P2P_ACCESS=1 for this MiniMax vLLM TP4 path.",
       "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n256-20260509T110741Z.log",
       "submitted": false
+    },
+    {
+      "label": "u4_decode_only_pp2_tp2_p512n256_negative",
+      "promptTokens": 512,
+      "outputTokens": 256,
+      "contextLength": 2048,
+      "tokSOut": 17.550271,
+      "tokSTotal": 52.650812,
+      "enabledMoeLayersLoggedOnPP0": 31,
+      "peakVramGb": 28.0,
+      "elapsedSeconds": 14.58666957897367,
+      "parallelism": {
+        "pipelineParallel": 2,
+        "tensorParallel": 2
+      },
+      "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp2-p512n256-20260509T111942Z.log",
+      "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp2-p512n256-20260509T111942Z.json",
+      "localmaxxingPayload": "data/localmaxxing-minimax-m27-autoround-u4-decode-pp2tp2-p512n256-20260509.payload.json",
+      "localmaxxingId": "cmoy9exmf003lmk01d3it9cz2",
+      "localmaxxingResponse": "/home/steve/bench-results/localmaxxing-minimax-m27-autoround-u4-decode-pp2tp2-p512n256-20260509.response.json",
+      "outcome": "negative/slower",
+      "details": "PP2 x TP2 uses all four B70s and fits, but is much slower than TP4 at batch 1. Reduced TP collective degree does not offset pipeline bubbles and larger per-rank compute."
     }
   ],
   "conclusion": "The useful MiniMax path is reducing decode MoE cost rather than n-gram speculation. The unsigned llm-scaler tiny MoE decode path improves p512/n128 from 20.17 to 29.75 output tok/s, p512/n256 initially reached 33.03 output tok/s, and removing the per-layer FP32-to-FP16 router-weight cast improved p512/n256 again to 34.16 output tok/s. Speculative ngram_gpu remains blocked/negative on this TP4 XPU harness."

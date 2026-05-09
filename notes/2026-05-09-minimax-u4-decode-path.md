@@ -12,6 +12,7 @@ The unsigned llm-scaler INT4 tiny-MoE path is now the best MiniMax AutoRound TP4
 | unsigned llm-scaler decode-only | 512/128 | 29.74843 | 148.742151 | current best |
 | unsigned llm-scaler decode-only | 512/256 | 33.033788 | 99.101363 | steady decode validation |
 | unsigned llm-scaler decode-only + FP32 route weights | 512/256 | 34.157842 | 102.473527 | avoids per-layer router-weight cast |
+| unsigned llm-scaler decode-only + PP2/TP2 | 512/256 | 17.550271 | 52.650812 | negative topology comparison |
 
 Key log:
 
@@ -24,6 +25,9 @@ Throughput: 0.13 requests/s, 99.10 total tokens/s, 33.03 output tokens/s
 
 /home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n256-20260509T105353Z.log
 Throughput: 0.13 requests/s, 102.47 total tokens/s, 34.16 output tokens/s
+
+/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp2-p512n256-20260509T111942Z.log
+Throughput: 0.07 requests/s, 52.65 total tokens/s, 17.55 output tokens/s
 ```
 
 ## What Changed
@@ -100,6 +104,7 @@ LocalMaxxing:
 - `cmoxptkfd00hsml01hf2ajhhp`: p512/n128, `29.74843` output tok/s.
 - `cmoxq7cww00i8ml019ihbeqc9`: p512/n256, `33.033788` output tok/s.
 - `cmoy8hs3n002smk01ksgcpavr`: p512/n256 with FP32 route weights, `34.157842` output tok/s.
+- `cmoy9exmf003lmk01d3it9cz2`: p512/n256 PP2/TP2 negative, `17.550271` output tok/s.
 
 ## Negative Follow-Up
 
@@ -120,6 +125,8 @@ No available shared memory broadcast block found in 60 seconds.
 ```
 
 The run was stopped without JSON throughput output. Keep `CCL_TOPO_P2P_ACCESS=1` for this MiniMax vLLM TP4 path.
+
+PP2 x TP2 was tested as a four-GPU layout that reduces tensor parallel degree from 4 to 2 while keeping model memory around `28.0 GiB` per card. It fits and runs, but p512/n256 drops to `17.550271` output tok/s. For batch-1 single-session latency, pipeline bubbles and larger per-rank work dominate any reduction in TP collective degree. Keep TP4/PP1 for this model.
 
 ## Next Work
 
