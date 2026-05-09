@@ -105,6 +105,14 @@ LocalMaxxing:
 
 `CCL_TOPO_FABRIC_VERTEX_CONNECTION_CHECK=0` was retested on the p512/n256 u4 decode path. It reached `32.726761` output tok/s and `98.180284` total tok/s, slightly below the default-topology `33.033788` output tok/s result. Keep default oneCCL topology recognition for this MiniMax path.
 
+`VLLM_XPU_ENABLE_XPU_GRAPH=1` is not applicable to the TP4 path right now. vLLM logs this before benchmarking:
+
+```text
+XPU Graph doesn't support capture communication ops, disabling cudagraph_mode.
+```
+
+The run was stopped during shard loading after that warning because the engine config had already fallen back to `cudagraph_mode=NONE`.
+
 ## Next Work
 
 The next useful optimization path is to reduce the remaining decode overhead around the same MiniMax MoE path:
@@ -112,5 +120,5 @@ The next useful optimization path is to reduce the remaining decode overhead aro
 - move more route/gather/top-k handling into the custom op so Python/vLLM glue does less per layer;
 - add a BF16-capable variant so the path can run without forcing FP16 activations;
 - inspect TP4 allreduce/attention decode cost now that MoE is less dominant;
-- retest XPU graph capture with the u4 path once the current correctness boundary is stable;
+- revisit XPU graph only if vLLM adds communication-op capture support or if we test a non-TP decode path;
 - consider a larger-batch version only if it does not pull prompt/prefill back onto a tiny-M kernel.

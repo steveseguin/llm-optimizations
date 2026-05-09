@@ -142,6 +142,19 @@
       "localmaxxingResponse": "/home/steve/bench-results/localmaxxing-minimax-m27-autoround-u4-decode-fp32-route-p512n256-20260509.response.json",
       "change": "llm-scaler tiny u4 down kernel accepts FP32 topk route weights directly; vLLM bridge stops casting topk_weights to FP16 for every decode-layer call",
       "outcome": "improved"
+    },
+    {
+      "label": "u4_decode_only_xpu_graph_tp4_not_applicable",
+      "promptTokens": 512,
+      "outputTokens": 256,
+      "contextLength": 2048,
+      "env": {
+        "VLLM_XPU_ENABLE_XPU_GRAPH": "1"
+      },
+      "outcome": "not_applicable",
+      "details": "vLLM/XPU disables graph capture for this TP4 run before benchmarking: XPU Graph does not support capture communication ops, so cudagraph_mode is set to NONE. Run was stopped during shard loading; no JSON throughput output.",
+      "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n256-20260509T110313Z.log",
+      "submitted": false
     }
   ],
   "conclusion": "The useful MiniMax path is reducing decode MoE cost rather than n-gram speculation. The unsigned llm-scaler tiny MoE decode path improves p512/n128 from 20.17 to 29.75 output tok/s, p512/n256 initially reached 33.03 output tok/s, and removing the per-layer FP32-to-FP16 router-weight cast improved p512/n256 again to 34.16 output tok/s. Speculative ngram_gpu remains blocked/negative on this TP4 XPU harness."
