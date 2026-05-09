@@ -559,7 +559,70 @@
       "outcome": "negative/slower",
       "qualityRisk": "FP16 router math can alter expert selection, so this is not a quality-preserving optimization unless separately validated.",
       "details": "The experiment precomputes FP16 copies of MiniMax gate weights after model load, computes router logits with FP16 linear, then casts logits back to FP32 for the existing top-k path. It regressed throughput substantially, so keep the default FP32 router."
+    },
+    {
+      "label": "u4_decode_only_default_ipc_xpu_decode_timing_p512n8_diagnostic",
+      "promptTokens": 512,
+      "outputTokens": 8,
+      "contextLength": 2048,
+      "env": {
+        "VLLM_XPU_DECODE_TIMING": "1",
+        "VLLM_XPU_DECODE_TIMING_RANK": "0",
+        "VLLM_XPU_DECODE_TIMING_PRINT_EVERY": "1",
+        "CCL_ZE_IPC_EXCHANGE": "unset/default",
+        "CCL_TOPO_P2P_ACCESS": "1"
+      },
+      "tokSTotal": 122.993979,
+      "elapsedSeconds": 4.227849227027036,
+      "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n8-20260509T143536Z.log",
+      "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n8-20260509T143536Z.json",
+      "patch": "patches/vllm-xpu-decode-timing-and-qk-contig-20260509.patch",
+      "submitted": false,
+      "outcome": "diagnostic_only",
+      "details": "Short run with per-step logging; do not treat as a throughput benchmark. Steady decode on rank 0 settled at roughly 26.5-26.9 ms for runner.forward, while runner.preprocess and runner.postprocess were sub-ms. The llm-scaler bridge prints around 0.018-0.022 ms for steady calls, so the remaining ceiling is inside compiled model forward rather than vLLM request scheduling."
+    },
+    {
+      "label": "u4_decode_only_default_ipc_enforce_eager_timing_p512n4_diagnostic",
+      "promptTokens": 512,
+      "outputTokens": 4,
+      "contextLength": 2048,
+      "extraArgs": "--enforce-eager",
+      "env": {
+        "VLLM_XPU_DECODE_TIMING": "1",
+        "VLLM_XPU_DECODE_TIMING_RANK": "0",
+        "VLLM_XPU_DECODE_TIMING_PRINT_EVERY": "1",
+        "CCL_ZE_IPC_EXCHANGE": "unset/default",
+        "CCL_TOPO_P2P_ACCESS": "1"
+      },
+      "tokSTotal": 491.072892,
+      "elapsedSeconds": 1.0507605040329508,
+      "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n4-20260509T144519Z.log",
+      "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n4-20260509T144519Z.json",
+      "patch": "patches/vllm-xpu-decode-timing-and-qk-contig-20260509.patch",
+      "submitted": false,
+      "outcome": "diagnostic_only",
+      "details": "Eager mode is much slower and changes execution, but it exposes hooks hidden by torch.compile. Per-layer steady p50 timings on rank 0 were roughly qkv 0.034 ms, qk_norm 0.247 ms, rope 0.018 ms, kv_attention 0.098 ms, o_proj 0.092 ms, router_linear 0.073 ms, experts_total 0.145 ms, with TP allreduce.direct p50 about 0.047 ms and about three allreduce calls per layer. This points toward Q/K norm plus collectives as an XPU fusion target."
+    },
+    {
+      "label": "u4_decode_only_default_ipc_qk_contiguous_p512n256_negative",
+      "promptTokens": 512,
+      "outputTokens": 256,
+      "contextLength": 2048,
+      "tokSOut": 33.92,
+      "tokSTotal": 101.765371,
+      "elapsedSeconds": 7.546771497000009,
+      "env": {
+        "VLLM_MINIMAX_QK_CONTIG": "1",
+        "CCL_ZE_IPC_EXCHANGE": "unset/default",
+        "CCL_TOPO_P2P_ACCESS": "1"
+      },
+      "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n256-20260509T145504Z.log",
+      "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n256-20260509T145504Z.json",
+      "patch": "patches/vllm-xpu-decode-timing-and-qk-contig-20260509.patch",
+      "submitted": false,
+      "outcome": "negative/slower",
+      "details": "Exact-math opt-in experiment that makes packed-QKV q/k views contiguous before MiniMax Q/K allreduce+RMSNorm. It regressed versus the p512/n256 default-IPC baseline of 34.578045 output tok/s, so non-contiguous Q/K views are not the main current bottleneck."
     }
   ],
-  "conclusion": "The useful MiniMax path is reducing decode MoE and communication overhead rather than n-gram speculation. The unsigned llm-scaler tiny MoE decode path improves p512/n128 from 20.17 to 29.75 output tok/s, p512/n256 initially reached 33.03 output tok/s, removing the per-layer FP32-to-FP16 router-weight cast improved p512/n256 to 34.16 output tok/s, and leaving CCL_ZE_IPC_EXCHANGE at the oneCCL default improved it again to 34.58 output tok/s. A longer p512/n512 run with the same best path reached 37.14 output tok/s, making it the best current steady-state MiniMax AutoRound decode result. Speculative ngram_gpu remains blocked/negative on this TP4 XPU harness; PP2/TP2, CCL USM, MAX_MODEL_LEN=1024, MAX_MODEL_LEN=4096, async-engine, XPU graph mode with fixed KV, Triton attention, block-size 128, and FP16 router are negative/neutral. DCP is blocked by TP4 versus 8 KV heads, detokenization is not the bottleneck, XPU KV fp8_inc is unsupported, and built-in torch profiling stalls. Standalone pidfd XCCL allreduce is about 15 us at MiniMax hidden-state payload sizes, so the remaining bottleneck is not raw small allreduce latency alone."
+  "conclusion": "The useful MiniMax path is reducing decode MoE and communication overhead rather than n-gram speculation. The unsigned llm-scaler tiny MoE decode path improves p512/n128 from 20.17 to 29.75 output tok/s, p512/n256 initially reached 33.03 output tok/s, removing the per-layer FP32-to-FP16 router-weight cast improved p512/n256 to 34.16 output tok/s, and leaving CCL_ZE_IPC_EXCHANGE at the oneCCL default improved it again to 34.58 output tok/s. A longer p512/n512 run with the same best path reached 37.14 output tok/s, making it the best current steady-state MiniMax AutoRound decode result. The latest diagnostics show steady compiled decode is about 26.9 ms inside runner.forward; scheduling/postprocess are sub-ms, eager timing points at Q/K norm plus repeated TP collectives as a real fusion target, and making Q/K slices contiguous is negative. Speculative ngram_gpu remains blocked/negative on this TP4 XPU harness; PP2/TP2, CCL USM, MAX_MODEL_LEN=1024, MAX_MODEL_LEN=4096, async-engine, XPU graph mode with fixed KV, Triton attention, block-size 128, FP16 router, and Q/K contiguous copies are negative/neutral. DCP is blocked by TP4 versus 8 KV heads, detokenization is not the bottleneck, XPU KV fp8_inc is unsupported, and built-in torch profiling stalls. Standalone pidfd XCCL allreduce is about 15 us at MiniMax hidden-state payload sizes, so the remaining bottleneck is not raw small allreduce latency alone."
 }

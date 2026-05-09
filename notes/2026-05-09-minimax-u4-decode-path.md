@@ -277,12 +277,52 @@ max wait: 2.051210 ms
 
 At median timing, one up plus one down tiny-MoE launch is roughly `0.09 ms` per MoE layer on a rank. Across MiniMax's 62 MoE layers that is around `5.5 ms/token` of kernel wait in isolation. That is meaningful, but it is still far below the approximately `26.9 ms/token` implied by the best p512/n512 result, so the next work should not assume MoE matvec alone is the entire remaining ceiling. The likely targets are now the per-layer bridge/router path, attention/KV, and graph/scheduler gaps around TP execution.
 
+An additional vLLM timing patch adds opt-in decode timers behind `VLLM_XPU_DECODE_TIMING=1`. The first compiled p512/n8 diagnostic is not a throughput result because it prints every step, but it usefully separates vLLM scheduler overhead from compiled model work:
+
+```text
+/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n8-20260509T143536Z.log
+runner.forward steady decode: about 26.5-26.9 ms on rank 0
+runner.preprocess steady decode: about 0.3-0.5 ms
+runner.postprocess steady decode: about 0.18-0.19 ms
+moe.llm_scaler_u4_bridge steady calls: about 0.018-0.022 ms
+```
+
+This confirms the main remaining ceiling is inside the compiled model forward, not request scheduling or output postprocess.
+
+An eager-only timing pass exposes the Python-level model boundaries that torch.compile hides:
+
+```text
+/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n4-20260509T144519Z.log
+steady p50 per-layer rank-0 timings:
+qkv ~0.034 ms
+qk_norm ~0.247 ms
+rope ~0.018 ms
+kv_attention ~0.098 ms
+o_proj ~0.092 ms
+router_linear ~0.073 ms
+experts_total ~0.145 ms
+tp.all_reduce.direct ~0.047 ms, about three calls per layer
+```
+
+Eager mode changes the execution and is much slower, so the absolute numbers are not a compiled-path profile. The useful signal is the shape of the work: MiniMax Q/K norm plus repeated TP collectives is a credible XPU fusion target. This matches the existing CUDA-only `minimax_allreduce_rms_qk` path in the vLLM tree, but that op is absent from the XPU build.
+
+An exact-math Q/K contiguous-slice experiment was then tested:
+
+```text
+VLLM_MINIMAX_QK_CONTIG=1
+/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n256-20260509T145504Z.log
+Throughput: 0.13 requests/s, 101.77 total tokens/s, 33.92 output tokens/s
+```
+
+This is slower than the default-IPC p512/n256 baseline of `34.578045` output tok/s, so forcing contiguous Q/K copies is not the right fix. Keep it only as a negative reproducibility switch in `patches/vllm-xpu-decode-timing-and-qk-contig-20260509.patch`.
+
 ## Next Work
 
 The next useful optimization path is to reduce the remaining decode overhead around the same MiniMax MoE path:
 
 - move more route/gather/top-k handling into the custom op so Python/vLLM glue does less per layer;
 - add a BF16-capable variant so the path can run without forcing FP16 activations;
+- prototype an XPU equivalent of the CUDA-only MiniMax `minimax_allreduce_rms_qk` fusion, or at least fuse Q/K variance, small allreduce, and RMS scaling more tightly than the current PyTorch graph;
 - inspect TP4 allreduce/attention decode cost now that MoE is less dominant;
 - add cleaner per-rank/per-process timers around the custom MoE bridge and vLLM attention call sites, because the first kernel-only trace shows matvec wait is only part of the decode step;
 - revisit XPU graph only if vLLM adds communication-op capture support or if we test a non-TP decode path;

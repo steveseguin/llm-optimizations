@@ -1,0 +1,792 @@
+diff --git a/vllm/distributed/communication_op.py b/vllm/distributed/communication_op.py
+index 5ad99e4e1..4ff3c0c9c 100644
+--- a/vllm/distributed/communication_op.py
++++ b/vllm/distributed/communication_op.py
+@@ -6,12 +6,15 @@ from typing import Any
+ import torch
+ import torch.distributed
+ 
++from vllm.utils.xpu_decode_timing import timed_region
++
+ from .parallel_state import get_tp_group
+ 
+ 
+ def tensor_model_parallel_all_reduce(input_: torch.Tensor) -> torch.Tensor:
+     """All-reduce the input tensor across model parallel group."""
+-    return get_tp_group().all_reduce(input_)
++    with timed_region("tp.all_reduce"):
++        return get_tp_group().all_reduce(input_)
+ 
+ 
+ def tensor_model_parallel_all_gather(
+diff --git a/vllm/distributed/parallel_state.py b/vllm/distributed/parallel_state.py
+index 58c49c09d..c570b9ee8 100644
+--- a/vllm/distributed/parallel_state.py
++++ b/vllm/distributed/parallel_state.py
+@@ -25,6 +25,7 @@ If you only need to use the distributed environment without model/pipeline
+ 
+ import contextlib
+ import gc
++import os
+ import pickle
+ import weakref
+ from collections import namedtuple
+@@ -57,6 +58,7 @@ from vllm.utils.system_utils import suppress_stdout
+ from vllm.utils.torch_utils import (
+     direct_register_custom_op,
+ )
++from vllm.utils.xpu_decode_timing import timed_region
+ 
+ if TYPE_CHECKING:
+     from vllm.distributed.stateless_coordinator import StatelessGroupCoordinator
+@@ -478,14 +480,26 @@ class GroupCoordinator:
+         )
+ 
+         if self.device_communicator is not None:
+-            assert isinstance(self.device_communicator, CudaCommunicator)
+-            ca_comm = self.device_communicator.ca_comm
++            if not isinstance(self.device_communicator, CudaCommunicator):
++                if os.environ.get("VLLM_XPU_GRAPH_NOOP_COMM_CAPTURE", "0") != "1":
++                    assert isinstance(self.device_communicator, CudaCommunicator)
++                logger.warning_once(
++                    "Skipping communicator graph-capture context for %s under "
++                    "VLLM_XPU_GRAPH_NOOP_COMM_CAPTURE=1.",
++                    type(self.device_communicator).__name__,
++                )
++                ca_comm = None
++            else:
++                ca_comm = self.device_communicator.ca_comm
+             if ca_comm is not None:
+                 maybe_ca_context = ca_comm.capture()  # type: ignore
+ 
+             from vllm._aiter_ops import rocm_aiter_ops
+ 
+-            if rocm_aiter_ops.is_enabled():
++            if (
++                isinstance(self.device_communicator, CudaCommunicator)
++                and rocm_aiter_ops.is_enabled()
++            ):
+                 aiter_ar = rocm_aiter_ops.get_aiter_allreduce()
+                 if aiter_ar is not None:
+                     maybe_aiter_context = aiter_ar.capture()  # type: ignore
+@@ -526,7 +540,8 @@ class GroupCoordinator:
+     def _all_reduce_out_place(self, input_: torch.Tensor) -> torch.Tensor:
+         if self.device_communicator is None:
+             raise ValueError("No device communicator found")
+-        return self.device_communicator.all_reduce(input_)
++        with timed_region("tp.all_reduce.direct"):
++            return self.device_communicator.all_reduce(input_)
+ 
+     def all_gather(self, input_: torch.Tensor, dim: int = -1) -> torch.Tensor:
+         world_size = self.world_size
+diff --git a/vllm/model_executor/layers/attention/attention.py b/vllm/model_executor/layers/attention/attention.py
+index db9ae2bbd..f08c530ef 100644
+--- a/vllm/model_executor/layers/attention/attention.py
++++ b/vllm/model_executor/layers/attention/attention.py
+@@ -31,6 +31,7 @@ from vllm.utils.torch_utils import (
+     direct_register_custom_op,
+     kv_cache_dtype_str_to_dtype,
+ )
++from vllm.utils.xpu_decode_timing import timed_region
+ from vllm.v1.attention.backend import (
+     AttentionBackend,
+     AttentionMetadata,
+@@ -467,17 +468,19 @@ class Attention(nn.Module, AttentionLayerBase):
+                 and key is not None
+                 and value is not None
+             ):
+-                kv_cache_dummy_dep = unified_kv_cache_update(
+-                    key, value, self.layer_name
++                with timed_region("attn.kv_update_submit"):
++                    kv_cache_dummy_dep = unified_kv_cache_update(
++                        key, value, self.layer_name
++                    )
++            with timed_region("attn.unified_attention_total"):
++                unified_attention_with_output(
++                    query,
++                    key,
++                    value,
++                    output,
++                    self.layer_name,
++                    kv_cache_dummy_dep=kv_cache_dummy_dep,
+                 )
+-            unified_attention_with_output(
+-                query,
+-                key,
+-                value,
+-                output,
+-                self.layer_name,
+-                kv_cache_dummy_dep=kv_cache_dummy_dep,
+-            )
+         else:
+             # Skip this if sharing KV cache with an earlier attention layer.
+             encoded = _encode_layer_name(self.layer_name)
+@@ -487,17 +490,19 @@ class Attention(nn.Module, AttentionLayerBase):
+                 and key is not None
+                 and value is not None
+             ):
+-                kv_cache_dummy_dep = torch.ops.vllm.unified_kv_cache_update(
+-                    key, value, encoded
++                with timed_region("attn.kv_update_submit"):
++                    kv_cache_dummy_dep = torch.ops.vllm.unified_kv_cache_update(
++                        key, value, encoded
++                    )
++            with timed_region("attn.unified_attention_total"):
++                torch.ops.vllm.unified_attention_with_output(
++                    query,
++                    key,
++                    value,
++                    output,
++                    encoded,
++                    kv_cache_dummy_dep=kv_cache_dummy_dep,
+                 )
+-            torch.ops.vllm.unified_attention_with_output(
+-                query,
+-                key,
+-                value,
+-                output,
+-                encoded,
+-                kv_cache_dummy_dep=kv_cache_dummy_dep,
+-            )
+         return output.view(-1, hidden_size)
+ 
+     def calc_kv_scales(self, query, key, value):
+diff --git a/vllm/model_executor/layers/mamba/linear_attn.py b/vllm/model_executor/layers/mamba/linear_attn.py
+index b277c9ed6..a25e2e3ac 100644
+--- a/vllm/model_executor/layers/mamba/linear_attn.py
++++ b/vllm/model_executor/layers/mamba/linear_attn.py
+@@ -2,6 +2,7 @@
+ # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
+ 
+ import math
++import os
+ from collections.abc import Callable
+ from functools import partial
+ 
+@@ -105,6 +106,9 @@ class MiniMaxText01RMSNormTP(CustomOp):
+         k: torch.Tensor,
+     ) -> tuple[torch.Tensor, torch.Tensor]:
+         orig_dtype = q.dtype
++        if os.environ.get("VLLM_MINIMAX_QK_CONTIG", "0") == "1":
++            q = q.contiguous()
++            k = k.contiguous()
+         q = q.to(torch.float32)
+         k = k.to(torch.float32)
+         q_var = q.pow(2).mean(dim=-1, keepdim=True)
+diff --git a/vllm/model_executor/layers/quantization/moe_wna16.py b/vllm/model_executor/layers/quantization/moe_wna16.py
+index e5ef3f4c3..95a81ff34 100644
+--- a/vllm/model_executor/layers/quantization/moe_wna16.py
++++ b/vllm/model_executor/layers/quantization/moe_wna16.py
+@@ -1,11 +1,13 @@
+ # SPDX-License-Identifier: Apache-2.0
+ # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
+ 
++import os
+ from typing import Any
+ 
+ import torch
+ 
+ from vllm.distributed import get_tensor_model_parallel_rank, get_tp_group
++from vllm.logger import init_logger
+ from vllm.model_executor.layers.fused_moe.activation import MoEActivation
+ from vllm.model_executor.layers.fused_moe.config import (
+     FusedMoEQuantConfig,
+@@ -32,6 +34,9 @@ from vllm.model_executor.layers.quantization.utils.marlin_utils import (
+ )
+ from vllm.model_executor.utils import set_weight_attrs
+ from vllm.platforms import current_platform
++from vllm.utils.xpu_decode_timing import timed_region
++
++logger = init_logger(__name__)
+ 
+ 
+ class MoeWNA16Config(QuantizationConfig):
+@@ -362,6 +367,39 @@ class MoeWNA16Method(FusedMoEMethodBase):
+             block_shape=[0, layer.group_size],
+         )
+ 
++    def _llm_scaler_moe_requested(self) -> bool:
++        return os.environ.get("VLLM_XPU_USE_LLM_SCALER_MOE", "0") == "1"
++
++    def _can_use_llm_scaler_moe(self, layer: torch.nn.Module) -> bool:
++        return (
++            self._llm_scaler_moe_requested()
++            and current_platform.is_xpu()
++            and self.quant_config.weight_bits == 4
++            and not self.quant_config.has_zp
++            and getattr(layer, "expert_map", None) is None
++            and getattr(layer, "global_num_experts", None)
++            == getattr(layer, "local_num_experts", None)
++            and not getattr(layer, "apply_router_weight_on_input", False)
++            and getattr(layer, "group_size", None) == 128
++            and getattr(layer, "w13_qweight", None) is not None
++            and getattr(layer, "w2_qweight", None) is not None
++            and layer.w13_qweight.dtype == torch.uint8
++            and layer.w2_qweight.dtype == torch.uint8
++            and layer.w13_scales.dtype == torch.float16
++            and layer.w2_scales.dtype == torch.float16
++        )
++
++    def process_weights_after_loading(self, layer: torch.nn.Module) -> None:
++        if not self._can_use_llm_scaler_moe(layer):
++            return
++        if getattr(layer, "_llm_scaler_moe_u4_decode", False):
++            return
++
++        layer._llm_scaler_moe_u4_decode = True
++        logger.info_once(
++            "Enabled llm-scaler XPU INT4 MoE decode path for %s", layer.layer_name
++        )
++
+     def apply(
+         self,
+         layer: FusedMoE,
+@@ -376,18 +414,44 @@ class MoeWNA16Method(FusedMoEMethodBase):
+             f"Only SiLU activation is supported, not {layer.activation}."
+         )
+ 
+-        return fused_experts(
+-            x,
+-            layer.w13_qweight,
+-            layer.w2_qweight,
+-            topk_weights=topk_weights,
+-            topk_ids=topk_ids,
+-            inplace=not self.moe.disable_inplace,
+-            apply_router_weight_on_input=layer.apply_router_weight_on_input,
+-            global_num_experts=layer.global_num_experts,
+-            expert_map=layer.expert_map,
+-            quant_config=self.moe_quant_config,
+-        )
++        if (
++            getattr(layer, "_llm_scaler_moe_u4_decode", False)
++            and shared_experts_input is None
++            and x.dtype == torch.float16
++            and x.shape[0] <= 4
++        ):
++            try:
++                from custom_esimd_kernels_vllm import (
++                    moe_forward_tiny_cutlass_nmajor_int4_u4,
++                )
++
++                with timed_region("moe.llm_scaler_u4_bridge"):
++                    return moe_forward_tiny_cutlass_nmajor_int4_u4(
++                        x,
++                        layer.w13_qweight,
++                        layer.w13_scales,
++                        layer.w2_qweight,
++                        layer.w2_scales,
++                        topk_weights.contiguous(),
++                        topk_ids.contiguous(),
++                    )
++            except Exception:
++                logger.exception("llm-scaler XPU INT4 MoE path failed")
++                raise
++
++        with timed_region("moe.fused_experts_fallback"):
++            return fused_experts(
++                x,
++                layer.w13_qweight,
++                layer.w2_qweight,
++                topk_weights=topk_weights,
++                topk_ids=topk_ids,
++                inplace=not self.moe.disable_inplace,
++                apply_router_weight_on_input=layer.apply_router_weight_on_input,
++                global_num_experts=layer.global_num_experts,
++                expert_map=layer.expert_map,
++                quant_config=self.moe_quant_config,
++            )
+ 
+     @staticmethod
+     def get_weight_loader(layer, weight_loader):
+diff --git a/vllm/model_executor/models/minimax_m2.py b/vllm/model_executor/models/minimax_m2.py
+index 818b7e681..f4305b2b3 100644
+--- a/vllm/model_executor/models/minimax_m2.py
++++ b/vllm/model_executor/models/minimax_m2.py
+@@ -23,6 +23,7 @@
+ # limitations under the License.
+ """Inference-only MiniMaxM2 model."""
+ 
++import os
+ from collections.abc import Iterable
+ from itertools import islice
+ from typing import Any
+@@ -62,6 +63,7 @@ from vllm.model_executor.model_loader.weight_utils import (
+     maybe_remap_kv_scale_name,
+ )
+ from vllm.sequence import IntermediateTensors
++from vllm.utils.xpu_decode_timing import timed_region
+ 
+ from .interfaces import EagleModelMixin, SupportsEagle3, SupportsLoRA, SupportsPP
+ from .utils import (
+@@ -73,6 +75,10 @@ from .utils import (
+     maybe_prefix,
+ )
+ 
++_MINIMAX_M2_FP16_ROUTER = (
++    os.environ.get("VLLM_MINIMAX_M2_FP16_ROUTER", "0") == "1"
++)
++
+ 
+ class MiniMaxM2MoE(nn.Module):
+     def __init__(
+@@ -132,10 +138,17 @@ class MiniMaxM2MoE(nn.Module):
+         hidden_states = hidden_states.view(-1, hidden_dim)
+ 
+         # router_logits: (num_tokens, n_experts)
+-        router_logits, _ = self.gate(hidden_states.to(torch.float32))
+-        final_hidden_states = self.experts(
+-            hidden_states=hidden_states, router_logits=router_logits
+-        )
++        with timed_region("minimax.moe.router_linear"):
++            if _MINIMAX_M2_FP16_ROUTER and hasattr(self, "_gate_weight_fp16"):
++                router_logits = torch.nn.functional.linear(
++                    hidden_states.to(torch.float16), self._gate_weight_fp16
++                ).to(torch.float32)
++            else:
++                router_logits, _ = self.gate(hidden_states.to(torch.float32))
++        with timed_region("minimax.moe.experts_total"):
++            final_hidden_states = self.experts(
++                hidden_states=hidden_states, router_logits=router_logits
++            )
+ 
+         return final_hidden_states.view(num_tokens, hidden_dim)
+ 
+@@ -242,12 +255,17 @@ class MiniMaxM2Attention(nn.Module):
+         positions: torch.Tensor,
+         hidden_states: torch.Tensor,
+     ) -> torch.Tensor:
+-        qkv, _ = self.qkv_proj(hidden_states)
++        with timed_region("minimax.attn.qkv"):
++            qkv, _ = self.qkv_proj(hidden_states)
+         q, k, v = qkv.split([self.q_size, self.kv_size, self.kv_size], dim=-1)
+-        q, k = MiniMaxText01RMSNormTP.forward_qk(self.q_norm, self.k_norm, q, k)
+-        q, k = self.rotary_emb(positions, q, k)
+-        attn_output = self.attn(q, k, v)
+-        output, _ = self.o_proj(attn_output)
++        with timed_region("minimax.attn.qk_norm"):
++            q, k = MiniMaxText01RMSNormTP.forward_qk(self.q_norm, self.k_norm, q, k)
++        with timed_region("minimax.attn.rope"):
++            q, k = self.rotary_emb(positions, q, k)
++        with timed_region("minimax.attn.kv_attention"):
++            attn_output = self.attn(q, k, v)
++        with timed_region("minimax.attn.o_proj"):
++            output, _ = self.o_proj(attn_output)
+         return output
+ 
+ 
+@@ -417,6 +435,22 @@ class MiniMaxM2Model(nn.Module, EagleModelMixin):
+             num_experts=self.config.num_local_experts,
+         )
+ 
++    def _init_fp16_router_buffers(self) -> None:
++        for layer in self.layers:
++            if not isinstance(layer, MiniMaxM2DecoderLayer):
++                continue
++            moe = layer.block_sparse_moe
++            gate_weight = getattr(moe.gate, "weight", None)
++            if gate_weight is None:
++                continue
++            gate_weight_fp16 = gate_weight.detach().to(torch.float16).contiguous()
++            if "_gate_weight_fp16" in moe._buffers:
++                moe._buffers["_gate_weight_fp16"] = gate_weight_fp16
++            else:
++                moe.register_buffer(
++                    "_gate_weight_fp16", gate_weight_fp16, persistent=False
++                )
++
+     def load_weights(self, weights: Iterable[tuple[str, torch.Tensor]]) -> set[str]:
+         stacked_params_mapping = [
+             # (param_name, shard_name, shard_id)
+@@ -513,6 +547,8 @@ class MiniMaxM2Model(nn.Module, EagleModelMixin):
+                     )
+                     weight_loader(param, loaded_weight)
+             loaded_params.add(name)
++        if _MINIMAX_M2_FP16_ROUTER:
++            self._init_fp16_router_buffers()
+         return loaded_params
+ 
+ 
+diff --git a/vllm/v1/worker/gpu_model_runner.py b/vllm/v1/worker/gpu_model_runner.py
+index bcab2ca2d..c893a2d37 100644
+--- a/vllm/v1/worker/gpu_model_runner.py
++++ b/vllm/v1/worker/gpu_model_runner.py
+@@ -4,6 +4,7 @@
+ import functools
+ import gc
+ import itertools
++import os
+ import threading
+ import time
+ from collections import defaultdict
+@@ -115,6 +116,7 @@ from vllm.utils.torch_utils import (
+     is_quantized_kv_cache,
+     kv_cache_dtype_str_to_dtype,
+ )
++from vllm.utils.xpu_decode_timing import timed_region
+ from vllm.v1.attention.backend import (
+     AttentionBackend,
+     AttentionCGSupport,
+@@ -1123,7 +1125,10 @@ class GPUModelRunner(
+             self.speculative_config is not None
+             and self.speculative_config.use_ngram_gpu()
+         )
+-        if is_ngram_gpu:
++        has_ngram_gpu_buffers = is_ngram_gpu and hasattr(
++            self, "token_ids_gpu_tensor"
++        )
++        if has_ngram_gpu_buffers:
+             ngram_gpu_new_reqs: list[CachedRequestState] = []
+ 
+         reqs_to_add: list[CachedRequestState] = []
+@@ -1193,7 +1198,7 @@ class GPUModelRunner(
+ 
+             reqs_to_add.append(req_state)
+             # Track new requests for ngram_gpu full tensor copy
+-            if is_ngram_gpu:
++            if has_ngram_gpu_buffers:
+                 ngram_gpu_new_reqs.append(req_state)
+ 
+         # Update the states of the running/resumed requests.
+@@ -1208,6 +1213,9 @@ class GPUModelRunner(
+             self.speculative_config is not None
+             and self.speculative_config.use_ngram_gpu()
+         ):
++            trace_ngram_pp = os.environ.get("VLLM_XPU_TRACE_NGRAM_PP")
++            original_total = scheduler_output.total_num_scheduled_tokens
++            original_num_scheduled = scheduler_output.num_scheduled_tokens.copy()
+             for req_id, toks in scheduled_spec_tokens.items():
+                 original_num_spec_per_req[req_id] = len(toks)
+             update_scheduler_for_invalid_drafts(
+@@ -1216,6 +1224,34 @@ class GPUModelRunner(
+                 scheduler_output,
+                 self.input_batch.req_id_to_index,
+             )
++            if trace_ngram_pp:
++                valid_counts: dict[str, int] = {}
++                if self._num_valid_draft_tokens_cpu is not None:
++                    for req_id in req_data.req_ids:
++                        req_index = self.input_batch.req_id_to_index.get(req_id)
++                        if req_index is not None:
++                            valid_counts[req_id] = int(
++                                self._num_valid_draft_tokens_cpu[req_index].item()
++                            )
++                logger.warning(
++                    "XPU ngram trim pp_rank=%s first=%s last=%s "
++                    "total=%s->%s scheduled=%s->%s spec_lens=%s->%s "
++                    "valid_counts=%s cached_req_ids=%s",
++                    get_pp_group().rank_in_group,
++                    get_pp_group().is_first_rank,
++                    get_pp_group().is_last_rank,
++                    original_total,
++                    scheduler_output.total_num_scheduled_tokens,
++                    original_num_scheduled,
++                    scheduler_output.num_scheduled_tokens,
++                    original_num_spec_per_req,
++                    {
++                        req_id: len(toks)
++                        for req_id, toks in scheduled_spec_tokens.items()
++                    },
++                    valid_counts,
++                    req_data.req_ids,
++                )
+         if self.use_async_spec_decode:
+             self.prev_num_draft_tokens.np.fill(0)
+ 
+@@ -1264,7 +1300,7 @@ class GPUModelRunner(
+                             optimistic_num_accepted
+                         )
+ 
+-                    if is_ngram_gpu and optimistic_num_accepted > 0:
++                    if has_ngram_gpu_buffers and optimistic_num_accepted > 0:
+                         self.input_batch.num_tokens_no_spec[req_index] += (
+                             optimistic_num_accepted
+                         )
+@@ -1286,13 +1322,32 @@ class GPUModelRunner(
+                     num_new_tokens = (
+                         num_computed_tokens + len(new_token_ids) - req_state.num_tokens
+                     )
+-                    if num_new_tokens == 1:
+-                        # Avoid slicing list in most common case.
+-                        req_state.output_token_ids.append(new_token_ids[-1])
+-                    elif num_new_tokens > 0:
+-                        req_state.output_token_ids.extend(
+-                            new_token_ids[-num_new_tokens:]
+-                        )
++                    if num_new_tokens > 0:
++                        if os.environ.get("VLLM_XPU_TRACE_NGRAM_PP") and (
++                            num_new_tokens > len(new_token_ids)
++                        ):
++                            logger.warning(
++                                "XPU PP state update has fewer token ids than "
++                                "computed delta pp_rank=%s req_id=%s "
++                                "num_new_tokens=%s new_token_ids=%s "
++                                "num_computed_tokens=%s req_state_num_tokens=%s "
++                                "scheduled=%s spec_lens=%s",
++                                get_pp_group().rank_in_group,
++                                req_id,
++                                num_new_tokens,
++                                new_token_ids,
++                                num_computed_tokens,
++                                req_state.num_tokens,
++                                scheduler_output.num_scheduled_tokens,
++                                {
++                                    spec_req_id: len(toks)
++                                    for spec_req_id, toks in scheduled_spec_tokens.items()
++                                },
++                            )
++                        if new_token_ids:
++                            req_state.output_token_ids.extend(
++                                new_token_ids[-num_new_tokens:]
++                            )
+             elif num_output_tokens < len(req_state.output_token_ids):
+                 # Some output tokens were discarded due to a sync-KV-load
+                 # failure, or output_token_ids was inflated by the optimistic
+@@ -1331,7 +1386,7 @@ class GPUModelRunner(
+ 
+                 reqs_to_add.append(req_state)
+                 # Track resumed requests for ngram_gpu full tensor copy
+-                if is_ngram_gpu:
++                if has_ngram_gpu_buffers:
+                     ngram_gpu_new_reqs.append(req_state)
+                 continue
+ 
+@@ -1373,7 +1428,7 @@ class GPUModelRunner(
+         self.input_batch.refresh_metadata()
+ 
+         # Incrementally update ngram_gpu tensors after batch is stable
+-        if is_ngram_gpu:
++        if has_ngram_gpu_buffers:
+             update_ngram_gpu_tensors_incremental(
+                 self.input_batch,
+                 self.token_ids_gpu_tensor,
+@@ -1410,7 +1465,7 @@ class GPUModelRunner(
+                     self.input_batch.num_computed_tokens_cpu[cur_req_index] -= (
+                         correction
+                     )
+-                    if is_ngram_gpu and correction > 0:
++                    if has_ngram_gpu_buffers and correction > 0:
+                         self.input_batch.num_tokens_no_spec[cur_req_index] -= correction
+                         self.num_tokens_no_spec_gpu[cur_req_index] -= correction
+ 
+@@ -2310,8 +2365,9 @@ class GPUModelRunner(
+                 cm.slot_mapping = slot_mappings[kv_cache_gid]
+ 
+             if self.speculative_config and spec_decode_common_attn_metadata is None:
+-                if isinstance(self.drafter, (EagleProposer, DFlashProposer)):
+-                    if self.drafter.kv_cache_gid == kv_cache_gid:
++                drafter = getattr(self, "drafter", None)
++                if isinstance(drafter, (EagleProposer, DFlashProposer)):
++                    if drafter.kv_cache_gid == kv_cache_gid:
+                         spec_decode_common_attn_metadata = cm
+                 else:
+                     spec_decode_common_attn_metadata = cm
+@@ -3864,11 +3920,29 @@ class GPUModelRunner(
+ 
+         num_scheduled_tokens = scheduler_output.total_num_scheduled_tokens
+         with (
++            timed_region("runner.preprocess"),
+             record_function_or_nullcontext("gpu_model_runner: preprocess"),
+             self.synchronize_input_prep(),
+         ):
+             # Update persistent batch states.
+             deferred_state_corrections_fn = self._update_states(scheduler_output)
++            if os.environ.get("VLLM_XPU_TRACE_NGRAM_PP"):
++                logger.warning(
++                    "XPU ngram post-update pp_rank=%s first=%s last=%s "
++                    "pre_update_total=%s post_update_total=%s scheduled=%s "
++                    "spec_lens=%s req_ids=%s",
++                    get_pp_group().rank_in_group,
++                    get_pp_group().is_first_rank,
++                    get_pp_group().is_last_rank,
++                    num_scheduled_tokens,
++                    scheduler_output.total_num_scheduled_tokens,
++                    scheduler_output.num_scheduled_tokens,
++                    {
++                        req_id: len(toks)
++                        for req_id, toks in scheduler_output.scheduled_spec_decode_tokens.items()
++                    },
++                    self.input_batch.req_ids,
++                )
+ 
+             if has_ec_transfer() and not get_ec_transfer().is_consumer:
+                 with self.maybe_get_ec_connector_output(
+@@ -4069,6 +4143,7 @@ class GPUModelRunner(
+         # (wait_for_save + clear metadata) until after draft model runs.
+         defer_kv_connector_finalize = self.speculative_config is not None
+         with (
++            timed_region("runner.forward"),
+             set_forward_context(
+                 attn_metadata,
+                 self.vllm_config,
+@@ -4094,7 +4169,10 @@ class GPUModelRunner(
+                 **model_kwargs,
+             )
+ 
+-        with record_function_or_nullcontext("gpu_model_runner: postprocess"):
++        with (
++            timed_region("runner.postprocess"),
++            record_function_or_nullcontext("gpu_model_runner: postprocess"),
++        ):
+             if self.use_aux_hidden_state_outputs:
+                 # True when EAGLE 3 is used.
+                 hidden_states, aux_hidden_states = model_output
+@@ -4253,6 +4331,36 @@ class GPUModelRunner(
+                     spec_decode_common_attn_metadata,
+                     slot_mappings,
+                 )
++                if os.environ.get("VLLM_XPU_TRACE_NGRAM_PP"):
++                    if torch.is_tensor(self._draft_token_ids):
++                        draft_summary = {
++                            "shape": tuple(self._draft_token_ids.shape),
++                            "dtype": str(self._draft_token_ids.dtype),
++                        }
++                    else:
++                        draft_summary = [
++                            len(toks) for toks in self._draft_token_ids[:4]
++                        ]
++                    if torch.is_tensor(sampled_token_ids):
++                        sampled_summary = {
++                            "shape": tuple(sampled_token_ids.shape),
++                            "dtype": str(sampled_token_ids.dtype),
++                        }
++                    else:
++                        sampled_summary = [
++                            len(toks) for toks in sampled_token_ids[:4]
++                        ]
++                    logger.warning(
++                        "XPU ngram proposed pp_rank=%s first=%s last=%s "
++                        "method=%s sampled=%s draft=%s req_ids=%s",
++                        get_pp_group().rank_in_group,
++                        get_pp_group().is_first_rank,
++                        get_pp_group().is_last_rank,
++                        spec_config.method,
++                        sampled_summary,
++                        draft_summary,
++                        self.input_batch.req_ids,
++                    )
+                 self._copy_draft_token_ids_to_cpu(scheduler_output)
+ 
+         spec_config = self.speculative_config
+@@ -4459,8 +4567,28 @@ class GPUModelRunner(
+ 
+     def take_draft_token_ids(self) -> DraftTokenIds | None:
+         if not self.num_spec_tokens or not self._draft_token_req_ids:
++            if os.environ.get("VLLM_XPU_TRACE_NGRAM_PP"):
++                logger.warning(
++                    "XPU ngram take_draft none pp_rank=%s first=%s last=%s "
++                    "num_spec_tokens=%s has_req_ids=%s",
++                    get_pp_group().rank_in_group,
++                    get_pp_group().is_first_rank,
++                    get_pp_group().is_last_rank,
++                    self.num_spec_tokens,
++                    bool(self._draft_token_req_ids),
++                )
+             return None
+         draft_token_ids, req_ids = self._get_draft_token_ids_cpu()
++        if os.environ.get("VLLM_XPU_TRACE_NGRAM_PP"):
++            logger.warning(
++                "XPU ngram take_draft pp_rank=%s first=%s last=%s "
++                "req_ids=%s draft_lens=%s",
++                get_pp_group().rank_in_group,
++                get_pp_group().is_first_rank,
++                get_pp_group().is_last_rank,
++                req_ids,
++                [len(toks) for toks in draft_token_ids[:4]],
++            )
+         return DraftTokenIds(req_ids, draft_token_ids)
+ 
+     def _copy_draft_token_ids_to_cpu(
+diff --git a/vllm/utils/xpu_decode_timing.py b/vllm/utils/xpu_decode_timing.py
+new file mode 100644
+index 000000000..2b28df99b
+--- /dev/null
++++ b/vllm/utils/xpu_decode_timing.py
+@@ -0,0 +1,88 @@
++# SPDX-License-Identifier: Apache-2.0
++# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
++
++"""Small opt-in timing helper for local XPU decode diagnostics."""
++
++import os
++import time
++from collections import defaultdict
++from contextlib import contextmanager
++
++_ENABLED = os.environ.get("VLLM_XPU_DECODE_TIMING", "0") == "1"
++_SYNC = os.environ.get("VLLM_XPU_DECODE_TIMING_SYNC", "0") == "1"
++_RANK_FILTER = os.environ.get("VLLM_XPU_DECODE_TIMING_RANK")
++_PRINT_EVERY = max(1, int(os.environ.get("VLLM_XPU_DECODE_TIMING_PRINT_EVERY", "0") or "0"))
++_STATS: dict[tuple[str, str], list[int]] = defaultdict(lambda: [0, 0, 0])
++
++
++def _rank_label() -> str:
++    for name in ("LOCAL_RANK", "RANK", "VLLM_LOCAL_RANK", "VLLM_RANK"):
++        value = os.environ.get(name)
++        if value is not None:
++            return value
++    try:
++        import torch.distributed as dist
++
++        if dist.is_available() and dist.is_initialized():
++            return str(dist.get_rank())
++    except Exception:
++        pass
++    return f"pid{os.getpid()}"
++
++
++def _rank_enabled(rank: str) -> bool:
++    return _RANK_FILTER is None or _RANK_FILTER == rank
++
++
++def _sync_xpu() -> None:
++    if not _SYNC:
++        return
++    try:
++        import torch
++
++        if hasattr(torch, "xpu") and torch.xpu.is_available():
++            torch.xpu.synchronize()
++    except Exception:
++        pass
++
++
++def _is_compiling() -> bool:
++    try:
++        import torch
++
++        compiler = getattr(torch, "compiler", None)
++        if compiler is not None and compiler.is_compiling():
++            return True
++        dynamo = getattr(torch, "_dynamo", None)
++        return bool(dynamo is not None and dynamo.is_compiling())
++    except Exception:
++        return False
++
++
++@contextmanager
++def timed_region(label: str):
++    if not _ENABLED or _is_compiling():
++        yield
++        return
++    rank = _rank_label()
++    if not _rank_enabled(rank):
++        yield
++        return
++    _sync_xpu()
++    start_ns = time.perf_counter_ns()
++    try:
++        yield
++    finally:
++        _sync_xpu()
++        elapsed_ns = time.perf_counter_ns() - start_ns
++        stat = _STATS[(rank, label)]
++        stat[0] += 1
++        stat[1] += elapsed_ns
++        stat[2] = max(stat[2], elapsed_ns)
++        if _PRINT_EVERY and stat[0] % _PRINT_EVERY == 0:
++            print(
++                "[vllm-xpu-timing] "
++                f"rank={rank} label={label} count={stat[0]} "
++                f"last_ms={elapsed_ns / 1e6:.6f}",
++                flush=True,
++            )
