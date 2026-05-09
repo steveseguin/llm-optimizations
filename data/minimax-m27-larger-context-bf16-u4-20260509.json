@@ -1,0 +1,76 @@
+{
+  "date": "2026-05-09",
+  "model": {
+    "hf_id": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+    "local_path": "/mnt/corsair-external/llm-models/minimax-m2.7-int4-autoround",
+    "format": "safetensors",
+    "quantization": "AutoRound INT4 W4A16"
+  },
+  "hardware": {
+    "gpu": "Intel Arc Pro B70",
+    "gpu_count": 4,
+    "vram_gb_per_gpu": 32,
+    "os": "Ubuntu 24.04.4 LTS"
+  },
+  "engine": {
+    "name": "vllm",
+    "version": "0.20.1-local",
+    "backend": "xpu",
+    "tensor_parallel": 4,
+    "dtype": "bfloat16",
+    "attention_backend": "FlashAttention2",
+    "xpu_graph": false,
+    "llm_scaler_u4_decode_bridge": true,
+    "ccl_atl_transport": "ofi",
+    "ccl_ze_ipc_exchange": "unset/default",
+    "ccl_topo_p2p_access": 1
+  },
+  "runs": [
+    {
+      "label": "vllm-minimax-m27-autoround-bf16-u4-tp4-p1024-n256",
+      "status": "success",
+      "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p1024n256-20260509T233854Z.log",
+      "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p1024n256-20260509T233854Z.json",
+      "prompt_tokens": 1024,
+      "output_tokens": 256,
+      "max_model_len": 2048,
+      "max_num_batched_tokens": 1024,
+      "max_num_seqs": 1,
+      "elapsed_s": 8.041927720012609,
+      "tok_s_total": 159.16581752092557,
+      "tok_s_output": 31.833163504185116,
+      "reported_tok_s_output": 31.83,
+      "reported_tok_s_total": 159.17,
+      "gpu_kv_cache_tokens": 2688,
+      "available_kv_cache_gb": 0.16,
+      "max_concurrency_at_2048_tokens": 1.31,
+      "peak_model_memory_gb": 28.96,
+      "model_load_s": 348.602704,
+      "torch_compile_s": 26.21,
+      "notes": "Valid larger-prompt MiniMax run. This keeps the same target model and no speculative decoding, no expert dropping, no sampling changes, and no GPU power-limit changes. The result clears 30 output tok/s at p1024/n256, but only 0.16 GiB KV headroom remains at max_model_len=2048."
+    },
+    {
+      "label": "vllm-minimax-m27-autoround-bf16-u4-tp4-p1536-n256",
+      "status": "failed_no_kv_memory",
+      "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p1536n256-20260509T233112Z.log",
+      "prompt_tokens": 1536,
+      "output_tokens": 256,
+      "max_model_len": 2048,
+      "max_num_batched_tokens": 2048,
+      "max_num_seqs": 1,
+      "available_kv_cache_gb": -0.3,
+      "error": "ValueError: No available memory for the cache blocks",
+      "notes": "The p1536/n256 compile/load path succeeded far enough to profile, but the larger compile range and KV reservation left negative KV memory. Larger MiniMax contexts need additional VRAM headroom, a smaller compile range, lower per-rank memory overhead, or more system memory/offload changes that do not steal GPU KV budget."
+    }
+  ],
+  "interpretation": [
+    "The BF16 llm-scaler u4 decode bridge remains useful at a 1024-token prompt; output throughput is 31.83 tok/s.",
+    "The MiniMax AutoRound model is close to the 32 GiB/card capacity limit on B70 at TP4: model loading reports 28.96 GiB/card and only 0.16 GiB remains for KV at max_model_len=2048.",
+    "The p1536/n256 failure is a capacity boundary, not a decode-kernel failure."
+  ],
+  "next_steps": [
+    "Try prompt-pattern speculation only as a workload-specific option; n-gram and suffix are lossless under vLLM's verifier but should not be expected to improve random-token leaderboard runs.",
+    "Investigate memory-headroom reductions before chasing larger contexts: compile range, graph cache overhead, MoE config memory, and possible weight/KV layout overhead.",
+    "Keep DFlash blocked until the drafter can allocate KV safely or until a smaller/leaner MiniMax draft becomes available."
+  ]
+}

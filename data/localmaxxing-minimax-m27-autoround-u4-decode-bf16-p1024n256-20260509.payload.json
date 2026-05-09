@@ -1,0 +1,39 @@
+{
+  "hfId": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+  "modelRevision": "main",
+  "hardware": {
+    "hwClass": "DISCRETE_GPU",
+    "gpuName": "Intel Arc Pro B70",
+    "gpuCount": 4,
+    "vramGb": 32,
+    "cpu": "AMD EPYC 9015",
+    "ramGb": 16,
+    "os": "Ubuntu 24.04.4"
+  },
+  "engineName": "vllm",
+  "engineVersion": "0.20.1-local",
+  "quantization": "INT4 AutoRound W4A16",
+  "promptTokens": 1024,
+  "outputTokens": 256,
+  "contextLength": 2048,
+  "batchSize": 1,
+  "tokSOut": 31.833163504185116,
+  "tokSTotal": 159.16581752092557,
+  "peakVramGb": 28.96,
+  "notes": "MiniMax M2.7 AutoRound W4A16 on 4x Intel Arc Pro B70 via vLLM/XPU TP4. BF16 hidden states with experimental llm-scaler u4 decode-only ESIMD INT4 MoE path. Larger-context validation at p1024/n256: 31.83 output tok/s and 159.17 total tok/s. No speculative decode, no expert dropping, no sampling change, no power-limit change. KV headroom is tight: only 0.16 GiB available at max_model_len=2048.",
+  "engineFlags": {
+    "commandSnippet": "VLLM_XPU_USE_LLM_SCALER_MOE=1 CCL_IPC=default vllm bench throughput --backend vllm --model /mnt/corsair-external/llm-models/minimax-m2.7-int4-autoround --tokenizer /mnt/corsair-external/llm-models/minimax-m2.7-int4-autoround --trust-remote-code --dtype bfloat16 --tensor-parallel-size 4 --distributed-executor-backend mp --max-model-len 2048 --max-num-batched-tokens 1024 --max-num-seqs 1 --dataset-name random --random-input-len 1024 --random-output-len 256 --random-range-ratio 0 --num-prompts 1 --disable-log-stats",
+    "tensorParallel": 4,
+    "gpuLayers": 999,
+    "contextLength": 2048,
+    "concurrency": 1,
+    "flashAttn": true,
+    "chunkedPrefill": true,
+    "prefillChunkSize": 1024,
+    "contBatching": true,
+    "attentionBackend": "flash_attn",
+    "engineQuant": "inc",
+    "specDecoding": false,
+    "extraFlags": "XPU/Level Zero; CCL_ATL_TRANSPORT=ofi; CCL_TOPO_P2P_ACCESS=1; CCL_ZE_IPC_EXCHANGE unset/default; VLLM_XPU_ENABLE_XPU_GRAPH=0; VLLM_XPU_USE_LLM_SCALER_MOE=1; PYTHONPATH includes /home/steve/src/llm-scaler/vllm/custom-esimd-kernels-vllm/python; dtype=bfloat16; llm-scaler u4 decode-only BF16 patch with FP16 scale-copy bridge; available KV cache memory 0.16 GiB; p1536/n256 failed with no KV memory"
+  }
+}
