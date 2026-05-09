@@ -175,6 +175,44 @@ No available shared memory broadcast block found in 60 seconds.
 
 No profile trace files were emitted, and the run was stopped. The profiler is too disruptive for this TP4 XPU path as configured.
 
+`--attention-backend TRITON_ATTN` is a clear negative on the p512/n256 screen. It selected the Triton backend, compiled successfully, then produced only `39.222834` total tok/s and `13.07` output tok/s:
+
+```text
+/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n256-20260509T130109Z.log
+Using Triton backend.
+Throughput: 0.05 requests/s, 39.22 total tokens/s, 13.07 output tokens/s
+```
+
+Keep the default XPU FlashAttention backend for the current MiniMax path.
+
+`--block-size 128` is also negative under the default FlashAttention backend. The same p512/n256 screen produced `72.014800` total tok/s and `24.00` output tok/s:
+
+```text
+/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n256-20260509T130937Z.log
+Throughput: 0.09 requests/s, 72.01 total tokens/s, 24.00 output tokens/s
+```
+
+Keep the XPU FlashAttention preferred KV block size of 64.
+
+Forcing XPU graph capture with the local `VLLM_XPU_FORCE_GRAPH_WITH_COMM=1` experiment is blocked before benchmark execution. The run reached `cudagraph_mode=PIECEWISE`, then failed during graph memory profiling:
+
+```text
+/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n256-20260509T131754Z.log
+FMHA sycl-tla kernels cannot be captured with XPU graphs, falling back to PIECEWISE graph mode on XPU platform.
+AssertionError: assert isinstance(self.device_communicator, CudaCommunicator)
+```
+
+This is a vLLM graph-capture integration blocker for TP on XPU/XCCL, not just a launch flag issue.
+
+`--no-enable-prefix-caching` is neutral/slightly slower on p512/n256:
+
+```text
+/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n256-20260509T132708Z.log
+Throughput: 0.13 requests/s, 102.04 total tokens/s, 34.01 output tokens/s
+```
+
+Keep prefix caching enabled. Disabling chunked prefill together with prefix caching was blocked by vLLM validation at the current `MAX_BATCHED_TOKENS=1024`; raising that to satisfy validation is not attractive yet because vLLM warns MiniMax does not officially support manually disabling chunked prefill.
+
 Standalone XCCL allreduce probes with explicit `CCL_ZE_IPC_EXCHANGE=pidfd` are fast at the MiniMax hidden-state payload sizes:
 
 ```text
@@ -186,6 +224,19 @@ small_20kb_fp32, 5120 elements, 20480 bytes: 0.014614 ms
 
 This says raw standalone XCCL latency is not large enough by itself to explain a roughly `26.9 ms/token` p512/n512 decode step. The remaining bottleneck is likely embedded graph/scheduler gaps, attention/KV work, router/top-k overhead, or the custom MoE bridge/kernels in context, rather than simple allreduce bandwidth alone. The same standalone allreduce script hung with `CCL_ZE_IPC_EXCHANGE` unset/default, while vLLM default IPC still benchmarks correctly; keep using explicit `pidfd` for standalone communication probes.
 
+A source-level timing hook was added to the llm-scaler MoE submit path behind `LLM_SCALER_MOE_TRACE_KERNELS=1`. The diagnostic p1/n4 run is not a throughput result because the hook waits on every submitted kernel, but it gives a useful bound:
+
+```text
+/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p1n4-20260509T124828Z.log
+1753 kernel wait samples
+median wait: 0.044650 ms
+average wait: 0.057533 ms
+p95 wait: 0.088551 ms
+max wait: 2.051210 ms
+```
+
+At median timing, one up plus one down tiny-MoE launch is roughly `0.09 ms` per MoE layer on a rank. Across MiniMax's 62 MoE layers that is around `5.5 ms/token` of kernel wait in isolation. That is meaningful, but it is still far below the approximately `26.9 ms/token` implied by the best p512/n512 result, so the next work should not assume MoE matvec alone is the entire remaining ceiling. The likely targets are now the per-layer bridge/router path, attention/KV, and graph/scheduler gaps around TP execution.
+
 ## Next Work
 
 The next useful optimization path is to reduce the remaining decode overhead around the same MiniMax MoE path:
@@ -193,5 +244,6 @@ The next useful optimization path is to reduce the remaining decode overhead aro
 - move more route/gather/top-k handling into the custom op so Python/vLLM glue does less per layer;
 - add a BF16-capable variant so the path can run without forcing FP16 activations;
 - inspect TP4 allreduce/attention decode cost now that MoE is less dominant;
+- add cleaner per-rank/per-process timers around the custom MoE bridge and vLLM attention call sites, because the first kernel-only trace shows matvec wait is only part of the decode step;
 - revisit XPU graph only if vLLM adds communication-op capture support or if we test a non-TP decode path;
 - consider a larger-batch version only if it does not pull prompt/prefill back onto a tiny-M kernel.

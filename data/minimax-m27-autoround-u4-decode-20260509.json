@@ -404,6 +404,114 @@
       "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/xccl-allreduce-4xb70-20260509T124218Z.log",
       "details": "Standalone torch.distributed XCCL allreduce hung before the first 4 KiB result when CCL_ZE_IPC_EXCHANGE was unset/default. vLLM default IPC still benchmarks correctly, but standalone communication probes should force pidfd.",
       "submitted": false
+    },
+    {
+      "label": "llm_scaler_moe_kernel_trace_p1n4_diagnostic",
+      "promptTokens": 1,
+      "outputTokens": 4,
+      "contextLength": 512,
+      "outcome": "diagnostic",
+      "env": {
+        "LLM_SCALER_MOE_TRACE_KERNELS": "1",
+        "CCL_ZE_IPC_EXCHANGE": "unset/default",
+        "CCL_TOPO_P2P_ACCESS": "1"
+      },
+      "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p1n4-20260509T124828Z.log",
+      "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p1n4-20260509T124828Z.json",
+      "trace": {
+        "kernelWaitSamples": 1753,
+        "avgWaitMs": 0.057533,
+        "medianWaitMs": 0.04465,
+        "p95WaitMs": 0.088551,
+        "minWaitMs": 0.02976,
+        "maxWaitMs": 2.05121
+      },
+      "submitted": false,
+      "details": "Diagnostic only: the timing hook waits on each submitted llm-scaler MoE kernel, so throughput is intentionally distorted. The median tiny up/down launch wait is around 0.045 ms, implying roughly 5.5 ms/token for 62 MoE layers at one up+down pair per layer, which is significant but still far below the best p512/n512 decode step of about 26.9 ms/token. Remaining work should profile the vLLM bridge, router/top-k, attention/KV, and graph/scheduler boundaries."
+    },
+    {
+      "label": "u4_decode_only_default_ipc_triton_attention_p512n256_negative",
+      "promptTokens": 512,
+      "outputTokens": 256,
+      "contextLength": 2048,
+      "tokSOut": 13.074278,
+      "tokSTotal": 39.222834,
+      "elapsedSeconds": 19.580430924950633,
+      "env": {
+        "CCL_ZE_IPC_EXCHANGE": "unset/default",
+        "CCL_TOPO_P2P_ACCESS": "1"
+      },
+      "extraArgs": "--attention-backend TRITON_ATTN",
+      "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n256-20260509T130109Z.log",
+      "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n256-20260509T130109Z.json",
+      "submitted": false,
+      "outcome": "negative/slower",
+      "details": "Triton attention was accepted and ran, but it regressed p512/n256 heavily compared with the default FlashAttention path. Keep default XPU FlashAttention."
+    },
+    {
+      "label": "u4_decode_only_default_ipc_block_size_128_p512n256_negative",
+      "promptTokens": 512,
+      "outputTokens": 256,
+      "contextLength": 2048,
+      "tokSOut": 24.004933,
+      "tokSTotal": 72.0148,
+      "elapsedSeconds": 10.66447458701441,
+      "env": {
+        "CCL_ZE_IPC_EXCHANGE": "unset/default",
+        "CCL_TOPO_P2P_ACCESS": "1"
+      },
+      "extraArgs": "--block-size 128",
+      "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n256-20260509T130937Z.log",
+      "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n256-20260509T130937Z.json",
+      "submitted": false,
+      "outcome": "negative/slower",
+      "details": "Forcing KV block size 128 under FlashAttention regressed p512/n256 versus the default XPU FlashAttention block size of 64."
+    },
+    {
+      "label": "u4_decode_only_default_ipc_forced_xpu_graph_p512n256_blocked",
+      "promptTokens": 512,
+      "outputTokens": 256,
+      "contextLength": 2048,
+      "outcome": "blocked",
+      "env": {
+        "VLLM_XPU_ENABLE_XPU_GRAPH": "1",
+        "VLLM_XPU_FORCE_GRAPH_WITH_COMM": "1",
+        "CCL_ZE_IPC_EXCHANGE": "unset/default",
+        "CCL_TOPO_P2P_ACCESS": "1"
+      },
+      "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n256-20260509T131754Z.log",
+      "submitted": false,
+      "details": "The local force-with-comm graph experiment reached PIECEWISE graph mode, then failed during graph memory profiling with an AssertionError because tensor-parallel graph_capture requires a CudaCommunicator. XPU/XCCL graph capture for TP needs a vLLM communicator integration change before this can be benchmarked."
+    },
+    {
+      "label": "u4_decode_only_default_ipc_no_prefix_cache_p512n256_neutral",
+      "promptTokens": 512,
+      "outputTokens": 256,
+      "contextLength": 2048,
+      "tokSOut": 34.013802,
+      "tokSTotal": 102.041406,
+      "elapsedSeconds": 7.526356474030763,
+      "env": {
+        "CCL_ZE_IPC_EXCHANGE": "unset/default",
+        "CCL_TOPO_P2P_ACCESS": "1"
+      },
+      "extraArgs": "--no-enable-prefix-caching",
+      "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n256-20260509T132708Z.log",
+      "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n256-20260509T132708Z.json",
+      "submitted": false,
+      "outcome": "neutral/slightly slower",
+      "details": "Disabling prefix caching did not improve the single random request benchmark. Keep the default prefix-caching behavior."
+    },
+    {
+      "label": "u4_decode_only_default_ipc_no_prefix_no_chunked_prefill_p512n256_blocked",
+      "promptTokens": 512,
+      "outputTokens": 256,
+      "contextLength": 2048,
+      "outcome": "blocked",
+      "extraArgs": "--no-enable-prefix-caching --no-enable-chunked-prefill",
+      "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n256-20260509T132643Z.log",
+      "submitted": false,
+      "details": "vLLM rejected the scheduler config because max_num_batched_tokens=1024 is smaller than max_model_len=2048 when chunked prefill is disabled. It also warns that this model does not officially support disabling chunked prefill, so this branch was not pursued further yet."
     }
   ],
   "conclusion": "The useful MiniMax path is reducing decode MoE and communication overhead rather than n-gram speculation. The unsigned llm-scaler tiny MoE decode path improves p512/n128 from 20.17 to 29.75 output tok/s, p512/n256 initially reached 33.03 output tok/s, removing the per-layer FP32-to-FP16 router-weight cast improved p512/n256 to 34.16 output tok/s, and leaving CCL_ZE_IPC_EXCHANGE at the oneCCL default improved it again to 34.58 output tok/s. A longer p512/n512 run with the same best path reached 37.14 output tok/s, making it the best current steady-state MiniMax AutoRound decode result. Speculative ngram_gpu remains blocked/negative on this TP4 XPU harness; PP2/TP2, CCL USM, MAX_MODEL_LEN=1024, MAX_MODEL_LEN=4096, and async-engine are negative/neutral. DCP is blocked by TP4 versus 8 KV heads, detokenization is not the bottleneck, XPU KV fp8_inc is unsupported, and built-in torch profiling stalls. Standalone pidfd XCCL allreduce is about 15 us at MiniMax hidden-state payload sizes, so the remaining bottleneck is not raw small allreduce latency alone."
