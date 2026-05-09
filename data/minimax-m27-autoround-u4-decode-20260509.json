@@ -78,6 +78,22 @@
       "localmaxxingResponse": "/home/steve/bench-results/localmaxxing-minimax-m27-autoround-u4-decode-p512n128-20260509.response.json"
     },
     {
+      "label": "u4_decode_only_p512n256",
+      "promptTokens": 512,
+      "outputTokens": 256,
+      "contextLength": 2048,
+      "tokSOut": 33.033788,
+      "tokSTotal": 99.101363,
+      "enabledMoeLayers": 62,
+      "peakVramGb": 28.11,
+      "elapsedSeconds": 7.7496411530300975,
+      "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n256-20260509T022204Z.log",
+      "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n256-20260509T022204Z.json",
+      "localmaxxingPayload": "data/localmaxxing-minimax-m27-autoround-u4-decode-p512n256-20260509.payload.json",
+      "localmaxxingId": "cmoxq7cww00i8ml019ihbeqc9",
+      "localmaxxingResponse": "/home/steve/bench-results/localmaxxing-minimax-m27-autoround-u4-decode-p512n256-20260509.response.json"
+    },
+    {
       "label": "u4_decode_only_ngram_gpu_p512n128_negative",
       "promptTokens": 512,
       "outputTokens": 128,
@@ -94,5 +110,5 @@
       "submitted": false
     }
   ],
-  "conclusion": "The useful MiniMax path is not n-gram speculation; it is reducing decode MoE cost. The unsigned llm-scaler tiny MoE decode path improves p512/n128 from 20.17 to 29.75 output tok/s, close to the 30 tok/s target. Speculative ngram_gpu remains blocked/negative on this TP4 XPU harness."
+  "conclusion": "The useful MiniMax path is not n-gram speculation; it is reducing decode MoE cost. The unsigned llm-scaler tiny MoE decode path improves p512/n128 from 20.17 to 29.75 output tok/s, and p512/n256 reaches 33.03 output tok/s once prefill is better amortized. Speculative ngram_gpu remains blocked/negative on this TP4 XPU harness."
 }

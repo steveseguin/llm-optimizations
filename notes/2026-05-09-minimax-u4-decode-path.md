@@ -10,12 +10,16 @@ The unsigned llm-scaler INT4 tiny-MoE path is now the best MiniMax AutoRound TP4
 | signed llm-scaler all-M prototype | 512/128 | 12.27 | 61.374 | negative; prefill used tiny path |
 | unsigned llm-scaler decode-only | 1/128 | 32.711775 | 32.967336 | decode isolation |
 | unsigned llm-scaler decode-only | 512/128 | 29.74843 | 148.742151 | current best |
+| unsigned llm-scaler decode-only | 512/256 | 33.033788 | 99.101363 | steady decode validation |
 
 Key log:
 
 ```text
 /home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n128-20260509T015634Z.log
 Throughput: 0.23 requests/s, 148.74 total tokens/s, 29.75 output tokens/s
+
+/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n256-20260509T022204Z.log
+Throughput: 0.13 requests/s, 99.10 total tokens/s, 33.03 output tokens/s
 ```
 
 ## What Changed
@@ -28,6 +32,8 @@ The current patch does two narrower things:
 - gates vLLM so the custom path only runs for MiniMax decode-size batches: `x.dtype == torch.float16` and `x.shape[0] <= 4`.
 
 This keeps prompt/prefill on vLLM's normal W4A16 fused-experts path and swaps only the decode MoE work onto the faster ESIMD kernel.
+
+The `512/256` validation confirms the decode-side goal: when the fixed prefill cost is amortized over a longer generation window, single-session output throughput is above 30 tok/s.
 
 ## Correctness Boundary
 
@@ -81,6 +87,11 @@ Patch artifacts:
 
 - `patches/llm-scaler-moe-int4-u4-decode-20260509.patch`
 - `patches/vllm-minimax-llm-scaler-u4-decode-20260509.patch`
+
+LocalMaxxing:
+
+- `cmoxptkfd00hsml01hf2ajhhp`: p512/n128, `29.74843` output tok/s.
+- `cmoxq7cww00i8ml019ihbeqc9`: p512/n256, `33.033788` output tok/s.
 
 ## Next Work
 

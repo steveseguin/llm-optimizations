@@ -1,0 +1,18 @@
+{
+  "localmaxxingId": "cmoxq7cww00i8ml019ihbeqc9",
+  "status": "APPROVED",
+  "model": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+  "result": {
+    "promptTokens": 512,
+    "outputTokens": 256,
+    "tokSOut": 33.033788,
+    "tokSTotal": 99.101363
+  },
+  "files": {
+    "payload": "data/localmaxxing-minimax-m27-autoround-u4-decode-p512n256-20260509.payload.json",
+    "response": "/home/steve/bench-results/localmaxxing-minimax-m27-autoround-u4-decode-p512n256-20260509.response.json",
+    "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n256-20260509T022204Z.log",
+    "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n256-20260509T022204Z.json"
+  },
+  "notes": "Longer output validation for the same u4 decode-only path. No API key is stored in this repo."
+}

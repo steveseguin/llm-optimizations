@@ -7,6 +7,7 @@ Model: `Lasimeri/MiniMax-M2.7-int4-AutoRound`, AutoRound W4A16 safetensors, vLLM
 | Label | LocalMaxxing ID | GPUs | Input | Output | tok/s out | tok/s total |
 | --- | --- | ---: | ---: | ---: | ---: | ---: |
 | `vllm-minimax-m27-autoround-u4-decode-p512-n128` | `cmoxptkfd00hsml01hf2ajhhp` | 4 | 512 | 128 | 29.748 | 148.742 |
+| `vllm-minimax-m27-autoround-u4-decode-p512-n256` | `cmoxq7cww00i8ml019ihbeqc9` | 4 | 512 | 256 | 33.034 | 99.101 |
 
 Note: this is the current best MiniMax AutoRound result on the four B70 system. It uses the unsigned llm-scaler u4 decode-only MoE path with FP16 activations, keeps prompt/prefill on vLLM fused experts, and does not use speculative decoding, expert dropping, sampling changes, or power-limit changes.
 
