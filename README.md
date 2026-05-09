@@ -26,6 +26,7 @@ Reproducibility notes, benchmark payloads, and local patches from the Intel Arc 
 - The next MiniMax performance blocker is true speed parallelism rather than capacity. Valid layer mode has only five scheduler splits and largely marches through the four GPUs sequentially. The >30 tok/s path likely requires quality-correct graph/tensor/expert parallelism, lower-overhead cross-device reductions, or a layout-aware active-expert kernel.
 - MiniMax AutoRound INT4 safetensors now load and generate through vLLM/XPU TP4 after the local INC `FusedMoE` to `MoeWNA16Config` patch and targeted vLLM package-skew repairs. Switching `CCL_ZE_IPC_EXCHANGE` from sockets to `pidfd` raised the p512/n128 result to 19.85 output tok/s and 99.231 total tok/s, accepted on LocalMaxxing as `cmox6tys30085ml0125gihg18`. The log still shows the next bottleneck: no B70-specific tuned MoE config for `E=256,N=384,dtype=int4_w4a16`. An AMD-derived config seed was accepted only after stripping an unsupported key, but it regressed to 1.73 output tok/s on p64/n16.
 - MiniMax AutoRound vLLM runtime toggles did not yet produce a speed path: `VLLM_XPU_ENABLE_XPU_GRAPH=1` is disabled by vLLM because TP4 communication ops cannot be captured, and MiniMax QK-norm fusion is blocked because this XPU build lacks `torch.ops._C.minimax_allreduce_rms_qk`.
+- MiniMax AutoRound's current best path is an experimental unsigned llm-scaler ESIMD INT4 MoE decode path in vLLM/XPU. It keeps prompt/prefill on vLLM fused experts and only routes tiny decode batches (`x.shape[0] <= 4`) through the custom raw-u4 kernel. The p512/n128 result improved from the FP16 baseline `20.17` output tok/s to `29.74843` output tok/s (`148.742151` total), with no speculative decode, no expert dropping, and no power-limit change. LocalMaxxing accepted this as `cmoxptkfd00hsml01hf2ajhhp`. MiniMax `ngram_gpu` with the same decode path failed/stalled during generation, so speculation remains negative for this harness.
 
 ## Layout
 
@@ -63,6 +64,7 @@ Reproducibility notes, benchmark payloads, and local patches from the Intel Arc 
 - `notes/2026-05-08-minimax-cpy-shape-trace.md`: MiniMax SYCL `CPY` shape trace and negative shape-specific copy fast path.
 - `notes/2026-05-08-minimax-fused-rmsnorm-sycl.md`: MiniMax SYCL RPC worker `FUSED_RMS_NORM` implementation and speed screen.
 - `notes/2026-05-08-minimax-autoround-vllm-xpu.md`: MiniMax AutoRound INT4 vLLM/XPU bring-up, including the quantized-MoE fit patch and remaining blockers.
+- `notes/2026-05-09-minimax-u4-decode-path.md`: unsigned llm-scaler u4 MiniMax decode path, p512/n128 `29.74843` output tok/s result, and negative `ngram_gpu` follow-up.
 - `data/qwen36-fp8-32k-tp4-vs-pp2-20260506.json`: post-reboot Q4 sanity plus FP8 32k-context TP4 vs TP2/PP2 validation.
 - `data/q4-esimd-blockscales-20260506.json`: structured ESIMD block-loaded scale metadata screen.
 - `data/q4-active-device-row-split-20260506.json`: structured active-device row-split patch validation and negative row-split smoke.
@@ -86,6 +88,7 @@ Reproducibility notes, benchmark payloads, and local patches from the Intel Arc 
 - `data/minimax-m27-cpy-shape-trace-20260508.json`: structured MiniMax `CPY` shape trace and negative fast-path test.
 - `data/minimax-m27-fused-rmsnorm-sycl-20260508.json`: structured MiniMax fused RMSNorm implementation result.
 - `data/minimax-m27-autoround-vllm-xpu-20260508.json`: structured MiniMax AutoRound INT4 vLLM/XPU bring-up result and remaining MoE tuning blocker.
+- `data/minimax-m27-autoround-u4-decode-20260509.json`: structured unsigned llm-scaler u4 decode path result, patch references, LocalMaxxing payload, and negative speculative follow-up.
 - `configs/vllm/minimax-m27-b70-int4-w4a16-moe-hybrid-20260508.json`: hybrid B70 MoE config for MiniMax AutoRound vLLM/XPU, tuned key `1` plus default prompt-size keys.
 - `configs/vllm/minimax-m27-b70-int4-w4a16-moe-ep-negative-20260508.json`: expert-parallel MiniMax MoE config retained as a negative/blocked result after EP underperformed and the tuned-config run OOMed.
 - `scripts/bench-qwen36-q4_0-gguf-vulkan-matrix.sh`: Q4_0 GGUF Vulkan benchmark sweep harness.
@@ -121,6 +124,8 @@ Reproducibility notes, benchmark payloads, and local patches from the Intel Arc 
 - `patches/vllm-inc-xpu-autoround-fusedmoe-wna16-20260508.patch`: experimental vLLM patch that lets INC/AutoRound XPU quantization apply WNA16 MoE quantization to MiniMax `FusedMoE` layers instead of falling back to unquantized MoE.
 - `patches/vllm-minimax-qknorm-passmanager-xpu-guard-20260508.patch`: guard patch so enabling MiniMax QK-norm fusion on XPU does not crash when the fused Lamport op is absent.
 - `patches/vllm-benchmark-moe-xpu-tune-harness-20260508.patch`: local vLLM MoE benchmark harness patch for XPU/Ray device exposure, XPU eager timing, and pruned small-M decode tuning.
+- `patches/llm-scaler-moe-int4-u4-decode-20260509.patch`: llm-scaler MoE-only unsigned uint4 tiny decode kernel and Python binding.
+- `patches/vllm-minimax-llm-scaler-u4-decode-20260509.patch`: vLLM WNA16 MiniMax gate that enables the llm-scaler u4 path only for tiny FP16 decode batches.
 
 ## Notes
 

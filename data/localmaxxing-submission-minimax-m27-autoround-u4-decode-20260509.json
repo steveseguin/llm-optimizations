@@ -1,0 +1,18 @@
+{
+  "localmaxxingId": "cmoxptkfd00hsml01hf2ajhhp",
+  "status": "APPROVED",
+  "model": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+  "result": {
+    "promptTokens": 512,
+    "outputTokens": 128,
+    "tokSOut": 29.74843,
+    "tokSTotal": 148.742151
+  },
+  "files": {
+    "payload": "data/localmaxxing-minimax-m27-autoround-u4-decode-p512n128-20260509.payload.json",
+    "response": "/home/steve/bench-results/localmaxxing-minimax-m27-autoround-u4-decode-p512n128-20260509.response.json",
+    "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n128-20260509T015634Z.log",
+    "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n128-20260509T015634Z.json"
+  },
+  "notes": "Submitted with curl after urllib was blocked by Cloudflare 1010. No API key is stored in this repo."
+}
