@@ -1,0 +1,61 @@
+{
+  "date": "2026-05-09",
+  "model": {
+    "hfId": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+    "base": "MiniMaxAI/MiniMax-M2.7",
+    "quantization": "INT4 AutoRound W4A16"
+  },
+  "hardware": {
+    "gpu": "Intel Arc Pro B70",
+    "gpuCount": 4,
+    "vramGbPerGpu": 32,
+    "os": "Ubuntu 24.04.4"
+  },
+  "baseline": {
+    "label": "u4_decode_only_default_ipc_p512n256",
+    "tokSOutBest": 34.578045,
+    "tokSOutRestoredControl": 33.444226,
+    "logBest": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n256-20260509T112853Z.log",
+    "logRestoredControl": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n256-20260509T164548Z.log"
+  },
+  "results": [
+    {
+      "label": "pybind_helper_dynamo_failure",
+      "outcome": "failed",
+      "details": "Raw pybind helper call is rejected by TorchDynamo during vLLM memory profiling.",
+      "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n256-20260509T170321Z.log"
+    },
+    {
+      "label": "custom_op_spir64_all_tokens",
+      "promptTokens": 512,
+      "outputTokens": 256,
+      "tokSOut": 22.5659,
+      "tokSTotal": 67.694004,
+      "elapsedSeconds": 11.345170182990842,
+      "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n256-20260509T171226Z.log",
+      "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n256-20260509T171226Z.json"
+    },
+    {
+      "label": "custom_op_bmg_aot_all_tokens",
+      "promptTokens": 512,
+      "outputTokens": 256,
+      "tokSOut": 32.5460,
+      "tokSTotal": 97.638162,
+      "elapsedSeconds": 7.865776932041626,
+      "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n256-20260509T172225Z.log",
+      "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n256-20260509T172225Z.json"
+    },
+    {
+      "label": "custom_op_bmg_aot_decode_only",
+      "promptTokens": 512,
+      "outputTokens": 256,
+      "tokSOut": 23.8984,
+      "tokSTotal": 71.695340,
+      "elapsedSeconds": 10.711993299017195,
+      "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n256-20260509T173058Z.log",
+      "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n256-20260509T173058Z.json"
+    }
+  ],
+  "decision": "Do not enable VLLM_MINIMAX_QK_RMS_XPU_HELPER for normal runs. The stock vLLM/Inductor Q/K RMS path is faster on this system."
+}
+

@@ -1,0 +1,323 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index e39181b..eaee674 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -443,6 +443,7 @@ if(BASIC_KERNELS_ENABLED)
+       "csrc/activation.cpp"
+       "csrc/pos_encoding_kernels.cpp"
+       "csrc/fused_qknorm_rope.cpp"
++      "csrc/minimax_qk_rms.cpp"
+       "csrc/torch_bindings.cpp"
+       "csrc/quantization/fp8/fp8_quant.cpp"
+       "csrc/quantization/fp4/mxfp4_quant.cpp"
+diff --git a/csrc/ops.h b/csrc/ops.h
+index 6618008..332144f 100644
+--- a/csrc/ops.h
++++ b/csrc/ops.h
+@@ -94,6 +94,23 @@ void fused_qk_norm_rope(
+     bool is_neox,
+     torch::Tensor& position_ids);
+ 
++void minimax_qk_rms_var(
++    torch::Tensor& qkv,
++    torch::Tensor& qk_var,
++    int64_t q_size,
++    int64_t kv_size);
++
++void minimax_qk_rms_apply(
++    torch::Tensor& qkv,
++    torch::Tensor& qk_var,
++    torch::Tensor& q_weight,
++    torch::Tensor& k_weight,
++    torch::Tensor& q_out,
++    torch::Tensor& k_out,
++    int64_t q_size,
++    int64_t kv_size,
++    double eps);
++
+ void reshape_and_cache(
+     torch::Tensor& key,
+     torch::Tensor& value,
+diff --git a/csrc/torch_bindings.cpp b/csrc/torch_bindings.cpp
+index dc5847c..51409bb 100644
+--- a/csrc/torch_bindings.cpp
++++ b/csrc/torch_bindings.cpp
+@@ -115,6 +115,19 @@ TORCH_LIBRARY_EXPAND(TORCH_EXTENSION_NAME, ops) {
+       "bool is_neox, Tensor position_ids) -> ()");
+   ops.impl("fused_qk_norm_rope", torch::kXPU, &fused_qk_norm_rope);
+ 
++  // MiniMax TP Q/K RMS helper. The caller still performs the inter-rank
++  // allreduce on qk_var; these kernels fuse local variance and apply work.
++  ops.def(
++      "minimax_qk_rms_var(Tensor qkv, Tensor! qk_var, int q_size, "
++      "int kv_size) -> ()");
++  ops.impl("minimax_qk_rms_var", torch::kXPU, &minimax_qk_rms_var);
++
++  ops.def(
++      "minimax_qk_rms_apply(Tensor qkv, Tensor qk_var, Tensor q_weight, "
++      "Tensor k_weight, Tensor! q_out, Tensor! k_out, int q_size, "
++      "int kv_size, float eps) -> ()");
++  ops.impl("minimax_qk_rms_apply", torch::kXPU, &minimax_qk_rms_apply);
++
+   // Compute FP8 quantized tensor for given scaling factor.
+   ops.def(
+       "static_scaled_fp8_quant(Tensor! result, Tensor input, Tensor scale, "
+diff --git a/home/steve/src/vllm-xpu-kernels/csrc/minimax_qk_rms.cpp b/home/steve/src/vllm-xpu-kernels/csrc/minimax_qk_rms.cpp
+new file mode 100644
+index 0000000..6ff9b17
+--- /dev/null
++++ b/home/steve/src/vllm-xpu-kernels/csrc/minimax_qk_rms.cpp
+@@ -0,0 +1,253 @@
++#include <sycl/sycl.hpp>
++
++#include <ATen/DeviceGuard.h>
++
++#include "dispatch_utils.h"
++#include "utils.h"
++
++namespace vllm {
++
++template <typename scalar_t>
++class minimax_qk_rms_var_kernel {
++ public:
++  minimax_qk_rms_var_kernel(
++      const scalar_t* qkv_,
++      float* qk_var_,
++      int q_size_,
++      int kv_size_,
++      int qkv_stride_)
++      : qkv(qkv_),
++        qk_var(qk_var_),
++        q_size(q_size_),
++        kv_size(kv_size_),
++        qkv_stride(qkv_stride_) {}
++
++  void operator() [[sycl::reqd_sub_group_size(32)]] (
++      const sycl::nd_item<1>& item) const {
++    const int group = item.get_group(0);
++    const int token_idx = group >> 1;
++    const int part = group & 1;
++    const int hidden = part == 0 ? q_size : kv_size;
++    const int offset = token_idx * qkv_stride + (part == 0 ? 0 : q_size);
++
++    float sum = 0.0f;
++    for (int i = item.get_local_id(0); i < hidden; i += item.get_local_range(0)) {
++      float x = static_cast<float>(qkv[offset + i]);
++      sum += x * x;
++    }
++
++    sum = sycl::reduce_over_group(item.get_group(), sum, sycl::plus<float>());
++    if (item.get_local_id(0) == 0) {
++      qk_var[token_idx * 2 + part] = sum / static_cast<float>(hidden);
++    }
++  }
++
++ private:
++  const scalar_t* __restrict__ qkv;
++  float* __restrict__ qk_var;
++  const int q_size;
++  const int kv_size;
++  const int qkv_stride;
++};
++
++template <typename scalar_t>
++class minimax_qk_rms_apply_kernel {
++ public:
++  minimax_qk_rms_apply_kernel(
++      const scalar_t* qkv_,
++      const float* qk_var_,
++      const scalar_t* q_weight_,
++      const scalar_t* k_weight_,
++      scalar_t* q_out_,
++      scalar_t* k_out_,
++      int q_size_,
++      int kv_size_,
++      int qkv_stride_,
++      float eps_)
++      : qkv(qkv_),
++        qk_var(qk_var_),
++        q_weight(q_weight_),
++        k_weight(k_weight_),
++        q_out(q_out_),
++        k_out(k_out_),
++        q_size(q_size_),
++        kv_size(kv_size_),
++        qkv_stride(qkv_stride_),
++        eps(eps_) {}
++
++  void operator() [[sycl::reqd_sub_group_size(32)]] (
++      const sycl::nd_item<1>& item) const {
++    const int group = item.get_group(0);
++    const int token_idx = group >> 1;
++    const int part = group & 1;
++    const int hidden = part == 0 ? q_size : kv_size;
++    const int input_offset = token_idx * qkv_stride + (part == 0 ? 0 : q_size);
++    const int output_offset = token_idx * hidden;
++    const float scale = sycl::rsqrt(qk_var[token_idx * 2 + part] + eps);
++
++    for (int i = item.get_local_id(0); i < hidden; i += item.get_local_range(0)) {
++      float x = static_cast<float>(qkv[input_offset + i]);
++      float w = static_cast<float>((part == 0 ? q_weight : k_weight)[i]);
++      scalar_t y = static_cast<scalar_t>(x * scale * w);
++      if (part == 0) {
++        q_out[output_offset + i] = y;
++      } else {
++        k_out[output_offset + i] = y;
++      }
++    }
++  }
++
++ private:
++  const scalar_t* __restrict__ qkv;
++  const float* __restrict__ qk_var;
++  const scalar_t* __restrict__ q_weight;
++  const scalar_t* __restrict__ k_weight;
++  scalar_t* __restrict__ q_out;
++  scalar_t* __restrict__ k_out;
++  const int q_size;
++  const int kv_size;
++  const int qkv_stride;
++  const float eps;
++};
++
++template <typename scalar_t>
++void launch_minimax_qk_rms_var(
++    torch::Tensor& qkv,
++    torch::Tensor& qk_var,
++    int q_size,
++    int kv_size) {
++  using sycl_t = typename vllm::xpu::SyclTypeTrait<scalar_t>::Type;
++
++  const int num_tokens = qkv.size(0);
++  const int qkv_stride = qkv.size(1);
++  constexpr int block_size = 256;
++
++  auto& queue = vllm::xpu::vllmGetQueue();
++  queue.submit([&](sycl::handler& cgh) {
++    cgh.parallel_for(
++        sycl::nd_range<1>(num_tokens * 2 * block_size, block_size),
++        minimax_qk_rms_var_kernel<sycl_t>(
++            reinterpret_cast<const sycl_t*>(qkv.data_ptr<scalar_t>()),
++            qk_var.data_ptr<float>(),
++            q_size,
++            kv_size,
++            qkv_stride));
++  });
++}
++
++template <typename scalar_t>
++void launch_minimax_qk_rms_apply(
++    torch::Tensor& qkv,
++    torch::Tensor& qk_var,
++    torch::Tensor& q_weight,
++    torch::Tensor& k_weight,
++    torch::Tensor& q_out,
++    torch::Tensor& k_out,
++    int q_size,
++    int kv_size,
++    float eps) {
++  using sycl_t = typename vllm::xpu::SyclTypeTrait<scalar_t>::Type;
++
++  const int num_tokens = qkv.size(0);
++  const int qkv_stride = qkv.size(1);
++  constexpr int block_size = 256;
++
++  auto& queue = vllm::xpu::vllmGetQueue();
++  queue.submit([&](sycl::handler& cgh) {
++    cgh.parallel_for(
++        sycl::nd_range<1>(num_tokens * 2 * block_size, block_size),
++        minimax_qk_rms_apply_kernel<sycl_t>(
++            reinterpret_cast<const sycl_t*>(qkv.data_ptr<scalar_t>()),
++            qk_var.data_ptr<float>(),
++            reinterpret_cast<const sycl_t*>(q_weight.data_ptr<scalar_t>()),
++            reinterpret_cast<const sycl_t*>(k_weight.data_ptr<scalar_t>()),
++            reinterpret_cast<sycl_t*>(q_out.data_ptr<scalar_t>()),
++            reinterpret_cast<sycl_t*>(k_out.data_ptr<scalar_t>()),
++            q_size,
++            kv_size,
++            qkv_stride,
++            eps));
++  });
++}
++
++}  // namespace vllm
++
++void minimax_qk_rms_var(
++    torch::Tensor& qkv,
++    torch::Tensor& qk_var,
++    int64_t q_size,
++    int64_t kv_size) {
++  const at::DeviceGuard device_guard(qkv.device());
++
++  CHECK_DEVICE(qkv);
++  CHECK_CONTIGUOUS(qkv);
++  CHECK_DEVICE(qk_var);
++  CHECK_CONTIGUOUS(qk_var);
++  TORCH_CHECK(qkv.dim() == 2, "qkv must be 2D");
++  TORCH_CHECK(qk_var.dim() == 2, "qk_var must be 2D");
++  TORCH_CHECK(qk_var.scalar_type() == torch::kFloat32, "qk_var must be float32");
++  TORCH_CHECK(qk_var.size(0) == qkv.size(0), "qk_var token dim must match qkv");
++  TORCH_CHECK(qk_var.size(1) == 2, "qk_var must have shape [num_tokens, 2]");
++  TORCH_CHECK(qkv.size(1) == q_size + 2 * kv_size, "qkv hidden dim mismatch");
++
++  VLLM_DISPATCH_HALF_TYPES(qkv.scalar_type(), "minimax_qk_rms_var", [&] {
++    vllm::launch_minimax_qk_rms_var<scalar_t>(
++        qkv, qk_var, static_cast<int>(q_size), static_cast<int>(kv_size));
++  });
++}
++
++void minimax_qk_rms_apply(
++    torch::Tensor& qkv,
++    torch::Tensor& qk_var,
++    torch::Tensor& q_weight,
++    torch::Tensor& k_weight,
++    torch::Tensor& q_out,
++    torch::Tensor& k_out,
++    int64_t q_size,
++    int64_t kv_size,
++    double eps) {
++  const at::DeviceGuard device_guard(qkv.device());
++
++  CHECK_DEVICE(qkv);
++  CHECK_CONTIGUOUS(qkv);
++  CHECK_DEVICE(qk_var);
++  CHECK_CONTIGUOUS(qk_var);
++  CHECK_DEVICE(q_weight);
++  CHECK_CONTIGUOUS(q_weight);
++  CHECK_DEVICE(k_weight);
++  CHECK_CONTIGUOUS(k_weight);
++  CHECK_DEVICE(q_out);
++  CHECK_CONTIGUOUS(q_out);
++  CHECK_DEVICE(k_out);
++  CHECK_CONTIGUOUS(k_out);
++  TORCH_CHECK(qkv.dim() == 2, "qkv must be 2D");
++  TORCH_CHECK(qk_var.dim() == 2, "qk_var must be 2D");
++  TORCH_CHECK(qk_var.scalar_type() == torch::kFloat32, "qk_var must be float32");
++  TORCH_CHECK(qk_var.size(0) == qkv.size(0), "qk_var token dim must match qkv");
++  TORCH_CHECK(qk_var.size(1) == 2, "qk_var must have shape [num_tokens, 2]");
++  TORCH_CHECK(qkv.size(1) == q_size + 2 * kv_size, "qkv hidden dim mismatch");
++  TORCH_CHECK(q_weight.size(0) == q_size, "q_weight size mismatch");
++  TORCH_CHECK(k_weight.size(0) == kv_size, "k_weight size mismatch");
++  TORCH_CHECK(q_out.size(0) == qkv.size(0) && q_out.size(1) == q_size,
++              "q_out shape mismatch");
++  TORCH_CHECK(k_out.size(0) == qkv.size(0) && k_out.size(1) == kv_size,
++              "k_out shape mismatch");
++  TORCH_CHECK(qkv.scalar_type() == q_weight.scalar_type() &&
++                  qkv.scalar_type() == k_weight.scalar_type() &&
++                  qkv.scalar_type() == q_out.scalar_type() &&
++                  qkv.scalar_type() == k_out.scalar_type(),
++              "qkv, weights, and outputs must have the same dtype");
++
++  VLLM_DISPATCH_HALF_TYPES(qkv.scalar_type(), "minimax_qk_rms_apply", [&] {
++    vllm::launch_minimax_qk_rms_apply<scalar_t>(
++        qkv,
++        qk_var,
++        q_weight,
++        k_weight,
++        q_out,
++        k_out,
++        static_cast<int>(q_size),
++        static_cast<int>(kv_size),
++        static_cast<float>(eps));
++  });
++}
