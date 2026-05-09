@@ -113,6 +113,14 @@ XPU Graph doesn't support capture communication ops, disabling cudagraph_mode.
 
 The run was stopped during shard loading after that warning because the engine config had already fallen back to `cudagraph_mode=NONE`.
 
+`CCL_TOPO_P2P_ACCESS=0` was tested to switch oneCCL from P2P mode to USM mode. The setting took effect, and the run reached model load plus initial profiling/warmup, but then stalled before benchmarking with repeated:
+
+```text
+No available shared memory broadcast block found in 60 seconds.
+```
+
+The run was stopped without JSON throughput output. Keep `CCL_TOPO_P2P_ACCESS=1` for this MiniMax vLLM TP4 path.
+
 ## Next Work
 
 The next useful optimization path is to reduce the remaining decode overhead around the same MiniMax MoE path:
