@@ -68,7 +68,7 @@ This keeps prompt/prefill on vLLM's normal W4A16 fused-experts path and swaps on
 
 The `512/256` validation confirms the decode-side goal: when the fixed prefill cost is amortized over a longer generation window, single-session output throughput is above 30 tok/s. Removing the router-weight cast improved the same p512/n256 method from `33.033788` to `34.157842` output tok/s.
 
-Leaving `CCL_ZE_IPC_EXCHANGE` unset so oneCCL can use its default IPC exchange improved p512/n256 again to `34.578045` output tok/s. The benchmark wrapper now supports `CCL_IPC=default` for that behavior; the older default remains `pidfd` unless explicitly overridden.
+Leaving `CCL_ZE_IPC_EXCHANGE` unset so oneCCL can use its default IPC exchange improved p512/n256 again to `34.578045` output tok/s. The benchmark wrapper now defaults to `CCL_IPC=default` for that behavior. Use `CCL_IPC=pidfd` only for diagnostics that need to force the alternate exchange path.
 
 The p512/n512 validation with the same default-IPC path reached `37.136187` output tok/s. That is the best current steady-state MiniMax AutoRound decode result and suggests the fixed prompt/setup portion is still materially affecting shorter p512/n128 and p512/n256 comparisons.
 
