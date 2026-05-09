@@ -339,7 +339,72 @@
       "details": "vLLM accepted --kv-cache-dtype fp8_inc and logged the accuracy-warning path, but XPU worker initialization failed with Unsupported data type of kv cache: fp8_inc.",
       "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n512-20260509T122140Z.log",
       "submitted": false
+    },
+    {
+      "label": "torch_profiler_p512n32_blocked",
+      "promptTokens": 512,
+      "outputTokens": 32,
+      "contextLength": 2048,
+      "outcome": "blocked/stalled",
+      "details": "vLLM torch profiler with XPU activities reached generation but repeatedly logged no available shared memory broadcast block found in 60 seconds. No profile trace files were emitted; run was stopped.",
+      "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n32-20260509T123226Z.log",
+      "profileDir": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/profile-p512n32-20260509T123226Z",
+      "submitted": false
+    },
+    {
+      "label": "standalone_xccl_decode_size_allreduce_pidfd",
+      "outcome": "diagnostic",
+      "env": {
+        "CCL_ZE_IPC_EXCHANGE": "pidfd",
+        "CCL_TOPO_P2P_ACCESS": "1"
+      },
+      "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/xccl-decode-size-allreduce-4xb70-pidfd-20260509T124512Z.log",
+      "results": [
+        {
+          "label": "minimax_hidden_fp16",
+          "bytes": 6144,
+          "avgMs": 0.015159
+        },
+        {
+          "label": "minimax_hidden_fp32",
+          "bytes": 12288,
+          "avgMs": 0.015141
+        },
+        {
+          "label": "two_hidden_fp16",
+          "bytes": 12288,
+          "avgMs": 0.014726
+        },
+        {
+          "label": "two_hidden_fp32",
+          "bytes": 24576,
+          "avgMs": 0.014906
+        },
+        {
+          "label": "small_20kb_fp32",
+          "bytes": 20480,
+          "avgMs": 0.014614
+        },
+        {
+          "label": "small_64kb_fp16",
+          "bytes": 65536,
+          "avgMs": 0.014835
+        }
+      ],
+      "details": "Standalone XCCL allreduce latency for MiniMax hidden-state sized payloads is about 15 us with pidfd IPC, so raw communication latency alone is too small to explain the remaining p512/n512 decode time.",
+      "submitted": false
+    },
+    {
+      "label": "standalone_xccl_decode_size_allreduce_default_ipc_blocked",
+      "outcome": "blocked/stalled",
+      "env": {
+        "CCL_ZE_IPC_EXCHANGE": "unset/default",
+        "CCL_TOPO_P2P_ACCESS": "1"
+      },
+      "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/xccl-allreduce-4xb70-20260509T124218Z.log",
+      "details": "Standalone torch.distributed XCCL allreduce hung before the first 4 KiB result when CCL_ZE_IPC_EXCHANGE was unset/default. vLLM default IPC still benchmarks correctly, but standalone communication probes should force pidfd.",
+      "submitted": false
     }
   ],
-  "conclusion": "The useful MiniMax path is reducing decode MoE and communication overhead rather than n-gram speculation. The unsigned llm-scaler tiny MoE decode path improves p512/n128 from 20.17 to 29.75 output tok/s, p512/n256 initially reached 33.03 output tok/s, removing the per-layer FP32-to-FP16 router-weight cast improved p512/n256 to 34.16 output tok/s, and leaving CCL_ZE_IPC_EXCHANGE at the oneCCL default improved it again to 34.58 output tok/s. A longer p512/n512 run with the same best path reached 37.14 output tok/s, making it the best current steady-state MiniMax AutoRound decode result. Speculative ngram_gpu remains blocked/negative on this TP4 XPU harness; PP2/TP2, CCL USM, MAX_MODEL_LEN=1024, MAX_MODEL_LEN=4096, and async-engine are negative/neutral. DCP is blocked by TP4 versus 8 KV heads, detokenization is not the bottleneck, and XPU KV fp8_inc is unsupported in this stack."
+  "conclusion": "The useful MiniMax path is reducing decode MoE and communication overhead rather than n-gram speculation. The unsigned llm-scaler tiny MoE decode path improves p512/n128 from 20.17 to 29.75 output tok/s, p512/n256 initially reached 33.03 output tok/s, removing the per-layer FP32-to-FP16 router-weight cast improved p512/n256 to 34.16 output tok/s, and leaving CCL_ZE_IPC_EXCHANGE at the oneCCL default improved it again to 34.58 output tok/s. A longer p512/n512 run with the same best path reached 37.14 output tok/s, making it the best current steady-state MiniMax AutoRound decode result. Speculative ngram_gpu remains blocked/negative on this TP4 XPU harness; PP2/TP2, CCL USM, MAX_MODEL_LEN=1024, MAX_MODEL_LEN=4096, and async-engine are negative/neutral. DCP is blocked by TP4 versus 8 KV heads, detokenization is not the bottleneck, XPU KV fp8_inc is unsupported, and built-in torch profiling stalls. Standalone pidfd XCCL allreduce is about 15 us at MiniMax hidden-state payload sizes, so the remaining bottleneck is not raw small allreduce latency alone."
 }

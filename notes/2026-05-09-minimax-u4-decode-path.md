@@ -167,6 +167,25 @@ tensor parallel size 4 must be greater than total num kv heads 8 when enable dec
 Unsupported data type of kv cache: fp8_inc
 ```
 
+Built-in vLLM torch profiling was also attempted with XPU activities on a short p512/n32 run. It reached generation but repeatedly logged:
+
+```text
+No available shared memory broadcast block found in 60 seconds.
+```
+
+No profile trace files were emitted, and the run was stopped. The profiler is too disruptive for this TP4 XPU path as configured.
+
+Standalone XCCL allreduce probes with explicit `CCL_ZE_IPC_EXCHANGE=pidfd` are fast at the MiniMax hidden-state payload sizes:
+
+```text
+/home/steve/bench-results/minimax-m2.7-autoround-vllm/xccl-decode-size-allreduce-4xb70-pidfd-20260509T124512Z.log
+minimax_hidden_fp16, 3072 elements, 6144 bytes: 0.015159 ms
+minimax_hidden_fp32, 3072 elements, 12288 bytes: 0.015141 ms
+small_20kb_fp32, 5120 elements, 20480 bytes: 0.014614 ms
+```
+
+This says raw standalone XCCL latency is not large enough by itself to explain a roughly `26.9 ms/token` p512/n512 decode step. The remaining bottleneck is likely embedded graph/scheduler gaps, attention/KV work, router/top-k overhead, or the custom MoE bridge/kernels in context, rather than simple allreduce bandwidth alone. The same standalone allreduce script hung with `CCL_ZE_IPC_EXCHANGE` unset/default, while vLLM default IPC still benchmarks correctly; keep using explicit `pidfd` for standalone communication probes.
+
 ## Next Work
 
 The next useful optimization path is to reduce the remaining decode overhead around the same MiniMax MoE path:
