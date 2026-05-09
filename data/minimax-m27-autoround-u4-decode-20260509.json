@@ -512,6 +512,27 @@
       "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n256-20260509T132643Z.log",
       "submitted": false,
       "details": "vLLM rejected the scheduler config because max_num_batched_tokens=1024 is smaller than max_model_len=2048 when chunked prefill is disabled. It also warns that this model does not officially support disabling chunked prefill, so this branch was not pursued further yet."
+    },
+    {
+      "label": "u4_decode_only_default_ipc_fp16_router_p512n256_negative",
+      "promptTokens": 512,
+      "outputTokens": 256,
+      "contextLength": 2048,
+      "tokSOut": 24.525612,
+      "tokSTotal": 73.576836,
+      "elapsedSeconds": 10.438067801005673,
+      "env": {
+        "VLLM_MINIMAX_M2_FP16_ROUTER": "1",
+        "CCL_ZE_IPC_EXCHANGE": "unset/default",
+        "CCL_TOPO_P2P_ACCESS": "1"
+      },
+      "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n256-20260509T133722Z.log",
+      "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n256-20260509T133722Z.json",
+      "patch": "patches/vllm-minimax-m2-fp16-router-experiment-20260509.patch",
+      "submitted": false,
+      "outcome": "negative/slower",
+      "qualityRisk": "FP16 router math can alter expert selection, so this is not a quality-preserving optimization unless separately validated.",
+      "details": "The experiment precomputes FP16 copies of MiniMax gate weights after model load, computes router logits with FP16 linear, then casts logits back to FP32 for the existing top-k path. It regressed throughput substantially, so keep the default FP32 router."
     }
   ],
   "conclusion": "The useful MiniMax path is reducing decode MoE and communication overhead rather than n-gram speculation. The unsigned llm-scaler tiny MoE decode path improves p512/n128 from 20.17 to 29.75 output tok/s, p512/n256 initially reached 33.03 output tok/s, removing the per-layer FP32-to-FP16 router-weight cast improved p512/n256 to 34.16 output tok/s, and leaving CCL_ZE_IPC_EXCHANGE at the oneCCL default improved it again to 34.58 output tok/s. A longer p512/n512 run with the same best path reached 37.14 output tok/s, making it the best current steady-state MiniMax AutoRound decode result. Speculative ngram_gpu remains blocked/negative on this TP4 XPU harness; PP2/TP2, CCL USM, MAX_MODEL_LEN=1024, MAX_MODEL_LEN=4096, and async-engine are negative/neutral. DCP is blocked by TP4 versus 8 KV heads, detokenization is not the bottleneck, XPU KV fp8_inc is unsupported, and built-in torch profiling stalls. Standalone pidfd XCCL allreduce is about 15 us at MiniMax hidden-state payload sizes, so the remaining bottleneck is not raw small allreduce latency alone."

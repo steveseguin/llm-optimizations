@@ -213,6 +213,17 @@ Throughput: 0.13 requests/s, 102.04 total tokens/s, 34.01 output tokens/s
 
 Keep prefix caching enabled. Disabling chunked prefill together with prefix caching was blocked by vLLM validation at the current `MAX_BATCHED_TOKENS=1024`; raising that to satisfy validation is not attractive yet because vLLM warns MiniMax does not officially support manually disabling chunked prefill.
 
+An opt-in FP16-router experiment was added behind `VLLM_MINIMAX_M2_FP16_ROUTER=1`. It materializes FP16 copies of the MiniMax replicated gate weights after model load and computes router logits with an FP16 GEMM, then casts logits back to FP32 for vLLM's normal top-k path. This is a speed/quality tradeoff probe because lower-precision router math can change expert selection.
+
+The result is negative on p512/n256:
+
+```text
+/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n256-20260509T133722Z.log
+Throughput: 0.10 requests/s, 73.58 total tokens/s, 24.53 output tokens/s
+```
+
+Keep the default FP32 router. Patch artifact: `patches/vllm-minimax-m2-fp16-router-experiment-20260509.patch`.
+
 Standalone XCCL allreduce probes with explicit `CCL_ZE_IPC_EXCHANGE=pidfd` are fast at the MiniMax hidden-state payload sizes:
 
 ```text

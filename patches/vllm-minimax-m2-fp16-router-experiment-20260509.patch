@@ -1,0 +1,69 @@
+diff --git a/vllm/model_executor/models/minimax_m2.py b/vllm/model_executor/models/minimax_m2.py
+index 818b7e681..e93acd1e7 100644
+--- a/vllm/model_executor/models/minimax_m2.py
++++ b/vllm/model_executor/models/minimax_m2.py
+@@ -23,6 +23,7 @@
+ # limitations under the License.
+ """Inference-only MiniMaxM2 model."""
+ 
++import os
+ from collections.abc import Iterable
+ from itertools import islice
+ from typing import Any
+@@ -73,6 +74,10 @@ from .utils import (
+     maybe_prefix,
+ )
+ 
++_MINIMAX_M2_FP16_ROUTER = (
++    os.environ.get("VLLM_MINIMAX_M2_FP16_ROUTER", "0") == "1"
++)
++
+ 
+ class MiniMaxM2MoE(nn.Module):
+     def __init__(
+@@ -132,7 +137,12 @@ class MiniMaxM2MoE(nn.Module):
+         hidden_states = hidden_states.view(-1, hidden_dim)
+ 
+         # router_logits: (num_tokens, n_experts)
+-        router_logits, _ = self.gate(hidden_states.to(torch.float32))
++        if _MINIMAX_M2_FP16_ROUTER and hasattr(self, "_gate_weight_fp16"):
++            router_logits = torch.nn.functional.linear(
++                hidden_states.to(torch.float16), self._gate_weight_fp16
++            ).to(torch.float32)
++        else:
++            router_logits, _ = self.gate(hidden_states.to(torch.float32))
+         final_hidden_states = self.experts(
+             hidden_states=hidden_states, router_logits=router_logits
+         )
+@@ -417,6 +427,22 @@ class MiniMaxM2Model(nn.Module, EagleModelMixin):
+             num_experts=self.config.num_local_experts,
+         )
+ 
++    def _init_fp16_router_buffers(self) -> None:
++        for layer in self.layers:
++            if not isinstance(layer, MiniMaxM2DecoderLayer):
++                continue
++            moe = layer.block_sparse_moe
++            gate_weight = getattr(moe.gate, "weight", None)
++            if gate_weight is None:
++                continue
++            gate_weight_fp16 = gate_weight.detach().to(torch.float16).contiguous()
++            if "_gate_weight_fp16" in moe._buffers:
++                moe._buffers["_gate_weight_fp16"] = gate_weight_fp16
++            else:
++                moe.register_buffer(
++                    "_gate_weight_fp16", gate_weight_fp16, persistent=False
++                )
++
+     def load_weights(self, weights: Iterable[tuple[str, torch.Tensor]]) -> set[str]:
+         stacked_params_mapping = [
+             # (param_name, shard_name, shard_id)
+@@ -513,6 +539,8 @@ class MiniMaxM2Model(nn.Module, EagleModelMixin):
+                     )
+                     weight_loader(param, loaded_weight)
+             loaded_params.add(name)
++        if _MINIMAX_M2_FP16_ROUTER:
++            self._init_fp16_router_buffers()
+         return loaded_params
+ 
+ 
