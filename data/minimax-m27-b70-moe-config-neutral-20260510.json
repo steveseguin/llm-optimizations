@@ -1,0 +1,40 @@
+{
+  "date": "2026-05-10",
+  "model": {
+    "hf_id": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+    "local_path": "/mnt/corsair-external/llm-models/minimax-m2.7-int4-autoround",
+    "quantization": "AutoRound INT4 W4A16"
+  },
+  "engine": {
+    "name": "vllm",
+    "version": "0.20.1-local",
+    "backend": "xpu",
+    "tensor_parallel": 4,
+    "dtype": "bfloat16",
+    "llm_scaler_u4_decode_bridge": true
+  },
+  "run": {
+    "label": "vllm-minimax-m27-b70-moe-config-hybrid-bf16-u4-p512-n256",
+    "status": "success_neutral_negative",
+    "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n256-20260510T000747Z.log",
+    "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n256-20260510T000747Z.json",
+    "tuned_config_folder": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/moe-config-hybrid-m1-default-prefill",
+    "tuned_config_file": "E=256,N=384,device_name=Intel(R)_Graphics_[0xe223],dtype=int4_w4a16.json",
+    "prompt_tokens": 512,
+    "output_tokens": 256,
+    "max_model_len": 2048,
+    "max_num_batched_tokens": 1024,
+    "elapsed_s": 7.696395114995539,
+    "tok_s_output": 33.262325566057996,
+    "tok_s_total": 99.78697669817399,
+    "available_kv_cache_gb": 0.16,
+    "gpu_kv_cache_tokens": 2688,
+    "model_load_gb": 28.96,
+    "evidence": [
+      "Log line confirms: Using configuration from /home/steve/bench-results/minimax-m2.7-autoround-vllm/moe-config-hybrid-m1-default-prefill/E=256,N=384,device_name=Intel(R)_Graphics_[0xe223],dtype=int4_w4a16.json for MoE layer.",
+      "The default-config warning is gone in this run.",
+      "Throughput is below the stronger non-tuned BF16 u4 p512/n256 datapoints, so the B70 config warning is not the current decode bottleneck under the llm-scaler u4 bridge."
+    ]
+  },
+  "conclusion": "Do not enable the 2026-05-08 hybrid B70 MoE config by default for current BF16 llm-scaler u4 decode runs. It can reduce the warning and may help older non-bridge/prefill paths, but it did not improve the current p512/n256 decode-style benchmark."
+}
