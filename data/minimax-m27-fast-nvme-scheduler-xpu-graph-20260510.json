@@ -139,6 +139,38 @@
       "tokSTotal": 54.02527490836688,
       "tokSOut": 36.01684993891125,
       "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1024-20260510T015751Z.log"
+    },
+    {
+      "name": "fast-nvme-p512-n1024-installed-b70-moe-config-run1",
+      "promptTokens": 512,
+      "outputTokens": 1024,
+      "maxModelLen": 2048,
+      "maxNumBatchedTokens": 1024,
+      "gpuMemoryUtilization": "default",
+      "xpuGraph": false,
+      "installedMoeConfig": "configs/vllm/minimax-m27-b70-int4-w4a16-moe-hybrid-20260508.json",
+      "loadSeconds": 73.172995,
+      "kvCacheMemoryGiB": 1.02,
+      "gpuKvCacheTokens": 17216,
+      "tokSTotal": 55.313733167116084,
+      "tokSOut": 36.87582211141072,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1024-20260510T020705Z.log"
+    },
+    {
+      "name": "fast-nvme-p512-n1024-installed-b70-moe-config-run2",
+      "promptTokens": 512,
+      "outputTokens": 1024,
+      "maxModelLen": 2048,
+      "maxNumBatchedTokens": 1024,
+      "gpuMemoryUtilization": "default",
+      "xpuGraph": false,
+      "installedMoeConfig": "configs/vllm/minimax-m27-b70-int4-w4a16-moe-hybrid-20260508.json",
+      "loadSeconds": 78.063693,
+      "kvCacheMemoryGiB": 1.02,
+      "gpuKvCacheTokens": 17216,
+      "tokSTotal": 54.92963620725372,
+      "tokSOut": 36.61975747150248,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1024-20260510T021000Z.log"
     }
   ],
   "observations": [
@@ -146,6 +178,7 @@
     "The best raw p512/n1024 decode result in this sweep is 36.67 output tok/s with max-num-batched-tokens 1024, XPU graph disabled, and default gpu-memory-utilization.",
     "max-num-batched-tokens is performance-sensitive on this stack: 1536 and 512 both reduced KV allocation and hurt decode.",
     "XPU graph remains negative for TP4 because vLLM reports communication capture is unsupported, disables graph mode, and loses KV headroom.",
-    "gpu-memory-utilization 0.95 doubles KV capacity to 33,408 tokens while keeping decode over 36 tok/s, so it is useful for larger-context serving even though default is slightly faster."
+    "gpu-memory-utilization 0.95 doubles KV capacity to 33,408 tokens while keeping decode over 36 tok/s, so it is useful for larger-context serving even though default is slightly faster.",
+    "Installing the archived B70 MoE config under vLLM's exact expected filename removes the missing-config warning and produced 36.88 then 36.62 output tok/s on repeat p512/n1024 runs. Treat it as neutral-to-small-positive for the current llm-scaler decode path, not as a clear new speed breakthrough."
   ]
 }

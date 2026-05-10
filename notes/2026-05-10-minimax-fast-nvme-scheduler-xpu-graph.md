@@ -28,6 +28,8 @@ All results use:
 | p512/n512 | 1024 | default | 17,216 | 35.297 | 70.594 | 74.95s |
 | p512/n512 | 1024 | `XPU_GRAPH=1`, negative | 9,408 | 26.316 | 52.632 | 78.06s |
 | p1/n1024 | 1024 | default | 9,408 | 31.880 | 31.911 | 77.13s |
+| p512/n1024 | 1024 | installed B70 MoE config, run 1 | 17,216 | 36.876 | 55.314 | 73.17s |
+| p512/n1024 | 1024 | installed B70 MoE config, run 2 | 17,216 | 36.620 | 54.930 | 78.06s |
 
 ## Findings
 
@@ -40,6 +42,18 @@ The NVMe move is a large iteration-speed win. Comparable p512/n1024 load time fe
 `--gpu-memory-utilization 0.95` is useful for context capacity rather than raw speed. It increased KV cache from 17,216 to 33,408 tokens and still held 36.02 output tok/s on p512/n1024. For raw decode speed, default gpu-memory-utilization is slightly better.
 
 PCIe reporting is still odd at the endpoint level. The B70 endpoints and downstream internal Intel bridge ports report 2.5 GT/s x1, but the root-to-card upstream links report PCIe 5.0 x16. Treat the endpoint x1 field as an internal/reporting artifact unless a direct bandwidth test proves otherwise.
+
+The archived hybrid B70 MoE config was not installed under vLLM's exact expected filename after reboot. Installing it to:
+
+```text
+/home/steve/.venvs/vllm-xpu/lib/python3.12/site-packages/vllm/model_executor/layers/fused_moe/configs/E=256,N=384,device_name=Intel(R)_Graphics_[0xe223],dtype=int4_w4a16.json
+```
+
+removed the missing-config warning and produced two p512/n1024 repeats at 36.876 and 36.620 output tok/s. That is neutral-to-small-positive against the 36.670 no-config result, so keep the config installed for warning cleanup and possible prefill stability, but do not treat it as a major optimization. Reinstall with:
+
+```bash
+/home/steve/llm-optimizations-publish/scripts/install-minimax-b70-moe-config.sh
+```
 
 ## Current Recommendation
 
