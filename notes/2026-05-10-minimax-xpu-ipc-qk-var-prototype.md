@@ -70,6 +70,10 @@ rank=3 iter=49 qk_var=[[51.5, 515.0], ...] ok=True
   publishes one sequence value per mailbox slot instead of one sequence value
   per payload element. Standalone checks passed at 50 iterations / 32 rows and
   at 10 iterations / 512 rows, both with three reused slots.
+- A no-host-barrier device-counter correctness smoke passed for 50 one-token
+  iterations when enough slots were available. This confirms the sequence
+  protocol can make progress without a Python barrier when slots are not
+  overwritten too early.
 
 ## What Did Not Work Yet
 
@@ -102,6 +106,25 @@ only about `0.03` output tok/s and the compiled opt-in path completed at about
 `0.02` output tok/s after a long compile/warmup. Keep the scalar variant as a
 negative artifact unless the protocol is moved into a lower-level fused kernel.
 
+The device-counter path is also far too slow as a standalone allreduce
+replacement. A 4-rank benchmark of a one-token `[1, 2]` payload measured:
+
+| Mode | Tokens | Iters | Slots | Host Barrier | Result |
+| --- | ---: | ---: | ---: | --- | ---: |
+| device-counter IPC | 1 | 20 | 64 | off | `416.172 ms/iter` |
+| device-counter IPC | 1 | 20 | 64 | on | `417.836 ms/iter` |
+
+For comparison, the XCCL microbenchmark for the same MiniMax decode-sized tiny
+allreduce was around `0.016 ms`. The mailbox protocol is therefore useful for
+learning about B70 peer-memory semantics, but not as a drop-in communication
+path.
+
+The benchmark also exposed a correctness requirement: slots must not wrap before
+all ranks have consumed them. A no-barrier 1000-iteration run with 128 slots
+hung, consistent with a faster rank overwriting a slot before a slower rank
+observed the expected sequence. Future IPC designs need a per-layer ring with
+enough slots, or a different protocol that cannot miss a sequence.
+
 ## Next Work
 
 The next prototype should move the sequence-counter path toward vLLM:
@@ -112,6 +135,10 @@ The next prototype should move the sequence-counter path toward vLLM:
   Python constants;
 - do not prioritize the scalar-sequence op in vLLM; it is useful as a simpler
   correctness reference but was far too slow in the real MiniMax path;
+- do not use the current device-counter mailbox op as a standalone allreduce
+  replacement; it is orders of magnitude slower than XCCL for `[tokens, 2]`;
+- if returning to IPC, fold peer reads into a larger Q/K RMS or KV-update kernel
+  where one launch and one set of fences covers substantially more useful work;
 - integrate behind a default-off MiniMax env flag replacing
   `tensor_model_parallel_all_reduce(qk_var) / tp_world_size`;
 - validate p1/n8 logits against the default oneCCL path before any throughput

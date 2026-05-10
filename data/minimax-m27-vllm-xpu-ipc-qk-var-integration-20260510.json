@@ -106,7 +106,20 @@
       "total_tokens_per_second": 0.02234789512476227,
       "output_tokens_per_second_from_log": 0.02,
       "interpretation": "Compiling does not rescue the scalar IPC path; keep VLLM_MINIMAX_QK_RMS_XPU_IPC_SCALAR_SEQ unset."
+    },
+    {
+      "name": "standalone_device_counter_decode_microbench",
+      "status": "negative_too_slow",
+      "source": "experiments/minimax_qk_rms_xpu_ipc/test_ipc_qk_var.py",
+      "world_size": 4,
+      "payload_shape": "[1, 2]",
+      "iterations": 20,
+      "warmup": 5,
+      "milliseconds_per_iteration_no_host_barrier": 416.172241,
+      "milliseconds_per_iteration_with_host_barrier": 417.836157,
+      "comparison": "Earlier XCCL microbenchmark measured about 0.016 ms for a decode-sized tiny allreduce.",
+      "interpretation": "The mailbox primitive itself is too slow; vLLM slowdown is not merely Python scheduling overhead."
     }
   ],
-  "decision": "Keep all VLLM_MINIMAX_QK_RMS_XPU_IPC flags unset for throughput benchmarks. Pre-initialization fixes the compile-time setup crash, but the current Python-level custom-op placement is far too slow when the IPC op actually runs. Next work should move the fusion lower in the MiniMax attention/QK-RMS path or fuse allreduce plus RMS application in a single XPU kernel with graph-safe pointer tensors."
+  "decision": "Keep all VLLM_MINIMAX_QK_RMS_XPU_IPC flags unset for throughput benchmarks. Pre-initialization fixes the compile-time setup crash, but the current mailbox allreduce is hundreds of milliseconds for a one-token [1,2] payload. Next work should avoid standalone IPC allreduce and instead target larger local fusions such as Q/K RMS apply plus RoPE/KV cache update, or an XPU equivalent of CUDA minimax_allreduce_rms_qk only if peer reads are amortized inside a much larger kernel."
 }

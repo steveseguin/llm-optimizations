@@ -135,7 +135,108 @@
       "status": "passed",
       "output_summary": "All four ranks printed ok=True at iteration 9 for 512 token rows with three reused slots.",
       "interpretation": "Correctness still holds for a prefill-sized payload, but standalone correctness did not translate to vLLM throughput."
+    },
+    {
+      "name": "device_counter_no_host_barrier_decode_correctness",
+      "world_size": 4,
+      "payload_shape": "[1, 2]",
+      "iterations": 50,
+      "slots": 128,
+      "timeout_iters": 100000,
+      "command_env": {
+        "MINIMAX_QK_IPC_SINGLE_KERNEL": "1",
+        "MINIMAX_QK_IPC_COUNTER": "1",
+        "MINIMAX_QK_IPC_SEQ": "0",
+        "MINIMAX_QK_IPC_ITERS": "50",
+        "MINIMAX_QK_IPC_TOKENS": "1",
+        "MINIMAX_QK_IPC_SLOTS": "128",
+        "MINIMAX_QK_IPC_TIMEOUT_ITERS": "100000",
+        "MINIMAX_QK_IPC_BARRIER": "0"
+      },
+      "expected_final_row": [
+        51.5,
+        515.0
+      ],
+      "status": "passed",
+      "output_summary": "All four ranks printed ok=True at iteration 49 without a host barrier.",
+      "interpretation": "The sequence protocol can make progress without a Python barrier when mailbox slots are not reused too early."
+    },
+    {
+      "name": "device_counter_no_host_barrier_slot_wrap",
+      "world_size": 4,
+      "payload_shape": "[1, 2]",
+      "iterations": 1000,
+      "warmup": 50,
+      "slots": 128,
+      "timeout_iters": 100000,
+      "command_env": {
+        "MINIMAX_QK_IPC_SINGLE_KERNEL": "1",
+        "MINIMAX_QK_IPC_COUNTER": "1",
+        "MINIMAX_QK_IPC_SEQ": "0",
+        "MINIMAX_QK_IPC_ITERS": "1000",
+        "MINIMAX_QK_IPC_WARMUP": "50",
+        "MINIMAX_QK_IPC_TOKENS": "1",
+        "MINIMAX_QK_IPC_SLOTS": "128",
+        "MINIMAX_QK_IPC_TIMEOUT_ITERS": "100000",
+        "MINIMAX_QK_IPC_BARRIER": "0",
+        "MINIMAX_QK_IPC_VALIDATE": "0",
+        "MINIMAX_QK_IPC_BENCH": "1"
+      },
+      "status": "hung_stopped",
+      "interpretation": "With no host barrier and too few slots, a faster rank can overwrite a slot before a slower rank observes the expected sequence. Future mailbox designs need per-layer ring slots or a protocol that cannot miss sequence values."
+    },
+    {
+      "name": "device_counter_decode_microbench_no_barrier",
+      "world_size": 4,
+      "payload_shape": "[1, 2]",
+      "iterations": 20,
+      "warmup": 5,
+      "slots": 64,
+      "timeout_iters": 100000,
+      "command_env": {
+        "MINIMAX_QK_IPC_SINGLE_KERNEL": "1",
+        "MINIMAX_QK_IPC_COUNTER": "1",
+        "MINIMAX_QK_IPC_SEQ": "0",
+        "MINIMAX_QK_IPC_ITERS": "20",
+        "MINIMAX_QK_IPC_WARMUP": "5",
+        "MINIMAX_QK_IPC_TOKENS": "1",
+        "MINIMAX_QK_IPC_SLOTS": "64",
+        "MINIMAX_QK_IPC_TIMEOUT_ITERS": "100000",
+        "MINIMAX_QK_IPC_BARRIER": "0",
+        "MINIMAX_QK_IPC_VALIDATE": "0",
+        "MINIMAX_QK_IPC_BENCH": "1"
+      },
+      "status": "passed_but_too_slow",
+      "elapsed_seconds": 8.323445,
+      "milliseconds_per_iteration": 416.172241,
+      "interpretation": "Orders of magnitude slower than the XCCL tiny-allreduce microbenchmark; not viable as standalone oneCCL replacement."
+    },
+    {
+      "name": "device_counter_decode_microbench_with_barrier",
+      "world_size": 4,
+      "payload_shape": "[1, 2]",
+      "iterations": 20,
+      "warmup": 5,
+      "slots": 64,
+      "timeout_iters": 100000,
+      "command_env": {
+        "MINIMAX_QK_IPC_SINGLE_KERNEL": "1",
+        "MINIMAX_QK_IPC_COUNTER": "1",
+        "MINIMAX_QK_IPC_SEQ": "0",
+        "MINIMAX_QK_IPC_ITERS": "20",
+        "MINIMAX_QK_IPC_WARMUP": "5",
+        "MINIMAX_QK_IPC_TOKENS": "1",
+        "MINIMAX_QK_IPC_SLOTS": "64",
+        "MINIMAX_QK_IPC_TIMEOUT_ITERS": "100000",
+        "MINIMAX_QK_IPC_BARRIER": "1",
+        "MINIMAX_QK_IPC_VALIDATE": "0",
+        "MINIMAX_QK_IPC_BENCH": "1"
+      },
+      "status": "passed_but_too_slow",
+      "elapsed_seconds": 8.356723,
+      "milliseconds_per_iteration": 417.836157,
+      "interpretation": "Host launch alignment does not materially change the cost; remote polling/system-scope fencing is the likely bottleneck."
     }
   ],
-  "decision": "The B70 stack supports PyTorch tensor Level Zero IPC handles and SYCL peer mailbox reads across four worker processes. Device-counter and scalar-sequence mailbox prototypes are correct under 4-rank slot-reuse stress, but the scalar variant is a vLLM performance dead end. The device-counter path remains the better source-level fusion candidate."
+  "decision": "The B70 stack supports PyTorch tensor Level Zero IPC handles and SYCL peer mailbox reads across four worker processes. Device-counter and scalar-sequence mailbox prototypes are correct under controlled stress, but the current mailbox allreduce is far too slow for decode-sized Q/K variance and unsafe under slot wrap without a larger ring. Future IPC work should only be revisited as part of a larger fused kernel."
 }

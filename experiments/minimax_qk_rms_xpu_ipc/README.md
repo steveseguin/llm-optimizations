@@ -40,3 +40,26 @@ The scalar-sequence variant can be tested with `MINIMAX_QK_IPC_SCALAR_SEQ=1`
 instead of `MINIMAX_QK_IPC_COUNTER=1`. It passes this standalone harness, but
 the vLLM integration was much too slow, so the device-counter path remains the
 primary fusion candidate.
+
+Benchmark mode:
+
+```bash
+MINIMAX_QK_IPC_BENCH=1 \
+MINIMAX_QK_IPC_VALIDATE=0 \
+MINIMAX_QK_IPC_BARRIER=0 \
+MINIMAX_QK_IPC_SINGLE_KERNEL=1 \
+MINIMAX_QK_IPC_COUNTER=1 \
+MINIMAX_QK_IPC_SEQ=0 \
+MINIMAX_QK_IPC_ITERS=20 \
+MINIMAX_QK_IPC_WARMUP=5 \
+MINIMAX_QK_IPC_TOKENS=1 \
+MINIMAX_QK_IPC_SLOTS=64 \
+MINIMAX_QK_IPC_TIMEOUT_ITERS=100000 \
+PYTHONPATH=. /home/steve/.venvs/vllm-xpu/bin/torchrun --standalone \
+  --nproc-per-node=4 test_ipc_qk_var.py
+```
+
+On 2026-05-10 this measured about `416 ms/iter` for a one-token `[1, 2]`
+payload, far slower than XCCL's decode-sized tiny allreduce microbench. Also
+avoid slot wrap in no-barrier tests; if a rank misses a sequence and a peer
+overwrites that slot, the equality-based poll can hang.

@@ -1,4 +1,5 @@
 import os
+import time
 
 import torch
 import torch.distributed as dist
@@ -20,6 +21,10 @@ def main() -> None:
 
     tokens = int(os.environ.get("MINIMAX_QK_IPC_TOKENS", "4"))
     iters = int(os.environ.get("MINIMAX_QK_IPC_ITERS", "1"))
+    warmup = int(os.environ.get("MINIMAX_QK_IPC_WARMUP", "0"))
+    bench = os.environ.get("MINIMAX_QK_IPC_BENCH", "0") == "1"
+    validate = os.environ.get("MINIMAX_QK_IPC_VALIDATE", "1") == "1"
+    use_barrier = os.environ.get("MINIMAX_QK_IPC_BARRIER", "1") == "1"
     timeout_iters = int(os.environ.get("MINIMAX_QK_IPC_TIMEOUT_ITERS", "500000000"))
     max_tokens = max(8, tokens)
     slots = int(os.environ.get("MINIMAX_QK_IPC_SLOTS", str(max(3, iters))))
@@ -75,8 +80,7 @@ def main() -> None:
         [signed_ptr(ptr) for ptr in ordered_seq_ptrs], device="xpu", dtype=torch.int64
     )
 
-    qk_var = torch.empty((tokens, 2), device="xpu", dtype=torch.float32)
-    for iteration in range(iters):
+    def run_one(iteration: int) -> bool:
         slot = iteration % slots
         q_base = float(rank + 1 + iteration)
         k_base = float((rank + 1 + iteration) * 10)
@@ -84,7 +88,8 @@ def main() -> None:
         qk_var[:, 1] = k_base
 
         if single_kernel and scalar_seq_kernel:
-            dist.barrier()
+            if use_barrier:
+                dist.barrier()
             minimax_qk_rms_xpu_ipc.allreduce_qk_var_seq_scalar(
                 qk_var,
                 peer_ptrs,
@@ -96,7 +101,8 @@ def main() -> None:
                 timeout_iters,
             )
         elif single_kernel and counter_kernel:
-            dist.barrier()
+            if use_barrier:
+                dist.barrier()
             minimax_qk_rms_xpu_ipc.allreduce_qk_var_seq_counter(
                 qk_var,
                 peer_ptrs,
@@ -108,7 +114,8 @@ def main() -> None:
                 timeout_iters,
             )
         elif single_kernel and sequence_kernel:
-            dist.barrier()
+            if use_barrier:
+                dist.barrier()
             minimax_qk_rms_xpu_ipc.allreduce_qk_var_seq(
                 qk_var,
                 peer_ptrs,
@@ -122,19 +129,23 @@ def main() -> None:
         elif single_kernel:
             mailbox[slot, :, :].fill_(-0.0)
             torch.xpu.synchronize()
-            dist.barrier()
+            if use_barrier:
+                dist.barrier()
             minimax_qk_rms_xpu_ipc.allreduce_qk_var(
                 qk_var, peer_ptrs, slot, max_tokens, world, timeout_iters
             )
         else:
             mailbox[slot, :tokens, :].copy_(qk_var)
             torch.xpu.synchronize()
-            dist.barrier()
+            if use_barrier:
+                dist.barrier()
             minimax_qk_rms_xpu_ipc.reduce_qk_var_from_mailboxes(
                 qk_var, peer_ptrs, slot, max_tokens, world
             )
         torch.xpu.synchronize()
 
+        if not validate:
+            return True
         expected_q = sum(float(r + 1 + iteration) for r in range(world)) / world
         expected_k = (
             sum(float((r + 1 + iteration) * 10) for r in range(world)) / world
@@ -143,13 +154,38 @@ def main() -> None:
         expected[:, 0] = expected_q
         expected[:, 1] = expected_k
 
-        ok = torch.allclose(qk_var.cpu(), expected.cpu(), atol=0, rtol=0)
+        return torch.allclose(qk_var.cpu(), expected.cpu(), atol=0, rtol=0)
+
+    qk_var = torch.empty((tokens, 2), device="xpu", dtype=torch.float32)
+    for iteration in range(warmup):
+        ok = run_one(iteration)
+        assert ok
+
+    if bench:
+        dist.barrier()
+        torch.xpu.synchronize()
+        start = time.perf_counter()
+    for iteration in range(iters):
+        logical_iteration = iteration + warmup
+        ok = run_one(logical_iteration)
         if not ok or iteration == iters - 1:
             print(
-                f"rank={rank} iter={iteration} qk_var={qk_var.cpu().tolist()} ok={ok}",
+                f"rank={rank} iter={logical_iteration} qk_var={qk_var.cpu().tolist()} ok={ok}",
                 flush=True,
             )
         assert ok
+    if bench:
+        torch.xpu.synchronize()
+        dist.barrier()
+        elapsed = time.perf_counter() - start
+        if rank == 0:
+            print(
+                "bench "
+                f"tokens={tokens} iters={iters} warmup={warmup} "
+                f"barrier={use_barrier} validate={validate} "
+                f"elapsed_s={elapsed:.6f} ms_per_iter={elapsed * 1000 / iters:.6f}",
+                flush=True,
+            )
 
     for ptr in opened:
         minimax_qk_rms_xpu_ipc.close_ipc_handle(ptr, local_rank)

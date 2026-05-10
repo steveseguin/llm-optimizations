@@ -76,6 +76,11 @@ The scalar-sequence mailbox op is also negative in vLLM. It passes the
 standalone harness, but MiniMax TP4 p1/n4 measured only about `0.03` output
 tok/s in eager mode and about `0.02` output tok/s in compiled opt-in mode.
 
+A follow-up standalone microbenchmark explains the failure: the device-counter
+IPC primitive itself measured about `416-418 ms` per one-token `[1, 2]`
+allreduce, versus the earlier XCCL tiny allreduce microbenchmark near
+`0.016 ms`. This is not just a vLLM scheduling artifact.
+
 The default behavior is therefore conservative:
 
 - `VLLM_MINIMAX_QK_RMS_XPU_IPC=1` can still run the eager counter-path liveness
@@ -91,8 +96,10 @@ The graph-safe version needs IPC setup outside the compiled forward path:
 - allocate mailboxes and exchange Level Zero handles during worker/model setup;
 - keep only fixed pointer tensors, device counters, and the custom op call in
   the compiled region;
-- move the actual Q/K variance exchange lower than the Python-level custom-op
-  hook if the current op-launch/fence placement remains slow;
+- abandon the current mailbox op as a standalone oneCCL replacement;
+- only revisit IPC if the peer-memory reads are folded into a much larger
+  fused kernel, such as Q/K variance + peer exchange + RMS apply, or Q/K apply
+  plus KV/cache writes;
 - then rerun p1/n8 logits comparison against the default oneCCL path;
 - only after logits match, benchmark p512/n512 and p512/n1536.
 
