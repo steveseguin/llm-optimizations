@@ -104,7 +104,32 @@
       "localMaxxingId": "cmoz82i2f007itl01fkno9or1",
       "payload": "data/localmaxxing-minimax-m27-autoround-u4-decode-fp16-fast-nvme-p512n1024-20260510-refresh.payload.json",
       "response": "data/localmaxxing-responses/minimax-m27-autoround-u4-decode-fp16-fast-nvme-p512n1024-20260510-refresh.response.json"
+    },
+    {
+      "name": "normal_qk_allreduce_p512n1536_run1",
+      "promptTokens": 512,
+      "outputTokens": 1536,
+      "gpuKvCacheTokens": 17216,
+      "tokSOut": 40.86437806364773,
+      "tokSTotal": 54.48583741819697,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260510T033913Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260510T033913Z.json",
+      "submittedToLocalMaxxing": false
+    },
+    {
+      "name": "normal_qk_allreduce_p512n1536_run2",
+      "promptTokens": 512,
+      "outputTokens": 1536,
+      "gpuKvCacheTokens": 17216,
+      "tokSOut": 41.130667019386024,
+      "tokSTotal": 54.84088935918136,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260510T034207Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260510T034207Z.json",
+      "submittedToLocalMaxxing": true,
+      "localMaxxingId": "cmoz8cow60001pd010klrb8g8",
+      "payload": "data/localmaxxing-minimax-m27-autoround-u4-decode-fp16-fast-nvme-p512n1536-20260510.payload.json",
+      "response": "data/localmaxxing-responses/minimax-m27-autoround-u4-decode-fp16-fast-nvme-p512n1536-20260510.response.json"
     }
   ],
-  "conclusion": "The correctness-breaking Q/K TP-allreduce skip is slower and invalid. The normal quality path repeated near 39.5-39.6 output tok/s at p512/n512 and 39.9-40.3 output tok/s at p512/n1024; both best rows were submitted to LocalMaxxing."
+  "conclusion": "The correctness-breaking Q/K TP-allreduce skip is slower and invalid. The normal quality path repeated near 39.5-39.6 output tok/s at p512/n512, 39.9-40.3 output tok/s at p512/n1024, and 40.9-41.1 output tok/s at p512/n1536. Best rows for each shape were submitted to LocalMaxxing."
 }
