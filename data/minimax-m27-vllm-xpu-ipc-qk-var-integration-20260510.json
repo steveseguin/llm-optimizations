@@ -1,0 +1,64 @@
+{
+  "experiment": "minimax_m27_vllm_xpu_ipc_qk_var_integration",
+  "date_utc": "2026-05-10",
+  "hardware": "4x Intel Arc Pro B70 32GB",
+  "model": "/mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround",
+  "base_vllm_commit": "c51df43005726a09c6eb7348e8c1b00501c70a8e",
+  "patch": {
+    "path": "patches/vllm-minimax-xpu-ipc-qk-var-20260510.patch",
+    "sha256": "41cca447d1409552e751427bb05a7ad156a979ace4437adcdfab823dbd55fcb5"
+  },
+  "extension": {
+    "source_dir": "experiments/minimax_qk_rms_xpu_ipc",
+    "installed_editable": true,
+    "build_compiler": "oneAPI 2025.3 icpx"
+  },
+  "prototype_prefill_shape_check": {
+    "command_env": {
+      "MINIMAX_QK_IPC_SINGLE_KERNEL": "1",
+      "MINIMAX_QK_IPC_COUNTER": "1",
+      "MINIMAX_QK_IPC_SEQ": "0",
+      "MINIMAX_QK_IPC_ITERS": "10",
+      "MINIMAX_QK_IPC_TOKENS": "512",
+      "MINIMAX_QK_IPC_SLOTS": "3",
+      "MINIMAX_QK_IPC_TIMEOUT_ITERS": "100000"
+    },
+    "status": "passed",
+    "expected_final_row": [11.5, 115.0],
+    "output_summary": "All four ranks printed ok=True at iteration 9 for 512 token rows with three reused slots."
+  },
+  "vllm_smokes": [
+    {
+      "name": "eager_ipc_liveness",
+      "status": "passed",
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-ipc-smoke/vllm-minimax-m27-autoround-tp4-p1n4-20260510T082524Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-ipc-smoke/vllm-minimax-m27-autoround-tp4-p1n4-20260510T082524Z.json",
+      "prompt_tokens": 1,
+      "output_tokens": 4,
+      "total_tokens_per_second": 7.586031568227589,
+      "output_tokens_per_second_from_log": 6.07,
+      "evidence": "Rank 0 logged MiniMax Q/K XPU IPC allreduce initialized (world_size=4, slots=128, max_tokens=1024).",
+      "interpretation": "Correct liveness smoke only; eager mode is not a performance benchmark."
+    },
+    {
+      "name": "compiled_ipc_attempt",
+      "status": "failed",
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-ipc-smoke/vllm-minimax-m27-autoround-tp4-p1n4-20260510T082737Z.log",
+      "symptom": "TorchDynamo rejected the disabled ensure_initialized function inside the compiled forward path.",
+      "error_summary": "Skip inlining torch.compiler.disable()d function _MiniMaxQkRmsXpuIpcState.ensure_initialized.",
+      "interpretation": "IPC mailbox setup must move outside the compiled region before this can be a real speed path."
+    },
+    {
+      "name": "compiled_flag_fallback_after_guard",
+      "status": "passed_without_ipc",
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-ipc-smoke/vllm-minimax-m27-autoround-tp4-p1n4-20260510T083018Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-ipc-smoke/vllm-minimax-m27-autoround-tp4-p1n4-20260510T083018Z.json",
+      "prompt_tokens": 1,
+      "output_tokens": 4,
+      "total_tokens_per_second": 2.2651393739724774,
+      "output_tokens_per_second_from_log": 1.81,
+      "interpretation": "The guard now avoids a compiled-mode crash by falling back to oneCCL; this is not an IPC performance result."
+    }
+  ],
+  "decision": "Keep VLLM_MINIMAX_QK_RMS_XPU_IPC unset for throughput benchmarks. Next work is graph-safe pre-initialization so the compiled forward path can call only the custom op with prebuilt pointer tensors and device counters."
+}

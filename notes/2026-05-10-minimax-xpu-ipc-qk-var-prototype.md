@@ -61,6 +61,9 @@ rank=3 iter=49 qk_var=[[51.5, 515.0], ...] ok=True
   mailbox slots across 50 iterations. This is the more relevant compiled-graph
   candidate because the expected sequence is read from device memory instead
   of passed as a Python integer that TorchDynamo could capture as a constant.
+- The same device-counter path also passed a prefill-sized payload smoke:
+  512 token rows, 10 iterations, and three reused mailbox slots, ending with
+  exact `[11.5, 115.0]` rows on all ranks.
 
 ## What Did Not Work Yet
 
