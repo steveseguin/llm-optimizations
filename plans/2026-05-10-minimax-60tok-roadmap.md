@@ -62,6 +62,11 @@ The u4 MoE bridge is no longer the only ceiling. Existing timing notes put MiniM
      `_C.fused_add_rms_norm` warmed to only `32.611` output tok/s. The fusion
      must happen in C++/SYCL or as a real compiler/kernel pass; Python dispatch
      and extra clones are too expensive.
+   - A guarded XPU out-of-place functional allreduce experiment removed the
+     clone/copy pairs around all 187 TP collectives, but warmed p512/n512 only
+     reached `35.64` output tok/s versus the accepted `39.610585` reference.
+     Cleaner functional allreduce tracing is not enough; keep this closed as a
+     negative unless paired with a real fused epilogue.
 
 2. Q/K RMS variance fusion
    - Standalone helper kernels and standalone mailbox allreduce were negative.

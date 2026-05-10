@@ -1,0 +1,20 @@
+diff --git a/vllm/distributed/device_communicators/xpu_communicator.py b/vllm/distributed/device_communicators/xpu_communicator.py
+index 0000000..0000000 100644
+--- a/vllm/distributed/device_communicators/xpu_communicator.py
++++ b/vllm/distributed/device_communicators/xpu_communicator.py
+@@
+ import torch
+ import torch.distributed as dist
++import torch.distributed._functional_collectives as funcol
+ from torch.distributed import ProcessGroup
+@@
+     def all_reduce(self, input_: torch.Tensor) -> torch.Tensor:
++        if (
++            os.environ.get("VLLM_XPU_COMPILE_OUT_OF_PLACE_ALLREDUCE", "0") == "1"
++            and torch.compiler.is_compiling()
++        ):
++            return funcol.all_reduce(input_, "sum", self.device_group)
++
+         output = input_.clone() if torch.compiler.is_compiling() else input_
+         if (
+             os.environ.get("VLLM_XPU_ALLREDUCE_ASYNC_WAIT", "0") == "1"

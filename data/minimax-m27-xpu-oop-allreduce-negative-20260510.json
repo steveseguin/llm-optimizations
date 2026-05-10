@@ -1,0 +1,55 @@
+{
+  "date": "2026-05-10",
+  "model": {
+    "hfId": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+    "localPath": "/mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround",
+    "quantization": "AutoRound INT4 W4A16"
+  },
+  "experiment": {
+    "name": "XPU compile-time out-of-place functional allreduce",
+    "envFlag": "VLLM_XPU_COMPILE_OUT_OF_PLACE_ALLREDUCE=1",
+    "patch": "patches/vllm-xpu-compile-out-of-place-allreduce-experiment-20260510.patch",
+    "goal": "Remove allreduce-adjacent clone/copy pairs from the compiled TP graph without changing target-model math."
+  },
+  "graphSmoke": {
+    "promptTokens": 64,
+    "outputTokens": 32,
+    "tokSTotal": 16.916308132370045,
+    "outputTokSApprox": 5.64,
+    "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-oop-ar-smoke/vllm-minimax-m27-autoround-tp4-p64n32-20260510T174921Z.log",
+    "cacheDir": "/mnt/fast-ai/vllm-cache/minimax-m2.7-autoround-oop-ar-smoke2-20260510T174921Z/torch_compile_cache/8b9fd5d36a/rank_0_0/backbone",
+    "actualAllReduceCalls": 187,
+    "actualWaitTensorCalls": 187,
+    "allreduceAdjacentCloneCopyOccurrences": 0
+  },
+  "screens": [
+    {
+      "promptTokens": 512,
+      "outputTokens": 512,
+      "contextLength": 2048,
+      "tokSTotal": 72.56649169735675,
+      "tokSOut": 36.28,
+      "elapsedSec": 14.111196173995268,
+      "gpuKvCacheTokens": 13632,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-oop-ar/vllm-minimax-m27-autoround-tp4-p512n512-20260510T175301Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-oop-ar/vllm-minimax-m27-autoround-tp4-p512n512-20260510T175301Z.json"
+    },
+    {
+      "promptTokens": 512,
+      "outputTokens": 512,
+      "contextLength": 2048,
+      "tokSTotal": 71.2851151614329,
+      "tokSOut": 35.64,
+      "elapsedSec": 14.364850189005665,
+      "gpuKvCacheTokens": 17216,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-oop-ar/vllm-minimax-m27-autoround-tp4-p512n512-20260510T175607Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-oop-ar/vllm-minimax-m27-autoround-tp4-p512n512-20260510T175607Z.json"
+    }
+  ],
+  "acceptedReference": {
+    "promptTokens": 512,
+    "outputTokens": 512,
+    "tokSOut": 39.610585
+  },
+  "outcome": "Negative. The graph transformation worked structurally, but throughput regressed versus the accepted quality-conservative p512/n512 reference. Do not submit to LocalMaxxing."
+}
