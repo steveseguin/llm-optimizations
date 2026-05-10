@@ -7,8 +7,10 @@ Level Zero IPC handles from real XPU tensors. It proves that four TP-style
 processes can exchange peer mailbox pointers and run an XPU kernel that reads
 all peer mailboxes to compute the global Q/K variance average.
 
-This is not wired into vLLM yet. It is a correctness stepping stone for a
-future XPU equivalent of vLLM's CUDA `minimax_allreduce_rms_qk` fusion.
+This started as a standalone correctness stepping stone for a future XPU
+equivalent of vLLM's CUDA `minimax_allreduce_rms_qk` fusion. A default-off
+vLLM hook now exists, but the standalone tests remain the cleanest place to
+separate mailbox protocol correctness from vLLM scheduler and graph behavior.
 
 ## Result
 
@@ -64,6 +66,10 @@ rank=3 iter=49 qk_var=[[51.5, 515.0], ...] ok=True
 - The same device-counter path also passed a prefill-sized payload smoke:
   512 token rows, 10 iterations, and three reused mailbox slots, ending with
   exact `[11.5, 115.0]` rows on all ranks.
+- A scalar-sequence variant also passes the standalone stress cases. It
+  publishes one sequence value per mailbox slot instead of one sequence value
+  per payload element. Standalone checks passed at 50 iterations / 32 rows and
+  at 10 iterations / 512 rows, both with three reused slots.
 
 ## What Did Not Work Yet
 
@@ -90,6 +96,12 @@ That two-phase version is probably not fast enough for vLLM decode as-is, but
 it confirmed the hard foundation: cross-process peer mailbox reads from SYCL
 work on the B70 stack.
 
+The scalar-sequence path is correct in the standalone harness, but it is not a
+vLLM speed path. When wired into MiniMax TP4, a p1/n4 eager smoke completed at
+only about `0.03` output tok/s and the compiled opt-in path completed at about
+`0.02` output tok/s after a long compile/warmup. Keep the scalar variant as a
+negative artifact unless the protocol is moved into a lower-level fused kernel.
+
 ## Next Work
 
 The next prototype should move the sequence-counter path toward vLLM:
@@ -98,6 +110,8 @@ The next prototype should move the sequence-counter path toward vLLM:
   construction, slot assignment, and sequence generation in a Python manager;
 - prefer the device-counter op for graph experiments so sequence values are not
   Python constants;
+- do not prioritize the scalar-sequence op in vLLM; it is useful as a simpler
+  correctness reference but was far too slow in the real MiniMax path;
 - integrate behind a default-off MiniMax env flag replacing
   `tensor_model_parallel_all_reduce(qk_var) / tp_world_size`;
 - validate p1/n8 logits against the default oneCCL path before any throughput

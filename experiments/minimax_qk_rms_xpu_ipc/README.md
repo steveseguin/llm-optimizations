@@ -3,8 +3,8 @@
 Prototype for the cross-process peer-memory part of a future XPU equivalent of
 vLLM's CUDA `minimax_allreduce_rms_qk` path.
 
-This is not wired into vLLM yet. The first target is a standalone correctness
-test:
+This is also wired into a default-off vLLM experiment, but the standalone
+harness is still the cleanest correctness test:
 
 1. each TP-style process allocates a small XPU mailbox tensor;
 2. each process exports its mailbox with Level Zero `zeMemGetIpcHandle`;
@@ -35,3 +35,8 @@ MINIMAX_QK_IPC_TIMEOUT_ITERS=100000 \
 PYTHONPATH=. /home/steve/.venvs/vllm-xpu/bin/torchrun --standalone \
   --nproc-per-node=4 test_ipc_qk_var.py
 ```
+
+The scalar-sequence variant can be tested with `MINIMAX_QK_IPC_SCALAR_SEQ=1`
+instead of `MINIMAX_QK_IPC_COUNTER=1`. It passes this standalone harness, but
+the vLLM integration was much too slow, so the device-counter path remains the
+primary fusion candidate.

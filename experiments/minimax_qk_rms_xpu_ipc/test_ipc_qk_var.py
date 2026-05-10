@@ -55,6 +55,7 @@ def main() -> None:
     single_kernel = os.environ.get("MINIMAX_QK_IPC_SINGLE_KERNEL", "0") == "1"
     sequence_kernel = os.environ.get("MINIMAX_QK_IPC_SEQ", "1") == "1"
     counter_kernel = os.environ.get("MINIMAX_QK_IPC_COUNTER", "0") == "1"
+    scalar_seq_kernel = os.environ.get("MINIMAX_QK_IPC_SCALAR_SEQ", "0") == "1"
     if single_kernel:
         # The single-kernel prototype writes to peer_ptrs[0] and polls all
         # entries, so put the local mailbox first. The sum is order-invariant.
@@ -82,7 +83,19 @@ def main() -> None:
         qk_var[:, 0] = q_base
         qk_var[:, 1] = k_base
 
-        if single_kernel and counter_kernel:
+        if single_kernel and scalar_seq_kernel:
+            dist.barrier()
+            minimax_qk_rms_xpu_ipc.allreduce_qk_var_seq_scalar(
+                qk_var,
+                peer_ptrs,
+                seq_ptrs,
+                seq_counter,
+                slot,
+                max_tokens,
+                world,
+                timeout_iters,
+            )
+        elif single_kernel and counter_kernel:
             dist.barrier()
             minimax_qk_rms_xpu_ipc.allreduce_qk_var_seq_counter(
                 qk_var,

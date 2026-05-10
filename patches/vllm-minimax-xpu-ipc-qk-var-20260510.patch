@@ -1,5 +1,5 @@
 diff --git a/vllm/model_executor/layers/mamba/linear_attn.py b/vllm/model_executor/layers/mamba/linear_attn.py
-index b277c9ed6..7c9965d78 100644
+index b277c9ed6..1491f9271 100644
 --- a/vllm/model_executor/layers/mamba/linear_attn.py
 +++ b/vllm/model_executor/layers/mamba/linear_attn.py
 @@ -2,21 +2,25 @@
@@ -28,7 +28,7 @@ index b277c9ed6..7c9965d78 100644
  from vllm.model_executor.custom_op import CustomOp
  from vllm.model_executor.layers.lightning_attn import (
      lightning_attention,
-@@ -33,6 +37,187 @@ from vllm.utils.torch_utils import direct_register_custom_op
+@@ -33,6 +37,219 @@ from vllm.utils.torch_utils import direct_register_custom_op
  from vllm.v1.attention.backend import AttentionMetadata
  from vllm.v1.attention.backends.linear_attn import LinearAttentionMetadata
  
@@ -37,8 +37,11 @@ index b277c9ed6..7c9965d78 100644
 +_MINIMAX_QK_RMS_XPU_IPC = (
 +    os.environ.get("VLLM_MINIMAX_QK_RMS_XPU_IPC", "0") == "1"
 +)
-+_MINIMAX_QK_RMS_XPU_IPC_EAGER_ONLY = (
-+    os.environ.get("VLLM_MINIMAX_QK_RMS_XPU_IPC_EAGER_ONLY", "1") == "1"
++_MINIMAX_QK_RMS_XPU_IPC_COMPILED = (
++    os.environ.get("VLLM_MINIMAX_QK_RMS_XPU_IPC_COMPILED", "0") == "1"
++)
++_MINIMAX_QK_RMS_XPU_IPC_SCALAR_SEQ = (
++    os.environ.get("VLLM_MINIMAX_QK_RMS_XPU_IPC_SCALAR_SEQ", "0") == "1"
 +)
 +_MINIMAX_QK_RMS_XPU_IPC_MAX_TOKENS = int(
 +    os.environ.get("VLLM_MINIMAX_QK_RMS_XPU_IPC_MAX_TOKENS", "1024")
@@ -57,6 +60,18 @@ index b277c9ed6..7c9965d78 100644
 +        try:
 +            torch.library.register_fake(
 +                "minimax_qk_rms_xpu_ipc::allreduce_qk_var_seq_counter"
++            )(
++                lambda qk_var,
++                payload_ptrs,
++                seq_ptrs,
++                counter,
++                slot,
++                max_tokens,
++                world_size,
++                timeout_iters: None
++            )
++            torch.library.register_fake(
++                "minimax_qk_rms_xpu_ipc::allreduce_qk_var_seq_scalar"
 +            )(
 +                lambda qk_var,
 +                payload_ptrs,
@@ -193,12 +208,20 @@ index b277c9ed6..7c9965d78 100644
 +            return False
 +        if slot < 0 or slot >= _MINIMAX_QK_RMS_XPU_IPC_SLOTS:
 +            return False
-+        if not self.ensure_initialized(qk_var):
-+            return False
++        if not self.initialized:
++            if torch.compiler.is_compiling():
++                return False
++            if not self.ensure_initialized(qk_var):
++                return False
 +        assert self.payload_ptrs is not None
 +        assert self.seq_ptrs is not None
 +        assert self.counter is not None
-+        torch.ops.minimax_qk_rms_xpu_ipc.allreduce_qk_var_seq_counter(
++        ipc_op = (
++            torch.ops.minimax_qk_rms_xpu_ipc.allreduce_qk_var_seq_scalar
++            if _MINIMAX_QK_RMS_XPU_IPC_SCALAR_SEQ
++            else torch.ops.minimax_qk_rms_xpu_ipc.allreduce_qk_var_seq_counter
++        )
++        ipc_op(
 +            qk_var,
 +            self.payload_ptrs,
 +            self.seq_ptrs,
@@ -213,10 +236,19 @@ index b277c9ed6..7c9965d78 100644
 +
 +_minimax_qk_rms_xpu_ipc_state = _MiniMaxQkRmsXpuIpcState()
 +
++
++def preinit_minimax_qk_rms_xpu_ipc(device: torch.device) -> bool:
++    if not _MINIMAX_QK_RMS_XPU_IPC or _minimax_qk_rms_xpu_ipc is None:
++        return False
++    if device.type != "xpu":
++        return False
++    qk_var = torch.empty((1, 2), device=device, dtype=torch.float32)
++    return _minimax_qk_rms_xpu_ipc_state.ensure_initialized(qk_var)
++
  
  @CustomOp.register("minimax_text01_rmsnorm_tp")
  class MiniMaxText01RMSNormTP(CustomOp):
-@@ -105,13 +290,34 @@ class MiniMaxText01RMSNormTP(CustomOp):
+@@ -105,13 +322,40 @@ class MiniMaxText01RMSNormTP(CustomOp):
          k: torch.Tensor,
      ) -> tuple[torch.Tensor, torch.Tensor]:
          orig_dtype = q.dtype
@@ -240,7 +272,13 @@ index b277c9ed6..7c9965d78 100644
 +                and qk_var.is_xpu
 +                and qk_var.dtype == torch.float32
 +                and qk_var.is_contiguous()
-+                and not torch.compiler.is_compiling()
++                and (
++                    not torch.compiler.is_compiling()
++                    or (
++                        _MINIMAX_QK_RMS_XPU_IPC_COMPILED
++                        and _minimax_qk_rms_xpu_ipc_state.initialized
++                    )
++                )
 +            )
 +            qk_ipc_slot = int(getattr(q_norm, "_minimax_qk_ipc_slot", 0))
 +            if not (
@@ -254,7 +292,7 @@ index b277c9ed6..7c9965d78 100644
          q = q * torch.rsqrt(q_var + q_norm.variance_epsilon) * q_norm.weight
          k = k * torch.rsqrt(k_var + k_norm.variance_epsilon) * k_norm.weight
 diff --git a/vllm/model_executor/models/minimax_m2.py b/vllm/model_executor/models/minimax_m2.py
-index 818b7e681..e2685eb39 100644
+index 818b7e681..13d97005a 100644
 --- a/vllm/model_executor/models/minimax_m2.py
 +++ b/vllm/model_executor/models/minimax_m2.py
 @@ -23,6 +23,8 @@
@@ -277,7 +315,19 @@ index 818b7e681..e2685eb39 100644
      get_tensor_model_parallel_world_size,
  )
  from vllm.model_executor.layers.attention import Attention
-@@ -62,6 +64,7 @@ from vllm.model_executor.model_loader.weight_utils import (
+@@ -50,7 +52,10 @@ from vllm.model_executor.layers.linear import (
+     RowParallelLinear,
+ )
+ from vllm.model_executor.layers.logits_processor import LogitsProcessor
+-from vllm.model_executor.layers.mamba.linear_attn import MiniMaxText01RMSNormTP
++from vllm.model_executor.layers.mamba.linear_attn import (
++    MiniMaxText01RMSNormTP,
++    preinit_minimax_qk_rms_xpu_ipc,
++)
+ from vllm.model_executor.layers.quantization import QuantizationConfig
+ from vllm.model_executor.layers.rotary_embedding import get_rope
+ from vllm.model_executor.layers.vocab_parallel_embedding import (
+@@ -62,6 +67,7 @@ from vllm.model_executor.model_loader.weight_utils import (
      maybe_remap_kv_scale_name,
  )
  from vllm.sequence import IntermediateTensors
@@ -285,7 +335,7 @@ index 818b7e681..e2685eb39 100644
  
  from .interfaces import EagleModelMixin, SupportsEagle3, SupportsLoRA, SupportsPP
  from .utils import (
-@@ -73,6 +76,39 @@ from .utils import (
+@@ -73,6 +79,39 @@ from .utils import (
      maybe_prefix,
  )
  
@@ -325,7 +375,7 @@ index 818b7e681..e2685eb39 100644
  
  class MiniMaxM2MoE(nn.Module):
      def __init__(
-@@ -132,10 +168,17 @@ class MiniMaxM2MoE(nn.Module):
+@@ -132,10 +171,17 @@ class MiniMaxM2MoE(nn.Module):
          hidden_states = hidden_states.view(-1, hidden_dim)
  
          # router_logits: (num_tokens, n_experts)
@@ -347,7 +397,7 @@ index 818b7e681..e2685eb39 100644
  
          return final_hidden_states.view(num_tokens, hidden_dim)
  
-@@ -221,33 +264,75 @@ class MiniMaxM2Attention(nn.Module):
+@@ -221,33 +267,75 @@ class MiniMaxM2Attention(nn.Module):
          self.q_norm = MiniMaxText01RMSNormTP(
              self.head_dim * self.total_num_heads, eps=rms_norm_eps
          )
@@ -444,7 +494,7 @@ index 818b7e681..e2685eb39 100644
          return output
  
  
-@@ -417,6 +502,22 @@ class MiniMaxM2Model(nn.Module, EagleModelMixin):
+@@ -417,6 +505,22 @@ class MiniMaxM2Model(nn.Module, EagleModelMixin):
              num_experts=self.config.num_local_experts,
          )
  
@@ -467,12 +517,19 @@ index 818b7e681..e2685eb39 100644
      def load_weights(self, weights: Iterable[tuple[str, torch.Tensor]]) -> set[str]:
          stacked_params_mapping = [
              # (param_name, shard_name, shard_id)
-@@ -513,6 +614,8 @@ class MiniMaxM2Model(nn.Module, EagleModelMixin):
+@@ -512,7 +616,14 @@ class MiniMaxM2Model(nn.Module, EagleModelMixin):
+                         param, "weight_loader", default_weight_loader
                      )
                      weight_loader(param, loaded_weight)
-             loaded_params.add(name)
+-            loaded_params.add(name)
++        loaded_params.add(name)
 +        if _MINIMAX_M2_FP16_ROUTER:
 +            self._init_fp16_router_buffers()
++        try:
++            device = next(self.parameters()).device
++        except StopIteration:
++            device = torch.device("cpu")
++        preinit_minimax_qk_rms_xpu_ipc(device)
          return loaded_params
  
  

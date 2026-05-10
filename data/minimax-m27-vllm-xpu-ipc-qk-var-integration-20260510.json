@@ -6,7 +6,7 @@
   "base_vllm_commit": "c51df43005726a09c6eb7348e8c1b00501c70a8e",
   "patch": {
     "path": "patches/vllm-minimax-xpu-ipc-qk-var-20260510.patch",
-    "sha256": "41cca447d1409552e751427bb05a7ad156a979ace4437adcdfab823dbd55fcb5"
+    "sha256": "9d3766df86405fd97718948204f2cc42267327c2c704fec8c70cae079440f1da"
   },
   "extension": {
     "source_dir": "experiments/minimax_qk_rms_xpu_ipc",
@@ -58,7 +58,55 @@
       "total_tokens_per_second": 2.2651393739724774,
       "output_tokens_per_second_from_log": 1.81,
       "interpretation": "The guard now avoids a compiled-mode crash by falling back to oneCCL; this is not an IPC performance result."
+    },
+    {
+      "name": "compiled_ipc_preinit_opt_in_counter_path",
+      "status": "negative_too_slow",
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-ipc-smoke/vllm-minimax-m27-autoround-tp4-p1n4-20260510T083636Z.log",
+      "json": null,
+      "prompt_tokens": 1,
+      "output_tokens": 4,
+      "torch_compile_seconds_from_log": 128.22,
+      "symptom": "IPC preinitialized and the compiled path entered the custom op, but p1/n4 generation took hundreds of seconds and the wrapper timed out before writing JSON.",
+      "interpretation": "Moving initialization before graph capture solves the Dynamo rejection but does not make the Python-level custom op placement a speed path."
+    },
+    {
+      "name": "compiled_preinit_flag_fallback",
+      "status": "passed_without_ipc",
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-ipc-smoke/vllm-minimax-m27-autoround-tp4-p1n4-20260510T084735Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-ipc-smoke/vllm-minimax-m27-autoround-tp4-p1n4-20260510T084735Z.json",
+      "prompt_tokens": 1,
+      "output_tokens": 4,
+      "total_tokens_per_second": 1.820430263374841,
+      "output_tokens_per_second_from_log": 1.46,
+      "interpretation": "The default compiled guard keeps real benchmarks on oneCCL unless VLLM_MINIMAX_QK_RMS_XPU_IPC_COMPILED=1 is explicitly set."
+    },
+    {
+      "name": "eager_scalar_sequence_ipc",
+      "status": "negative_too_slow",
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-ipc-smoke/vllm-minimax-m27-autoround-tp4-p1n4-20260510T085754Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-ipc-smoke/vllm-minimax-m27-autoround-tp4-p1n4-20260510T085754Z.json",
+      "prompt_tokens": 1,
+      "output_tokens": 4,
+      "elapsed_seconds": 125.30159247800111,
+      "total_tokens_per_second": 0.039903722699117634,
+      "output_tokens_per_second_from_log": 0.03,
+      "evidence": "Rank 0 logged MiniMax Q/K XPU IPC allreduce initialized, then vLLM logged shared-memory wait warnings before completion.",
+      "interpretation": "The scalar sequence protocol passes standalone but desynchronizes or fences badly under vLLM scheduling."
+    },
+    {
+      "name": "compiled_scalar_sequence_ipc_opt_in",
+      "status": "negative_too_slow",
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-ipc-smoke/vllm-minimax-m27-autoround-tp4-p1n4-20260510T090405Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-ipc-smoke/vllm-minimax-m27-autoround-tp4-p1n4-20260510T090405Z.json",
+      "prompt_tokens": 1,
+      "output_tokens": 4,
+      "elapsed_seconds": 223.73471738999797,
+      "torch_compile_seconds_from_log": 128.22,
+      "total_tokens_per_second": 0.02234789512476227,
+      "output_tokens_per_second_from_log": 0.02,
+      "interpretation": "Compiling does not rescue the scalar IPC path; keep VLLM_MINIMAX_QK_RMS_XPU_IPC_SCALAR_SEQ unset."
     }
   ],
-  "decision": "Keep VLLM_MINIMAX_QK_RMS_XPU_IPC unset for throughput benchmarks. Next work is graph-safe pre-initialization so the compiled forward path can call only the custom op with prebuilt pointer tensors and device counters."
+  "decision": "Keep all VLLM_MINIMAX_QK_RMS_XPU_IPC flags unset for throughput benchmarks. Pre-initialization fixes the compile-time setup crash, but the current Python-level custom-op placement is far too slow when the IPC op actually runs. Next work should move the fusion lower in the MiniMax attention/QK-RMS path or fuse allreduce plus RMS application in a single XPU kernel with graph-safe pointer tensors."
 }
