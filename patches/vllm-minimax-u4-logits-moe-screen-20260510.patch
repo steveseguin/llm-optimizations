@@ -1,0 +1,221 @@
+diff --git a/vllm/model_executor/layers/quantization/moe_wna16.py b/vllm/model_executor/layers/quantization/moe_wna16.py
+index e5ef3f4c3..acfaeb6b9 100644
+--- a/vllm/model_executor/layers/quantization/moe_wna16.py
++++ b/vllm/model_executor/layers/quantization/moe_wna16.py
+@@ -1,11 +1,13 @@
+ # SPDX-License-Identifier: Apache-2.0
+ # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
+ 
++import os
+ from typing import Any
+ 
+ import torch
+ 
+ from vllm.distributed import get_tensor_model_parallel_rank, get_tp_group
++from vllm.logger import init_logger
+ from vllm.model_executor.layers.fused_moe.activation import MoEActivation
+ from vllm.model_executor.layers.fused_moe.config import (
+     FusedMoEQuantConfig,
+@@ -32,6 +34,7 @@ from vllm.model_executor.layers.quantization.utils.marlin_utils import (
+ )
+ from vllm.model_executor.utils import set_weight_attrs
+ from vllm.platforms import current_platform
++logger = init_logger(__name__)
+ 
+ 
+ class MoeWNA16Config(QuantizationConfig):
+@@ -362,6 +365,88 @@ class MoeWNA16Method(FusedMoEMethodBase):
+             block_shape=[0, layer.group_size],
+         )
+ 
++    def _llm_scaler_moe_requested(self) -> bool:
++        return os.environ.get("VLLM_XPU_USE_LLM_SCALER_MOE", "0") == "1"
++
++    def _llm_scaler_moe_logits_requested(self) -> bool:
++        return os.environ.get("VLLM_XPU_USE_LLM_SCALER_MOE_LOGITS", "0") == "1"
++
++    def _llm_scaler_moe_logits_max_tokens(self) -> int:
++        return int(os.environ.get("VLLM_XPU_LLM_SCALER_MOE_LOGITS_MAX_TOKENS", "4"))
++
++    @property
++    def is_monolithic(self) -> bool:
++        return False
++
++    def should_apply_decode_monolithic(
++        self, layer: torch.nn.Module, x: torch.Tensor
++    ) -> bool:
++        return (
++            self._llm_scaler_moe_logits_requested()
++            and getattr(layer, "_llm_scaler_moe_u4_decode", False)
++            and x.dtype in (torch.float16, torch.bfloat16)
++            and x.shape[0] <= self._llm_scaler_moe_logits_max_tokens()
++            and getattr(layer, "top_k", None) == 2
++            and getattr(layer, "renormalize", None) is True
++            and getattr(layer, "expert_map", None) is None
++            and not getattr(layer, "use_grouped_topk", False)
++        )
++
++    def _can_use_llm_scaler_moe(self, layer: torch.nn.Module) -> bool:
++        expert_map = getattr(layer, "expert_map", None)
++        expert_layout_supported = (
++            (
++                expert_map is None
++                and getattr(layer, "global_num_experts", None)
++                == getattr(layer, "local_num_experts", None)
++            )
++            or (
++                expert_map is not None
++                and getattr(layer, "local_num_experts", 0) > 0
++                and getattr(layer, "global_num_experts", 0)
++                > getattr(layer, "local_num_experts", 0)
++            )
++        )
++        return (
++            self._llm_scaler_moe_requested()
++            and current_platform.is_xpu()
++            and self.quant_config.weight_bits == 4
++            and not self.quant_config.has_zp
++            and expert_layout_supported
++            and not getattr(layer, "apply_router_weight_on_input", False)
++            and getattr(layer, "group_size", None) == 128
++            and getattr(layer, "w13_qweight", None) is not None
++            and getattr(layer, "w2_qweight", None) is not None
++            and layer.w13_qweight.dtype == torch.uint8
++            and layer.w2_qweight.dtype == torch.uint8
++            and layer.w13_scales.dtype in (torch.float16, torch.bfloat16)
++            and layer.w2_scales.dtype in (torch.float16, torch.bfloat16)
++        )
++
++    def process_weights_after_loading(self, layer: torch.nn.Module) -> None:
++        if not self._can_use_llm_scaler_moe(layer):
++            return
++        if getattr(layer, "_llm_scaler_moe_u4_decode", False):
++            return
++
++        layer._llm_scaler_w13_scales = (
++            layer.w13_scales
++            if layer.w13_scales.dtype == torch.float16
++            else layer.w13_scales.to(torch.float16).contiguous()
++        )
++        layer._llm_scaler_w2_scales = (
++            layer.w2_scales
++            if layer.w2_scales.dtype == torch.float16
++            else layer.w2_scales.to(torch.float16).contiguous()
++        )
++        layer._llm_scaler_moe_u4_decode = True
++        logger.info_once(
++            "Enabled llm-scaler XPU INT4 MoE decode path for %s "
++            "(scale_dtype=%s)",
++            layer.layer_name,
++            layer.w13_scales.dtype,
++        )
++
+     def apply(
+         self,
+         layer: FusedMoE,
+@@ -376,6 +461,105 @@ class MoeWNA16Method(FusedMoEMethodBase):
+             f"Only SiLU activation is supported, not {layer.activation}."
+         )
+ 
++        if (
++            getattr(layer, "_llm_scaler_moe_u4_decode", False)
++            and shared_experts_input is None
++            and x.dtype in (torch.float16, torch.bfloat16)
++            and x.shape[0] <= self._llm_scaler_moe_logits_max_tokens()
++        ):
++            try:
++                from custom_esimd_kernels_vllm import (
++                    moe_forward_tiny_cutlass_nmajor_int4_u4,
++                )
++
++                expert_map = getattr(layer, "expert_map", None)
++                if expert_map is not None:
++                    mapped_topk_ids = expert_map[topk_ids.long()]
++                    local_mask = mapped_topk_ids >= 0
++                    mapped_topk_weights = topk_weights * local_mask.to(
++                        topk_weights.dtype
++                    )
++                else:
++                    mapped_topk_ids = topk_ids
++                    mapped_topk_weights = topk_weights
++                return moe_forward_tiny_cutlass_nmajor_int4_u4(
++                    x,
++                    layer.w13_qweight,
++                    layer._llm_scaler_w13_scales,
++                    layer.w2_qweight,
++                    layer._llm_scaler_w2_scales,
++                    mapped_topk_weights.contiguous(),
++                    mapped_topk_ids.contiguous(),
++                )
++            except Exception:
++                logger.exception("llm-scaler XPU INT4 MoE path failed")
++                raise
++
++        return fused_experts(
++            x,
++            layer.w13_qweight,
++            layer.w2_qweight,
++            topk_weights=topk_weights,
++            topk_ids=topk_ids,
++            inplace=not self.moe.disable_inplace,
++            apply_router_weight_on_input=layer.apply_router_weight_on_input,
++            global_num_experts=layer.global_num_experts,
++            expert_map=layer.expert_map,
++            quant_config=self.moe_quant_config,
++        )
++
++    def apply_monolithic(
++        self,
++        layer: FusedMoE,
++        x: torch.Tensor,
++        router_logits: torch.Tensor,
++        input_ids: torch.Tensor | None = None,
++    ) -> torch.Tensor:
++        if (
++            self._llm_scaler_moe_logits_requested()
++            and getattr(layer, "_llm_scaler_moe_u4_decode", False)
++            and x.dtype in (torch.float16, torch.bfloat16)
++            and x.shape[0] <= 4
++            and getattr(layer, "top_k", None) == 2
++            and getattr(layer, "renormalize", None) is True
++            and getattr(layer, "expert_map", None) is None
++            and not getattr(layer, "use_grouped_topk", False)
++        ):
++            try:
++                from custom_esimd_kernels_vllm import (
++                    moe_forward_tiny_cutlass_nmajor_int4_u4_logits,
++                )
++
++                logger.info_once(
++                    "Using llm-scaler XPU INT4 MoE logits decode path"
++                )
++                x = x.contiguous()
++                router_logits = router_logits.contiguous()
++                return moe_forward_tiny_cutlass_nmajor_int4_u4_logits(
++                    x,
++                    layer.w13_qweight,
++                    layer._llm_scaler_w13_scales,
++                    layer.w2_qweight,
++                    layer._llm_scaler_w2_scales,
++                    router_logits,
++                )
++            except Exception:
++                logger.exception("llm-scaler XPU INT4 MoE logits path failed")
++                raise
++
++        from vllm.model_executor.layers.fused_moe import fused_experts
++        from vllm.model_executor.layers.fused_moe.router.fused_topk_router import (
++            fused_topk,
++        )
++
++        topk_weights, topk_ids, _ = fused_topk(
++            hidden_states=x,
++            gating_output=router_logits,
++            topk=layer.top_k,
++            renormalize=layer.renormalize,
++            indices_type=self.topk_indices_dtype,
++        )
++
+         return fused_experts(
+             x,
+             layer.w13_qweight,

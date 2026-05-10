@@ -1,0 +1,81 @@
+{
+  "date": "2026-05-10",
+  "model": {
+    "hfId": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+    "localPath": "/mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround",
+    "quantization": "AutoRound INT4 W4A16"
+  },
+  "hardware": {
+    "gpuName": "Intel Arc Pro B70",
+    "gpuCount": 4,
+    "vramGbEach": 32
+  },
+  "targets": {
+    "nonSpecOutputTokS": 60,
+    "speculativeOutputTokS": 75,
+    "qualityGuardrail": "target logits/tokens must be preserved; no expert dropping or skipped Q/K TP variance allreduce"
+  },
+  "extensionRecovery": {
+    "status": "recovered",
+    "activeExtension": "/home/steve/src/llm-scaler/vllm/custom-esimd-kernels-vllm/python/custom_esimd_kernels_vllm/moe_int4_ops.cpython-312-x86_64-linux-gnu.so",
+    "rebuildRoot": "/home/steve/src/llm-scaler-u4-e0only/vllm/custom-esimd-kernels-vllm",
+    "compilerRuntimeLesson": "Build/import MoE-only extension with oneAPI 2025.3 compiler and venv libs first; oneAPI 2026-first runtime reproduced SYCL registration crashes."
+  },
+  "cleanRecoveredRun": {
+    "label": "recovered-clean-p512n1536",
+    "promptTokens": 512,
+    "outputTokens": 1536,
+    "contextLength": 2048,
+    "maxNumBatchedTokens": 1024,
+    "tensorParallel": 4,
+    "dtype": "float16",
+    "tokSTotal": 50.29952673234906,
+    "tokSOut": 37.724645049261795,
+    "elapsedSeconds": 40.71608885900059,
+    "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-recovered-clean-p512n1536/vllm-minimax-m27-autoround-tp4-p512n1536-20260510T201653Z.log",
+    "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-recovered-clean-p512n1536/vllm-minimax-m27-autoround-tp4-p512n1536-20260510T201653Z.json",
+    "localmaxxing": "not submitted; recovery floor near existing accepted anchor"
+  },
+  "speculativeScreens": [
+    {
+      "label": "M2.5 Eagle3 draft TP1",
+      "draftPath": "/mnt/fast-ai/llm-models/spec-drafts/MiniMax-M2.5-Eagle3",
+      "method": "eagle3",
+      "numSpeculativeTokens": 4,
+      "draftTensorParallel": 1,
+      "promptTokens": 64,
+      "outputTokens": 128,
+      "status": "blocked",
+      "result": "Loaded and compiled, then stalled at processed prompts with repeated shared-memory broadcast-block warnings.",
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-eagle3-m25-p64n128/vllm-minimax-m27-autoround-tp4-p64n128-20260510T202353Z.log"
+    },
+    {
+      "label": "M2.5 Eagle3 draft TP4",
+      "draftPath": "/mnt/fast-ai/llm-models/spec-drafts/MiniMax-M2.5-Eagle3",
+      "method": "eagle3",
+      "numSpeculativeTokens": 2,
+      "draftTensorParallel": 4,
+      "promptTokens": 64,
+      "outputTokens": 32,
+      "status": "blocked",
+      "result": "Stalled during early distributed initialization/load before token generation.",
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-eagle3-m25-tp4-p64n32/vllm-minimax-m27-autoround-tp4-p64n32-20260510T203021Z.log"
+    },
+    {
+      "label": "M2.7 DFlash draft TP1",
+      "draftPath": "/mnt/fast-ai/llm-models/spec-drafts/MiniMax-M2.7-L3H5-DFlash",
+      "method": "dflash",
+      "numSpeculativeTokens": 4,
+      "draftTensorParallel": 1,
+      "promptTokens": 64,
+      "outputTokens": 32,
+      "status": "blocked",
+      "result": "Target and drafter loaded; auxiliary layers detected; graphs compiled; generation stalled with shared-memory broadcast-block warning.",
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-dflash-m27-p64n32/vllm-minimax-m27-autoround-tp4-p64n32-20260510T203735Z.log"
+    }
+  ],
+  "next": [
+    "Keep speculation as a target-verified stretch path but fix vLLM XPU scheduler/shared-memory blocking before spending more full-model time on it.",
+    "Prioritize hidden-state allreduce plus residual/RMSNorm fusion and MoE epilogue/allreduce fusion for non-spec 60+ tok/s."
+  ]
+}

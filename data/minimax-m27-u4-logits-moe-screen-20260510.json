@@ -1,0 +1,70 @@
+{
+  "date": "2026-05-10",
+  "model": {
+    "hfId": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+    "localPath": "/mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround",
+    "quantization": "AutoRound INT4 W4A16"
+  },
+  "hardware": {
+    "gpuName": "Intel Arc Pro B70",
+    "gpuCount": 4,
+    "vramGbEach": 32
+  },
+  "experiment": {
+    "name": "llm-scaler U4 logits MoE path",
+    "goal": "Fuse router top-k selection into the llm-scaler INT4 MoE call without changing model quality.",
+    "extensionPath": "/home/steve/src/llm-scaler-u4-logits/vllm/custom-esimd-kernels-vllm/python/custom_esimd_kernels_vllm/moe_int4_ops.cpython-312-x86_64-linux-gnu.so",
+    "vllmEnv": [
+      "VLLM_XPU_USE_LLM_SCALER_MOE_LOGITS",
+      "VLLM_XPU_LLM_SCALER_MOE_LOGITS_MAX_TOKENS"
+    ],
+    "defaultState": "off"
+  },
+  "runs": [
+    {
+      "label": "clean pre-screen",
+      "promptTokens": 64,
+      "outputTokens": 32,
+      "tokSTotal": 79.59701668855953,
+      "tokSOut": 26.53233889618651,
+      "status": "healthy baseline",
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-u4-logits-smoke-p64n32/vllm-minimax-m27-autoround-tp4-p64n32-20260510T205119Z.log"
+    },
+    {
+      "label": "logits default max4",
+      "promptTokens": 64,
+      "outputTokens": 32,
+      "tokSTotal": 75.71350353210921,
+      "tokSOut": 25.23783451070307,
+      "status": "no speedup",
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-u4-logits-smoke-p64n32/vllm-minimax-m27-autoround-tp4-p64n32-20260510T205401Z.log"
+    },
+    {
+      "label": "logits forced max256",
+      "promptTokens": 64,
+      "outputTokens": 32,
+      "status": "failed",
+      "error": "llm-scaler kernel requires contiguous x with 1 <= M <= 64",
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-u4-logits-max256-p64n32/vllm-minimax-m27-autoround-tp4-p64n32-20260510T205711Z.log"
+    },
+    {
+      "label": "logits forced max64 contiguous",
+      "promptTokens": 64,
+      "outputTokens": 32,
+      "tokSTotal": 19.083763954042134,
+      "tokSOut": 6.361254651347378,
+      "status": "negative",
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-u4-logits-max64-p64n32/vllm-minimax-m27-autoround-tp4-p64n32-20260510T205948Z.log"
+    },
+    {
+      "label": "post-screen clean default",
+      "promptTokens": 64,
+      "outputTokens": 32,
+      "tokSTotal": 75.61668728506635,
+      "tokSOut": 25.20556242835545,
+      "status": "default path remains healthy",
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-post-logits-clean-smoke-p64n32/vllm-minimax-m27-autoround-tp4-p64n32-20260510T210256Z.log"
+    }
+  ],
+  "decision": "Keep logits MoE path default-off; do not submit to LocalMaxxing; continue with TP collective and MoE epilogue fusion work."
+}
