@@ -56,6 +56,17 @@
       "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p1n8-20260510T025024Z.log",
       "status": "completed after guarding async_op behind not torch.compiler.is_compiling"
     },
+    "guardedFullRun": {
+      "shape": "p512/n512",
+      "dtype": "bfloat16",
+      "gpuMemoryUtilization": 0.95,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n512-20260510T030708Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n512-20260510T030708Z.json",
+      "gpuKvCacheTokens": 18880,
+      "tokSOut": 35.949023098086215,
+      "tokSTotal": 71.89804619617243,
+      "status": "completed; compiled collectives use the guarded synchronous path, so this is neutral-to-negative versus baseline"
+    },
     "decision": "Keep as an eager-only diagnostic hook. It is not a compiled MiniMax performance path unless the collective is moved behind a graph-safe custom op or graph partition."
   },
   "moeTiming": {

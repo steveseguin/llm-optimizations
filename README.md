@@ -34,6 +34,8 @@ Reproducibility notes, benchmark payloads, and local patches from the Intel Arc 
 - A default-off MiniMax router-logits fusion now imports and passes standalone FP16/BF16 exact-match tests when built with oneAPI 2025.3, and a tiny p1/n8 vLLM smoke ran. The full p512/n512 TP4 run hung after prompt rendering with repeated shared-memory wait messages, so keep `VLLM_XPU_USE_LLM_SCALER_MOE_LOGITS` unset for real benchmarks.
 - MiniMax DFlash speculative decoding is negative on the current TP4 XPU stack. `MirecX/MiniMax-M2.7-L3H5-DFlash` loads, compiles, shares target embeddings/lm head, and selects the expected target taps `(2, 16, 30, 43, 57)`, but retries with `num_speculative_tokens=3` were blocked by KV memory pressure, one Level Zero `UR_RESULT_ERROR_DEVICE_LOST`, and a generation hang after KV allocation. The drafter card reports `m_accept ~= 1.38`, already below expected break-even, so keep MiniMax optimization focused on non-speculative Q/K collective fusion and MoE decode work for now.
 - MiniMax AutoRound EP with a non-local expert skip is functional but not useful yet. Keeping non-local expert ids as `-1` and skipping them inside the llm-scaler u4 kernels only moved a BF16 p1/n8 EP smoke from `16.795602` to `16.883004` total tok/s, far below the stable non-EP BF16 u4 p512/n512 result of `36.607699` output tok/s. Treat EP loss as communication/scheduler/all-to-all dominated until proven otherwise.
+- The guarded `VLLM_XPU_ALLREDUCE_ASYNC_WAIT=1` hook completed a full BF16 0.95 MiniMax p512/n512 run at `35.949` output tok/s, but the hook is disabled inside compiled collectives. It stays as an eager-only diagnostic, not a speed setting or LocalMaxxing result.
+- Intel llm-scaler branch `origin/fix_27b_kernel` (`db05b45`) fixes a large-`N` dense INT4 ResAddNormGEMV race reported on Qwen3.6-27B `gate_up` (`N=8704,K=5120,TP=4`). It is relevant if we return to dense Qwen3.6 INT4 AutoRound/sym-int4, but not to the current MiniMax u4 MoE bridge, Qwen Q4_0 GGUF, or Qwen static FP8 paths.
 
 ## Layout
 
@@ -78,6 +80,7 @@ Reproducibility notes, benchmark payloads, and local patches from the Intel Arc 
 - `notes/2026-05-09-minimax-oneapi-compiler-compat.md`: oneAPI 2025.3 compiler compatibility finding, FP16 u4 restore, and negative XPU graph / CCL IPC / context-size screens.
 - `notes/2026-05-09-minimax-router-logits-fusion-negative.md`: default-off fused top-2/router logits experiment; standalone math passes, full TP4 vLLM run hangs.
 - `notes/2026-05-09-minimax-ep-skip-and-dflash-update.md`: EP non-local expert skip smoke and updated DFlash speculative retry matrix; both negative for speed.
+- `notes/2026-05-10-llm-scaler-fix-27b-kernel.md`: upstream llm-scaler Qwen3.6 27B dense INT4 correctness fix discovered after fetching `origin/fix_27b_kernel`.
 - `data/qwen36-fp8-32k-tp4-vs-pp2-20260506.json`: post-reboot Q4 sanity plus FP8 32k-context TP4 vs TP2/PP2 validation.
 - `data/q4-esimd-blockscales-20260506.json`: structured ESIMD block-loaded scale metadata screen.
 - `data/q4-active-device-row-split-20260506.json`: structured active-device row-split patch validation and negative row-split smoke.
@@ -109,6 +112,7 @@ Reproducibility notes, benchmark payloads, and local patches from the Intel Arc 
 - `data/minimax-m27-autoround-oneapi2025-recovery-20260509.json`: structured compiler compatibility restore data and follow-up toggle results.
 - `data/minimax-m27-ep-skip-and-dflash-20260509.json`: structured EP skip and DFlash retry matrix.
 - `data/minimax-m27-fast-nvme-scheduler-xpu-graph-20260510.json`: fast-NVMe MiniMax scheduler, XPU graph, GPU-memory-utilization, B70 MoE config, and BF16 capacity-mode follow-up data.
+- `data/llm-scaler-fix-27b-kernel-20260510.json`: structured record of upstream llm-scaler `fix_27b_kernel` and its relevance boundaries.
 - `data/localmaxxing-submission-minimax-m27-autoround-bf16-u4-decode-20260509.json`: LocalMaxxing response for the BF16 u4 decode p512/n512 result.
 - `data/localmaxxing-minimax-m27-autoround-u4-decode-bf16-gpumem095-p512n1024-20260510.payload.json`: LocalMaxxing payload for the fast-NVMe BF16 0.95 MiniMax capacity-mode result.
 - `data/localmaxxing-responses/minimax-m27-autoround-u4-decode-bf16-gpumem095-p512n1024-20260510.response.json`: LocalMaxxing response for the fast-NVMe BF16 0.95 MiniMax capacity-mode result.

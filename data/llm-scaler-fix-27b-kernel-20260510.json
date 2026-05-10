@@ -1,0 +1,34 @@
+{
+  "dateUtc": "2026-05-10",
+  "repository": "/home/steve/src/llm-scaler",
+  "remoteBranch": "origin/fix_27b_kernel",
+  "commit": "db05b45831a5a534b74510797832dcf9b3c7e7ab",
+  "title": "esimd: fix resadd_norm_gemv_int4 race on large N",
+  "changedFiles": [
+    "vllm/custom-esimd-kernels-vllm/csrc/xpu/esimd_kernels/resadd_norm_gemv_int4.h"
+  ],
+  "reportedAffectedPath": {
+    "model": "Qwen3.6-27B dense gate_up",
+    "shape": {
+      "N": 8704,
+      "K": 5120,
+      "tensorParallel": 4
+    },
+    "symptom": "relative error versus IPEX jumps around N > 512 because later workgroups can read an already-updated residual"
+  },
+  "reportedUnaffectedPath": {
+    "model": "Qwen3.6-35B-A3B sym_int4 router",
+    "shape": {
+      "N": 256
+    },
+    "reason": "small N stays on the original fused path"
+  },
+  "fixSummary": "For N > 512, split the fused ResAddNormGEMV INT4 path into a residual/RMS prepass followed by a GEMV-from-normed kernel.",
+  "relevance": {
+    "qwen36DenseInt4": "candidate correctness fix before future Qwen3.6 27B dense INT4 speed tests",
+    "qwen36Q4Gguf": "not applicable",
+    "qwen36StaticFp8": "not applicable",
+    "minimaxM27AutoroundU4Decode": "not expected to affect current MiniMax bridge"
+  },
+  "decision": "Recorded for future Qwen3.6 dense INT4 work; not applied to the dirty MiniMax llm-scaler branch yet."
+}

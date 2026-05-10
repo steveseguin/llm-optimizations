@@ -54,11 +54,20 @@ torch._dynamo.exc.Unsupported: async_op=True for distributed collectives
 
 I tightened the guard so the hook is ignored while `torch.compiler.is_compiling()`, then verified a tiny compiled p1/n8 smoke completes with the env var set. That means the patch is safe to keep as an eager-only diagnostic, but it is not a current performance path.
 
+I also ran a full guarded BF16 0.95 p512/n512 pass after the smoke. It completed, but because the hook is ignored inside compiled collectives it behaved like the normal compiled path:
+
+- p512/n512, BF16, `--gpu-memory-utilization 0.95`: `35.95` output tok/s, `71.90` total tok/s;
+- KV cache: `18,880` tokens;
+- log: `/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n512-20260510T030708Z.log`.
+
+This is neutral-to-negative versus the BF16 p512/n512 and p512/n1024 baselines, so it is not a LocalMaxxing submission.
+
 Artifacts:
 
 - patch: `patches/vllm-xpu-allreduce-async-wait-guard-20260510.patch`
 - blocked compiled p512/n512 log: `/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n512-20260510T024748Z.log`
 - guarded p1/n8 smoke log: `/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p1n8-20260510T025024Z.log`
+- guarded p512/n512 full log: `/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n512-20260510T030708Z.log`
 
 Conclusion: do not use async-op allreduce as a compiled MiniMax optimization unless we move the collective behind a graph-safe custom op or alter the graph partitioning so Dynamo does not trace `async_op=True`.
 

@@ -35,6 +35,7 @@ All results use:
 | p512/n1024 | 1024 | BF16, `--gpu-memory-utilization 0.95`, run 1 | 18,880 | 37.304 | 55.955 | 77.30s |
 | p512/n1024 | 1024 | BF16, `--gpu-memory-utilization 0.95`, run 2 | 18,880 | 35.954 | 53.931 | 67.17s |
 | p512/n1536 | 1024 | BF16, `--gpu-memory-utilization 0.95`, long decode | 18,880 | 36.324 | 48.432 | 64.93s |
+| p512/n512 | 1024 | BF16, `--gpu-memory-utilization 0.95`, guarded async-wait env | 18,880 | 35.949 | 71.898 | ~64.4s |
 
 ## Findings
 
@@ -53,6 +54,8 @@ BF16 is viable only with a higher memory target on this setup. The default-memor
 LocalMaxxing accepted the first BF16 0.95 run as `cmoz632kr0068tl017a1z6r0u`. The submission notes include the repeat at 35.954 output tok/s so the public record does not hide the observed variance.
 
 A longer BF16 p512/n1536 run completed at 36.324 output tok/s. This gives a steadier boundary condition: extending decode length does not reveal hidden throughput above the p512/n1024 range, so the current capacity-mode ceiling is still roughly mid-to-high 30s tok/s on this stack.
+
+The guarded `VLLM_XPU_ALLREDUCE_ASYNC_WAIT=1` full run completed at 35.949 output tok/s for BF16 p512/n512 with 18,880 KV tokens. Since the hook is disabled while TorchDynamo compiles collectives, this confirms the hook is diagnostic-only for MiniMax compiled TP4. It is not a LocalMaxxing candidate.
 
 I also ran a short eager-mode BF16 0.95 p512/n16 timing diagnostic with XPU synchronization and rank-0 summaries. Eager mode is much slower and includes prefill outliers, so it is not a throughput result. It still confirms the same bottleneck shape as the 2026-05-09 timing work: Q/K norm plus repeated TP allreduces remains prominent, and prefill still falls back through vLLM fused experts.
 
@@ -134,4 +137,5 @@ TP=4 \
 - Keep BF16 0.95 as the quality-conservative MiniMax serving recipe; the BF16 default-memory path has no usable KV cache headroom on this host.
 - Add or tune a MiniMax-specific `fused_moe` config for `E=256,N=384,device_name=Intel(R)_Graphics_[0xe223],dtype=int4_w4a16`.
 - Keep XPU graph disabled for TP4 until communication-op capture support changes.
+- Do not use the guarded async-wait allreduce hook as a compiled-path speed setting; a useful variant would need a graph-safe fused collective/custom op.
 - Prefer `/mnt/fast-ai` for active benchmarks and use the external drive as colder storage.

@@ -323,6 +323,27 @@
       "tokSOut": 36.324282299093625,
       "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260510T025547Z.log",
       "note": "Long decode did not improve beyond the p512/n1024 BF16 0.95 range; no LocalMaxxing submission."
+    },
+    {
+      "name": "fast-nvme-p512-n512-bf16-gpu-mem-util-0.95-allreduce-async-wait-guarded",
+      "promptTokens": 512,
+      "outputTokens": 512,
+      "maxModelLen": 2048,
+      "maxNumBatchedTokens": 1024,
+      "gpuMemoryUtilization": 0.95,
+      "xpuGraph": false,
+      "dtype": "bfloat16",
+      "installedMoeConfig": "configs/vllm/minimax-m27-b70-int4-w4a16-moe-hybrid-20260508.json",
+      "env": {
+        "VLLM_XPU_ALLREDUCE_ASYNC_WAIT": "1"
+      },
+      "loadSecondsApprox": 64.4,
+      "gpuKvCacheTokens": 18880,
+      "tokSTotal": 71.89804619617243,
+      "tokSOut": 35.949023098086215,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n512-20260510T030708Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n512-20260510T030708Z.json",
+      "note": "The async-wait hook is guarded off while torch.compile traces collectives, so the completed full run is neutral-to-negative and not a LocalMaxxing submission."
     }
   ],
   "observations": [
@@ -334,6 +355,7 @@
     "Installing the archived B70 MoE config under vLLM's exact expected filename removes the missing-config warning and produced 36.88 then 36.62 output tok/s on repeat p512/n1024 runs. Treat it as neutral-to-small-positive for the current llm-scaler decode path, not as a clear new speed breakthrough.",
     "gpu-memory-utilization 0.93 increased KV cache to 22,592 tokens, but the generation hung with repeated shared-memory broadcast wait warnings. This middle setting is currently less attractive than either default speed mode or the completed 0.95 capacity mode.",
     "BF16 default-memory mode failed before generation because vLLM reported no available memory for KV cache blocks. Raising gpu-memory-utilization to 0.95 made BF16 viable with 18,880 KV tokens and p512/n1024 output throughput of 37.30 and 35.95 tok/s on two repeats. Treat this as a quality-conservative capacity mode, not a clean speed breakthrough over the FP16 default-memory recipe.",
-    "A longer BF16 p512/n1536 run reached 36.32 output tok/s, so extending decode length does not uncover a hidden >40 tok/s steady-state path."
+    "A longer BF16 p512/n1536 run reached 36.32 output tok/s, so extending decode length does not uncover a hidden >40 tok/s steady-state path.",
+    "The guarded async-wait allreduce full run reached 35.95 output tok/s at p512/n512, confirming the hook is diagnostic only and not a compiled-path speed improvement."
   ]
 }
