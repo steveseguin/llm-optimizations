@@ -51,6 +51,10 @@ The u4 MoE bridge is no longer the only ceiling. Existing timing notes put MiniM
      failed to beat the reference: warm p512/n512 reached `35.077` output tok/s
      alone and `35.804` when paired with delayed `o_proj` allreduce. Do not
      spend more time on provider swaps without collective fusion.
+   - A Python-level custom op that wraps `dist.all_reduce` plus
+     `_C.fused_add_rms_norm` warmed to only `32.611` output tok/s. The fusion
+     must happen in C++/SYCL or as a real compiler/kernel pass; Python dispatch
+     and extra clones are too expensive.
 
 2. Q/K RMS variance fusion
    - Standalone helper kernels and standalone mailbox allreduce were negative.

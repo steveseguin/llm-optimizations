@@ -1,0 +1,93 @@
+diff --git a/vllm/model_executor/models/minimax_m2.py b/vllm/model_executor/models/minimax_m2.py
+index 000000000..000000000 100644
+--- a/vllm/model_executor/models/minimax_m2.py
++++ b/vllm/model_executor/models/minimax_m2.py
+@@ -80,6 +80,53 @@ def _minimax_qk_norm_xpu_helper_enabled() -> bool:
+     return os.environ.get("VLLM_MINIMAX_QK_NORM_XPU_DIRECT", "0") == "1"
+ 
+ 
++def _minimax_post_attn_ar_fused_enabled() -> bool:
++    return os.environ.get("VLLM_MINIMAX_POST_ATTN_AR_FUSED_RMS_XPU", "0") == "1"
++
++
++_MINIMAX_POST_ATTN_AR_FUSED_REGISTERED = False
++
++
++def _ensure_minimax_post_attn_ar_fused_op() -> None:
++    global _MINIMAX_POST_ATTN_AR_FUSED_REGISTERED
++    if _MINIMAX_POST_ATTN_AR_FUSED_REGISTERED:
++        return
++
++    import torch.distributed as dist
++
++    from vllm.distributed.parallel_state import get_tp_group
++    from vllm.utils.torch_utils import direct_register_custom_op
++
++    def _post_attn_ar_fused_rms(
++        input_: torch.Tensor,
++        residual: torch.Tensor,
++        weight: torch.Tensor,
++        epsilon: float,
++    ) -> tuple[torch.Tensor, torch.Tensor]:
++        output = input_.clone()
++        dist.all_reduce(output, group=get_tp_group().device_group)
++        residual_out = residual.clone()
++        torch.ops._C.fused_add_rms_norm(output, residual_out, weight, epsilon)
++        return output, residual_out
++
++    def _post_attn_ar_fused_rms_fake(
++        input_: torch.Tensor,
++        residual: torch.Tensor,
++        weight: torch.Tensor,
++        epsilon: float,
++    ) -> tuple[torch.Tensor, torch.Tensor]:
++        return torch.empty_like(input_), torch.empty_like(residual)
++
++    direct_register_custom_op(
++        op_name="minimax_post_attn_ar_fused_rms",
++        op_func=_post_attn_ar_fused_rms,
++        fake_impl=_post_attn_ar_fused_rms_fake,
++        mutates_args=[],
++    )
++    _MINIMAX_POST_ATTN_AR_FUSED_REGISTERED = True
++
++
+ def _minimax_qk_norm_xpu_helper(
+     qkv: torch.Tensor,
+     q_norm: MiniMaxText01RMSNormTP,
+@@ -229,9 +276,12 @@ class MiniMaxM2Attention(nn.Module):
+             self.total_num_heads * self.head_dim,
+             hidden_size,
+             bias=False,
++            reduce_results=not _minimax_post_attn_ar_fused_enabled(),
+             quant_config=quant_config,
+             prefix=f"{prefix}.o_proj",
+         )
++        if _minimax_post_attn_ar_fused_enabled():
++            _ensure_minimax_post_attn_ar_fused_op()
+         self.rotary_emb = get_rope(
+             self.head_dim,
+             max_position=max_position_embeddings,
+@@ -357,7 +407,21 @@ class MiniMaxM2DecoderLayer(nn.Module):
+         )
+ 
+         # Fully Connected
+-        hidden_states, residual = self.post_attention_layernorm(hidden_states, residual)
++        if (
++            _minimax_post_attn_ar_fused_enabled()
++            and hidden_states.is_xpu
++            and residual is not None
++        ):
++            hidden_states, residual = torch.ops.vllm.minimax_post_attn_ar_fused_rms(
++                hidden_states,
++                residual,
++                self.post_attention_layernorm.weight.data,
++                self.post_attention_layernorm.variance_epsilon,
++            )
++        else:
++            hidden_states, residual = self.post_attention_layernorm(
++                hidden_states, residual
++            )
+ 
+         hidden_states = self.block_sparse_moe(hidden_states)
+ 

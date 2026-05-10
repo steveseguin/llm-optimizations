@@ -73,6 +73,7 @@ Reproducibility notes, benchmark payloads, and local patches from the Intel Arc 
 - Inlining `MiniMaxText01LinearAttention` is not applicable to the active MiniMax M2 AutoRound model: it uses `minimax_m2.py` normal attention, produced the same `4799a3c8...` AOT hash, and the temporary gate was removed.
 - Source-tree vLLM IR `fused_add_rms_norm` is a useful diagnostic but not a speed path yet. After adding the B70 MiniMax MoE config to `/home/steve/src/vllm`, source default warmed to `34.602` output tok/s, source with `--enable-flashinfer-autotune` warmed to `35.781`, and source with `fused_add_rms_norm=["xpu_kernels","native"]` warmed to `35.649`, all below the installed-runtime p512/n512 reference. The installed `custom_ops=["none","+rms_norm"]` path also warmed to only `36.159`. Do not submit these to LocalMaxxing.
 - A follow-up installed-runtime post-attention fused-add RMS screen was also negative. `VLLM_MINIMAX_POST_ATTN_FUSED_ADD_RMS_XPU=1` warmed to `35.077` output tok/s at p512/n512, and pairing it with delayed output-projection allreduce warmed to `35.804`, still below the accepted `39.611` reference. Keep both env flags unset and move to true collective-plus-epilogue fusion.
+- Wrapping output-projection allreduce plus fused-add RMSNorm in a Python-level custom op is worse: after fixing an initial Dynamo registration failure, the warm p512/n512 run reached only `32.611` output tok/s. This confirms that the next MiniMax fusion must be C++/SYCL or compiler-level, not a Python custom-op wrapper around existing allreduce and RMS kernels.
 - Intel llm-scaler branch `origin/fix_27b_kernel` (`db05b45`) fixes a large-`N` dense INT4 ResAddNormGEMV race reported on Qwen3.6-27B `gate_up` (`N=8704,K=5120,TP=4`). It is relevant if we return to dense Qwen3.6 INT4 AutoRound/sym-int4, but not to the current MiniMax u4 MoE bridge, Qwen Q4_0 GGUF, or Qwen static FP8 paths.
 - Latest MiniMax negative screens keep the optimization target pointed at source-level fusion rather than launch flags. Direct XPU Q/K RMS helper (`28.036` tok/s), llm-scaler MoE logits path (`35.899`), TP2/PP2 (`24.976`), and generic FP8 KV (`28.104`) all underperformed the quality-cleared TP4 p512/n512 reference (`39.611`). Explicit `fp8_e5m2` KV fails in the XPU FlashAttention metadata path. These were not submitted to LocalMaxxing; they are recorded as pruning data.
 
@@ -206,6 +207,7 @@ Reproducibility notes, benchmark payloads, and local patches from the Intel Arc 
 - `data/minimax-m27-autoround-dflash-fast-nvme-negative-20260510.json`: structured negative DFlash speculative-decode retest from fast NVMe.
 - `data/minimax-m27-source-ir-fusedadd-screen-20260510.json`: structured source-tree and installed-runtime RMS/fused-add implementation screen.
 - `data/minimax-m27-postattn-fusedadd-delay-negative-20260510.json`: structured installed-runtime post-attention fused-add RMS and delayed-output-allreduce negative screen.
+- `data/minimax-m27-python-ar-fused-customop-negative-20260510.json`: structured Python custom-op allreduce plus fused-add RMS negative screen.
 - `notes/2026-05-10-b70-pcie-and-xpu-smi.md`: B70 PCIe hierarchy and `xpu-smi` setup note; all four slot-facing links are PCIe 5.0 x16, PCIe downgrade is disabled, and a local no-file `libze1` shim keeps the existing Intel Level Zero loader intact.
 - `data/b70-pcie-and-xpu-smi-20260510.json`: structured PCIe bridge table and `xpu-smi` package state.
 - `configs/vllm/minimax-m27-b70-int4-w4a16-moe-hybrid-20260508.json`: hybrid B70 MoE config for MiniMax AutoRound vLLM/XPU, tuned key `1` plus default prompt-size keys.
@@ -262,10 +264,12 @@ Reproducibility notes, benchmark payloads, and local patches from the Intel Arc 
 - `patches/vllm-minimax-qk-var-allreduce-dtype-negative-20260510.patch`: negative MiniMax Q/K variance dtype experiment; FP16 variance collectives compiled but underperformed and were reverted from the active runtime.
 - `patches/vllm-source-b70-minimax-moe-config-20260510.patch`: source-tree B70 MiniMax MoE config needed for fair `/home/steve/src/vllm` import tests.
 - `patches/vllm-minimax-postattn-fusedadd-delay-negative-20260510.patch`: default-off installed-runtime post-attention fused-add RMS and delayed-output-allreduce experiment; archived as negative.
+- `patches/vllm-minimax-postattn-ar-fused-customop-negative-20260510.patch`: Python-level allreduce plus fused-add RMS custom-op wrapper; compiled but warmed to only `32.611` output tok/s.
 - `plans/2026-05-10-minimax-60tok-roadmap.md`: raised MiniMax AutoRound target ladder and next workstreams for quality-preserving 4x B70 optimization.
 - `notes/2026-05-10-minimax-dflash-fast-nvme-retest.md`: fast-NVMe DFlash retest; load/compile works, generation still stalls before any throughput result.
 - `notes/2026-05-10-minimax-source-ir-fusedadd-screen.md`: source-tree IR fused-add RMS screen; mechanically works but remains below the installed-runtime reference.
 - `notes/2026-05-10-minimax-postattn-fusedadd-delay-negative.md`: installed-runtime post-attention fused-add RMS and delayed-output-allreduce screen; both variants remained below the accepted MiniMax AutoRound reference.
+- `notes/2026-05-10-minimax-python-ar-fused-customop-negative.md`: Python custom-op allreduce plus fused-add RMS wrapper; liveness passes after registration fix, but p512/n512 throughput is clearly negative.
 
 ## Notes
 

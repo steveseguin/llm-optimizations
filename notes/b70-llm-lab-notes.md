@@ -28,6 +28,10 @@ Recent negative follow-ups:
   tok/s at p512/n512, and delayed `o_proj` allreduce plus fused-add RMS warmed
   to `35.804`. Both are negative versus the accepted `39.611` p512/n512
   reference and were not submitted to LocalMaxxing.
+- A Python-level custom op wrapping output-projection allreduce plus
+  `_C.fused_add_rms_norm` compiled after moving registration out of the forward
+  path, but warmed to only `32.611` output tok/s at p512/n512. This rules out
+  Python custom-op wrapping as the practical fusion layer.
 
 Current direction:
 

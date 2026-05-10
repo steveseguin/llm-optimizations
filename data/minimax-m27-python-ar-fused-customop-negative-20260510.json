@@ -1,0 +1,83 @@
+{
+  "date_utc": "2026-05-10",
+  "label": "minimax-m27-python-ar-fused-customop-negative",
+  "status": "negative_no_submission",
+  "reason_not_submitted_to_localmaxxing": "Warm p512/n512 output throughput was 32.610599 tok/s, below the accepted 39.610585 tok/s MiniMax AutoRound reference.",
+  "model": {
+    "hf_id": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+    "local_path": "/mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround",
+    "dtype": "float16",
+    "quantization": "AutoRound INT4 W4A16"
+  },
+  "hardware": {
+    "gpu_name": "Intel Arc Pro B70 32GB",
+    "gpu_count": 4,
+    "os": "Ubuntu 24.04.4 LTS"
+  },
+  "reference": {
+    "accepted_p512n512_output_tok_s": 39.610585,
+    "quality_conservative_p512n1536_output_tok_s": 37.552538,
+    "quality_conservative_p512n1536_total_tok_s": 50.070051
+  },
+  "patch": "patches/vllm-minimax-postattn-ar-fused-customop-negative-20260510.patch",
+  "runs": [
+    {
+      "name": "bad_registration_smoke",
+      "shape": {
+        "prompt_tokens": 1,
+        "output_tokens": 4,
+        "max_model_len": 1024,
+        "max_batched_tokens": 128
+      },
+      "status": "failed",
+      "failure": "Dynamo attempted to trace direct_register_custom_op/infer_schema because op registration was inside decoder forward.",
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-postattn-ar-fused-smoke/vllm-minimax-m27-autoround-tp4-p1n4-20260510T165346Z.log"
+    },
+    {
+      "name": "fixed_registration_smoke",
+      "shape": {
+        "prompt_tokens": 1,
+        "output_tokens": 4,
+        "max_model_len": 1024,
+        "max_batched_tokens": 128
+      },
+      "status": "completed_liveness_only",
+      "kv_tokens": 4736,
+      "tok_s_total": 2.1395699760066305,
+      "tok_s_out": 1.7116559808053044,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-postattn-ar-fused-smoke/vllm-minimax-m27-autoround-tp4-p1n4-20260510T165629Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-postattn-ar-fused-smoke/vllm-minimax-m27-autoround-tp4-p1n4-20260510T165629Z.json"
+    },
+    {
+      "name": "p512n512_cold",
+      "shape": {
+        "prompt_tokens": 512,
+        "output_tokens": 512,
+        "max_model_len": 2048,
+        "max_batched_tokens": 512
+      },
+      "cache_state": "cold_isolated_aot",
+      "kv_tokens": 9472,
+      "tok_s_total": 48.90740979998098,
+      "tok_s_out": 24.45370489999049,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-postattn-ar-fused/vllm-minimax-m27-autoround-tp4-p512n512-20260510T165924Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-postattn-ar-fused/vllm-minimax-m27-autoround-tp4-p512n512-20260510T165924Z.json"
+    },
+    {
+      "name": "p512n512_warm",
+      "shape": {
+        "prompt_tokens": 512,
+        "output_tokens": 512,
+        "max_model_len": 2048,
+        "max_batched_tokens": 512
+      },
+      "cache_state": "warm_aot_reload",
+      "kv_tokens": 17920,
+      "tok_s_total": 65.22119879949715,
+      "tok_s_out": 32.610599399748575,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-postattn-ar-fused/vllm-minimax-m27-autoround-tp4-p512n512-20260510T170237Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-postattn-ar-fused/vllm-minimax-m27-autoround-tp4-p512n512-20260510T170237Z.json"
+    }
+  ],
+  "decision": "Do not pursue Python-level custom op fusion; the next useful path needs C++/SYCL or compiler-level fusion without Python dispatch and extra clones."
+}
