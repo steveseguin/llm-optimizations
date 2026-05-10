@@ -66,6 +66,9 @@ The u4 MoE bridge is no longer the only ceiling. Existing timing notes put MiniM
 
 6. Speculative decode and MTP
    - Current MiniMax n-gram, ngram_gpu, and DFlash screens are negative or unstable.
+   - A fast-NVMe DFlash retest loaded and compiled both target and drafter, but
+     still stalled before generating a p64/n32 sample. Storage was not the
+     blocker.
    - Revisit speculation only with a draft that has target-model verification and a measured acceptance rate high enough to beat the extra scheduler and KV pressure.
    - If speculation works, publish both decode tok/s and total/prefill tok/s to LocalMaxxing with the spec method and draft model recorded.
 

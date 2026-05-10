@@ -1,0 +1,50 @@
+{
+  "date_utc": "2026-05-10T15:51:00Z",
+  "label": "minimax-m27-autoround-dflash-fast-nvme-negative",
+  "status": "negative_no_submission",
+  "reason_not_submitted_to_localmaxxing": "The run did not complete generation and emitted no throughput JSON.",
+  "target_model": {
+    "hf_id": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+    "local_path": "/mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround",
+    "dtype": "float16",
+    "quantization": "AutoRound INT4 W4A16"
+  },
+  "draft_model": {
+    "hf_id": "MirecX/MiniMax-M2.7-L3H5-DFlash",
+    "local_path": "/mnt/fast-ai/llm-models/minimax-m2.7-l3h5-dflash",
+    "checkpoint_size_gib": 0.70,
+    "auxiliary_layers": [2, 16, 30, 43, 57]
+  },
+  "hardware": {
+    "gpu_name": "Intel Arc Pro B70 32GB",
+    "gpu_count": 4,
+    "os": "Ubuntu 24.04.4 LTS"
+  },
+  "engine": {
+    "name": "vLLM",
+    "backend": "xpu",
+    "tensor_parallel": 4,
+    "speculative_method": "dflash",
+    "num_speculative_tokens": 4,
+    "draft_tensor_parallel_size": 1,
+    "xpu_graph": false,
+    "llm_scaler_moe_decode": true
+  },
+  "shape": {
+    "prompt_tokens": 64,
+    "output_tokens": 32,
+    "max_model_len": 512,
+    "max_batched_tokens": 128,
+    "max_num_seqs": 1
+  },
+  "observed": {
+    "target_model_load_gib": 28.4,
+    "target_model_load_seconds": 71.897575,
+    "gpu_kv_cache_tokens": 4160,
+    "generated_tokens": 0,
+    "json_result_emitted": false,
+    "warning": "No available shared memory broadcast block found in 60 seconds.",
+    "log_path": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-dflash-smoke/vllm-minimax-m27-autoround-tp4-p64n32-20260510T155100Z.log"
+  },
+  "decision": "Keep DFlash downloaded but deprioritize it until the XPU TP4 speculative path can complete a capped smoke."
+}
