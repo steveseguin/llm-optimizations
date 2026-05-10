@@ -1,0 +1,53 @@
+{
+  "date": "2026-05-10",
+  "model": "/mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround",
+  "hardware": "4x Intel Arc Pro B70 32GB",
+  "engine": "vLLM/XPU TP4",
+  "dtype": "float16",
+  "quantization": "INC AutoRound WNA16 / INT4",
+  "decode_path": "llm-scaler unsigned-u4 MiniMax MoE decode",
+  "benchmark_shape": {
+    "prompt_tokens": 512,
+    "output_tokens": 512,
+    "context_length": 2048,
+    "batch_size": 1
+  },
+  "shared_settings": {
+    "VLLM_XPU_USE_LLM_SCALER_MOE": "1",
+    "VLLM_XPU_ENABLE_XPU_GRAPH": "0",
+    "CCL_ATL_TRANSPORT": "ofi",
+    "CCL_TOPO_P2P_ACCESS": "1",
+    "tensor_parallel": 4,
+    "max_num_batched_tokens": 1024,
+    "max_num_seqs": 1,
+    "gpu_kv_cache_tokens": 17216,
+    "aot_hash": "4799a3c8468de261861723fba07480ef61e010f504245a62e5e93f4e9aef8e22"
+  },
+  "results": [
+    {
+      "name": "worker_affinity_auto",
+      "CCL_WORKER_AFFINITY": "auto",
+      "elapsed_time_s": 14.028822603999288,
+      "tok_s_total": 72.99258312013167,
+      "tok_s_out": 36.496291560065835,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-ccl-affinity/vllm-minimax-m27-autoround-tp4-p512n512-20260510T144526Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-ccl-affinity/vllm-minimax-m27-autoround-tp4-p512n512-20260510T144526Z.json"
+    },
+    {
+      "name": "worker_affinity_explicit_0_1_2_3",
+      "CCL_WORKER_AFFINITY": "0,1,2,3",
+      "elapsed_time_s": 14.395089580997592,
+      "tok_s_total": 71.13536836559484,
+      "tok_s_out": 35.56768418279742,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-ccl-affinity/vllm-minimax-m27-autoround-tp4-p512n512-20260510T144804Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-ccl-affinity/vllm-minimax-m27-autoround-tp4-p512n512-20260510T144804Z.json"
+    }
+  ],
+  "comparison_points": {
+    "accepted_p512n512_tok_s_out": 39.610585453357565,
+    "accepted_p512n1024_tok_s_out": 40.3037302779233,
+    "conservative_p512n1536_tok_s_out": 37.552538
+  },
+  "outcome": "negative",
+  "localmaxxing_submission": "not submitted; lower than accepted reference points"
+}
