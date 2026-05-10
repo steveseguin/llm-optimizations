@@ -51,6 +51,23 @@ BF16 is viable only with a higher memory target on this setup. The default-memor
 
 LocalMaxxing accepted the first BF16 0.95 run as `cmoz632kr0068tl017a1z6r0u`. The submission notes include the repeat at 35.954 output tok/s so the public record does not hide the observed variance.
 
+I also ran a short eager-mode BF16 0.95 p512/n16 timing diagnostic with XPU synchronization and rank-0 summaries. Eager mode is much slower and includes prefill outliers, so it is not a throughput result. It still confirms the same bottleneck shape as the 2026-05-09 timing work: Q/K norm plus repeated TP allreduces remains prominent, and prefill still falls back through vLLM fused experts.
+
+Summary excerpt:
+
+| label | count | total ms | avg ms |
+| --- | ---: | ---: | ---: |
+| `minimax.moe.experts_total` | 1116 | 5328.315 | 4.774 |
+| `moe.quant_apply` | 1116 | 4794.934 | 4.297 |
+| `moe.fused_experts_fallback` | 124 | 3648.298 | 29.422 |
+| `tp.all_reduce` | 3366 | 1308.566 | 0.389 |
+| `moe.llm_scaler_u4_bridge` | 992 | 1013.653 | 1.022 |
+| `minimax.attn.qk_norm` | 1116 | 888.985 | 0.797 |
+| `minimax.attn.o_proj` | 1116 | 417.845 | 0.374 |
+| `minimax.attn.kv_attention` | 1116 | 385.404 | 0.345 |
+
+Log: `/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n16-20260510T024420Z.log`
+
 PCIe reporting is still odd at the endpoint level. The B70 endpoints and downstream internal Intel bridge ports report 2.5 GT/s x1, but the root-to-card upstream links report PCIe 5.0 x16. Treat the endpoint x1 field as an internal/reporting artifact unless a direct bandwidth test proves otherwise.
 
 The archived hybrid B70 MoE config was not installed under vLLM's exact expected filename after reboot. Installing it to:

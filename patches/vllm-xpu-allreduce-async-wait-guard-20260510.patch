@@ -1,0 +1,28 @@
+diff --git a/vllm/distributed/device_communicators/xpu_communicator.py b/vllm/distributed/device_communicators/xpu_communicator.py
+index 29c731fbc..192a6e7ff 100644
+--- a/vllm/distributed/device_communicators/xpu_communicator.py
++++ b/vllm/distributed/device_communicators/xpu_communicator.py
+@@ -1,6 +1,7 @@
+ # SPDX-License-Identifier: Apache-2.0
+ # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
+ 
++import os
+ 
+ import torch
+ import torch.distributed as dist
+@@ -43,7 +44,14 @@ class XpuCommunicator(DeviceCommunicatorBase):
+ 
+     def all_reduce(self, input_: torch.Tensor) -> torch.Tensor:
+         output = input_.clone() if torch.compiler.is_compiling() else input_
+-        dist.all_reduce(output, group=self.device_group)
++        if (
++            os.environ.get("VLLM_XPU_ALLREDUCE_ASYNC_WAIT", "0") == "1"
++            and not torch.compiler.is_compiling()
++        ):
++            work = dist.all_reduce(output, group=self.device_group, async_op=True)
++            work.wait()
++        else:
++            dist.all_reduce(output, group=self.device_group)
+         return output
+ 
+     def reduce_scatter(self, input_: torch.Tensor, dim: int = -1):

@@ -35,6 +35,29 @@
     "status": "stalled during distributed/CCL initialization before shard loading completed; terminated during cleanup",
     "decision": "Do not force CCL_ALLREDUCE=direct for MiniMax TP4 on the current B70 stack."
   },
+  "xpuAllreduceAsyncWaitHook": {
+    "date": "2026-05-10",
+    "patch": "patches/vllm-xpu-allreduce-async-wait-guard-20260510.patch",
+    "env": {
+      "VLLM_XPU_ALLREDUCE_ASYNC_WAIT": "1"
+    },
+    "compiledAttempt": {
+      "shape": "p512/n512",
+      "dtype": "bfloat16",
+      "gpuMemoryUtilization": 0.95,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n512-20260510T024748Z.log",
+      "status": "blocked before benchmark during AOT capture",
+      "error": "torch._dynamo.exc.Unsupported: async_op=True for distributed collectives"
+    },
+    "guardedSmoke": {
+      "shape": "p1/n8",
+      "dtype": "bfloat16",
+      "gpuMemoryUtilization": 0.95,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p1n8-20260510T025024Z.log",
+      "status": "completed after guarding async_op behind not torch.compiler.is_compiling"
+    },
+    "decision": "Keep as an eager-only diagnostic hook. It is not a compiled MiniMax performance path unless the collective is moved behind a graph-safe custom op or graph partition."
+  },
   "moeTiming": {
     "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n4-20260509T180217Z.log",
     "selectExpertsDecodeMsPerLayer": "0.058-0.064",

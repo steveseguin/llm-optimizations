@@ -39,6 +39,66 @@
     "payload": "data/localmaxxing-minimax-m27-autoround-u4-decode-bf16-gpumem095-p512n1024-20260510.payload.json",
     "response": "data/localmaxxing-responses/minimax-m27-autoround-u4-decode-bf16-gpumem095-p512n1024-20260510.response.json"
   },
+  "eagerTimingDiagnostic": {
+    "name": "bf16-gpumem095-p512n16-enforce-eager-sync-rank0",
+    "status": "diagnostic_only",
+    "reason": "enforce-eager and XPU synchronization distort throughput; use only for bottleneck shape",
+    "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n16-20260510T024420Z.log",
+    "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n16-20260510T024420Z.json",
+    "elapsedSeconds": 10.246514206000029,
+    "tokSTotal": 51.529719218153254,
+    "summaryRank0": [
+      {
+        "label": "minimax.moe.experts_total",
+        "count": 1116,
+        "totalMs": 5328.315096,
+        "avgMs": 4.774476
+      },
+      {
+        "label": "moe.quant_apply",
+        "count": 1116,
+        "totalMs": 4794.934317,
+        "avgMs": 4.296536
+      },
+      {
+        "label": "moe.fused_experts_fallback",
+        "count": 124,
+        "totalMs": 3648.297714,
+        "avgMs": 29.421756
+      },
+      {
+        "label": "tp.all_reduce",
+        "count": 3366,
+        "totalMs": 1308.565892,
+        "avgMs": 0.38876
+      },
+      {
+        "label": "moe.llm_scaler_u4_bridge",
+        "count": 992,
+        "totalMs": 1013.652526,
+        "avgMs": 1.021827
+      },
+      {
+        "label": "minimax.attn.qk_norm",
+        "count": 1116,
+        "totalMs": 888.985158,
+        "avgMs": 0.796582
+      },
+      {
+        "label": "minimax.attn.o_proj",
+        "count": 1116,
+        "totalMs": 417.844935,
+        "avgMs": 0.374413
+      },
+      {
+        "label": "minimax.attn.kv_attention",
+        "count": 1116,
+        "totalMs": 385.403882,
+        "avgMs": 0.345344
+      }
+    ],
+    "interpretation": "Eager absolute timings are distorted by prefill and synchronization, but the work shape still points to Q/K norm plus repeated TP allreduces and prefill fused-experts fallback as high-value targets."
+  },
   "benchmarks": [
     {
       "name": "fast-nvme-p1-n1024-default",

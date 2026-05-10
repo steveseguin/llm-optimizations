@@ -155,6 +155,7 @@ Reproducibility notes, benchmark payloads, and local patches from the Intel Arc 
 - `patches/vllm-xpu-decode-timing-summary-helper-20260509.patch`: standalone timing helper file with atexit summaries and corrected `PRINT_EVERY=0` summary-only behavior.
 - `patches/vllm-minimax-ep-u4-expert-map-skip-20260509.patch`: vLLM MiniMax WNA16/runner diff including the decode u4 bridge, router/logits gate, and EP non-local expert-map skip.
 - `patches/llm-scaler-minimax-ep-u4-skip-20260509.patch`: llm-scaler MiniMax u4 kernel diff including BF16/logits helpers and `expert < 0` skip handling.
+- `patches/vllm-xpu-allreduce-async-wait-guard-20260510.patch`: default-off XPU allreduce async-wait diagnostic hook; compiled MiniMax is blocked because TorchDynamo rejects `async_op=True` collectives.
 
 ## Notes
 

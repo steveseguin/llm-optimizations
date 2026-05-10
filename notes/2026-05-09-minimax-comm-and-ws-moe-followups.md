@@ -38,6 +38,30 @@ Log:
 
 Conclusion: do not force `CCL_ALLREDUCE=direct` for MiniMax TP4 on the current B70 stack. Keep oneCCL algorithm selection on default unless a lower-level microbenchmark shows a specific model-run-safe algorithm win.
 
+## XPU Async-Wait Allreduce Hook
+
+I added a default-off diagnostic hook in `XpuCommunicator.all_reduce`:
+
+```text
+VLLM_XPU_ALLREDUCE_ASYNC_WAIT=1
+```
+
+It calls `dist.all_reduce(..., async_op=True)` and immediately waits, so the math is unchanged. The compiled MiniMax TP4 path cannot use it: TorchDynamo rejects `async_op=True` for distributed collectives during AOT capture. The first p512/n512 attempt failed before benchmarking with:
+
+```text
+torch._dynamo.exc.Unsupported: async_op=True for distributed collectives
+```
+
+I tightened the guard so the hook is ignored while `torch.compiler.is_compiling()`, then verified a tiny compiled p1/n8 smoke completes with the env var set. That means the patch is safe to keep as an eager-only diagnostic, but it is not a current performance path.
+
+Artifacts:
+
+- patch: `patches/vllm-xpu-allreduce-async-wait-guard-20260510.patch`
+- blocked compiled p512/n512 log: `/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n512-20260510T024748Z.log`
+- guarded p1/n8 smoke log: `/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p1n8-20260510T025024Z.log`
+
+Conclusion: do not use async-op allreduce as a compiled MiniMax optimization unless we move the collective behind a graph-safe custom op or alter the graph partitioning so Dynamo does not trace `async_op=True`.
+
 ## vLLM MoE Timing Split
 
 A temporary `MoERunner` timing patch separated router expert selection from quant apply on a short p512/n4 diagnostic:
