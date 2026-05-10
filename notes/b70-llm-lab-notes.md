@@ -4,6 +4,41 @@ Date: 2026-05-04
 
 This note is the current public/reproducible summary for the B70 optimization work. The active technical plan is `plans/q4_0-gguf-b70-optimization-plan.md`; submitted benchmark IDs and exact payloads are recorded in `notes/localmaxxing-submissions-2026-05-04.md` and `data/localmaxxing-payloads-20260504.json.gz.b64`.
 
+## 2026-05-10 MiniMax AutoRound Addendum
+
+MiniMax M2.7 AutoRound INT4 is now the main four-card optimization target. The
+aspiration target has been raised to `60 tok/s` output at p512/n1536 on 4x B70,
+with `75+ tok/s` reserved for verified speculative/MTP or deeper fusion that
+preserves target logits.
+
+Current quality-conservative anchor:
+
+- `37.552538` output tok/s / `50.070051` total tok/s at p512/n1536, TP4,
+  FP16, llm-scaler raw-u4 decode MoE path, Q/K TP variance allreduce enabled,
+  no speculation, no expert dropping, and no power-limit change. LocalMaxxing:
+  `cmozow03v005wlo01q81bnspx`.
+
+Recent negative follow-ups:
+
+- DFlash from fast NVMe loads/compiles target and drafter but stalls before
+  producing a p64/n32 benchmark result.
+- Source-tree and installed-runtime RMS provider swaps are below the accepted
+  MiniMax reference.
+- Installed-runtime post-attention fused-add RMS warmed to `35.077` output
+  tok/s at p512/n512, and delayed `o_proj` allreduce plus fused-add RMS warmed
+  to `35.804`. Both are negative versus the accepted `39.611` p512/n512
+  reference and were not submitted to LocalMaxxing.
+
+Current direction:
+
+- Stop spending time on standalone RMS provider swaps or simply moving the same
+  allreduce call.
+- Build an XPU-specific allreduce plus residual/RMSNorm or MoE/projection
+  epilogue fusion path, with p512/n512 and p512/n1536 validation after each
+  change.
+- Keep all negative/diagnostic flags unset for real benchmarks unless a run is
+  explicitly labeled as an experiment.
+
 ## Hardware And Constraints
 
 - Host: Ubuntu 24.04.4 LTS, kernel 6.17.0-22-generic during the latest runs.

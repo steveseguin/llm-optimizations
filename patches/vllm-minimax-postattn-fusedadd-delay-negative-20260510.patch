@@ -1,0 +1,61 @@
+diff --git a/vllm/model_executor/models/minimax_m2.py b/vllm/model_executor/models/minimax_m2.py
+index 000000000..000000000 100644
+--- a/vllm/model_executor/models/minimax_m2.py
++++ b/vllm/model_executor/models/minimax_m2.py
+@@ -45,7 +45,7 @@ from vllm.model_executor.layers.fused_moe import (
+     FusedMoE,
+     fused_moe_make_expert_params_mapping,
+ )
+-from vllm.model_executor.layers.layernorm import RMSNorm
++from vllm.model_executor.layers.layernorm import RMSNorm, fused_add_rms_norm
+ from vllm.model_executor.layers.linear import (
+     QKVParallelLinear,
+     ReplicatedLinear,
+@@ -80,6 +80,14 @@ def _minimax_qk_norm_xpu_direct_enabled() -> bool:
+     return os.environ.get("VLLM_MINIMAX_QK_NORM_XPU_DIRECT", "0") == "1"
+ 
+ 
++def _minimax_o_proj_delay_allreduce_enabled() -> bool:
++    return os.environ.get("VLLM_MINIMAX_O_PROJ_DELAY_ALLREDUCE", "0") == "1"
++
++
++def _minimax_post_attn_fused_add_rms_enabled() -> bool:
++    return os.environ.get("VLLM_MINIMAX_POST_ATTN_FUSED_ADD_RMS_XPU", "0") == "1"
++
++
+ def _minimax_qk_norm_xpu_helper(
+     qkv: torch.Tensor,
+     q_norm: MiniMaxText01RMSNormTP,
+@@ -229,6 +237,7 @@ class MiniMaxM2Attention(nn.Module):
+             self.total_num_heads * self.head_dim,
+             hidden_size,
+             bias=False,
++            reduce_results=not _minimax_o_proj_delay_allreduce_enabled(),
+             quant_config=quant_config,
+             prefix=f"{prefix}.o_proj",
+         )
+@@ -357,7 +366,23 @@ class MiniMaxM2DecoderLayer(nn.Module):
+         )
+ 
+         # Fully Connected
+-        hidden_states, residual = self.post_attention_layernorm(hidden_states, residual)
++        if _minimax_o_proj_delay_allreduce_enabled():
++            hidden_states = tensor_model_parallel_all_reduce(hidden_states)
++        if (
++            _minimax_post_attn_fused_add_rms_enabled()
++            and hidden_states.is_xpu
++            and residual is not None
++        ):
++            hidden_states, residual = fused_add_rms_norm(
++                hidden_states,
++                residual,
++                self.post_attention_layernorm.weight.data,
++                self.post_attention_layernorm.variance_epsilon,
++            )
++        else:
++            hidden_states, residual = self.post_attention_layernorm(
++                hidden_states, residual
++            )
+ 
+         hidden_states = self.block_sparse_moe(hidden_states)
+ 

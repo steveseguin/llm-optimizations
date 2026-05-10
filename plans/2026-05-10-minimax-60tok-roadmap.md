@@ -47,6 +47,10 @@ The u4 MoE bridge is no longer the only ceiling. Existing timing notes put MiniM
      source-tree `fused_add_rms_norm=["xpu_kernels"]` both stayed below the
      installed-runtime reference. Future work needs to fuse the collective
      boundary with adjacent epilogue work, not just replace the RMSNorm kernel.
+   - An installed-runtime post-attention `fused_add_rms_norm` screen also
+     failed to beat the reference: warm p512/n512 reached `35.077` output tok/s
+     alone and `35.804` when paired with delayed `o_proj` allreduce. Do not
+     spend more time on provider swaps without collective fusion.
 
 2. Q/K RMS variance fusion
    - Standalone helper kernels and standalone mailbox allreduce were negative.
@@ -82,7 +86,7 @@ The u4 MoE bridge is no longer the only ceiling. Existing timing notes put MiniM
 
 ## Immediate Next Tests
 
-1. Screen oneCCL worker affinity with default worker count. Do not increase `CCL_WORKER_COUNT` because `CCL_WORKER_COUNT=2` hung during XCCL initialization and Intel documents that multiple workers are not recommended for GPU buffers.
+1. Prototype an XPU-specific fused allreduce/residual/RMSNorm boundary as a default-off patch. The standalone RMS provider and delayed-allreduce screens are closed as negative.
 2. Build a lower-overhead decode timing pass around attention, Q/K RMS, projections, and MoE that can run for short diagnostics without perturbing real throughput.
-3. Prototype an XPU-specific fused allreduce/residual/RMSNorm boundary as a default-off patch.
+3. Inspect compiled IR around hidden-state allreduce wait sites and target the first boundary that feeds immediately into residual/RMS or MoE epilogue work.
 4. Re-run p512/n512 and p512/n1536 after each code change, then submit only quality-preserving, repeatable improvements to LocalMaxxing.

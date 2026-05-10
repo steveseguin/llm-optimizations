@@ -1,0 +1,85 @@
+{
+  "date_utc": "2026-05-10",
+  "label": "minimax-m27-postattn-fusedadd-delay-negative",
+  "status": "negative_no_submission",
+  "reason_not_submitted_to_localmaxxing": "All runs are below the accepted MiniMax AutoRound TP4 p512/n512 reference and do not represent a useful public speed improvement.",
+  "model": {
+    "hf_id": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+    "local_path": "/mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround",
+    "dtype": "float16",
+    "quantization": "AutoRound INT4 W4A16"
+  },
+  "hardware": {
+    "gpu_name": "Intel Arc Pro B70 32GB",
+    "gpu_count": 4,
+    "os": "Ubuntu 24.04.4 LTS"
+  },
+  "shape": {
+    "prompt_tokens": 512,
+    "output_tokens": 512,
+    "max_model_len": 2048,
+    "max_batched_tokens": 512,
+    "max_num_seqs": 1,
+    "tensor_parallel": 4
+  },
+  "reference": {
+    "accepted_p512n512_output_tok_s": 39.610585,
+    "quality_conservative_p512n1536_output_tok_s": 37.552538,
+    "quality_conservative_p512n1536_total_tok_s": 50.070051
+  },
+  "runs": [
+    {
+      "name": "post_attention_fused_add_rms_cold",
+      "env": {
+        "VLLM_MINIMAX_POST_ATTN_FUSED_ADD_RMS_XPU": "1",
+        "VLLM_MINIMAX_O_PROJ_DELAY_ALLREDUCE": "0"
+      },
+      "cache_state": "cold_isolated_aot",
+      "kv_tokens": 9472,
+      "tok_s_total": 55.366871188138155,
+      "tok_s_out": 27.683435594069077,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-postattn-fusedadd/vllm-minimax-m27-autoround-tp4-p512n512-20260510T163516Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-postattn-fusedadd/vllm-minimax-m27-autoround-tp4-p512n512-20260510T163516Z.json"
+    },
+    {
+      "name": "post_attention_fused_add_rms_warm",
+      "env": {
+        "VLLM_MINIMAX_POST_ATTN_FUSED_ADD_RMS_XPU": "1",
+        "VLLM_MINIMAX_O_PROJ_DELAY_ALLREDUCE": "0"
+      },
+      "cache_state": "warm_aot_reload",
+      "kv_tokens": 17984,
+      "tok_s_total": 70.15456711276205,
+      "tok_s_out": 35.077283556381024,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-postattn-fusedadd/vllm-minimax-m27-autoround-tp4-p512n512-20260510T163832Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-postattn-fusedadd/vllm-minimax-m27-autoround-tp4-p512n512-20260510T163832Z.json"
+    },
+    {
+      "name": "oproj_delay_plus_post_attention_fused_add_rms_cold",
+      "env": {
+        "VLLM_MINIMAX_POST_ATTN_FUSED_ADD_RMS_XPU": "1",
+        "VLLM_MINIMAX_O_PROJ_DELAY_ALLREDUCE": "1"
+      },
+      "cache_state": "cold_isolated_aot",
+      "kv_tokens": 9472,
+      "tok_s_total": 52.48769144645182,
+      "tok_s_out": 26.24384572322591,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-oproj-delay-fusedadd/vllm-minimax-m27-autoround-tp4-p512n512-20260510T164227Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-oproj-delay-fusedadd/vllm-minimax-m27-autoround-tp4-p512n512-20260510T164227Z.json"
+    },
+    {
+      "name": "oproj_delay_plus_post_attention_fused_add_rms_warm",
+      "env": {
+        "VLLM_MINIMAX_POST_ATTN_FUSED_ADD_RMS_XPU": "1",
+        "VLLM_MINIMAX_O_PROJ_DELAY_ALLREDUCE": "1"
+      },
+      "cache_state": "warm_aot_reload",
+      "kv_tokens": 17984,
+      "tok_s_total": 71.6071749824286,
+      "tok_s_out": 35.8035874912143,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-oproj-delay-fusedadd/vllm-minimax-m27-autoround-tp4-p512n512-20260510T164542Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-oproj-delay-fusedadd/vllm-minimax-m27-autoround-tp4-p512n512-20260510T164542Z.json"
+    }
+  ],
+  "decision": "Keep both env flags unset; continue with true allreduce plus epilogue fusion rather than standalone RMS provider swaps or delayed allreduce placement."
+}
