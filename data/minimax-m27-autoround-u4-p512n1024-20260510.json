@@ -1,0 +1,52 @@
+{
+  "label": "vllm-minimax-m27-autoround-u4-decode-p512-n1024",
+  "date_utc": "2026-05-10",
+  "model": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+  "local_model_path": "/mnt/corsair-external/llm-models/minimax-m2.7-int4-autoround",
+  "hardware": {
+    "gpu": "Intel Arc Pro B70",
+    "gpu_count": 4,
+    "vram_gb_per_gpu": 32,
+    "os": "Ubuntu 24.04.4"
+  },
+  "engine": {
+    "name": "vllm",
+    "version": "0.20.1-local",
+    "backend": "xpu",
+    "runtime": "Level Zero",
+    "tensor_parallel": 4,
+    "dtype": "float16",
+    "quantization": "INT4 AutoRound W4A16",
+    "llm_scaler_u4_decode_bridge": true,
+    "speculative_decode": false
+  },
+  "request": {
+    "prompt_tokens": 512,
+    "output_tokens": 1024,
+    "context_length": 2048,
+    "batch_size": 1,
+    "max_num_batched_tokens": 1024,
+    "max_num_seqs": 1
+  },
+  "environment": {
+    "CCL_ATL_TRANSPORT": "ofi",
+    "CCL_ZE_IPC_EXCHANGE": "unset/default",
+    "CCL_TOPO_P2P_ACCESS": "1",
+    "VLLM_XPU_ENABLE_XPU_GRAPH": "0",
+    "VLLM_XPU_USE_LLM_SCALER_MOE": "1"
+  },
+  "result": {
+    "elapsed_s": 28.49725152697647,
+    "requests_per_second": 0.03509110340179178,
+    "tok_s_total": 53.89993482515217,
+    "tok_s_output": 35.933289883435,
+    "peak_model_load_vram_gib": 28.11,
+    "available_kv_cache_memory_gib": 1.02,
+    "gpu_kv_cache_tokens": 17216
+  },
+  "logs": {
+    "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1024-20260510T003153Z.log",
+    "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1024-20260510T003153Z.json"
+  },
+  "interpretation": "The longer-output run is valid and remains above the 30 tok/s starting goal, but it is slower than the p512/n512 high of 37.136 tok/s. This suggests the current ceiling is not just prefill amortization; decode cost rises with longer active context/KV usage. Keep p512/n512 as the best published speed point and use p512/n1024 as a longer-generation validation datapoint."
+}
