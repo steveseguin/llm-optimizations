@@ -31,6 +31,9 @@ All results use:
 | p512/n1024 | 1024 | installed B70 MoE config, run 1 | 17,216 | 36.876 | 55.314 | 73.17s |
 | p512/n1024 | 1024 | installed B70 MoE config, run 2 | 17,216 | 36.620 | 54.930 | 78.06s |
 | p512/n1024 | 1024 | `--gpu-memory-utilization 0.93`, unstable | 22,592 | hung | hung | 65.82s |
+| p512/n1024 | 1024 | BF16 default memory, failed | 0 | no KV cache | no KV cache | 66.09s |
+| p512/n1024 | 1024 | BF16, `--gpu-memory-utilization 0.95`, run 1 | 18,880 | 37.304 | 55.955 | 77.30s |
+| p512/n1024 | 1024 | BF16, `--gpu-memory-utilization 0.95`, run 2 | 18,880 | 35.954 | 53.931 | 67.17s |
 
 ## Findings
 
@@ -43,6 +46,10 @@ The NVMe move is a large iteration-speed win. Comparable p512/n1024 load time fe
 `--gpu-memory-utilization 0.95` is useful for context capacity rather than raw speed. It increased KV cache from 17,216 to 33,408 tokens and still held 36.02 output tok/s on p512/n1024. For raw decode speed, default gpu-memory-utilization is slightly better.
 
 `--gpu-memory-utilization 0.93` is currently unstable. It increased KV cache to 22,592 tokens, but generation did not advance and vLLM emitted two shared-memory broadcast wait warnings before manual interruption. Do not use 0.93 as a serving setting without a repeat/profiling pass.
+
+BF16 is viable only with a higher memory target on this setup. The default-memory BF16 run loaded the model but reported negative KV headroom and failed before generation with `No available memory for the cache blocks`. With `--gpu-memory-utilization 0.95`, BF16 completed twice at 37.304 and 35.954 output tok/s, with 18,880 KV tokens. This is a quality-conservative capacity mode rather than a clear speed breakthrough: it keeps BF16 activations and has enough context headroom, but the two-run range overlaps the FP16 best path.
+
+LocalMaxxing accepted the first BF16 0.95 run as `cmoz632kr0068tl017a1z6r0u`. The submission notes include the repeat at 35.954 output tok/s so the public record does not hide the observed variance.
 
 PCIe reporting is still odd at the endpoint level. The B70 endpoints and downstream internal Intel bridge ports report 2.5 GT/s x1, but the root-to-card upstream links report PCIe 5.0 x16. Treat the endpoint x1 field as an internal/reporting artifact unless a direct bandwidth test proves otherwise.
 
@@ -80,7 +87,7 @@ TP=4 \
 /home/steve/llm-optimizations-publish/scripts/bench-vllm-minimax-autoround-xpu.sh
 ```
 
-For larger-context serving where KV capacity matters more than peak decode:
+For larger-context serving where KV capacity and a more quality-conservative activation dtype matter more than peak decode:
 
 ```bash
 GPU_MEMORY_UTILIZATION=0.95 \
@@ -90,7 +97,7 @@ HF_HOME=/mnt/fast-ai/llm-cache/hf \
 USE_LLM_SCALER_MOE=1 \
 CCL_IPC=default \
 XPU_GRAPH=0 \
-DTYPE=float16 \
+DTYPE=bfloat16 \
 INPUT_LEN=512 \
 OUTPUT_LEN=1024 \
 MAX_MODEL_LEN=2048 \
@@ -104,6 +111,7 @@ TP=4 \
 ## Next Work
 
 - Treat `gpu-memory-utilization` default as the raw-speed setting and 0.95 as the larger-KV setting; 0.93 hung and needs lower-level profiling before more midpoint sweeps.
+- Keep BF16 0.95 as the quality-conservative MiniMax serving recipe; the BF16 default-memory path has no usable KV cache headroom on this host.
 - Add or tune a MiniMax-specific `fused_moe` config for `E=256,N=384,device_name=Intel(R)_Graphics_[0xe223],dtype=int4_w4a16`.
 - Keep XPU graph disabled for TP4 until communication-op capture support changes.
 - Prefer `/mnt/fast-ai` for active benchmarks and use the external drive as colder storage.

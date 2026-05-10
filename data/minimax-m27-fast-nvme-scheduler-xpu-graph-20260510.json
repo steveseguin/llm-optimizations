@@ -34,6 +34,11 @@
     "cclTopoP2pAccess": 1,
     "cclZeIpcExchange": "unset/default"
   },
+  "localmaxxing": {
+    "bf16GpuMem095P512N1024Run1Id": "cmoz632kr0068tl017a1z6r0u",
+    "payload": "data/localmaxxing-minimax-m27-autoround-u4-decode-bf16-gpumem095-p512n1024-20260510.payload.json",
+    "response": "data/localmaxxing-responses/minimax-m27-autoround-u4-decode-bf16-gpumem095-p512n1024-20260510.response.json"
+  },
   "benchmarks": [
     {
       "name": "fast-nvme-p1-n1024-default",
@@ -188,6 +193,58 @@
       "tokSTotal": null,
       "tokSOut": null,
       "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1024-20260510T021408Z.log"
+    },
+    {
+      "name": "fast-nvme-p512-n1024-bf16-default-no-kv-cache",
+      "promptTokens": 512,
+      "outputTokens": 1024,
+      "maxModelLen": 2048,
+      "maxNumBatchedTokens": 1024,
+      "gpuMemoryUtilization": "default",
+      "xpuGraph": false,
+      "dtype": "bfloat16",
+      "installedMoeConfig": "configs/vllm/minimax-m27-b70-int4-w4a16-moe-hybrid-20260508.json",
+      "loadSeconds": 66.085671,
+      "kvCacheMemoryGiB": -0.3,
+      "gpuKvCacheTokens": 0,
+      "status": "failed before generation: no available memory for cache blocks",
+      "tokSTotal": null,
+      "tokSOut": null,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1024-20260510T023026Z.log"
+    },
+    {
+      "name": "fast-nvme-p512-n1024-bf16-gpu-mem-util-0.95-run1",
+      "promptTokens": 512,
+      "outputTokens": 1024,
+      "maxModelLen": 2048,
+      "maxNumBatchedTokens": 1024,
+      "gpuMemoryUtilization": 0.95,
+      "xpuGraph": false,
+      "dtype": "bfloat16",
+      "installedMoeConfig": "configs/vllm/minimax-m27-b70-int4-w4a16-moe-hybrid-20260508.json",
+      "loadSeconds": 77.295448,
+      "kvCacheMemoryGiB": 1.12,
+      "gpuKvCacheTokens": 18880,
+      "tokSTotal": 55.955481647437395,
+      "tokSOut": 37.30365443162493,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1024-20260510T023304Z.log"
+    },
+    {
+      "name": "fast-nvme-p512-n1024-bf16-gpu-mem-util-0.95-run2",
+      "promptTokens": 512,
+      "outputTokens": 1024,
+      "maxModelLen": 2048,
+      "maxNumBatchedTokens": 1024,
+      "gpuMemoryUtilization": 0.95,
+      "xpuGraph": false,
+      "dtype": "bfloat16",
+      "installedMoeConfig": "configs/vllm/minimax-m27-b70-int4-w4a16-moe-hybrid-20260508.json",
+      "loadSeconds": 67.172634,
+      "kvCacheMemoryGiB": 1.12,
+      "gpuKvCacheTokens": 18880,
+      "tokSTotal": 53.930657417031156,
+      "tokSOut": 35.9537716113541,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1024-20260510T023605Z.log"
     }
   ],
   "observations": [
@@ -197,6 +254,7 @@
     "XPU graph remains negative for TP4 because vLLM reports communication capture is unsupported, disables graph mode, and loses KV headroom.",
     "gpu-memory-utilization 0.95 doubles KV capacity to 33,408 tokens while keeping decode over 36 tok/s, so it is useful for larger-context serving even though default is slightly faster.",
     "Installing the archived B70 MoE config under vLLM's exact expected filename removes the missing-config warning and produced 36.88 then 36.62 output tok/s on repeat p512/n1024 runs. Treat it as neutral-to-small-positive for the current llm-scaler decode path, not as a clear new speed breakthrough.",
-    "gpu-memory-utilization 0.93 increased KV cache to 22,592 tokens, but the generation hung with repeated shared-memory broadcast wait warnings. This middle setting is currently less attractive than either default speed mode or the completed 0.95 capacity mode."
+    "gpu-memory-utilization 0.93 increased KV cache to 22,592 tokens, but the generation hung with repeated shared-memory broadcast wait warnings. This middle setting is currently less attractive than either default speed mode or the completed 0.95 capacity mode.",
+    "BF16 default-memory mode failed before generation because vLLM reported no available memory for KV cache blocks. Raising gpu-memory-utilization to 0.95 made BF16 viable with 18,880 KV tokens and p512/n1024 output throughput of 37.30 and 35.95 tok/s on two repeats. Treat this as a quality-conservative capacity mode, not a clean speed breakthrough over the FP16 default-memory recipe."
   ]
 }

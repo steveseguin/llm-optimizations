@@ -22,6 +22,22 @@ Logs:
 
 Conclusion: keep the current vLLM default IPC path for model runs, and keep explicit `pidfd` only for standalone XCCL probes. The next speed work should stay in model execution rather than oneCCL env tuning.
 
+## oneCCL Direct Algorithm Follow-up
+
+On 2026-05-10 I also tested forcing the oneCCL allreduce algorithm:
+
+```bash
+CCL_ALLREDUCE=direct
+```
+
+with the current fast-NVMe MiniMax TP4 p512/n512 harness. It stalled during distributed/CCL initialization before shard loading completed and was terminated by the benchmark timeout/cleanup path. This is worse than the default algorithm selection and is not a serving candidate.
+
+Log:
+
+- `/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n512-20260510T022446Z.log`
+
+Conclusion: do not force `CCL_ALLREDUCE=direct` for MiniMax TP4 on the current B70 stack. Keep oneCCL algorithm selection on default unless a lower-level microbenchmark shows a specific model-run-safe algorithm win.
+
 ## vLLM MoE Timing Split
 
 A temporary `MoERunner` timing patch separated router expert selection from quant apply on a short p512/n4 diagnostic:

@@ -23,6 +23,18 @@
     "baselineHiddenFp32AvgMs": 0.015018,
     "decision": "No oneCCL small-payload env variant beat the baseline enough to promote."
   },
+  "cclAllreduceDirectModelRun": {
+    "date": "2026-05-10",
+    "env": {
+      "CCL_ALLREDUCE": "direct"
+    },
+    "shape": "p512/n512",
+    "dtype": "bfloat16",
+    "gpuMemoryUtilization": "default",
+    "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n512-20260510T022446Z.log",
+    "status": "stalled during distributed/CCL initialization before shard loading completed; terminated during cleanup",
+    "decision": "Do not force CCL_ALLREDUCE=direct for MiniMax TP4 on the current B70 stack."
+  },
   "moeTiming": {
     "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n4-20260509T180217Z.log",
     "selectExpertsDecodeMsPerLayer": "0.058-0.064",
