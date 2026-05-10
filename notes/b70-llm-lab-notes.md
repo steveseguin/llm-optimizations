@@ -32,6 +32,13 @@ Recent negative follow-ups:
   `_C.fused_add_rms_norm` compiled after moving registration out of the forward
   path, but warmed to only `32.611` output tok/s at p512/n512. This rules out
   Python custom-op wrapping as the practical fusion layer.
+- Current clean p512/n1536 MiniMax refresh is `37.17` output tok/s /
+  `49.558` total tok/s with 17,216 GPU KV-cache tokens. The active AOT graph
+  shows 187 TP allreduce boundaries per generated-token graph: 62 Q/K
+  variance, 62 output-projection hidden, 62 MoE hidden, and one vocab-embedding
+  allreduce. This confirms the next speed path is reducing/fusing collective
+  boundaries, especially hidden-state allreduce plus residual/RMSNorm, rather
+  than more standalone MoE matvec work.
 
 Current direction:
 

@@ -1,0 +1,94 @@
+{
+  "date": "2026-05-10",
+  "objective": "Raise the MiniMax M2.7 AutoRound INT4 4x B70 target from the earlier >30 tok/s bring-up goal to a quality-preserving 60+ tok/s optimization target.",
+  "model": {
+    "hfId": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+    "localPath": "/mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround",
+    "quantization": "AutoRound INT4 W4A16",
+    "primaryEngine": "vLLM/XPU with local llm-scaler U4 decode kernels"
+  },
+  "targets": {
+    "nearTermOutputTokS": 45,
+    "mainOutputTokS": 60,
+    "stretchOutputTokS": 75,
+    "stretchCondition": "Only count 75+ tok/s if achieved through target-verified speculative decoding/MTP or deeper source-level fusion that preserves target logits."
+  },
+  "currentQualityAnchors": [
+    {
+      "label": "quality-conservative long anchor",
+      "promptTokens": 512,
+      "outputTokens": 1536,
+      "contextLength": 2048,
+      "tensorParallel": 4,
+      "tokSOut": 37.552538,
+      "tokSTotal": 50.070051,
+      "localmaxxingId": "cmozow03v005wlo01q81bnspx",
+      "qualityNotes": "Q/K TP variance allreduce enabled; no speculation; no expert dropping; no power-limit change."
+    },
+    {
+      "label": "short accepted speed point, later treated as scheduling clue if AOT graph lacks visible Q/K variance allreduce",
+      "promptTokens": 512,
+      "outputTokens": 512,
+      "contextLength": 2048,
+      "tensorParallel": 4,
+      "tokSOut": 39.610585,
+      "tokSTotal": 79.221171
+    }
+  ],
+  "qualityGuardrails": [
+    "Do not skip Q/K RMS TP variance allreduce.",
+    "Do not drop experts or silently route missing experts.",
+    "Do not promote deferred reductions that cross RMSNorm, router, MoE, or attention nonlinearities without token/logit equivalence checks.",
+    "Do not count a lower-quality quantization switch as a MiniMax AutoRound speed improvement unless it is labeled separately.",
+    "Do not count speculative decoding unless the target model verifies accepted tokens."
+  ],
+  "externalReferences": [
+    {
+      "title": "vLLM speculative decoding documentation",
+      "url": "https://docs.vllm.ai/en/latest/features/speculative_decoding/",
+      "use": "Spec methods include ngram, suffix, MTP, Eagle3, and DFlash. Treat speculation as quality-preserving only through target verification."
+    },
+    {
+      "title": "vLLM Intel AutoRound quantization documentation",
+      "url": "https://docs.vllm.ai/en/stable/features/quantization/inc/",
+      "use": "Intel-platform recipes currently include W4A16 and W8A16, matching the MiniMax AutoRound W4A16 path."
+    },
+    {
+      "title": "Intel llm-scaler",
+      "url": "https://github.com/intel/llm-scaler",
+      "use": "Advertises Arc Pro B60/B70 support, CCL P2P/USM, INT4/FP8 serving, and tensor/pipeline/data parallelism; mine for transferable kernels and scheduling ideas."
+    },
+    {
+      "title": "MiniMax M2.7 hardware performance report",
+      "url": "https://devradar.dev/radar/minmax-m2-7-inference-benchmarks-rtx-hardware",
+      "use": "Recent non-Intel numbers at 32k context include 71.52 tok/s on 4x RTX 4090, 118.74 tok/s on RTX PRO 6000, and 24.41 tok/s on DGX Spark; backend/quant differ but support a higher aspiration target."
+    },
+    {
+      "title": "DFlash paper",
+      "url": "https://arxiv.org/abs/2602.06036",
+      "use": "Technically interesting speculative path; local MiniMax B70 DFlash currently stalls before producing a benchmark result."
+    },
+    {
+      "title": "SGLang expert parallelism documentation",
+      "url": "https://sgl-project.github.io/advanced_features/expert_parallelism.html",
+      "use": "Current fast MoE serving leans on routed backends such as DeepEP/DeepGEMM and FlashInfer/TRT-LLM. The XPU lesson is to reduce generic TP collectives through routed-MoE and epilogue-aware kernels."
+    },
+    {
+      "title": "KTransformers benchmark board",
+      "url": "https://ktransformers.net/en/benchmarks",
+      "use": "Shows strong decode results on RTX 5090 systems and reinforces that specialized model/backbone kernels can beat generic TP layouts."
+    },
+    {
+      "title": "MiniMax-M2.7 REAP AutoRound W4A16 variant",
+      "url": "https://huggingface.co/MJPansa/MiniMax-M2.7-REAP-172B-A10B-AutoRound-W4A16",
+      "use": "A pruned-expert speed/fit variant; useful as a separate quality tradeoff track, not a replacement for the current full MiniMax target."
+    }
+  ],
+  "nextImplementationPreference": [
+    "Keep active benchmarks on the clean quality path unless a run is explicitly experimental.",
+    "Avoid Python custom-op wrappers around dist.all_reduce after the p512/n512 regression.",
+    "Implement the next fusion in C++/SYCL or as a real compiler pass.",
+    "Start with MiniMax-specific TP4 decode shapes: Q/K RMS variance allreduce plus RMS apply, or hidden-state allreduce immediately followed by residual add/RMSNorm.",
+    "Archive each negative/default-off patch with logs and leave its env flag unset."
+  ]
+}

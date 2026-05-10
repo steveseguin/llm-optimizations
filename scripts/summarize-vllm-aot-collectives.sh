@@ -12,22 +12,27 @@ if [ ! -d "$cache" ]; then
   exit 1
 fi
 
+count_rg() {
+  local pattern="$1"
+  (rg -n "$pattern" "$cache" -g '*.py' 2>/dev/null || true) | wc -l
+}
+
 printf 'cache=%s\n' "$cache"
 printf 'all_reduce_comment_lines='
-rg -n "Topologically Sorted Source Nodes: \\[.*all_reduce" "$cache" -g '*.py' | wc -l
+count_rg "Topologically Sorted Source Nodes: \\[.*all_reduce"
 printf 'all_reduce_call_lines='
-rg -n "_c10d_functional\\.all_reduce_" "$cache" -g '*.py' | wc -l
+count_rg "^[[:space:]]*[A-Za-z_][A-Za-z0-9_]*: .* = torch\\.ops\\._c10d_functional\\.all_reduce"
 printf 'wait_tensor_call_lines='
-rg -n "_c10d_functional\\.wait_tensor" "$cache" -g '*.py' | wc -l
+count_rg "^[[:space:]]*[A-Za-z_][A-Za-z0-9_]*: .* = torch\\.ops\\._c10d_functional\\.wait_tensor"
 printf 'rms_int4_lines='
-rg -n "vllm_ir\\.rms_norm.*_xpu_C\\.int4_gemm_w4a16|rms_norm_default, int4_gemm_w4a16" "$cache" -g '*.py' | wc -l
+count_rg "vllm_ir\\.rms_norm.*_xpu_C\\.int4_gemm_w4a16|rms_norm_default, int4_gemm_w4a16"
 printf 'fused_add_rms_lines='
-rg -n "fused_add_rms_norm|vllm_ir\\.fused_add_rms_norm" "$cache" -g '*.py' | wc -l
+count_rg "fused_add_rms_norm|vllm_ir\\.fused_add_rms_norm"
 
 echo
 echo "files_with_collectives:"
-rg -l "_c10d_functional\\.all_reduce_" "$cache" -g '*.py' | sort
+rg -l "_c10d_functional\\.all_reduce" "$cache" -g '*.py' 2>/dev/null | sort || true
 
 echo
 echo "sample_collective_context:"
-rg -n "Topologically Sorted Source Nodes: \\[all_reduce|_c10d_functional\\.all_reduce_|_c10d_functional\\.wait_tensor|rms_norm_default, int4_gemm_w4a16" "$cache" -g '*.py' | head -120
+rg -n "Topologically Sorted Source Nodes: \\[all_reduce|^[[:space:]]*[A-Za-z_][A-Za-z0-9_]*: .* = torch\\.ops\\._c10d_functional\\.all_reduce|^[[:space:]]*[A-Za-z_][A-Za-z0-9_]*: .* = torch\\.ops\\._c10d_functional\\.wait_tensor|rms_norm_default, int4_gemm_w4a16" "$cache" -g '*.py' 2>/dev/null | head -120 || true

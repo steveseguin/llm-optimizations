@@ -1,0 +1,79 @@
+{
+  "date": "2026-05-10",
+  "host": "4x Intel Arc Pro B70 32GB, Ubuntu 24.04",
+  "model": {
+    "hfId": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+    "localPath": "/mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround",
+    "quantization": "AutoRound INT4 W4A16",
+    "dtype": "float16"
+  },
+  "baselineRefresh": {
+    "promptTokens": 512,
+    "outputTokens": 1536,
+    "contextLength": 2048,
+    "tensorParallel": 4,
+    "pipelineParallel": 1,
+    "tokSTotal": 49.55778558053995,
+    "tokSOut": 37.17,
+    "elapsedSec": 41.325494591997995,
+    "gpuKvCacheTokens": 17216,
+    "maxConcurrencyFor2048Tokens": 8.41,
+    "cacheDir": "/home/steve/.cache/vllm/torch_compile_cache/1354e65d1f/rank_0_0/backbone",
+    "aotPath": "/home/steve/.cache/vllm/torch_compile_cache/torch_aot_compile/679011672fb322d8dc186c528582d5f2bee43d3132510c02990580dbc9a4ccbf/rank_0_0/model",
+    "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-current-baseline-refresh/vllm-minimax-m27-autoround-tp4-p512n1536-20260510T172305Z.log",
+    "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-current-baseline-refresh/vllm-minimax-m27-autoround-tp4-p512n1536-20260510T172305Z.json",
+    "localmaxxingDecision": "Not submitted; valid floor but not an improvement over accepted p512/n1536 anchor."
+  },
+  "acceptedReference": {
+    "promptTokens": 512,
+    "outputTokens": 1536,
+    "tokSOut": 37.552538,
+    "tokSTotal": 50.070051,
+    "localmaxxingId": "cmozow03v005wlo01q81bnspx"
+  },
+  "mbt2048Screen": {
+    "promptTokens": 512,
+    "outputTokens": 1536,
+    "contextLength": 2048,
+    "maxNumBatchedTokens": 2048,
+    "tokSTotal": 45.166741543908124,
+    "tokSOut": 33.88,
+    "elapsedSec": 45.34309826200479,
+    "gpuKvCacheTokens": 9344,
+    "maxConcurrencyFor2048Tokens": 4.56,
+    "cacheDir": "/home/steve/.cache/vllm/torch_compile_cache/2a54c113e7/rank_0_0/backbone",
+    "aotPath": "/home/steve/.cache/vllm/torch_compile_cache/torch_aot_compile/f9abbefd3ad0c0dfd3fbf887cacde5d45838458f399191a666e9dcc4fd268836/rank_0_0/model",
+    "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-mbt-sweep/vllm-minimax-m27-autoround-tp4-p512n1536-20260510T173025Z.log",
+    "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-mbt-sweep/vllm-minimax-m27-autoround-tp4-p512n1536-20260510T173025Z.json",
+    "outcome": "Regression; keep MAX_BATCHED_TOKENS=1024 for p512/n1536 speed path."
+  },
+  "aotCollectiveCensus": {
+    "rank": 0,
+    "computationGraph": "/home/steve/.cache/vllm/torch_compile_cache/1354e65d1f/rank_0_0/backbone/computation_graph.py",
+    "actualAllReduceCalls": 187,
+    "actualWaitTensorCalls": 187,
+    "allReduceShapes": [
+      {
+        "shape": "f16[s72, 3072]",
+        "count": 125,
+        "meaning": "One vocab embedding allreduce plus 62 output-projection hidden reductions plus 62 MoE hidden reductions."
+      },
+      {
+        "shape": "f32[s72, 2]",
+        "count": 62,
+        "meaning": "One Q/K RMS variance allreduce per MiniMax layer."
+      }
+    ]
+  },
+  "interpretation": [
+    "The current decode graph has 187 TP allreduce/wait boundaries per generated-token graph.",
+    "The tiny Q/K allreduce alone is not the full bottleneck; clone/wait/copy and graph scheduling around all collectives are material.",
+    "The largest next opportunity is reducing or fusing the effective cost of the 125 hidden-state reductions that feed residual-add RMSNorm boundaries.",
+    "Standalone Python allreduce wrappers and local-only helper kernels are not sufficient."
+  ],
+  "nextTargets": [
+    "o_proj hidden allreduce plus post-attention residual-add RMSNorm",
+    "MoE output allreduce plus next-layer input residual-add RMSNorm",
+    "Q/K variance allreduce plus Q/K RMS apply if the existing INT4 AOT schedule can be preserved"
+  ]
+}

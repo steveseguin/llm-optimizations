@@ -16,6 +16,13 @@ Revised targets:
 - Main target: `60 tok/s` output at p512/n1536 on 4x B70 with the MiniMax AutoRound INT4 model.
 - Stretch target: `75+ tok/s` only if achieved by verified speculative decoding, MTP-style target-compatible drafting, or deeper source-level fusion that preserves target logits.
 
+These targets should move upward with quantization/runtime changes. The
+AutoRound INT4 path is materially faster than the GGUF capacity path, so the
+old `>30 tok/s` starting target is now just the minimum bar. A useful B70
+software result should either move the current quality-cleared p512/n1536
+reference by at least a few percent, or explain a bottleneck that blocks the
+`60 tok/s` target.
+
 ## Quality Guardrails
 
 Only promote results that preserve target-model behavior:
@@ -88,9 +95,62 @@ The u4 MoE bridge is no longer the only ceiling. Existing timing notes put MiniM
    - Qwen3.6/Qwen3.5 27B/35B FP8 or Q4 can still be useful to isolate dense attention/TP behavior from MiniMax MoE behavior.
    - These are secondary probes, not the main objective, unless they reveal a transferable XPU communication or graph-scheduling fix.
 
+## External Reference Points
+
+- vLLM documents speculative decoding methods including `ngram`, `suffix`,
+  `mtp`, `eagle3`, and `dflash`, and describes the framework as target
+  verified. That keeps speculation on the roadmap, but only results that
+  preserve target-model verification should count as quality-preserving
+  MiniMax wins.
+- vLLM's Intel AutoRound page lists W4A16 and W8A16 as the currently enabled
+  Intel-platform recipes. Our MiniMax AutoRound path is therefore aligned with
+  the actively supported Intel quantization surface, even though the B70/XPU
+  MoE fast path is still local and experimental.
+- Intel `llm-scaler` now advertises Arc Pro B60/B70 support and its vLLM image
+  calls out CCL P2P/USM, INT4/FP8 serving, tensor/pipeline/data parallelism,
+  and context-length tooling. We should continue mining it for kernel and
+  scheduling ideas, but local B70 measurements still decide whether a path is
+  useful.
+- Public MiniMax M2.7 hardware reports for non-Intel systems are higher than
+  our current B70 result: one recent 32k-context llama.cpp report lists about
+  `71.52 tok/s` on 4x RTX 4090, `118.74 tok/s` on one RTX PRO 6000, and
+  `24.41 tok/s` on DGX Spark. The quantization and backend differ from our
+  AutoRound/vLLM setup, but these numbers support setting the B70 aspiration
+  above `60 tok/s` once TP communication and graph scheduling improve.
+- DFlash remains technically interesting because the paper claims lossless
+  acceleration from block-diffusion drafting, but the current MiniMax B70
+  DFlash harness loads and compiles then stalls before producing a throughput
+  result. Do not count it until the benchmark completes and reports acceptance
+  behavior.
+- SGLang's current expert-parallel documentation points fast MoE serving toward
+  specialized routed backends such as DeepEP/DeepGEMM and FlashInfer/TRT-LLM
+  routed MoE kernels. These are NVIDIA-specific today, but the design lesson is
+  relevant: MiniMax speed comes from routed-MoE/communication-aware kernels, not
+  from generic per-layer TP collectives.
+- KTransformers' public benchmark board shows strong single-session decode for
+  dense and MoE models on RTX 5090 systems, and a public MiniMax 2.5 8x-3090
+  report used SGLang TP/EP rather than simple pipeline mode. For B70 this argues
+  against spending more time on TP2/PP2 for batch-1 latency, and for investing
+  in an XPU equivalent of routed MoE plus collective epilogue fusion.
+- REAP-pruned MiniMax M2.7 AutoRound W4A16 variants exist and may be useful as
+  a separate quality/speed tradeoff track, but they reduce experts and are not a
+  drop-in quality-preserving improvement for the current full MiniMax AutoRound
+  target.
+
 ## Immediate Next Tests
 
 1. Prototype an XPU-specific fused allreduce/residual/RMSNorm boundary as a default-off patch. The standalone RMS provider and delayed-allreduce screens are closed as negative.
 2. Build a lower-overhead decode timing pass around attention, Q/K RMS, projections, and MoE that can run for short diagnostics without perturbing real throughput.
 3. Inspect compiled IR around hidden-state allreduce wait sites and target the first boundary that feeds immediately into residual/RMS or MoE epilogue work.
 4. Re-run p512/n512 and p512/n1536 after each code change, then submit only quality-preserving, repeatable improvements to LocalMaxxing.
+
+Current code-direction preference after the latest negative screens:
+
+1. Keep the active runtime on the clean quality path for baseline runs.
+2. Avoid Python custom-op wrappers around `dist.all_reduce`; they add clones and
+   dispatch overhead without changing the real boundary.
+3. Implement the next fusion in C++/SYCL or a real compiler pass, starting with
+   the smallest MiniMax-specific shape: TP4, decode-sized tensors, Q/K RMS or
+   hidden-state allreduce followed immediately by residual add/RMSNorm.
+4. If a fusion cannot beat the current p512/n1536 anchor, archive it as a
+   negative and leave the env flag unset.
