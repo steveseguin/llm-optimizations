@@ -1,0 +1,114 @@
+{
+  "date": "2026-05-10",
+  "model": {
+    "hfId": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+    "base": "MiniMaxAI/MiniMax-M2.7",
+    "quantization": "INT4 AutoRound W4A16"
+  },
+  "hardware": {
+    "gpu": "Intel Arc Pro B70",
+    "gpuCount": 4,
+    "vramGbPerGpu": 32,
+    "os": "Ubuntu 24.04.4 LTS"
+  },
+  "runtime": {
+    "engine": "vllm",
+    "engineVersion": "0.20.1-local",
+    "backend": "xpu",
+    "tensorParallel": 4,
+    "dtype": "float16",
+    "maxModelLen": 2048,
+    "maxNumBatchedTokens": 1024,
+    "maxNumSeqs": 1,
+    "xpuGraph": false,
+    "llmScalerU4DecodeMoe": true,
+    "speculativeDecoding": false,
+    "powerLimitRaised": false
+  },
+  "experiment": {
+    "name": "delay_moe_late_allreduce_to_minimax_decoder_layer",
+    "env": {
+      "VLLM_MINIMAX_MOE_DELAY_ALLREDUCE": "1",
+      "VLLM_CACHE_ROOT": "/mnt/fast-ai/vllm-cache/minimax-moe-delay-20260510"
+    },
+    "patch": "patches/vllm-minimax-moe-delay-allreduce-20260510.patch",
+    "commandScript": "scripts/bench-vllm-minimax-autoround-xpu.sh",
+    "qualityPreservingForTp4NonEp": true
+  },
+  "reference": {
+    "sameShapeP512N512": {
+      "promptTokens": 512,
+      "outputTokens": 512,
+      "gpuKvCacheTokens": 17216,
+      "aotHash": "4799a3c8468de261861723fba07480ef61e010f504245a62e5e93f4e9aef8e22",
+      "elapsedSeconds": 14.293667791003827,
+      "tokSTotal": 71.64011469781653,
+      "tokSOut": 35.820057348908264
+    },
+    "qualityConservativeP512N1536TokSOut": 37.552538,
+    "qualityConservativeP512N1536TokSTotal": 50.070051
+  },
+  "results": [
+    {
+      "label": "fresh_isolated_compile_p512n512",
+      "promptTokens": 512,
+      "outputTokens": 512,
+      "contextLength": 2048,
+      "gpuKvCacheTokens": 9408,
+      "aotHash": "f596ee229faef7f7856a3df9cec423de2468f4faa2189a298fb7454030c7edd3",
+      "elapsedSeconds": 18.202645343000768,
+      "tokSTotal": 56.255559601601846,
+      "tokSOut": 28.127779800800923,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-moe-delay/vllm-minimax-m27-autoround-tp4-p512n512-20260510T124819Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-moe-delay/vllm-minimax-m27-autoround-tp4-p512n512-20260510T124819Z.json",
+      "interpretation": "Cold isolated AOT artifact with reduced KV cache."
+    },
+    {
+      "label": "warmed_aot_reload_p512n512",
+      "promptTokens": 512,
+      "outputTokens": 512,
+      "contextLength": 2048,
+      "gpuKvCacheTokens": 17216,
+      "aotHash": "f596ee229faef7f7856a3df9cec423de2468f4faa2189a298fb7454030c7edd3",
+      "elapsedSeconds": 13.981071862006502,
+      "tokSTotal": 73.24188088773903,
+      "tokSOut": 36.620940443869515,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-moe-delay/vllm-minimax-m27-autoround-tp4-p512n512-20260510T125125Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-moe-delay/vllm-minimax-m27-autoround-tp4-p512n512-20260510T125125Z.json",
+      "interpretation": "Small same-shape gain over immediate p512/n512 baseline."
+    },
+    {
+      "label": "warmed_aot_reload_p512n1536",
+      "promptTokens": 512,
+      "outputTokens": 1536,
+      "contextLength": 2048,
+      "gpuKvCacheTokens": 17216,
+      "aotHash": "f596ee229faef7f7856a3df9cec423de2468f4faa2189a298fb7454030c7edd3",
+      "elapsedSeconds": 40.72556211399933,
+      "tokSTotal": 50.28782645816457,
+      "tokSOut": 37.71586984362342,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-moe-delay/vllm-minimax-m27-autoround-tp4-p512n1536-20260510T125354Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-moe-delay/vllm-minimax-m27-autoround-tp4-p512n1536-20260510T125354Z.json",
+      "interpretation": "Slightly above the quality-conservative reference, but not enough without a repeat."
+    },
+    {
+      "label": "warmed_aot_reload_p512n1536_repeat",
+      "promptTokens": 512,
+      "outputTokens": 1536,
+      "contextLength": 2048,
+      "gpuKvCacheTokens": 17216,
+      "aotHash": "f596ee229faef7f7856a3df9cec423de2468f4faa2189a298fb7454030c7edd3",
+      "elapsedSeconds": 41.489521064002474,
+      "tokSTotal": 49.36186168166942,
+      "tokSOut": 37.021396261252065,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-moe-delay/vllm-minimax-m27-autoround-tp4-p512n1536-20260510T125656Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-moe-delay/vllm-minimax-m27-autoround-tp4-p512n1536-20260510T125656Z.json",
+      "interpretation": "Repeat fell below reference; do not promote."
+    }
+  ],
+  "decision": "Archive only. Delaying the late MoE allreduce is a scheduling clue, not a reliable speed path by itself.",
+  "localmaxxing": {
+    "submitted": false,
+    "reason": "Unpromoted mixed result; repeat did not beat the existing quality-conservative LocalMaxxing submission."
+  }
+}

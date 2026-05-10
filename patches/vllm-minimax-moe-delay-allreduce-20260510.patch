@@ -1,0 +1,68 @@
+diff --git a/vllm/model_executor/layers/fused_moe/runner/moe_runner.py b/vllm/model_executor/layers/fused_moe/runner/moe_runner.py
+--- a/vllm/model_executor/layers/fused_moe/runner/moe_runner.py
++++ b/vllm/model_executor/layers/fused_moe/runner/moe_runner.py
+@@ -1,5 +1,6 @@
+ # SPDX-License-Identifier: Apache-2.0
+ # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
++import os
+ from collections.abc import Callable
+ from contextlib import nullcontext
+ from typing import TYPE_CHECKING
+@@ -43,6 +44,11 @@ from vllm.utils.torch_utils import (
+     direct_register_custom_op,
+ )
+ 
++_MINIMAX_MOE_DELAY_ALLREDUCE = (
++    os.environ.get("VLLM_MINIMAX_MOE_DELAY_ALLREDUCE", "0") == "1"
++)
++
++
+ def get_layer_from_name(layer_name: str) -> torch.nn.Module:
+     forward_context: ForwardContext = get_forward_context()
+     if not _USE_LAYERNAME and layer_name == "from_forward_context":
+@@ -373,6 +379,7 @@ class MoERunner(MoERunnerInterface):
+             not self.moe_config.is_sequence_parallel
+             and (self.moe_config.tp_size > 1 or self.moe_config.ep_size > 1)
+             and not self._fused_output_is_reduced
++            and not _MINIMAX_MOE_DELAY_ALLREDUCE
+         ):
+             states = tensor_model_parallel_all_reduce(states)
+ 
+diff --git a/vllm/model_executor/models/minimax_m2.py b/vllm/model_executor/models/minimax_m2.py
+--- a/vllm/model_executor/models/minimax_m2.py
++++ b/vllm/model_executor/models/minimax_m2.py
+@@ -23,6 +23,7 @@
+ # limitations under the License.
+ """Inference-only MiniMaxM2 model."""
+ 
++import os
+ from collections.abc import Iterable
+ from itertools import islice
+ from typing import Any
+@@ -36,6 +37,7 @@ from vllm.config import CacheConfig, ModelConfig, VllmConfig
+ from vllm.distributed import (
+     get_pp_group,
+     get_tensor_model_parallel_world_size,
++    tensor_model_parallel_all_reduce,
+ )
+ from vllm.model_executor.layers.attention import Attention
+ from vllm.model_executor.layers.fused_moe import (
+@@ -73,6 +75,10 @@ from .utils import (
+     maybe_prefix,
+ )
+ 
++_MINIMAX_MOE_DELAY_ALLREDUCE = (
++    os.environ.get("VLLM_MINIMAX_MOE_DELAY_ALLREDUCE", "0") == "1"
++)
++
+ 
+ class MiniMaxM2MoE(nn.Module):
+     def __init__(
+@@ -318,5 +324,7 @@ class MiniMaxM2DecoderLayer(nn.Module):
+         hidden_states, residual = self.post_attention_layernorm(hidden_states, residual)
+ 
+         hidden_states = self.block_sparse_moe(hidden_states)
++        if _MINIMAX_MOE_DELAY_ALLREDUCE:
++            hidden_states = tensor_model_parallel_all_reduce(hidden_states)
+ 
+         return hidden_states, residual
