@@ -1593,5 +1593,60 @@
         "gpuMemUtil": 0.9
       }
     }
+  },
+  {
+    "label": "vllm-minimax-m27-autoround-ep-tuned-p512-n1536",
+    "submittedAt": "2026-05-10T11:15:58.145Z",
+    "payload": {
+      "hfId": "MiniMaxAI/MiniMax-M2.7",
+      "modelRevision": "main",
+      "hardware": {
+        "hwClass": "DISCRETE_GPU",
+        "gpuName": "Intel Arc Pro B70 32GB",
+        "gpuCount": 4,
+        "vramGb": 32,
+        "cpu": "AMD EPYC 9015 8-Core Processor",
+        "ramGb": 16,
+        "os": "Ubuntu 24.04.4 LTS"
+      },
+      "engineName": "vllm",
+      "engineVersion": "0.20.1-local",
+      "quantization": "INT4 AutoRound W4A16",
+      "promptTokens": 512,
+      "outputTokens": 1536,
+      "contextLength": 2048,
+      "batchSize": 1,
+      "tokSOut": 30.91072085207306,
+      "tokSTotal": 41.21429446943075,
+      "peakVramGb": 28.11,
+      "notes": "Diagnostic MiniMax M2.7 EP result. Local weights are Lasimeri/MiniMax-M2.7-int4-AutoRound submitted under base MiniMaxAI/MiniMax-M2.7 for consistency with earlier accepted runs. 4x Intel Arc Pro B70 TP4+EP4, XPU/Level Zero, local vLLM INC/XPU FusedMoE WNA16 patch, llm-scaler unsigned INT4 MoE decode path, tuned E=64,N=1536 B70 MoE config, default AgRs all2all. This clears 30 tok/s but remains slower than the non-EP TP4 speed path, so it is not the recommended recipe. No speculative decode, no expert dropping, no power-limit changes.",
+      "engineFlags": {
+        "commandSnippet": "VLLM_TUNED_CONFIG_FOLDER=/home/steve/bench-results/minimax-m2.7-autoround-vllm/moe-config-ep-hybrid-m1-default-prefill USE_LLM_SCALER_MOE=1 CCL_TOPO_P2P_ACCESS=1 VLLM_XPU_ENABLE_XPU_GRAPH=0 vllm bench throughput --backend vllm --model /mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround --tokenizer /mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround --trust-remote-code --dtype float16 --tensor-parallel-size 4 --distributed-executor-backend mp --max-model-len 2048 --max-num-batched-tokens 1024 --max-num-seqs 1 --dataset-name random --random-input-len 512 --random-output-len 1536 --random-range-ratio 0 --num-prompts 1 --disable-log-stats --enable-expert-parallel",
+        "tensorParallel": 4,
+        "pipelineParallel": 1,
+        "splitMode": "expert_parallel",
+        "kvCacheDtype": "auto",
+        "gpuMemUtil": 0.9,
+        "flashAttn": true,
+        "attentionBackend": "flash_attn",
+        "contextLength": 2048,
+        "prefillChunkSize": 1024,
+        "maxRunningSeqs": 1,
+        "concurrency": 1,
+        "specDecoding": false,
+        "mtpEnabled": false,
+        "engineQuant": "inc",
+        "extraFlags": "enable_expert_parallel=true, EP local/global experts 64/256, all2all_backend=allgather_reducescatter/AgRs on XPU, tuned config E=64,N=1536, llm-scaler u4 MoE decode path, XPU graph disabled, CCL_ATL_TRANSPORT=ofi, CCL_TOPO_P2P_ACCESS=1, no power-limit change"
+      }
+    },
+    "httpStatus": 201,
+    "response": {
+      "id": "cmozofyv5005hlo01puv9rjs6",
+      "status": "APPROVED",
+      "tokSOut": 30.91072085207306,
+      "tokSTotal": 41.21429446943075,
+      "createdAt": "2026-05-10T11:15:58.145Z"
+    },
+    "notes": "Diagnostic TP4+EP4 result with E64/N1536 B70 MoE config. Accepted without backend because LocalMaxxing rejects backend=xpu. Not recommended over non-EP TP4 high."
   }
 ]

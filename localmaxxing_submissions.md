@@ -19,6 +19,7 @@ Model: `Lasimeri/MiniMax-M2.7-int4-AutoRound`, AutoRound W4A16 safetensors, vLLM
 | `vllm-minimax-m27-autoround-u4-decode-fast-nvme-maxlen8192-gpumem095-p512-n1536` | `cmoz90lg0000wpd018x3zuukw` | 4 | 512 | 1536 | 33.308 | 44.411 |
 | `vllm-minimax-m27-autoround-u4-decode-fast-nvme-maxlen8192-gpumem095-p4096-n512` | `cmoz97d350015pd01smqui7lk` | 4 | 4096 | 512 | 31.287 | 281.587 |
 | `vllm-minimax-m27-autoround-u4-decode-fast-nvme-maxlen8192-gpumem095-p512-n1536-refresh` | `cmoz9ayax001cpd01xkr0w54l` | 4 | 512 | 1536 | 36.805 | 49.074 |
+| `vllm-minimax-m27-autoround-ep-tuned-p512-n1536` | `cmozofyv5005hlo01puv9rjs6` | 4 | 512 | 1536 | 30.911 | 41.214 |
 
 Note: `cmoz8cow60001pd010klrb8g8` is the current best MiniMax AutoRound result on the four B70 system. It uses the unsigned llm-scaler u4 decode-only MoE path with FP16 activations, fast ext4 NVMe model storage, the installed B70 MoE config, normal Q/K TP allreduce, no speculative decoding, no expert dropping, and no power-limit changes. It covers the full `max_model_len=2048` request window with p512/n1536 and repeated at `40.864` then `41.131` output tok/s.
 
@@ -278,3 +279,5 @@ Note: `cmoz97d350015pd01smqui7lk` is the real larger-prompt 8192-context capacit
 Note: `cmoz9ayax001cpd01xkr0w54l` is the warmed p512/n1536 8192-context refresh. It reports 33,408 GPU KV-cache tokens and improves the same shape to `36.805` output tok/s, so it supersedes the first 8192 p512/n1536 sample while remaining a capacity datapoint rather than a raw-speed route.
 
 Note: `cmoz8ryb9000bpd014xhl3pxu` keeps `max_model_len=4096` but sets `gpu_memory_utilization=0.95`, recovering much of the lost KV headroom and improving throughput to `36.616` output tok/s.
+
+Note: `cmozofyv5005hlo01puv9rjs6` is a diagnostic vLLM expert-parallel result, not the recommended MiniMax recipe. It uses TP4+EP4, the llm-scaler u4 MoE decode path, and the B70 E64/N1536 tuned MoE config. The tuned config is required: without it, p512/n512 fell to `25.076` output tok/s and 8,768 KV tokens; with it, p512/n512 rose to `29.892` output tok/s and 16,320 KV tokens. The longer p512/n1536 run clears `30.911` output tok/s, but still trails the non-EP TP4 high `cmoz8cow60001pd010klrb8g8` at `41.131`. LocalMaxxing rejected `backend=xpu`, so the accepted payload omits backend and preserves XPU details in notes/engine flags.

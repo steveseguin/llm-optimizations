@@ -1,0 +1,105 @@
+{
+  "date": "2026-05-10",
+  "model": {
+    "hf_id": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+    "base_hf_id_for_localmaxxing": "MiniMaxAI/MiniMax-M2.7",
+    "local_path": "/mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround",
+    "quantization": "INT4 AutoRound W4A16"
+  },
+  "runtime": {
+    "engine": "vLLM",
+    "engine_version": "0.20.1-local",
+    "device": "XPU / Level Zero",
+    "tensor_parallel": 4,
+    "expert_parallel": true,
+    "all2all_backend": "allgather_reducescatter",
+    "moe_config_folder": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/moe-config-ep-hybrid-m1-default-prefill",
+    "moe_config_file": "E=64,N=1536,device_name=Intel(R)_Graphics_[0xe223],dtype=int4_w4a16.json",
+    "llm_scaler_u4_decode": true,
+    "xpu_graph": false,
+    "power_limit_changes": false
+  },
+  "runs": [
+    {
+      "label": "ep-smoke-default-moe-config",
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-ep/vllm-minimax-m27-autoround-tp4-p1n8-20260510T105752Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-ep/vllm-minimax-m27-autoround-tp4-p1n8-20260510T105752Z.json",
+      "prompt_tokens": 1,
+      "output_tokens": 8,
+      "context_length": 512,
+      "elapsed_s": 2.080595933999575,
+      "tok_s_out": 3.845052212815501,
+      "tok_s_total": 4.325683739417438,
+      "gpu_kv_cache_tokens": 8896,
+      "status": "functional smoke only"
+    },
+    {
+      "label": "ep-linear-default-moe-config",
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-ep/vllm-minimax-m27-autoround-tp4-p512n512-20260510T110047Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-ep/vllm-minimax-m27-autoround-tp4-p512n512-20260510T110047Z.json",
+      "prompt_tokens": 512,
+      "output_tokens": 512,
+      "context_length": 2048,
+      "elapsed_s": 20.417747268998937,
+      "tok_s_out": 25.07622379954666,
+      "tok_s_total": 50.15244759909332,
+      "gpu_kv_cache_tokens": 8768,
+      "status": "negative; missing E=64,N=1536 B70 MoE config"
+    },
+    {
+      "label": "ep-linear-tuned-e64n1536",
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-ep/vllm-minimax-m27-autoround-tp4-p512n512-20260510T110509Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-ep/vllm-minimax-m27-autoround-tp4-p512n512-20260510T110509Z.json",
+      "prompt_tokens": 512,
+      "output_tokens": 512,
+      "context_length": 2048,
+      "elapsed_s": 17.128129823002382,
+      "tok_s_out": 29.89234699239638,
+      "tok_s_total": 59.78469398479276,
+      "gpu_kv_cache_tokens": 16320,
+      "status": "improved but below non-EP TP4 path"
+    },
+    {
+      "label": "ep-linear-tuned-e64n1536-long-output",
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-ep/vllm-minimax-m27-autoround-tp4-p512n1536-20260510T110744Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-ep/vllm-minimax-m27-autoround-tp4-p512n1536-20260510T110744Z.json",
+      "prompt_tokens": 512,
+      "output_tokens": 1536,
+      "context_length": 2048,
+      "elapsed_s": 49.69149724300223,
+      "tok_s_out": 30.91072085207306,
+      "tok_s_total": 41.21429446943075,
+      "gpu_kv_cache_tokens": 16320,
+      "localmaxxing_id": "cmozofyv5005hlo01puv9rjs6",
+      "status": "valid diagnostic result; not recommended over non-EP TP4"
+    },
+    {
+      "label": "ep-round-robin-requested",
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-ep/vllm-minimax-m27-autoround-tp4-p512n512-20260510T111059Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-ep/vllm-minimax-m27-autoround-tp4-p512n512-20260510T111059Z.json",
+      "prompt_tokens": 512,
+      "output_tokens": 512,
+      "context_length": 2048,
+      "elapsed_s": 20.481941507001466,
+      "tok_s_out": 24.9976302209915,
+      "tok_s_total": 49.995260441983,
+      "gpu_kv_cache_tokens": 8768,
+      "status": "negative; vLLM fell back to linear placement"
+    },
+    {
+      "label": "ep-dbo-requested",
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-ep/vllm-minimax-m27-autoround-tp4-p512n512-20260510T111413Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-ep/vllm-minimax-m27-autoround-tp4-p512n512-20260510T111413Z.json",
+      "prompt_tokens": 512,
+      "output_tokens": 512,
+      "context_length": 2048,
+      "status": "blocked; --enable-dbo requires DeepEP all2all backends, while XPU uses AgRs/allgather_reducescatter"
+    }
+  ],
+  "interpretation": [
+    "The E=64,N=1536 tuned MoE config is necessary for EP to avoid a large KV/headroom regression and recover from about 25 tok/s to about 30 tok/s on p512 windows.",
+    "Even after the tuned config, EP remains slower than the current non-EP TP4 MiniMax path on this 4x B70 XPU stack.",
+    "Round-robin placement is not currently applicable to MiniMax M2.7 in vLLM because it falls back to linear placement for this model topology.",
+    "Dual Batch Overlap is blocked on this XPU path because vLLM only enables microbatching for DeepEP all2all backends."
+  ]
+}
