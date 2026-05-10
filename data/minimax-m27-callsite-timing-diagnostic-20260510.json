@@ -1,0 +1,79 @@
+{
+  "date": "2026-05-10",
+  "model": {
+    "hfId": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+    "localPath": "/mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround",
+    "engine": "vLLM/XPU",
+    "tensorParallel": 4,
+    "dtype": "float16",
+    "customMoE": "llm-scaler raw-u4 tiny decode path"
+  },
+  "diagnosticPatch": {
+    "path": "patches/vllm-xpu-allreduce-callsite-timing-20260510.patch",
+    "activeRuntimeStatus": "reverted",
+    "reason": "Useful for eager call-site census, but unsafe for compiled MiniMax runs because Python-side label branches changed AOT behavior."
+  },
+  "callsiteTimingRun": {
+    "shape": "p64/n4",
+    "maxModelLen": 128,
+    "maxNumBatchedTokens": 128,
+    "enforceEager": true,
+    "timingMode": "synchronized per-call prints",
+    "timingLines": 5480,
+    "tokSTotal": 28.24320744607208,
+    "tokSOut": 1.66,
+    "notABenchmark": true,
+    "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-callsite-timing-eager-p64n4-print/vllm-minimax-m27-autoround-tp4-p64n4-20260510T220131Z.log",
+    "perDecodeTokenPerRank": {
+      "qkVarAllreduceF32_1x2": 62,
+      "rowParallelOProjAllreduceF16_1x3072": 62,
+      "moeFinalAllreduceF16_1x3072": 62,
+      "llmScalerMoeU4M1": 62
+    },
+    "sampleAveragesMs": {
+      "decodeQkVarAllreduceF32_1x2": 0.171257,
+      "decodeRowOProjAllreduceF16_1x3072": 0.289057,
+      "decodeMoeFinalAllreduceF16_1x3072": 0.270652,
+      "decodeLlmScalerMoeU4M1": 1.275513
+    },
+    "note": "Per-call synchronized prints exaggerate kernel cost, especially first-call MoE outliers. Counts are the durable result."
+  },
+  "negativeCompiledRuns": [
+    {
+      "label": "labels present, long compile shape",
+      "shape": "p64/n128",
+      "maxModelLen": 2048,
+      "maxNumBatchedTokens": 1024,
+      "tokSTotal": 25.751752902981195,
+      "tokSOut": 17.17,
+      "gpuKvTokens": 9408,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-plain-after-callsitepatch-p64n128/vllm-minimax-m27-autoround-tp4-p64n128-20260510T220429Z.log"
+    },
+    {
+      "label": "labels gated but source branches present",
+      "shape": "p64/n128",
+      "maxModelLen": 512,
+      "maxNumBatchedTokens": 256,
+      "tokSTotal": 25.20502173939745,
+      "tokSOut": 16.8,
+      "gpuKvTokens": 9472,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-plain-after-callsitepatch-m512-p64n128/vllm-minimax-m27-autoround-tp4-p64n128-20260510T220742Z.log"
+    }
+  ],
+  "recoveryRun": {
+    "shape": "p64/n128",
+    "maxModelLen": 512,
+    "maxNumBatchedTokens": 256,
+    "tokSTotal": 48.00631072961023,
+    "tokSOut": 32.0,
+    "gpuKvTokens": 18240,
+    "localmaxxingSubmitted": false,
+    "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-plain-after-callsite-revert-m512-p64n128/vllm-minimax-m27-autoround-tp4-p64n128-20260510T221754Z.log"
+  },
+  "conclusion": "The call-site census confirmed that each MiniMax decode token performs 62 Q/K variance allreduces, 62 attention o_proj allreduces, 62 MoE-final allreduces, and 62 u4 MoE calls per rank. The implementation method is not safe for compiled runs, so the patch is archived and the active runtime was restored.",
+  "nextTargets": [
+    "Implement graph-safe XPU fusion for hidden-state allreduce followed by residual add/RMSNorm after o_proj.",
+    "Implement graph-safe XPU fusion for MoE-final allreduce followed by next-layer residual add/RMSNorm.",
+    "Avoid Python call-site branches in compiled MiniMax source; use AOT graph inspection or C++/SYCL/compiler-pass instrumentation instead."
+  ]
+}

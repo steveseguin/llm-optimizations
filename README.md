@@ -274,6 +274,12 @@ Reproducibility notes, benchmark payloads, and local patches from the Intel Arc 
 - `notes/2026-05-10-minimax-source-ir-fusedadd-screen.md`: source-tree IR fused-add RMS screen; mechanically works but remains below the installed-runtime reference.
 - `notes/2026-05-10-minimax-postattn-fusedadd-delay-negative.md`: installed-runtime post-attention fused-add RMS and delayed-output-allreduce screen; both variants remained below the accepted MiniMax AutoRound reference.
 - `notes/2026-05-10-minimax-python-ar-fused-customop-negative.md`: Python custom-op allreduce plus fused-add RMS wrapper; liveness passes after registration fix, but p512/n512 throughput is clearly negative.
+- `notes/2026-05-10-minimax-60tok-collective-plan-update.md`: raised MiniMax AutoRound 4x B70 targets, latest upstream/speculation references, short negative screens, and the next hidden-state collective-boundary implementation plan.
+- `data/minimax-m27-collective-plan-update-20260510.json`: structured current anchors, short screens, timing diagnostics, external references, and next implementation order for the 60+ tok/s MiniMax target.
+- `patches/vllm-xpu-allreduce-moe-timing-20260510.patch`: opt-in allreduce/MoE timing hook artifact for reproducing the p64/n32 collective census.
+- `notes/2026-05-10-minimax-callsite-timing-diagnostic.md`: call-site timing label experiment; confirms per-token collective counts but is archived as a negative active-runtime patch because it slows compiled MiniMax.
+- `data/minimax-m27-callsite-timing-diagnostic-20260510.json`: structured call-site timing counts, negative compiled runs, and recovery validation after reverting the active runtime.
+- `patches/vllm-xpu-allreduce-callsite-timing-20260510.patch`: archived diagnostic-only call-site label patch; do not apply to production MiniMax runs.
 
 ## Notes
 

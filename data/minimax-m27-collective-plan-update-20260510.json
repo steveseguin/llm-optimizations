@@ -1,0 +1,188 @@
+{
+  "date": "2026-05-10",
+  "objective": "Raise MiniMax M2.7 AutoRound INT4 4x B70 optimization target to 60+ output tok/s non-speculative and 75+ output tok/s with target-verified speculation.",
+  "model": {
+    "hfId": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+    "localPath": "/mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround",
+    "quantization": "AutoRound INT4 W4A16",
+    "engine": "vLLM/XPU",
+    "tensorParallel": 4,
+    "dtype": "float16",
+    "customMoE": "llm-scaler raw-u4 tiny decode path"
+  },
+  "targets": {
+    "qualityPreservingOutputTokS": 60,
+    "targetVerifiedSpeculativeOutputTokS": 75,
+    "reporting": "Report total/prefill-inclusive tok/s and output/decode tok/s for promoted LocalMaxxing results."
+  },
+  "qualityGuardrails": [
+    "Q/K TP variance allreduce remains enabled.",
+    "No expert dropping.",
+    "No root-residual or deferred-reduction shortcut is promoted without logit checks.",
+    "Speculative decode must use target verification."
+  ],
+  "anchors": [
+    {
+      "label": "accepted quality-conservative long anchor",
+      "promptTokens": 512,
+      "outputTokens": 1536,
+      "contextLength": 2048,
+      "tokSTotal": 50.070051,
+      "tokSOut": 37.552538,
+      "localmaxxingId": "cmozow03v005wlo01q81bnspx",
+      "notes": "No speculation, no expert dropping, Q/K TP variance allreduce enabled."
+    },
+    {
+      "label": "post-reboot repeat",
+      "promptTokens": 512,
+      "outputTokens": 1536,
+      "contextLength": 2048,
+      "elapsedSeconds": 41.303759105998324,
+      "tokSTotal": 49.58386462462638,
+      "tokSOut": 37.19,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-postreboot-baseline-p512n1536/vllm-minimax-m27-autoround-tp4-p512n1536-20260510T211125Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-postreboot-baseline-p512n1536/vllm-minimax-m27-autoround-tp4-p512n1536-20260510T211125Z.json",
+      "submittedToLocalMaxxing": false,
+      "submissionReason": "Duplicate of existing valid anchor, not a new achievement."
+    }
+  ],
+  "shortScreens": [
+    {
+      "label": "plain p64/n128 reference",
+      "promptTokens": 64,
+      "outputTokens": 128,
+      "tokSTotal": 50.41863670712918,
+      "tokSOut": 33.61,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-plain-p64n128/vllm-minimax-m27-autoround-tp4-p64n128-20260510T212603Z.log"
+    },
+    {
+      "label": "DFlash no-async, 4 speculative tokens",
+      "promptTokens": 64,
+      "outputTokens": 32,
+      "tokSTotal": 7.291368693052626,
+      "tokSOut": 2.43,
+      "outcome": "negative",
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-dflash-noasync-p64n32/vllm-minimax-m27-autoround-tp4-p64n32-20260510T211525Z.log"
+    },
+    {
+      "label": "DFlash no-async, 1 speculative token",
+      "promptTokens": 64,
+      "outputTokens": 128,
+      "tokSTotal": 12.665482413976388,
+      "tokSOut": 8.44,
+      "outcome": "negative",
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-dflash-noasync-tok1-p64n128/vllm-minimax-m27-autoround-tp4-p64n128-20260510T211856Z.log"
+    },
+    {
+      "label": "ngram_gpu, 4 speculative tokens",
+      "promptTokens": 64,
+      "outputTokens": 128,
+      "tokSTotal": 14.974027524685047,
+      "tokSOut": 9.98,
+      "outcome": "negative for random-prompt throughput",
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-ngramgpu-p64n128/vllm-minimax-m27-autoround-tp4-p64n128-20260510T212246Z.log"
+    },
+    {
+      "label": "CCL_TOPO_FABRIC_VERTEX_CONNECTION_CHECK=0",
+      "promptTokens": 64,
+      "outputTokens": 128,
+      "tokSTotal": 50.46018605575997,
+      "tokSOut": 33.64,
+      "outcome": "neutral",
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-ccl-fabric-no-check-p64n128/vllm-minimax-m27-autoround-tp4-p64n128-20260510T212904Z.log"
+    },
+    {
+      "label": "Q/K helper fusion pass",
+      "promptTokens": 64,
+      "outputTokens": 128,
+      "tokSTotal": 24.0194500769334,
+      "tokSOut": 16.01,
+      "outcome": "negative",
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-qk-helper-fusion-p64n128/vllm-minimax-m27-autoround-tp4-p64n128-20260510T213904Z.log"
+    },
+    {
+      "label": "XPU_GRAPH=1",
+      "promptTokens": 64,
+      "outputTokens": 128,
+      "tokSTotal": 22.98285321180376,
+      "tokSOut": 15.32,
+      "outcome": "negative; vLLM disables graph capture with communication ops",
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-xpugraph-p64n128/vllm-minimax-m27-autoround-tp4-p64n128-20260510T214200Z.log"
+    },
+    {
+      "label": "compile out-of-place allreduce",
+      "promptTokens": 64,
+      "outputTokens": 128,
+      "tokSTotal": 48.87616656412971,
+      "tokSOut": 32.58,
+      "outcome": "neutral to slightly negative",
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-compile-outofplace-ar-p64n128/vllm-minimax-m27-autoround-tp4-p64n128-20260510T214731Z.log"
+    }
+  ],
+  "timingDiagnostics": [
+    {
+      "label": "compiled synchronized timing",
+      "shape": "p64/n128",
+      "tokSTotal": 38.205544734673154,
+      "tokSOut": 25.47,
+      "notABenchmark": true,
+      "observation": "Compiled allreduces are hidden inside the AOT graph; visible llm_scaler_moe_u4:M1 count is 7936, equal to 62 layers times 128 decode tokens.",
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-timing-p64n128/vllm-minimax-m27-autoround-tp4-p64n128-20260510T213236Z.log"
+    },
+    {
+      "label": "eager synchronized timing",
+      "shape": "p64/n32",
+      "tokSTotal": 23.569009184806266,
+      "tokSOut": 7.86,
+      "notABenchmark": true,
+      "perDecodeTokenCounts": {
+        "hiddenAllreduceF16_1x3072": 125,
+        "qkVarianceAllreduceF32_1x2": 62,
+        "llmScalerMoeU4Calls": 62
+      },
+      "typicalAverageMs": {
+        "hiddenAllreduceF16_1x3072": "0.10-0.11",
+        "qkVarianceAllreduceF32_1x2": "0.105-0.112",
+        "llmScalerMoeU4Call": "0.217-0.236"
+      },
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-timing-eager-p64n32/vllm-minimax-m27-autoround-tp4-p64n32-20260510T213543Z.log"
+    }
+  ],
+  "externalReferences": [
+    {
+      "title": "Intel llm-scaler releases",
+      "url": "https://github.com/intel/llm-scaler/blob/main/Releases.md",
+      "note": "Latest listed vLLM image is 0.14.0-b8.2.1 in 05/2026."
+    },
+    {
+      "title": "Intel llm-scaler README",
+      "url": "https://github.com/intel/llm-scaler",
+      "note": "Calls out Arc Pro B60/B70 support, CCL P2P/USM, INT4/FP8 serving, and TP/PP/DP."
+    },
+    {
+      "title": "vLLM speculative decoding docs",
+      "url": "https://docs.vllm.ai/en/latest/features/speculative_decoding/",
+      "note": "Common methods include draft_model, ngram, suffix, mtp, eagle3, and dflash."
+    },
+    {
+      "title": "vLLM P-EAGLE blog",
+      "url": "https://vllm.ai/blog/p-eagle",
+      "note": "Parallel drafting is promising but no ready MiniMax P-EAGLE drafter was found."
+    },
+    {
+      "title": "MiniMax M2.7 external hardware benchmarks",
+      "url": "https://devradar.dev/radar/minmax-m2-7-inference-benchmarks-rtx-hardware",
+      "note": "External aspiration reference; backend and quantization differ from this B70 AutoRound path."
+    }
+  ],
+  "nextImplementationOrder": [
+    "Add finer call-site timing labels for hidden-state TP allreduces.",
+    "Prototype XPU/compiled fusion around hidden-state allreduce followed by residual add/RMSNorm after o_proj or MoE output.",
+    "Keep Q/K variance allreduce intact unless a graph-safe replacement passes logit checks.",
+    "Revisit DFlash/EAGLE only after scheduler/runtime fixes because current B70 runs are far below non-spec decode.",
+    "Promote only if p64/n128 beats the short reference, then validate p512/n1536 and submit to LocalMaxxing."
+  ],
+  "patches": [
+    "patches/vllm-xpu-allreduce-moe-timing-20260510.patch"
+  ]
+}
