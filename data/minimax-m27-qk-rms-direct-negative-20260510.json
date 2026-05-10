@@ -1,0 +1,87 @@
+{
+  "date": "2026-05-10",
+  "model": {
+    "hfId": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+    "base": "MiniMaxAI/MiniMax-M2.7",
+    "quantization": "INT4 AutoRound W4A16"
+  },
+  "hardware": {
+    "gpu": "Intel Arc Pro B70",
+    "gpuCount": 4,
+    "vramGbPerGpu": 32,
+    "os": "Ubuntu 24.04.4 LTS"
+  },
+  "runtime": {
+    "engine": "vllm",
+    "engineVersion": "0.20.1-local",
+    "backend": "xpu",
+    "tensorParallel": 4,
+    "dtype": "float16",
+    "maxModelLen": 2048,
+    "maxNumBatchedTokens": 1024,
+    "maxNumSeqs": 1,
+    "xpuGraph": false,
+    "llmScalerU4DecodeMoe": true,
+    "speculativeDecoding": false,
+    "powerLimitRaised": false
+  },
+  "experiment": {
+    "name": "direct_minimax_qk_rms_xpu_var_apply_from_qkv",
+    "env": {
+      "VLLM_MINIMAX_QK_RMS_XPU_DIRECT": "1",
+      "VLLM_CACHE_ROOT": "/mnt/fast-ai/vllm-cache/minimax-qk-direct-20260510"
+    },
+    "patch": "patches/vllm-minimax-qk-rms-xpu-direct-negative-20260510.patch",
+    "standaloneExtension": "experiments/minimax_qk_rms_xpu",
+    "commandScript": "scripts/bench-vllm-minimax-autoround-xpu.sh"
+  },
+  "reference": {
+    "label": "same_shape_baseline_before_direct_helper",
+    "promptTokens": 512,
+    "outputTokens": 512,
+    "contextLength": 2048,
+    "gpuKvCacheTokens": 17216,
+    "aotHash": "4799a3c8468de261861723fba07480ef61e010f504245a62e5e93f4e9aef8e22",
+    "elapsedSeconds": 14.293667791003827,
+    "tokSTotal": 71.64011469781653,
+    "tokSOut": 35.820057348908264,
+    "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-post-xpusmi/vllm-minimax-m27-autoround-tp4-p512n512-20260510T121708Z.log",
+    "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-post-xpusmi/vllm-minimax-m27-autoround-tp4-p512n512-20260510T121708Z.json"
+  },
+  "results": [
+    {
+      "label": "fresh_isolated_compile_p512n512",
+      "promptTokens": 512,
+      "outputTokens": 512,
+      "contextLength": 2048,
+      "gpuKvCacheTokens": 9408,
+      "aotHash": "af57de598e99ce1e2874e1f13bd65c9a6261febd687c11d7c5870626bf38667b",
+      "elapsedSeconds": 19.20979463099502,
+      "tokSTotal": 53.306139897392505,
+      "tokSOut": 26.653069948696253,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-qk-direct/vllm-minimax-m27-autoround-tp4-p512n512-20260510T122149Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-qk-direct/vllm-minimax-m27-autoround-tp4-p512n512-20260510T122149Z.json",
+      "interpretation": "Cold isolated AOT artifact: KV cache fell to 9408 tokens and throughput was well below baseline."
+    },
+    {
+      "label": "warm_repeat_recompiled_p512n512",
+      "promptTokens": 512,
+      "outputTokens": 512,
+      "contextLength": 2048,
+      "gpuKvCacheTokens": 17216,
+      "aotHash": "af57de598e99ce1e2874e1f13bd65c9a6261febd687c11d7c5870626bf38667b",
+      "elapsedSeconds": 14.74720009900193,
+      "tokSTotal": 69.43690959135374,
+      "tokSOut": 34.71845479567687,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-qk-direct/vllm-minimax-m27-autoround-tp4-p512n512-20260510T122636Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-qk-direct/vllm-minimax-m27-autoround-tp4-p512n512-20260510T122636Z.json",
+      "aotReloadIssue": "'_OpNamespace' 'minimax_qk_rms_xpu' object has no attribute 'var'",
+      "interpretation": "Recovered normal KV-cache capacity but remained slower than the same-shape baseline."
+    }
+  ],
+  "decision": "Do not enable VLLM_MINIMAX_QK_RMS_XPU_DIRECT for real benchmarks. The direct helper is valid in shape but slower than the active stock Q/K path and creates a custom-op AOT reload problem.",
+  "localmaxxing": {
+    "submitted": false,
+    "reason": "Negative diagnostic below existing submitted MiniMax AutoRound results."
+  }
+}
