@@ -1,0 +1,51 @@
+{
+  "label": "minimax-m27-ccl-transport-mpi-negative",
+  "date_utc": "2026-05-10",
+  "model": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+  "local_model_path": "/mnt/corsair-external/llm-models/minimax-m2.7-int4-autoround",
+  "hardware": {
+    "gpu": "Intel Arc Pro B70",
+    "gpu_count": 4,
+    "vram_gb_per_gpu": 32
+  },
+  "engine": {
+    "name": "vllm",
+    "backend": "xpu",
+    "tensor_parallel": 4,
+    "dtype": "bfloat16",
+    "quantization": "int4 AutoRound W4A16",
+    "llm_scaler_u4_decode_bridge": true
+  },
+  "command_environment": {
+    "CCL_ATL_TRANSPORT": "mpi",
+    "USE_LLM_SCALER_MOE": "1",
+    "XPU_GRAPH": "0",
+    "INPUT_LEN": 512,
+    "OUTPUT_LEN": 256,
+    "MAX_MODEL_LEN": 2048,
+    "MAX_BATCHED_TOKENS": 1024,
+    "MAX_NUM_SEQS": 1,
+    "NUM_PROMPTS": 1,
+    "TP": 4
+  },
+  "status": "failed_before_model_load",
+  "result": {
+    "output_tok_s": null,
+    "total_tok_s": null,
+    "elapsed_s": 33.49,
+    "exit_status": 1
+  },
+  "logs": {
+    "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n256-20260510T001548Z.log"
+  },
+  "failure_signature": [
+    "MPIDI_GPU_init_mpl_global",
+    "MPIDI_GPU_init",
+    "PMPI_Init_thread",
+    "atl_mpi::init",
+    "atl_mpi_comm::init_transport",
+    "WorkerProc initialization failed due to an exception in a background process",
+    "RuntimeError: Engine core initialization failed"
+  ],
+  "interpretation": "CCL_ATL_TRANSPORT=mpi is not viable for the current vLLM/XPU multi-process setup on 4x B70. It fails during oneCCL/MPI worker initialization before model load. Keep CCL_ATL_TRANSPORT=ofi as the known working transport."
+}
