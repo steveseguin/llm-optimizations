@@ -94,6 +94,16 @@ The u4 MoE bridge is no longer the only ceiling. Existing timing notes put MiniM
    - Always record cold versus warm behavior and GPU KV-cache tokens.
    - Treat the `9,408` KV-token artifact as a performance smell, not a valid speed floor.
    - Keep dormant helper/timing branches out of active runtime unless the corresponding env flag is being tested.
+   - DBO is not a current B70 flag path. vLLM rejects `--enable-dbo` without
+     DeepEP all-to-all, and upstream documents DBO as requiring DP>1, expert
+     parallelism, and DeepEP. Keep DBO as an overlap design reference only.
+   - Decode-context parallelism is also closed for this TP4 MiniMax layout:
+     `--decode-context-parallel-size 2` fails GQA/MQA validation because the
+     model has 8 KV heads and the four-B70 TP4 shape does not satisfy vLLM's
+     DCP constraint.
+   - EP round-robin does not rescue expert parallelism for batch-1 speed.
+     The warm p64/n32 screen reached only `22.338` output-equivalent tok/s,
+     consistent with earlier slower EP4 long-run behavior.
 
 6. Speculative decode and MTP
    - Current MiniMax n-gram, ngram_gpu, and DFlash screens are negative or unstable.
@@ -102,6 +112,11 @@ The u4 MoE bridge is no longer the only ceiling. Existing timing notes put MiniM
      blocker.
    - Revisit speculation only with a draft that has target-model verification and a measured acceptance rate high enough to beat the extra scheduler and KV pressure.
    - If speculation works, publish both decode tok/s and total/prefill tok/s to LocalMaxxing with the spec method and draft model recorded.
+   - Raise the speculative aspiration above the non-spec target: if target
+     verification works and acceptance is high enough, `75+` output tok/s is a
+     reasonable stretch. Do not label workload-dependent n-gram wins as a
+     general MiniMax speedup unless acceptance behavior and prompt shape are
+     reported.
 
 7. Secondary dense-model comparisons
    - Qwen3.6/Qwen3.5 27B/35B FP8 or Q4 can still be useful to isolate dense attention/TP behavior from MiniMax MoE behavior.
@@ -160,6 +175,9 @@ The u4 MoE bridge is no longer the only ceiling. Existing timing notes put MiniM
 2. Build a lower-overhead decode timing pass around attention, Q/K RMS, projections, and MoE that can run for short diagnostics without perturbing real throughput.
 3. Inspect compiled IR around hidden-state allreduce wait sites and target the first boundary that feeds immediately into residual/RMS or MoE epilogue work.
 4. Re-run p512/n512 and p512/n1536 after each code change, then submit only quality-preserving, repeatable improvements to LocalMaxxing.
+5. Keep `scripts/summarize-vllm-aot-collectives.sh` in the loop. The current
+   clean TP4 AOT census reports `92` allreduce comment lines and `48`
+   allreduce-to-RMS/MoE boundary lines; this is now the primary fusion target.
 
 Current code-direction preference after the latest negative screens:
 
