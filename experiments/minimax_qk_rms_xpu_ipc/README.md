@@ -25,7 +25,13 @@ Run:
 
 ```bash
 cd /home/steve/llm-optimizations-publish/experiments/minimax_qk_rms_xpu_ipc
+MINIMAX_QK_IPC_SINGLE_KERNEL=1 \
+MINIMAX_QK_IPC_COUNTER=1 \
+MINIMAX_QK_IPC_SEQ=0 \
+MINIMAX_QK_IPC_ITERS=50 \
+MINIMAX_QK_IPC_TOKENS=32 \
+MINIMAX_QK_IPC_SLOTS=3 \
+MINIMAX_QK_IPC_TIMEOUT_ITERS=100000 \
 PYTHONPATH=. /home/steve/.venvs/vllm-xpu/bin/torchrun --standalone \
   --nproc-per-node=4 test_ipc_qk_var.py
 ```
-

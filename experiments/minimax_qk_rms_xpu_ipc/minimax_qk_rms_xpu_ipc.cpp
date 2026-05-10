@@ -218,6 +218,77 @@ class IpcQkVarAllreduceSeqKernel {
   int timeout_iters_;
 };
 
+class IpcQkVarAllreduceCounterKernel {
+ public:
+  IpcQkVarAllreduceCounterKernel(float* qk_var,
+                                 const int64_t* payload_ptrs,
+                                 const int64_t* seq_ptrs,
+                                 const int32_t* counter,
+                                 int64_t num_items,
+                                 int64_t mailbox_offset,
+                                 int64_t counter_slot,
+                                 int world_size,
+                                 int timeout_iters)
+      : qk_var_(qk_var),
+        payload_ptrs_(payload_ptrs),
+        seq_ptrs_(seq_ptrs),
+        counter_(counter),
+        num_items_(num_items),
+        mailbox_offset_(mailbox_offset),
+        counter_slot_(counter_slot),
+        world_size_(world_size),
+        timeout_iters_(timeout_iters) {}
+
+  void operator()(sycl::id<1> id) const {
+    const int64_t idx = static_cast<int64_t>(id[0]);
+    if (idx >= num_items_) {
+      return;
+    }
+
+    const int sequence = counter_[counter_slot_];
+    float* local_payload = reinterpret_cast<float*>(payload_ptrs_[0]);
+    int32_t* local_seq = reinterpret_cast<int32_t*>(seq_ptrs_[0]);
+    local_payload[mailbox_offset_ + idx] = qk_var_[idx];
+    sycl::atomic_fence(sycl::memory_order::seq_cst, sycl::memory_scope::system);
+    local_seq[mailbox_offset_ + idx] = sequence;
+    sycl::atomic_fence(sycl::memory_order::seq_cst, sycl::memory_scope::system);
+
+    float sum = 0.0f;
+    for (int rank = 0; rank < world_size_; ++rank) {
+      const volatile int32_t* peer_seq =
+          reinterpret_cast<const volatile int32_t*>(seq_ptrs_[rank]);
+      const volatile float* peer_payload =
+          reinterpret_cast<const volatile float*>(payload_ptrs_[rank]);
+      int seen = 0;
+      int iters = 0;
+      while (iters < timeout_iters_) {
+        sycl::atomic_fence(sycl::memory_order::seq_cst,
+                           sycl::memory_scope::system);
+        seen = peer_seq[mailbox_offset_ + idx];
+        if (seen == sequence) {
+          break;
+        }
+        ++iters;
+      }
+      sycl::atomic_fence(sycl::memory_order::seq_cst, sycl::memory_scope::system);
+      sum += peer_payload[mailbox_offset_ + idx];
+    }
+
+    qk_var_[idx] = sum / static_cast<float>(world_size_);
+  }
+
+ private:
+  float* qk_var_;
+  const int64_t* payload_ptrs_;
+  const int64_t* seq_ptrs_;
+  const int32_t* counter_;
+  int64_t num_items_;
+  int64_t mailbox_offset_;
+  int64_t counter_slot_;
+  int world_size_;
+  int timeout_iters_;
+};
+
 }  // namespace
 
 std::string get_ipc_handle(torch::Tensor tensor) {
@@ -367,6 +438,65 @@ void allreduce_qk_var_seq(torch::Tensor qk_var,
   });
 }
 
+void allreduce_qk_var_seq_counter(torch::Tensor qk_var,
+                                  torch::Tensor payload_ptrs,
+                                  torch::Tensor seq_ptrs,
+                                  torch::Tensor counter,
+                                  int64_t slot,
+                                  int64_t max_tokens,
+                                  int64_t world_size,
+                                  int64_t timeout_iters) {
+  const at::DeviceGuard device_guard(qk_var.device());
+  CHECK_XPU(qk_var);
+  CHECK_CONTIGUOUS(qk_var);
+  CHECK_XPU(payload_ptrs);
+  CHECK_CONTIGUOUS(payload_ptrs);
+  CHECK_XPU(seq_ptrs);
+  CHECK_CONTIGUOUS(seq_ptrs);
+  CHECK_XPU(counter);
+  CHECK_CONTIGUOUS(counter);
+  TORCH_CHECK(qk_var.scalar_type() == torch::kFloat32, "qk_var must be float32");
+  TORCH_CHECK(payload_ptrs.scalar_type() == torch::kInt64,
+              "payload_ptrs must be int64");
+  TORCH_CHECK(seq_ptrs.scalar_type() == torch::kInt64, "seq_ptrs must be int64");
+  TORCH_CHECK(counter.scalar_type() == torch::kInt32, "counter must be int32");
+  TORCH_CHECK(qk_var.dim() == 2 && qk_var.size(1) == 2,
+              "qk_var must have shape [tokens, 2]");
+  TORCH_CHECK(payload_ptrs.numel() >= world_size,
+              "payload_ptrs must contain one pointer per rank");
+  TORCH_CHECK(seq_ptrs.numel() >= world_size,
+              "seq_ptrs must contain one pointer per rank");
+  TORCH_CHECK(slot >= 0, "slot must be non-negative");
+  TORCH_CHECK(slot < counter.numel(), "counter slot out of range");
+  TORCH_CHECK(max_tokens >= qk_var.size(0), "max_tokens too small");
+
+  const int64_t num_items = qk_var.numel();
+  const int64_t mailbox_offset = slot * max_tokens * 2;
+  auto& queue = c10::xpu::getCurrentXPUStream(qk_var.device().index()).queue();
+  int32_t* counter_ptr = counter.data_ptr<int32_t>();
+  auto counter_event = queue.submit([&](sycl::handler& cgh) {
+    cgh.single_task([=]() {
+      counter_ptr[slot] += 1;
+      sycl::atomic_fence(sycl::memory_order::seq_cst,
+                         sycl::memory_scope::system);
+    });
+  });
+  queue.submit([&](sycl::handler& cgh) {
+    cgh.depends_on(counter_event);
+    cgh.parallel_for(
+        sycl::range<1>(num_items),
+        IpcQkVarAllreduceCounterKernel(qk_var.data_ptr<float>(),
+                                       payload_ptrs.data_ptr<int64_t>(),
+                                       seq_ptrs.data_ptr<int64_t>(),
+                                       counter.data_ptr<int32_t>(),
+                                       num_items,
+                                       mailbox_offset,
+                                       slot,
+                                       static_cast<int>(world_size),
+                                       static_cast<int>(timeout_iters)));
+  });
+}
+
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
   m.def("get_ipc_handle", &get_ipc_handle, "Export a tensor's Level Zero IPC handle");
   m.def("open_ipc_handle", &open_ipc_handle, "Open a Level Zero IPC handle");
@@ -380,16 +510,21 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
   m.def("allreduce_qk_var_seq",
         &allreduce_qk_var_seq,
         "Single-kernel sequence-mailbox allreduce average for [tokens, 2] qk_var");
+  m.def("allreduce_qk_var_seq_counter",
+        &allreduce_qk_var_seq_counter,
+        "Device-counter sequence-mailbox allreduce average for [tokens, 2] qk_var");
 }
 
 TORCH_LIBRARY(minimax_qk_rms_xpu_ipc, m) {
   m.def("allreduce_qk_var(Tensor! qk_var, Tensor peer_ptrs, int slot, int max_tokens, int world_size, int timeout_iters) -> ()");
   m.def("reduce_qk_var_from_mailboxes(Tensor! qk_var, Tensor peer_ptrs, int slot, int max_tokens, int world_size) -> ()");
   m.def("allreduce_qk_var_seq(Tensor! qk_var, Tensor payload_ptrs, Tensor seq_ptrs, int slot, int sequence, int max_tokens, int world_size, int timeout_iters) -> ()");
+  m.def("allreduce_qk_var_seq_counter(Tensor! qk_var, Tensor payload_ptrs, Tensor seq_ptrs, Tensor! counter, int slot, int max_tokens, int world_size, int timeout_iters) -> ()");
 }
 
 TORCH_LIBRARY_IMPL(minimax_qk_rms_xpu_ipc, XPU, m) {
   m.impl("allreduce_qk_var", &allreduce_qk_var);
   m.impl("reduce_qk_var_from_mailboxes", &reduce_qk_var_from_mailboxes);
   m.impl("allreduce_qk_var_seq", &allreduce_qk_var_seq);
+  m.impl("allreduce_qk_var_seq_counter", &allreduce_qk_var_seq_counter);
 }

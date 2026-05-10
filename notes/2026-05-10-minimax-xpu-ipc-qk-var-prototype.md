@@ -26,9 +26,11 @@ Run:
 
 ```bash
 MINIMAX_QK_IPC_SINGLE_KERNEL=1 \
-MINIMAX_QK_IPC_SEQ=1 \
+MINIMAX_QK_IPC_COUNTER=1 \
+MINIMAX_QK_IPC_SEQ=0 \
 MINIMAX_QK_IPC_ITERS=50 \
 MINIMAX_QK_IPC_TOKENS=32 \
+MINIMAX_QK_IPC_SLOTS=3 \
 MINIMAX_QK_IPC_TIMEOUT_ITERS=100000 \
 PYTHONPATH=. /home/steve/.venvs/vllm-xpu/bin/torchrun --standalone \
   --nproc-per-node=4 test_ipc_qk_var.py
@@ -55,6 +57,10 @@ rank=3 iter=49 qk_var=[[51.5, 515.0], ...] ok=True
 - A single-kernel sequence-counter variant now passes 4-rank stress:
   50 iterations, 32 token rows, local write, system fence, sequence publish,
   remote sequence polling, and peer payload reduction inside one SYCL kernel.
+- A device-counter variant also passes 4-rank stress while reusing only three
+  mailbox slots across 50 iterations. This is the more relevant compiled-graph
+  candidate because the expected sequence is read from device memory instead
+  of passed as a Python integer that TorchDynamo could capture as a constant.
 
 ## What Did Not Work Yet
 
@@ -64,7 +70,7 @@ peers, while earlier ranks read stale sentinel values from one or more peers.
 Adding a host `dist.barrier()` before launch was not enough because the race is
 inside cross-device kernel ordering/visibility, not process launch order alone.
 
-The first sequence-counter stress used the old 500M spin timeout and looked
+The first host-sequence-counter stress used the old 500M spin timeout and looked
 hung. A shorter `MINIMAX_QK_IPC_TIMEOUT_ITERS=100000` completed correctly and
 is a better test harness default for failure isolation. The high timeout may
 still be useful in a real integration, but it hides liveness failures during
@@ -87,6 +93,8 @@ The next prototype should move the sequence-counter path toward vLLM:
 
 - wrap mailbox allocation, Level Zero handle exchange, peer pointer table
   construction, slot assignment, and sequence generation in a Python manager;
+- prefer the device-counter op for graph experiments so sequence values are not
+  Python constants;
 - integrate behind a default-off MiniMax env flag replacing
   `tensor_model_parallel_all_reduce(qk_var) / tp_world_size`;
 - validate p1/n8 logits against the default oneCCL path before any throughput

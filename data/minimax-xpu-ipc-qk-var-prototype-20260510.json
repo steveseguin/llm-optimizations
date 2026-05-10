@@ -43,7 +43,28 @@
       "status": "passed",
       "output_summary": "All four ranks printed ok=True at iteration 49 with qk_var rows [51.5, 515.0].",
       "caveat": "The earlier 500M spin timeout made failures or slow visibility look like hangs during experiments; the timeout is now tunable."
+    },
+    {
+      "name": "device_counter_sequence_reused_slots",
+      "world_size": 4,
+      "payload_shape": "[32, 2]",
+      "iterations": 50,
+      "slots": 3,
+      "timeout_iters": 100000,
+      "command_env": {
+        "MINIMAX_QK_IPC_SINGLE_KERNEL": "1",
+        "MINIMAX_QK_IPC_COUNTER": "1",
+        "MINIMAX_QK_IPC_SEQ": "0",
+        "MINIMAX_QK_IPC_ITERS": "50",
+        "MINIMAX_QK_IPC_TOKENS": "32",
+        "MINIMAX_QK_IPC_SLOTS": "3",
+        "MINIMAX_QK_IPC_TIMEOUT_ITERS": "100000"
+      },
+      "expected_final_row": [51.5, 515.0],
+      "status": "passed",
+      "output_summary": "All four ranks printed ok=True at iteration 49 while reusing three mailbox slots.",
+      "interpretation": "Device-side sequence counters avoid Python integer sequence constants and are the preferred candidate for compiled vLLM integration."
     }
   ],
-  "decision": "The B70 stack supports PyTorch tensor Level Zero IPC handles and SYCL peer mailbox reads across four worker processes. A sequence-counter single-kernel write/poll/reduce prototype is correct under 4-rank stress, so the next step is default-off vLLM MiniMax integration and logits comparison against the oneCCL path."
+  "decision": "The B70 stack supports PyTorch tensor Level Zero IPC handles and SYCL peer mailbox reads across four worker processes. A device-counter sequence-mailbox prototype is correct under 4-rank slot-reuse stress, so the next step is default-off vLLM MiniMax integration and logits comparison against the oneCCL path."
 }

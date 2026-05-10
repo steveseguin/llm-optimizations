@@ -22,9 +22,10 @@ def main() -> None:
     iters = int(os.environ.get("MINIMAX_QK_IPC_ITERS", "1"))
     timeout_iters = int(os.environ.get("MINIMAX_QK_IPC_TIMEOUT_ITERS", "500000000"))
     max_tokens = max(8, tokens)
-    slots = max(3, iters)
+    slots = int(os.environ.get("MINIMAX_QK_IPC_SLOTS", str(max(3, iters))))
     mailbox = torch.full((slots, max_tokens, 2), -0.0, device="xpu", dtype=torch.float32)
     seq_mailbox = torch.zeros((slots, max_tokens, 2), device="xpu", dtype=torch.int32)
+    seq_counter = torch.zeros((slots,), device="xpu", dtype=torch.int32)
     handle = minimax_qk_rms_xpu_ipc.get_ipc_handle(mailbox)
     seq_handle = minimax_qk_rms_xpu_ipc.get_ipc_handle(seq_mailbox)
     handles = [None for _ in range(world)]
@@ -53,6 +54,7 @@ def main() -> None:
 
     single_kernel = os.environ.get("MINIMAX_QK_IPC_SINGLE_KERNEL", "0") == "1"
     sequence_kernel = os.environ.get("MINIMAX_QK_IPC_SEQ", "1") == "1"
+    counter_kernel = os.environ.get("MINIMAX_QK_IPC_COUNTER", "0") == "1"
     if single_kernel:
         # The single-kernel prototype writes to peer_ptrs[0] and polls all
         # entries, so put the local mailbox first. The sum is order-invariant.
@@ -80,7 +82,19 @@ def main() -> None:
         qk_var[:, 0] = q_base
         qk_var[:, 1] = k_base
 
-        if single_kernel and sequence_kernel:
+        if single_kernel and counter_kernel:
+            dist.barrier()
+            minimax_qk_rms_xpu_ipc.allreduce_qk_var_seq_counter(
+                qk_var,
+                peer_ptrs,
+                seq_ptrs,
+                seq_counter,
+                slot,
+                max_tokens,
+                world,
+                timeout_iters,
+            )
+        elif single_kernel and sequence_kernel:
             dist.barrier()
             minimax_qk_rms_xpu_ipc.allreduce_qk_var_seq(
                 qk_var,
