@@ -20,12 +20,15 @@ Model: `Lasimeri/MiniMax-M2.7-int4-AutoRound`, AutoRound W4A16 safetensors, vLLM
 | `vllm-minimax-m27-autoround-u4-decode-fast-nvme-maxlen8192-gpumem095-p4096-n512` | `cmoz97d350015pd01smqui7lk` | 4 | 4096 | 512 | 31.287 | 281.587 |
 | `vllm-minimax-m27-autoround-u4-decode-fast-nvme-maxlen8192-gpumem095-p512-n1536-refresh` | `cmoz9ayax001cpd01xkr0w54l` | 4 | 512 | 1536 | 36.805 | 49.074 |
 | `vllm-minimax-m27-autoround-ep-tuned-p512-n1536` | `cmozofyv5005hlo01puv9rjs6` | 4 | 512 | 1536 | 30.911 | 41.214 |
+| `vllm-minimax-m27-autoround-quality-qkallreduce-p512-n1536` | `cmozow03v005wlo01q81bnspx` | 4 | 512 | 1536 | 37.553 | 50.070 |
 
-Note: `cmoz8cow60001pd010klrb8g8` is the current best MiniMax AutoRound result on the four B70 system. It uses the unsigned llm-scaler u4 decode-only MoE path with FP16 activations, fast ext4 NVMe model storage, the installed B70 MoE config, normal Q/K TP allreduce, no speculative decoding, no expert dropping, and no power-limit changes. It covers the full `max_model_len=2048` request window with p512/n1536 and repeated at `40.864` then `41.131` output tok/s.
+Note: `cmozow03v005wlo01q81bnspx` is the current quality-conservative MiniMax AutoRound reference on the four B70 system. It uses the unsigned llm-scaler u4 decode-only MoE path with FP16 activations, fast ext4 NVMe model storage, the installed B70 MoE config, Q/K RMS variance allreduce enabled across TP ranks, no speculative decoding, no expert dropping, and no power-limit changes.
 
-Note: `cmoz82i2f007itl01fkno9or1` is the matching p512/n1024 long-output validation. Two refreshed p512/n1024 samples were `39.894` and `40.304` output tok/s.
+Note: `cmoz8cow60001pd010klrb8g8` is now marked suspect rather than quality-cleared. A later inspection of its cached `c15860...` AOT graph found the regular hidden-state allreduces, but not the per-layer Q/K RMS variance allreduce. Keep it as a useful AOT/scheduling clue, not the target quality baseline.
 
-Note: `cmoz7rs2w0077tl01o3f1kxnm` is the matching p512/n512 fast-NVMe validation. It uses the same quality path and repeated at `39.516` output tok/s.
+Note: `cmoz82i2f007itl01fkno9or1` is part of the same now-suspect fast AOT family as `cmoz8cow60001pd010klrb8g8`. Two refreshed p512/n1024 samples were `39.894` and `40.304` output tok/s, but do not treat them as quality-cleared until the Q/K variance allreduce is verified in the graph for that shape.
+
+Note: `cmoz7rs2w0077tl01o3f1kxnm` is part of the same now-suspect fast AOT family as `cmoz8cow60001pd010klrb8g8`. It repeated at `39.516` output tok/s, but does not supersede the Q/K-allreduce quality-conservative p512/n1536 reference.
 
 Note: `cmoz8k9z40008pd01rhu50c0n` is a larger-context capacity datapoint, not a speed record. Raising `max_model_len` to 4096 reduced GPU KV cache from 17,216 to 9,408 tokens and lowered the same p512/n1536 request from `41.131` to `33.258` output tok/s.
 
@@ -261,14 +264,17 @@ Model: `Lasimeri/MiniMax-M2.7-int4-AutoRound`, AutoRound W4A16 safetensors.
 | `vllm-minimax-m27-autoround-u4-decode-fast-nvme-maxlen8192-gpumem095-p512-n1536` | `cmoz90lg0000wpd018x3zuukw` | 4 | 512 | 1536 | 33.308 | 44.411 |
 | `vllm-minimax-m27-autoround-u4-decode-fast-nvme-maxlen8192-gpumem095-p4096-n512` | `cmoz97d350015pd01smqui7lk` | 4 | 4096 | 512 | 31.287 | 281.587 |
 | `vllm-minimax-m27-autoround-u4-decode-fast-nvme-maxlen8192-gpumem095-p512-n1536-refresh` | `cmoz9ayax001cpd01xkr0w54l` | 4 | 512 | 1536 | 36.805 | 49.074 |
+| `vllm-minimax-m27-autoround-quality-qkallreduce-p512-n1536` | `cmozow03v005wlo01q81bnspx` | 4 | 512 | 1536 | 37.553 | 50.070 |
 
 Note: `cmoz4qkc3005htl01t70cd8l7` is the corrected fast-NVMe p512/n1024 MiniMax AutoRound validation. It keeps the same vLLM/XPU TP4 llm-scaler u4 decode-only path as the prior long-output run, but moves the checkpoint from the external NTFS USB drive to ext4 PCIe 5.0 NVMe. Comparable model load time dropped from `348.18s` to `84.39s`, and decode improved from `35.933` to `36.670` output tok/s. The key scheduler lesson is that `--max-num-batched-tokens 1024` is the current sweet spot for this shape; `1536` fell to `29.478` output tok/s and `512` fell to `31.862`. `XPU_GRAPH=1` remains negative because communication capture is unsupported and the run loses KV headroom.
 
-Note: `cmoz7rs2w0077tl01o3f1kxnm` is the current fast-NVMe p512/n512 MiniMax AutoRound high. It uses the normal quality path with Q/K TP allreduce, no speculative decode, and no power-limit changes. A diagnostic `VLLM_MINIMAX_QK_SKIP_TP_ALLREDUCE=1` run intentionally broke Q/K TP RMSNorm math and was slower at `26.158` output tok/s, so it was not submitted. The valid p512/n512 repeat reached `39.516` output tok/s.
+Note: `cmoz7rs2w0077tl01o3f1kxnm` is now part of the suspect fast AOT family. A separate diagnostic `VLLM_MINIMAX_QK_SKIP_TP_ALLREDUCE=1` run intentionally broke Q/K TP RMSNorm math and was slower at `26.158` output tok/s, but later graph inspection also showed the fast `c15860...` family did not visibly include the Q/K RMS variance allreduce.
 
-Note: `cmoz82i2f007itl01fkno9or1` is the refreshed p512/n1024 long-output high. It supersedes the older `cmoz4qkc3005htl01t70cd8l7` p512/n1024 row under the same quality path; refreshed samples were `39.894` and `40.304` output tok/s.
+Note: `cmoz82i2f007itl01fkno9or1` is the refreshed p512/n1024 long-output high from the same suspect fast AOT family. It supersedes the older `cmoz4qkc3005htl01t70cd8l7` p512/n1024 row for speed only; refreshed samples were `39.894` and `40.304` output tok/s.
 
-Note: `cmoz8cow60001pd010klrb8g8` is the full-window p512/n1536 high at `max_model_len=2048`. It repeated at `40.864` and `41.131` output tok/s under the same normal quality path.
+Note: `cmozow03v005wlo01q81bnspx` is the current quality-conservative p512/n1536 reference at `max_model_len=2048`. Its compiled graph includes Q/K RMS variance allreduce across TP ranks and reaches `37.553` output tok/s.
+
+Note: `cmoz8cow60001pd010klrb8g8` is now marked suspect rather than quality-cleared. It repeated at `40.864` and `41.131` output tok/s, but later graph inspection of the fast `c15860...` AOT artifact found the regular hidden-state allreduces and did not find the per-layer Q/K RMS variance allreduce.
 
 Note: `cmoz8k9z40008pd01rhu50c0n` is the `max_model_len=4096` capacity check. It remains valid but is slower because KV headroom/concurrency shrink materially at the larger configured context.
 
@@ -280,4 +286,4 @@ Note: `cmoz9ayax001cpd01xkr0w54l` is the warmed p512/n1536 8192-context refresh.
 
 Note: `cmoz8ryb9000bpd014xhl3pxu` keeps `max_model_len=4096` but sets `gpu_memory_utilization=0.95`, recovering much of the lost KV headroom and improving throughput to `36.616` output tok/s.
 
-Note: `cmozofyv5005hlo01puv9rjs6` is a diagnostic vLLM expert-parallel result, not the recommended MiniMax recipe. It uses TP4+EP4, the llm-scaler u4 MoE decode path, and the B70 E64/N1536 tuned MoE config. The tuned config is required: without it, p512/n512 fell to `25.076` output tok/s and 8,768 KV tokens; with it, p512/n512 rose to `29.892` output tok/s and 16,320 KV tokens. The longer p512/n1536 run clears `30.911` output tok/s, but still trails the non-EP TP4 high `cmoz8cow60001pd010klrb8g8` at `41.131`. LocalMaxxing rejected `backend=xpu`, so the accepted payload omits backend and preserves XPU details in notes/engine flags.
+Note: `cmozofyv5005hlo01puv9rjs6` is a diagnostic vLLM expert-parallel result, not the recommended MiniMax recipe. It uses TP4+EP4, the llm-scaler u4 MoE decode path, and the B70 E64/N1536 tuned MoE config. The tuned config is required: without it, p512/n512 fell to `25.076` output tok/s and 8,768 KV tokens; with it, p512/n512 rose to `29.892` output tok/s and 16,320 KV tokens. The longer p512/n1536 run clears `30.911` output tok/s, but still trails the Q/K-allreduce quality-conservative TP4 reference `cmozow03v005wlo01q81bnspx` at `37.553`. LocalMaxxing rejected `backend=xpu`, so the accepted payload omits backend and preserves XPU details in notes/engine flags.

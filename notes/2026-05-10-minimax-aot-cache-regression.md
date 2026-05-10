@@ -4,10 +4,10 @@
 
 After the post-reboot restore, the fast MiniMax AutoRound FP16 TP4 path became
 sensitive to the exact vLLM compiled graph and AOT cache artifact. The prior
-accepted high remains `41.130667` output tok/s for p512/n1536. The currently
-reproducible floor after the cache was overwritten is about `35-36` output tok/s
-for p512/n512 and `36.56` output tok/s for p512/n1536 with
-`gpu_memory_utilization=0.95`.
+accepted high was `41.130667` output tok/s for p512/n1536, but later graph
+inspection moved that AOT artifact to suspect status because the Q/K RMS
+variance allreduce was not visible in the fast graph. The current
+quality-conservative p512/n1536 reference is `37.552538` output tok/s.
 
 No model weights, quantization, sampling, speculative decoding, or GPU power
 settings were changed in these screens.
@@ -63,8 +63,9 @@ The active runtime is back on the quality-preserving MiniMax TP4 path:
 - simple K-norm constructor for this MiniMax M2.7 TP4 graph shape
 
 Do not submit these regression/floor runs to LocalMaxxing as new records. The
-accepted `41.130667` p512/n1536 run remains the published high, and the new
-results are useful mainly as cache/graph-shape diagnostics.
+accepted `41.130667` p512/n1536 run should be treated as a suspect scheduling
+clue, and the later `37.552538` p512/n1536 Q/K-allreduce run is the current
+quality-conservative public reference.
 
 ## Next Work
 

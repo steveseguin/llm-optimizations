@@ -1,0 +1,41 @@
+{
+  "hfId": "MiniMaxAI/MiniMax-M2.7",
+  "modelRevision": "main",
+  "hardware": {
+    "hwClass": "DISCRETE_GPU",
+    "gpuName": "Intel Arc Pro B70 32GB",
+    "gpuCount": 4,
+    "vramGb": 32,
+    "cpu": "AMD EPYC 9015 8-Core Processor",
+    "ramGb": 16,
+    "os": "Ubuntu 24.04.4 LTS"
+  },
+  "engineName": "vllm",
+  "engineVersion": "0.20.1-local",
+  "quantization": "INT4 AutoRound W4A16",
+  "promptTokens": 512,
+  "outputTokens": 1536,
+  "contextLength": 2048,
+  "batchSize": 1,
+  "tokSOut": 37.55253824718782,
+  "tokSTotal": 50.07005099625042,
+  "peakVramGb": 28.11,
+  "notes": "Quality-conservative MiniMax M2.7 AutoRound TP4 run after verifying Q/K RMS variance is all-reduced across tensor-parallel ranks. Local weights are Lasimeri/MiniMax-M2.7-int4-AutoRound submitted under base MiniMaxAI/MiniMax-M2.7 for consistency with earlier accepted runs. 4x Intel Arc Pro B70, XPU/Level Zero, local vLLM INC/XPU WNA16 patch, llm-scaler unsigned INT4 MoE decode path, B70 E=256,N=384 MoE config, FP16 activations, max_model_len=2048. A previous 41.13 tok/s AOT artifact is now treated as suspect because its graph did not show the Q/K variance all-reduce. No speculative decode, no expert dropping, no power-limit changes.",
+  "engineFlags": {
+    "commandSnippet": "USE_LLM_SCALER_MOE=1 CCL_TOPO_P2P_ACCESS=1 VLLM_XPU_ENABLE_XPU_GRAPH=0 vllm bench throughput --backend vllm --model /mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround --tokenizer /mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround --trust-remote-code --dtype float16 --tensor-parallel-size 4 --distributed-executor-backend mp --max-model-len 2048 --max-num-batched-tokens 1024 --max-num-seqs 1 --dataset-name random --random-input-len 512 --random-output-len 1536 --random-range-ratio 0 --num-prompts 1 --disable-log-stats",
+    "tensorParallel": 4,
+    "pipelineParallel": 1,
+    "kvCacheDtype": "auto",
+    "gpuMemUtil": 0.9,
+    "flashAttn": true,
+    "attentionBackend": "flash_attn",
+    "contextLength": 2048,
+    "prefillChunkSize": 1024,
+    "maxRunningSeqs": 1,
+    "concurrency": 1,
+    "specDecoding": false,
+    "mtpEnabled": false,
+    "engineQuant": "inc",
+    "extraFlags": "XPU/Level Zero, B70 tuned MoE config E=256,N=384,dtype=int4_w4a16, llm-scaler u4 MoE decode path for x.shape<=4, Q/K RMS variance tensor_model_parallel_all_reduce enabled, XPU graph disabled, CCL_ATL_TRANSPORT=ofi, CCL_TOPO_P2P_ACCESS=1, no power-limit change"
+  }
+}

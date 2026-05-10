@@ -3,8 +3,10 @@
 ## Purpose
 
 Screen vLLM's built-in expert parallelism for MiniMax M2.7 on the four B70
-system after the standard TP4 path had reached a valid `41.130667` output tok/s
-high at p512/n1536. vLLM's MiniMax recipe recommends TP4+EP4 on H100-class
+system after the standard TP4 path had reached a `41.130667` output tok/s
+fast AOT result at p512/n1536. That fast AOT result is now suspect because its
+cached graph did not visibly include Q/K RMS variance allreduce; the current
+quality-conservative TP4 reference is `37.552538` output tok/s. vLLM's MiniMax recipe recommends TP4+EP4 on H100-class
 systems, and the EP deployment docs describe expert layers as sharded across
 EP ranks while attention remains tensor-parallel when TP is greater than one.
 
@@ -53,9 +55,10 @@ about 25 output tok/s. Pointing `VLLM_TUNED_CONFIG_FOLDER` at the E64/N1536 seed
 recovers 16.3k KV tokens and improves p512/n512 to about 29.9 output tok/s.
 
 That still does not beat the non-EP TP4 path. The best EP run here, p512/n1536,
-is 30.911 output tok/s versus the accepted non-EP TP4 high of 41.131 output
-tok/s. On B70/XPU, EP's AgRs all-to-all cost and scheduling overhead outweigh
-the reduced per-rank expert count for batch-1 single-session decode.
+is 30.911 output tok/s versus the Q/K-allreduce quality-conservative TP4
+reference of 37.553 output tok/s. On B70/XPU, EP's AgRs all-to-all cost and
+scheduling overhead outweigh the reduced per-rank expert count for batch-1
+single-session decode.
 
 Round-robin placement is not useful in the current vLLM MiniMax topology. The
 runtime warns that round-robin expert placement is only supported for models

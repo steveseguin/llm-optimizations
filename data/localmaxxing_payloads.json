@@ -1647,6 +1647,21 @@
       "tokSTotal": 41.21429446943075,
       "createdAt": "2026-05-10T11:15:58.145Z"
     },
-    "notes": "Diagnostic TP4+EP4 result with E64/N1536 B70 MoE config. Accepted without backend because LocalMaxxing rejects backend=xpu. Not recommended over non-EP TP4 high."
+    "notes": "Diagnostic TP4+EP4 result with E64/N1536 B70 MoE config. Accepted without backend because LocalMaxxing rejects backend=xpu. Not recommended over the Q/K-allreduce quality-conservative TP4 reference."
+  },
+  {
+    "label": "vllm-minimax-m27-autoround-quality-qkallreduce-p512-n1536",
+    "submittedAt": "2026-05-10T11:28:26.252Z",
+    "payloadFile": "data/localmaxxing-minimax-m27-autoround-quality-qkallreduce-p512n1536-20260510.payload.json",
+    "responseFile": "data/localmaxxing-responses/minimax-m27-autoround-quality-qkallreduce-p512n1536-20260510.response.json",
+    "httpStatus": 201,
+    "response": {
+      "id": "cmozow03v005wlo01q81bnspx",
+      "status": "APPROVED",
+      "tokSOut": 37.55253824718782,
+      "tokSTotal": 50.07005099625042,
+      "createdAt": "2026-05-10T11:28:26.252Z"
+    },
+    "notes": "Current quality-conservative MiniMax TP4 reference. Q/K RMS variance allreduce is present in the compiled graph; older 41.13 tok/s AOT artifact is now treated as suspect."
   }
 ]
