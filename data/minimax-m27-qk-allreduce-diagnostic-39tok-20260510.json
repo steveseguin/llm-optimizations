@@ -162,7 +162,24 @@
       "localMaxxingId": "cmoz8ryb9000bpd014xhl3pxu",
       "payload": "data/localmaxxing-minimax-m27-autoround-u4-decode-fp16-fast-nvme-maxlen4096-gpumem095-p512n1536-20260510.payload.json",
       "response": "data/localmaxxing-responses/minimax-m27-autoround-u4-decode-fp16-fast-nvme-maxlen4096-gpumem095-p512n1536-20260510.response.json"
+    },
+    {
+      "name": "normal_qk_allreduce_p512n1536_max_model_len8192_gpu_mem095_capacity",
+      "promptTokens": 512,
+      "outputTokens": 1536,
+      "maxModelLen": 8192,
+      "gpuMemoryUtilization": 0.95,
+      "gpuKvCacheTokens": 25600,
+      "maxConcurrency": 3.12,
+      "tokSOut": 33.30801176815689,
+      "tokSTotal": 44.41068235754252,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260510T035902Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260510T035902Z.json",
+      "submittedToLocalMaxxing": true,
+      "localMaxxingId": "cmoz90lg0000wpd018x3zuukw",
+      "payload": "data/localmaxxing-minimax-m27-autoround-u4-decode-fp16-fast-nvme-maxlen8192-gpumem095-p512n1536-20260510.payload.json",
+      "response": "data/localmaxxing-responses/minimax-m27-autoround-u4-decode-fp16-fast-nvme-maxlen8192-gpumem095-p512n1536-20260510.response.json"
     }
   ],
-  "conclusion": "The correctness-breaking Q/K TP-allreduce skip is slower and invalid. The normal quality path repeated near 39.5-39.6 output tok/s at p512/n512, 39.9-40.3 output tok/s at p512/n1024, and 40.9-41.1 output tok/s at p512/n1536. Setting max_model_len=4096 drops the same p512/n1536 request to 33.26 output tok/s at default memory; gpu_memory_utilization=0.95 recovers KV capacity and improves it to 36.62 tok/s. Best rows and both 4096 capacity datapoints were submitted to LocalMaxxing."
+  "conclusion": "The correctness-breaking Q/K TP-allreduce skip is slower and invalid. The normal quality path repeated near 39.5-39.6 output tok/s at p512/n512, 39.9-40.3 output tok/s at p512/n1024, and 40.9-41.1 output tok/s at p512/n1536. Setting max_model_len=4096 drops the same p512/n1536 request to 33.26 output tok/s at default memory; gpu_memory_utilization=0.95 recovers KV capacity and improves it to 36.62 tok/s. Setting max_model_len=8192 with gpu_memory_utilization=0.95 completes with 25,600 KV tokens but drops the same request to 33.31 output tok/s. Best rows and the capacity datapoints were submitted to LocalMaxxing."
 }

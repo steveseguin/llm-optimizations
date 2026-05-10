@@ -20,8 +20,9 @@ Runtime: vLLM `0.20.1-local`, XPU/Level Zero, TP4 on 4x Intel Arc Pro B70, FP16 
 | Control p512/n1536 run 2 | normal Q/K TP allreduce | 512 | 1536 | 17,216 | 41.131 | 54.841 | `/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260510T034207Z.log` |
 | `max_model_len=4096` capacity | normal Q/K TP allreduce | 512 | 1536 | 9,408 | 33.258 | 44.344 | `/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260510T034709Z.log` |
 | `max_model_len=4096`, `gpu_memory_utilization=0.95` | normal Q/K TP allreduce | 512 | 1536 | 33,408 | 36.616 | 48.822 | `/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260510T035402Z.log` |
+| `max_model_len=8192`, `gpu_memory_utilization=0.95` | normal Q/K TP allreduce | 512 | 1536 | 25,600 | 33.308 | 44.411 | `/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260510T035902Z.log` |
 
-LocalMaxxing accepted the first p512/n512 control run as `cmoz7rs2w0077tl01o3f1kxnm`, the second p512/n1024 control run as `cmoz82i2f007itl01fkno9or1`, the second p512/n1536 control run as `cmoz8cow60001pd010klrb8g8`, the 4096-context default-memory capacity run as `cmoz8k9z40008pd01rhu50c0n`, and the 4096-context 0.95-memory capacity run as `cmoz8ryb9000bpd014xhl3pxu`.
+LocalMaxxing accepted the first p512/n512 control run as `cmoz7rs2w0077tl01o3f1kxnm`, the second p512/n1024 control run as `cmoz82i2f007itl01fkno9or1`, the second p512/n1536 control run as `cmoz8cow60001pd010klrb8g8`, the 4096-context default-memory capacity run as `cmoz8k9z40008pd01rhu50c0n`, the 4096-context 0.95-memory capacity run as `cmoz8ryb9000bpd014xhl3pxu`, and the 8192-context 0.95-memory capacity run as `cmoz90lg0000wpd018x3zuukw`.
 
 ## Interpretation
 
@@ -31,8 +32,10 @@ The valid p512/n512 control repeated tightly at `39.61` then `39.52` output tok/
 
 Raising `max_model_len` to 4096 is a capacity tradeoff, not a speed path. The same p512/n1536 request fell to `33.26` output tok/s because the available GPU KV cache dropped from 17,216 to 9,408 tokens and max concurrency fell to 2.30x for 4096-token requests. Setting `gpu_memory_utilization=0.95` improves the 4096-context recipe: KV cache rises to 33,408 tokens, max concurrency rises to 8.16x, and output speed recovers to `36.62` tok/s, but it still trails the 2048-window speed path.
 
+At `max_model_len=8192`, `gpu_memory_utilization=0.95` completed cleanly and reported 25,600 GPU KV-cache tokens, enough for 3.12 concurrent 8192-token requests. The same p512/n1536 request reached `33.31` output tok/s. This validates an 8192-context capacity configuration on the current TP4 path, but the scheduler/KV cost makes it slower than both the 2048 speed path and the 4096/0.95 capacity recipe.
+
 ## Next Work
 
 - Do not pursue Q/K allreduce elimination by dropping the collective; it is invalid and slower.
 - A real XPU equivalent of CUDA `minimax_allreduce_rms_qk` would still need to fuse local variance, inter-rank exchange, and RMS apply in one graph-safe custom op. The skip diagnostic shows that a naive removal is not a useful proxy.
-- Next test BF16 or larger `max_model_len` only if capacity is the goal; for raw speed keep the 2048-window FP16 recipe.
+- Next test a larger real prompt at `max_model_len=8192` only if capacity is the goal; for raw speed keep the 2048-window FP16 recipe.
