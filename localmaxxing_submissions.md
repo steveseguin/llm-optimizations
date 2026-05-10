@@ -17,6 +17,8 @@ Model: `Lasimeri/MiniMax-M2.7-int4-AutoRound`, AutoRound W4A16 safetensors, vLLM
 | `vllm-minimax-m27-autoround-u4-decode-fast-nvme-maxlen4096-p512-n1536` | `cmoz8k9z40008pd01rhu50c0n` | 4 | 512 | 1536 | 33.258 | 44.344 |
 | `vllm-minimax-m27-autoround-u4-decode-fast-nvme-maxlen4096-gpumem095-p512-n1536` | `cmoz8ryb9000bpd014xhl3pxu` | 4 | 512 | 1536 | 36.616 | 48.822 |
 | `vllm-minimax-m27-autoround-u4-decode-fast-nvme-maxlen8192-gpumem095-p512-n1536` | `cmoz90lg0000wpd018x3zuukw` | 4 | 512 | 1536 | 33.308 | 44.411 |
+| `vllm-minimax-m27-autoround-u4-decode-fast-nvme-maxlen8192-gpumem095-p4096-n512` | `cmoz97d350015pd01smqui7lk` | 4 | 4096 | 512 | 31.287 | 281.587 |
+| `vllm-minimax-m27-autoround-u4-decode-fast-nvme-maxlen8192-gpumem095-p512-n1536-refresh` | `cmoz9ayax001cpd01xkr0w54l` | 4 | 512 | 1536 | 36.805 | 49.074 |
 
 Note: `cmoz8cow60001pd010klrb8g8` is the current best MiniMax AutoRound result on the four B70 system. It uses the unsigned llm-scaler u4 decode-only MoE path with FP16 activations, fast ext4 NVMe model storage, the installed B70 MoE config, normal Q/K TP allreduce, no speculative decoding, no expert dropping, and no power-limit changes. It covers the full `max_model_len=2048` request window with p512/n1536 and repeated at `40.864` then `41.131` output tok/s.
 
@@ -28,7 +30,11 @@ Note: `cmoz8k9z40008pd01rhu50c0n` is a larger-context capacity datapoint, not a 
 
 Note: `cmoz8ryb9000bpd014xhl3pxu` is the better 4096-context capacity recipe. Adding `gpu_memory_utilization=0.95` raises GPU KV cache to 33,408 tokens and improves the same p512/n1536 request to `36.616` output tok/s, still below the 2048-window speed path.
 
-Note: `cmoz90lg0000wpd018x3zuukw` is the 8192-context capacity recipe. It keeps `gpu_memory_utilization=0.95`, reports 25,600 GPU KV-cache tokens and 3.12x max concurrency for 8192-token requests, and reaches `33.308` output tok/s on the same p512/n1536 request.
+Note: `cmoz90lg0000wpd018x3zuukw` is the first 8192-context capacity sample. It keeps `gpu_memory_utilization=0.95`, reports 25,600 GPU KV-cache tokens and 3.12x max concurrency for 8192-token requests, and reaches `33.308` output tok/s on the same p512/n1536 request. A warmed refresh superseded it.
+
+Note: `cmoz97d350015pd01smqui7lk` is the real larger-prompt 8192-context sample. It uses p4096/n512, reports 33,408 GPU KV-cache tokens and 4.08x max concurrency for 8192-token requests, and reaches `31.287` output tok/s / `281.587` total tok/s.
+
+Note: `cmoz9ayax001cpd01xkr0w54l` is the warmed 8192-context p512/n1536 refresh. It reports 33,408 GPU KV-cache tokens and improves the same shape from `33.308` to `36.805` output tok/s, still below the `max_model_len=2048` speed path.
 
 Note: `cmoyzvknv003ttl01q9vsyytb` is the larger-prompt validation for the BF16 llm-scaler u4 decode bridge. It keeps the same quality-preserving target path and reaches `31.833 tok/s` output at `p1024/n256`, but also records the current capacity boundary: vLLM reports only `0.16 GiB` available KV memory at `max_model_len=2048`, while a `p1536/n256` attempt failed with no available KV cache blocks.
 
@@ -252,6 +258,8 @@ Model: `Lasimeri/MiniMax-M2.7-int4-AutoRound`, AutoRound W4A16 safetensors.
 | `vllm-minimax-m27-autoround-u4-decode-fast-nvme-maxlen4096-p512-n1536` | `cmoz8k9z40008pd01rhu50c0n` | 4 | 512 | 1536 | 33.258 | 44.344 |
 | `vllm-minimax-m27-autoround-u4-decode-fast-nvme-maxlen4096-gpumem095-p512-n1536` | `cmoz8ryb9000bpd014xhl3pxu` | 4 | 512 | 1536 | 36.616 | 48.822 |
 | `vllm-minimax-m27-autoround-u4-decode-fast-nvme-maxlen8192-gpumem095-p512-n1536` | `cmoz90lg0000wpd018x3zuukw` | 4 | 512 | 1536 | 33.308 | 44.411 |
+| `vllm-minimax-m27-autoround-u4-decode-fast-nvme-maxlen8192-gpumem095-p4096-n512` | `cmoz97d350015pd01smqui7lk` | 4 | 4096 | 512 | 31.287 | 281.587 |
+| `vllm-minimax-m27-autoround-u4-decode-fast-nvme-maxlen8192-gpumem095-p512-n1536-refresh` | `cmoz9ayax001cpd01xkr0w54l` | 4 | 512 | 1536 | 36.805 | 49.074 |
 
 Note: `cmoz4qkc3005htl01t70cd8l7` is the corrected fast-NVMe p512/n1024 MiniMax AutoRound validation. It keeps the same vLLM/XPU TP4 llm-scaler u4 decode-only path as the prior long-output run, but moves the checkpoint from the external NTFS USB drive to ext4 PCIe 5.0 NVMe. Comparable model load time dropped from `348.18s` to `84.39s`, and decode improved from `35.933` to `36.670` output tok/s. The key scheduler lesson is that `--max-num-batched-tokens 1024` is the current sweet spot for this shape; `1536` fell to `29.478` output tok/s and `512` fell to `31.862`. `XPU_GRAPH=1` remains negative because communication capture is unsupported and the run loses KV headroom.
 
@@ -263,6 +271,10 @@ Note: `cmoz8cow60001pd010klrb8g8` is the full-window p512/n1536 high at `max_mod
 
 Note: `cmoz8k9z40008pd01rhu50c0n` is the `max_model_len=4096` capacity check. It remains valid but is slower because KV headroom/concurrency shrink materially at the larger configured context.
 
-Note: `cmoz90lg0000wpd018x3zuukw` is the `max_model_len=8192`, `gpu_memory_utilization=0.95` capacity check. It completes cleanly with 25,600 GPU KV-cache tokens, but output speed falls to `33.308` tok/s on the same p512/n1536 request, so it is a capacity datapoint rather than a raw-speed route.
+Note: `cmoz90lg0000wpd018x3zuukw` is the first `max_model_len=8192`, `gpu_memory_utilization=0.95` capacity check. It completes cleanly with 25,600 GPU KV-cache tokens, but output speed falls to `33.308` tok/s on the same p512/n1536 request.
+
+Note: `cmoz97d350015pd01smqui7lk` is the real larger-prompt 8192-context capacity check at p4096/n512. It reports 33,408 GPU KV-cache tokens and reaches `31.287` output tok/s / `281.587` total tok/s.
+
+Note: `cmoz9ayax001cpd01xkr0w54l` is the warmed p512/n1536 8192-context refresh. It reports 33,408 GPU KV-cache tokens and improves the same shape to `36.805` output tok/s, so it supersedes the first 8192 p512/n1536 sample while remaining a capacity datapoint rather than a raw-speed route.
 
 Note: `cmoz8ryb9000bpd014xhl3pxu` keeps `max_model_len=4096` but sets `gpu_memory_utilization=0.95`, recovering much of the lost KV headroom and improving throughput to `36.616` output tok/s.
