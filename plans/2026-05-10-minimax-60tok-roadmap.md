@@ -107,6 +107,12 @@ The u4 MoE bridge is no longer the only ceiling. Existing timing notes put MiniM
 
 6. Speculative decode and MTP
    - Current MiniMax n-gram, ngram_gpu, and DFlash screens are negative or unstable.
+   - A fresh p64/n128 screen confirmed the gap: clean baseline reached
+     `50.618` total tok/s and `33.745` output tok/s, while plain ngram
+     reached only `11.059` total tok/s and `7.373` output tok/s. Raising
+     `MAX_BATCHED_TOKENS` to `1024` did not change the result materially.
+   - `ngram_gpu` is still not usable on this XPU stack. It loaded and compiled,
+     but stalled at zero processed prompts until terminated.
    - A fast-NVMe DFlash retest loaded and compiled both target and drafter, but
      still stalled before generating a p64/n32 sample. Storage was not the
      blocker.
@@ -143,6 +149,18 @@ The u4 MoE bridge is no longer the only ceiling. Existing timing notes put MiniM
   and currently requiring the CUDA `minimax_allreduce_rms_qk` custom op. That
   validates our local direction: port or replace this boundary for XPU rather
   than enabling CUDA/ROCm fusion passes globally.
+- The stock `fuse_allreduce_rms` flag was explicitly disabled by the local XPU
+  runtime in a p64/n32 screen. Treat upstream AllReduce+RMS as a design pattern,
+  not as an available B70 flag path.
+- llm-scaler core ESIMD fused add/RMS/GEMV kernels were built locally but are
+  unsafe on this stack: direct calls segfaulted in `libsycl.so.8`, and vLLM
+  worker imports failed in SYCL image registration while the generated core
+  extension was present. The generated core `.so` is quarantined; the working
+  `moe_int4_ops` extension remains active.
+- The MiniMax AutoRound model config keeps router/gate layers at 16-bit/float
+  precision, so INT4 router fusion is not quality-preserving unless separately
+  validated. Keep router quality intact and target expert kernels or collective
+  epilogues instead.
 - Public MiniMax M2.7 hardware reports for non-Intel systems are higher than
   our current B70 result: one recent 32k-context llama.cpp report lists about
   `71.52 tok/s` on 4x RTX 4090, `118.74 tok/s` on one RTX PRO 6000, and
@@ -178,6 +196,9 @@ The u4 MoE bridge is no longer the only ceiling. Existing timing notes put MiniM
 5. Keep `scripts/summarize-vllm-aot-collectives.sh` in the loop. The current
    clean TP4 AOT census reports `92` allreduce comment lines and `48`
    allreduce-to-RMS/MoE boundary lines; this is now the primary fusion target.
+6. Do not enable `--enforce-eager` for MiniMax throughput. It is mentioned in
+   Intel AutoRound deployment docs, but local p64/n128 throughput dropped from
+   `33.745` output tok/s compiled to `18.007` output tok/s eager.
 
 Current code-direction preference after the latest negative screens:
 

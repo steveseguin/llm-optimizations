@@ -1,0 +1,153 @@
+{
+  "date": "2026-05-10",
+  "model": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+  "model_path": "/mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround",
+  "hardware": "4x Intel Arc Pro B70 32GB",
+  "engine": "vLLM 0.20.1-local XPU",
+  "primary_target": {
+    "non_speculative_output_tok_s_p512n1536": 60,
+    "speculative_output_tok_s_p512n1536": 75,
+    "quality_required": true
+  },
+  "quality_guardrails": [
+    "No expert dropping",
+    "No skipped Q/K RMS TP variance allreduce",
+    "No non-equivalent root residual or deferred reduction across nonlinearities",
+    "No speculative result counted without target verification",
+    "No GPU power-limit changes"
+  ],
+  "clean_references": {
+    "accepted_long_run_p512n1536": {
+      "output_tok_s": 37.552538,
+      "total_tok_s": 50.070051,
+      "localmaxxing_id": "cmozow03v005wlo01q81bnspx"
+    },
+    "current_refresh_p512n1536": {
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-current-baseline-refresh/vllm-minimax-m27-autoround-tp4-p512n1536-20260510T172305Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-current-baseline-refresh/vllm-minimax-m27-autoround-tp4-p512n1536-20260510T172305Z.json",
+      "elapsed_s": 41.325494591997995,
+      "output_tok_s": 37.16833918540496,
+      "total_tok_s": 49.55778558053995
+    }
+  },
+  "llm_scaler_core_esimd": {
+    "source_root": "/home/steve/src/llm-scaler/vllm/custom-esimd-kernels-vllm",
+    "built_core_extension": "custom_esimd_kernels.cpython-312-x86_64-linux-gnu.so",
+    "active_moe_extension": "moe_int4_ops.cpython-312-x86_64-linux-gnu.so",
+    "build_notes": [
+      "oneAPI compiler was required on PATH",
+      "The working compiler flag form was '-device bmg'",
+      "Core ESIMD kernels compiled but were unsafe at runtime"
+    ],
+    "failure": {
+      "symptom": "Direct fused add/RMS calls segfaulted in libsycl.so.8; vLLM workers failed on import during SYCL image registration",
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-smoke-after-esimd-core/vllm-minimax-m27-autoround-tp4-p64n32-20260510T184949Z.log",
+      "stack_markers": [
+        "sycl::_V1::detail::ProgramManager::addImage",
+        "__sycl_register_lib"
+      ]
+    },
+    "quarantine": {
+      "path": "/home/steve/src/llm-scaler/vllm/custom-esimd-kernels-vllm/python/custom_esimd_kernels_vllm/custom_esimd_kernels.cpython-312-x86_64-linux-gnu.so.disabled-20260510T185258Z",
+      "decision": "Keep the core ESIMD extension disabled until the SYCL registration/call crash is fixed. Keep the INT4 MoE extension active."
+    },
+    "post_quarantine_health_check": {
+      "shape": "p64/n32",
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-smoke-after-esimd-quarantine/vllm-minimax-m27-autoround-tp4-p64n32-20260510T185306Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-smoke-after-esimd-quarantine/vllm-minimax-m27-autoround-tp4-p64n32-20260510T185306Z.json",
+      "elapsed_s": 1.2414242189988727,
+      "total_tok_s": 77.3305357917197,
+      "output_tok_s": 25.776845263906566
+    },
+    "router_quality_note": "MiniMax AutoRound keeps MoE router/gate layers at 16-bit or float precision. INT4 router fusion is not quality-preserving without separate validation."
+  },
+  "speculative_screens": [
+    {
+      "name": "baseline_p64n128",
+      "shape": "p64/n128",
+      "extra_args": "",
+      "max_model_len": 512,
+      "max_batched_tokens": 256,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-spec-screen-baseline-p64n128/vllm-minimax-m27-autoround-tp4-p64n128-20260510T185539Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-spec-screen-baseline-p64n128/vllm-minimax-m27-autoround-tp4-p64n128-20260510T185539Z.json",
+      "elapsed_s": 3.7930994470007136,
+      "total_tok_s": 50.61823521442829,
+      "output_tok_s": 33.74549014295219
+    },
+    {
+      "name": "ngram_p64n128",
+      "shape": "p64/n128",
+      "extra_args": "--speculative-config {\"method\":\"ngram\",\"num_speculative_tokens\":4,\"prompt_lookup_max\":4,\"prompt_lookup_min\":1}",
+      "max_model_len": 512,
+      "max_batched_tokens": 256,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-spec-screen-ngram-p64n128/vllm-minimax-m27-autoround-tp4-p64n128-20260510T185814Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-spec-screen-ngram-p64n128/vllm-minimax-m27-autoround-tp4-p64n128-20260510T185814Z.json",
+      "elapsed_s": 17.361641153001983,
+      "total_tok_s": 11.058862368365531,
+      "output_tok_s": 7.372574912243688,
+      "observation": "Async scheduling disabled for ngram-based speculative decoding; throughput collapsed on this random workload."
+    },
+    {
+      "name": "ngram_p64n128_mbt1024",
+      "shape": "p64/n128",
+      "extra_args": "--speculative-config {\"method\":\"ngram\",\"num_speculative_tokens\":4,\"prompt_lookup_max\":4,\"prompt_lookup_min\":1}",
+      "max_model_len": 512,
+      "max_batched_tokens": 1024,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-spec-screen-ngram-p64n128-mbt1024/vllm-minimax-m27-autoround-tp4-p64n128-20260510T190154Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-spec-screen-ngram-p64n128-mbt1024/vllm-minimax-m27-autoround-tp4-p64n128-20260510T190154Z.json",
+      "elapsed_s": 17.251805625004636,
+      "total_tok_s": 11.129269838382404,
+      "output_tok_s": 7.41951322558827,
+      "observation": "Increasing max batched tokens did not fix ngram throughput."
+    },
+    {
+      "name": "ngram_gpu_p64n128",
+      "shape": "p64/n128",
+      "extra_args": "--speculative-config {\"method\":\"ngram_gpu\",\"num_speculative_tokens\":4,\"prompt_lookup_max\":4,\"prompt_lookup_min\":1}",
+      "max_model_len": 512,
+      "max_batched_tokens": 1024,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-spec-screen-ngramgpu-p64n128/vllm-minimax-m27-autoround-tp4-p64n128-20260510T190545Z.log",
+      "json": null,
+      "result": "stalled_before_completion",
+      "observation": "Loaded and compiled, then stayed at 0 processed prompts until terminated."
+    }
+  ],
+  "fusion_and_eager_screens": [
+    {
+      "name": "fuse_allreduce_rms_flag_p64n32",
+      "shape": "p64/n32",
+      "extra_args": "-cc.pass_config.fuse_allreduce_rms=True",
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-fuse-allreduce-rms-screen-p64n32/vllm-minimax-m27-autoround-tp4-p64n32-20260510T191511Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-fuse-allreduce-rms-screen-p64n32/vllm-minimax-m27-autoround-tp4-p64n32-20260510T191511Z.json",
+      "elapsed_s": 1.1957336959967506,
+      "total_tok_s": 80.28543506083555,
+      "output_tok_s": 26.761811686945183,
+      "observation": "XPU runtime explicitly disabled the requested AllReduce + RMSNorm fusion, so this is not a real fusion result."
+    },
+    {
+      "name": "enforce_eager_p64n128",
+      "shape": "p64/n128",
+      "extra_args": "--enforce-eager",
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-enforce-eager-screen-p64n128/vllm-minimax-m27-autoround-tp4-p64n128-20260510T191742Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-enforce-eager-screen-p64n128/vllm-minimax-m27-autoround-tp4-p64n128-20260510T191742Z.json",
+      "elapsed_s": 7.108311773001333,
+      "total_tok_s": 27.010632922609147,
+      "output_tok_s": 18.007088615072764,
+      "observation": "Negative versus compiled p64/n128 baseline."
+    }
+  ],
+  "decisions": [
+    "No new LocalMaxxing submission from these screens because they are negative or diagnostic, not improved public results.",
+    "Keep llm-scaler core ESIMD extension quarantined; keep llm-scaler INT4 MoE extension active.",
+    "Keep ngram speculation closed for the current random MiniMax workload. Revisit speculation only with target-compatible draft/acceptance metrics or after fixing ngram_gpu.",
+    "Keep --enforce-eager off for throughput runs on this MiniMax B70 path.",
+    "Next code work should be native XPU C++/SYCL or compiler/backend-level fusion around Q/K RMS variance allreduce and allreduce/residual/RMS boundaries."
+  ],
+  "external_sources": [
+    "https://docs.vllm.ai/en/stable/design/fusions/",
+    "https://docs.vllm.ai/en/v0.11.0/features/spec_decode.html",
+    "https://docs.vllm.ai/en/stable/api/vllm/v1/spec_decode/ngram_proposer_gpu/",
+    "https://docs.vllm.ai/en/stable/features/quantization/inc/",
+    "https://github.com/intel/llm-scaler/blob/main/vllm/README.md"
+  ]
+}
