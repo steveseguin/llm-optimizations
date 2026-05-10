@@ -34,6 +34,7 @@ All results use:
 | p512/n1024 | 1024 | BF16 default memory, failed | 0 | no KV cache | no KV cache | 66.09s |
 | p512/n1024 | 1024 | BF16, `--gpu-memory-utilization 0.95`, run 1 | 18,880 | 37.304 | 55.955 | 77.30s |
 | p512/n1024 | 1024 | BF16, `--gpu-memory-utilization 0.95`, run 2 | 18,880 | 35.954 | 53.931 | 67.17s |
+| p512/n1536 | 1024 | BF16, `--gpu-memory-utilization 0.95`, long decode | 18,880 | 36.324 | 48.432 | 64.93s |
 
 ## Findings
 
@@ -50,6 +51,8 @@ The NVMe move is a large iteration-speed win. Comparable p512/n1024 load time fe
 BF16 is viable only with a higher memory target on this setup. The default-memory BF16 run loaded the model but reported negative KV headroom and failed before generation with `No available memory for the cache blocks`. With `--gpu-memory-utilization 0.95`, BF16 completed twice at 37.304 and 35.954 output tok/s, with 18,880 KV tokens. This is a quality-conservative capacity mode rather than a clear speed breakthrough: it keeps BF16 activations and has enough context headroom, but the two-run range overlaps the FP16 best path.
 
 LocalMaxxing accepted the first BF16 0.95 run as `cmoz632kr0068tl017a1z6r0u`. The submission notes include the repeat at 35.954 output tok/s so the public record does not hide the observed variance.
+
+A longer BF16 p512/n1536 run completed at 36.324 output tok/s. This gives a steadier boundary condition: extending decode length does not reveal hidden throughput above the p512/n1024 range, so the current capacity-mode ceiling is still roughly mid-to-high 30s tok/s on this stack.
 
 I also ran a short eager-mode BF16 0.95 p512/n16 timing diagnostic with XPU synchronization and rank-0 summaries. Eager mode is much slower and includes prefill outliers, so it is not a throughput result. It still confirms the same bottleneck shape as the 2026-05-09 timing work: Q/K norm plus repeated TP allreduces remains prominent, and prefill still falls back through vLLM fused experts.
 
