@@ -1,0 +1,191 @@
+{
+  "dateUtc": "2026-05-10",
+  "model": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+  "hardware": {
+    "gpuName": "Intel Arc Pro B70",
+    "gpuCount": 4,
+    "vramGbPerGpu": 32,
+    "os": "Ubuntu 24.04.4",
+    "kernel": "6.17.0-23-generic",
+    "fastNvmeMount": "/mnt/fast-ai"
+  },
+  "engine": {
+    "name": "vLLM",
+    "version": "0.20.1-local",
+    "backend": "XPU/Level Zero",
+    "dtype": "float16",
+    "tensorParallel": 4,
+    "llmScalerU4Decode": true,
+    "xpuGraph": false,
+    "cclIpc": "default"
+  },
+  "restore": {
+    "problem": "Default-off Q/K apply+RoPE helper branch changed the compiled AOT graph cache from c15860... to c952f... and reduced MiniMax throughput.",
+    "activeFix": "Removed the apply+RoPE helper branch from active source and venv copy while leaving the existing Q/K RMS helper gate default-off.",
+    "patch": "patches/vllm-minimax-remove-qk-apply-rope-branch-restore-c158-20260510.patch",
+    "pyCompile": "passed",
+    "customOpCheck": {
+      "torchOpsNamespace": "moe_int4_ops",
+      "op": "moe_forward_tiny_cutlass_nmajor_int4_u4",
+      "visible": true
+    },
+    "runs": [
+      {
+        "name": "smoke_after_u4_restore_p128n32",
+        "promptTokens": 128,
+        "outputTokens": 32,
+        "elapsedSeconds": 1.3313629269996454,
+        "tokSTotal": 120.17759902671723,
+        "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p128n32-20260510T053730Z.log",
+        "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p128n32-20260510T053730Z.json"
+      },
+      {
+        "name": "pre_restore_p512n1536_c952",
+        "promptTokens": 512,
+        "outputTokens": 1536,
+        "elapsedSeconds": 41.715778150000915,
+        "tokSTotal": 49.0941339422181,
+        "tokSOut": 36.82060045666357,
+        "aotCache": "c952f45843e4700f6b55d0d51014b41b832bf0956fac8b122286c8f4d5c2b9f6",
+        "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260510T053933Z.log",
+        "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260510T053933Z.json"
+      },
+      {
+        "name": "restored_p512n512_c158",
+        "promptTokens": 512,
+        "outputTokens": 512,
+        "elapsedSeconds": 13.1288015550017,
+        "tokSTotal": 77.9964565470856,
+        "tokSOut": 38.9982282735428,
+        "aotCache": "c15860ddb8a1077c5ba1a1ae2d0f86552a357eb56772cdbf02828195b5a363ec",
+        "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n512-20260510T054939Z.log",
+        "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n512-20260510T054939Z.json"
+      },
+      {
+        "name": "restored_p512n1536_run1_c158",
+        "promptTokens": 512,
+        "outputTokens": 1536,
+        "elapsedSeconds": 38.93555907300106,
+        "tokSTotal": 52.599732706037784,
+        "tokSOut": 39.44979952952834,
+        "aotCache": "c15860ddb8a1077c5ba1a1ae2d0f86552a357eb56772cdbf02828195b5a363ec",
+        "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260510T055206Z.log",
+        "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260510T055206Z.json"
+      },
+      {
+        "name": "restored_p512n1536_run2_c158",
+        "promptTokens": 512,
+        "outputTokens": 1536,
+        "elapsedSeconds": 38.43767844299873,
+        "tokSTotal": 53.281053460007676,
+        "tokSOut": 39.960790095005756,
+        "aotCache": "c15860ddb8a1077c5ba1a1ae2d0f86552a357eb56772cdbf02828195b5a363ec",
+        "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260510T055509Z.log",
+        "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260510T055509Z.json"
+      }
+    ],
+    "localmaxxing": {
+      "submitted": false,
+      "reason": "Restore runs are useful learning datapoints but remain below the already accepted 41.130667 tok/s p512/n1536 result."
+    }
+  },
+  "longOutput": [
+    {
+      "name": "p512n2048_default_memory",
+      "promptTokens": 512,
+      "outputTokens": 2048,
+      "maxModelLen": 2048,
+      "gpuMemoryUtilization": "default",
+      "elapsedSeconds": 60.36866731200098,
+      "tokSTotal": 42.406104258841,
+      "tokSOut": 33.9248834070728,
+      "gpuKvCacheTokens": 9408,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n2048-20260510T051156Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n2048-20260510T051156Z.json"
+    },
+    {
+      "name": "p512n2048_gpu_memory_utilization_095",
+      "promptTokens": 512,
+      "outputTokens": 2048,
+      "maxModelLen": 2048,
+      "gpuMemoryUtilization": 0.95,
+      "elapsedSeconds": 55.695236786999885,
+      "tokSTotal": 45.964433364210834,
+      "tokSOut": 36.77154669136866,
+      "gpuKvCacheTokens": 33408,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n2048-20260510T051546Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n2048-20260510T051546Z.json"
+    }
+  ],
+  "xcclOutOfPlaceMicrobench": {
+    "script": "benchmarks/b70_xccl_allreduce_bench.py",
+    "log": "/mnt/fast-ai/bench-results/xccl-allreduce/b70-xccl-allreduce-outplace-modes-20260510T050938Z.log",
+    "worldSize": 4,
+    "iters": 1000,
+    "modes": [
+      {
+        "mode": "inplace",
+        "latencyMs": {
+          "8B": 0.016,
+          "6144B": 0.015,
+          "1MiB": 0.042,
+          "256MiB": 9.636
+        }
+      },
+      {
+        "mode": "clone",
+        "latencyMs": {
+          "8B": 0.021,
+          "6144B": 0.020,
+          "1MiB": 0.044,
+          "256MiB": 10.667
+        }
+      },
+      {
+        "mode": "empty_copy",
+        "latencyMs": {
+          "8B": 0.021,
+          "6144B": 0.020,
+          "1MiB": 0.044,
+          "256MiB": 10.667
+        }
+      }
+    ],
+    "conclusion": "The out-of-place clone/copy cost is measurable but only about 0.005 ms for tiny MiniMax decode allreduces, so raw XCCL clone overhead is not the main ceiling."
+  },
+  "htileExperiment": {
+    "patch": "patches/llm-scaler-minimax-u4-down-htile-negative-20260510.patch",
+    "buildLog": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/build-moe-int4-u4-oneapi2025-20260510T052153Z.log",
+    "synthetic": {
+      "defaultMedianUs": 140.425,
+      "htileMedianUs": 44.43,
+      "maxDiff": 0.0,
+      "meanDiff": 0.0
+    },
+    "vllmRuns": [
+      {
+        "name": "htile_p512n512",
+        "tokSOut": 35.0665679168454,
+        "tokSTotal": 70.13313583369079,
+        "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n512-20260510T052357Z.log"
+      },
+      {
+        "name": "same_rebuild_control_p512n512",
+        "tokSOut": 36.012197578341674,
+        "tokSTotal": 72.02439515668335,
+        "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n512-20260510T052624Z.log"
+      }
+    ],
+    "decision": "Do not promote. Synthetic kernel timing improved, but the full compiled vLLM model slowed."
+  },
+  "xpuGraphFollowup": {
+    "name": "xpu_graph_1_after_rebuild_p512n512",
+    "promptTokens": 512,
+    "outputTokens": 512,
+    "elapsedSeconds": 18.212325333999615,
+    "tokSTotal": 56.22565933897245,
+    "tokSOut": 28.112829669486224,
+    "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n512-20260510T054312Z.log",
+    "conclusion": "Still negative. vLLM reports XPU graph cannot capture TP communication ops and disables cudagraph_mode."
+  }
+}
