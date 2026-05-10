@@ -1,0 +1,122 @@
+{
+  "date_utc": "2026-05-10",
+  "label": "minimax-m27-source-ir-fusedadd-screen",
+  "status": "negative_no_submission",
+  "reason_not_submitted_to_localmaxxing": "All runs were source/runtime implementation screens below the current installed-runtime reference.",
+  "model": {
+    "hf_id": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+    "local_path": "/mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround",
+    "dtype": "float16",
+    "quantization": "AutoRound INT4 W4A16"
+  },
+  "hardware": {
+    "gpu_name": "Intel Arc Pro B70 32GB",
+    "gpu_count": 4,
+    "os": "Ubuntu 24.04.4 LTS"
+  },
+  "shape": {
+    "prompt_tokens": 512,
+    "output_tokens": 512,
+    "max_model_len": 2048,
+    "max_batched_tokens": 512,
+    "max_num_seqs": 1,
+    "tensor_parallel": 4
+  },
+  "reference": {
+    "installed_runtime_p512n512_output_tok_s": 39.610585,
+    "quality_conservative_p512n1536_output_tok_s": 37.552538
+  },
+  "runs": [
+    {
+      "name": "installed_custom_ops_rms_cold",
+      "runtime": "site-packages",
+      "config": "custom_ops=[none,+rms_norm]",
+      "kv_tokens": 9472,
+      "tok_s_total": 57.24488152949012,
+      "tok_s_out": 28.62244076474506,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-rms-custom/vllm-minimax-m27-autoround-tp4-p512n512-20260510T160342Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-rms-custom/vllm-minimax-m27-autoround-tp4-p512n512-20260510T160342Z.json"
+    },
+    {
+      "name": "installed_custom_ops_rms_warm",
+      "runtime": "site-packages",
+      "config": "custom_ops=[none,+rms_norm]",
+      "kv_tokens": 17920,
+      "tok_s_total": 72.31718790768805,
+      "tok_s_out": 36.158593953844026,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-rms-custom/vllm-minimax-m27-autoround-tp4-p512n512-20260510T160716Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-rms-custom/vllm-minimax-m27-autoround-tp4-p512n512-20260510T160716Z.json"
+    },
+    {
+      "name": "source_fusedadd_xpu_missing_config_cold",
+      "runtime": "/home/steve/src/vllm",
+      "config": "fused_add_rms_norm=[xpu_kernels], missing B70 MoE config",
+      "kv_tokens": 9472,
+      "tok_s_total": 55.95132951602831,
+      "tok_s_out": 27.975664758014155,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-source-fusedadd-xpu/vllm-minimax-m27-autoround-tp4-p512n512-20260510T161048Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-source-fusedadd-xpu/vllm-minimax-m27-autoround-tp4-p512n512-20260510T161048Z.json"
+    },
+    {
+      "name": "source_fusedadd_xpu_missing_config_warm",
+      "runtime": "/home/steve/src/vllm",
+      "config": "fused_add_rms_norm=[xpu_kernels], missing B70 MoE config",
+      "kv_tokens": 17920,
+      "tok_s_total": 70.31532949407739,
+      "tok_s_out": 35.157664747038694,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-source-fusedadd-xpu/vllm-minimax-m27-autoround-tp4-p512n512-20260510T161400Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-source-fusedadd-xpu/vllm-minimax-m27-autoround-tp4-p512n512-20260510T161400Z.json"
+    },
+    {
+      "name": "source_fusedadd_xpu_with_config_warm",
+      "runtime": "/home/steve/src/vllm",
+      "config": "fused_add_rms_norm=[xpu_kernels], B70 MoE config present",
+      "kv_tokens": 17920,
+      "tok_s_total": 71.29797512249031,
+      "tok_s_out": 35.64898756124516,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-source-fusedadd-xpu/vllm-minimax-m27-autoround-tp4-p512n512-20260510T161658Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-source-fusedadd-xpu/vllm-minimax-m27-autoround-tp4-p512n512-20260510T161658Z.json"
+    },
+    {
+      "name": "source_default_with_config_cold",
+      "runtime": "/home/steve/src/vllm",
+      "config": "default IR, B70 MoE config present",
+      "kv_tokens": 9472,
+      "tok_s_total": 55.70073192820078,
+      "tok_s_out": 27.85036596410039,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-source-default-control/vllm-minimax-m27-autoround-tp4-p512n512-20260510T161935Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-source-default-control/vllm-minimax-m27-autoround-tp4-p512n512-20260510T161935Z.json"
+    },
+    {
+      "name": "source_default_with_config_warm",
+      "runtime": "/home/steve/src/vllm",
+      "config": "default IR, B70 MoE config present",
+      "kv_tokens": 17920,
+      "tok_s_total": 69.20356633298894,
+      "tok_s_out": 34.60178316649447,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-source-default-control/vllm-minimax-m27-autoround-tp4-p512n512-20260510T162245Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-source-default-control/vllm-minimax-m27-autoround-tp4-p512n512-20260510T162245Z.json"
+    },
+    {
+      "name": "source_default_autotune_cold",
+      "runtime": "/home/steve/src/vllm",
+      "config": "default IR, --enable-flashinfer-autotune",
+      "kv_tokens": 9472,
+      "tok_s_total": 55.94141453985148,
+      "tok_s_out": 27.97070726992574,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-source-default-autotune/vllm-minimax-m27-autoround-tp4-p512n512-20260510T162618Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-source-default-autotune/vllm-minimax-m27-autoround-tp4-p512n512-20260510T162618Z.json"
+    },
+    {
+      "name": "source_default_autotune_warm",
+      "runtime": "/home/steve/src/vllm",
+      "config": "default IR, --enable-flashinfer-autotune",
+      "kv_tokens": 17920,
+      "tok_s_total": 71.56230930953379,
+      "tok_s_out": 35.781154654766895,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-source-default-autotune/vllm-minimax-m27-autoround-tp4-p512n512-20260510T162933Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-source-default-autotune/vllm-minimax-m27-autoround-tp4-p512n512-20260510T162933Z.json"
+    }
+  ],
+  "decision": "Do not use source-tree import for official MiniMax results until its baseline matches the installed runtime; keep the B70 MoE config in source for future source experiments."
+}

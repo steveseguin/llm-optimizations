@@ -71,6 +71,7 @@ Reproducibility notes, benchmark payloads, and local patches from the Intel Arc 
 - The guarded `VLLM_XPU_ALLREDUCE_ASYNC_WAIT=1` hook completed a full BF16 0.95 MiniMax p512/n512 run at `35.949` output tok/s, but the hook is disabled inside compiled collectives. It stays as an eager-only diagnostic, not a speed setting or LocalMaxxing result.
 - Casting the MiniMax Q/K RMS variance allreduce payload from FP32 to FP16 is also negative: the graph changed to `f16[s72,2]` variance collectives, but warm p512/n512 reached only `35.316` output tok/s and carries a normalization-precision tradeoff. The active runtime was reverted to FP32 variance allreduce; keep `VLLM_MINIMAX_QK_VAR_ALLREDUCE_DTYPE` unset.
 - Inlining `MiniMaxText01LinearAttention` is not applicable to the active MiniMax M2 AutoRound model: it uses `minimax_m2.py` normal attention, produced the same `4799a3c8...` AOT hash, and the temporary gate was removed.
+- Source-tree vLLM IR `fused_add_rms_norm` is a useful diagnostic but not a speed path yet. After adding the B70 MiniMax MoE config to `/home/steve/src/vllm`, source default warmed to `34.602` output tok/s, source with `--enable-flashinfer-autotune` warmed to `35.781`, and source with `fused_add_rms_norm=["xpu_kernels","native"]` warmed to `35.649`, all below the installed-runtime p512/n512 reference. The installed `custom_ops=["none","+rms_norm"]` path also warmed to only `36.159`. Do not submit these to LocalMaxxing.
 - Intel llm-scaler branch `origin/fix_27b_kernel` (`db05b45`) fixes a large-`N` dense INT4 ResAddNormGEMV race reported on Qwen3.6-27B `gate_up` (`N=8704,K=5120,TP=4`). It is relevant if we return to dense Qwen3.6 INT4 AutoRound/sym-int4, but not to the current MiniMax u4 MoE bridge, Qwen Q4_0 GGUF, or Qwen static FP8 paths.
 - Latest MiniMax negative screens keep the optimization target pointed at source-level fusion rather than launch flags. Direct XPU Q/K RMS helper (`28.036` tok/s), llm-scaler MoE logits path (`35.899`), TP2/PP2 (`24.976`), and generic FP8 KV (`28.104`) all underperformed the quality-cleared TP4 p512/n512 reference (`39.611`). Explicit `fp8_e5m2` KV fails in the XPU FlashAttention metadata path. These were not submitted to LocalMaxxing; they are recorded as pruning data.
 
@@ -202,6 +203,7 @@ Reproducibility notes, benchmark payloads, and local patches from the Intel Arc 
 - `data/localmaxxing-minimax-m27-autoround-u4-decode-fp16-fast-nvme-maxlen8192-gpumem095-p512n1536-refresh-20260510.payload.json`: LocalMaxxing payload for the refreshed `max_model_len=8192`, `gpu_memory_utilization=0.95`, p512/n1536 MiniMax AutoRound capacity datapoint.
 - `data/localmaxxing-responses/minimax-m27-autoround-u4-decode-fp16-fast-nvme-maxlen8192-gpumem095-p512n1536-refresh-20260510.response.json`: LocalMaxxing response for the refreshed `max_model_len=8192`, `gpu_memory_utilization=0.95`, p512/n1536 MiniMax AutoRound capacity datapoint.
 - `data/minimax-m27-autoround-dflash-fast-nvme-negative-20260510.json`: structured negative DFlash speculative-decode retest from fast NVMe.
+- `data/minimax-m27-source-ir-fusedadd-screen-20260510.json`: structured source-tree and installed-runtime RMS/fused-add implementation screen.
 - `notes/2026-05-10-b70-pcie-and-xpu-smi.md`: B70 PCIe hierarchy and `xpu-smi` setup note; all four slot-facing links are PCIe 5.0 x16, PCIe downgrade is disabled, and a local no-file `libze1` shim keeps the existing Intel Level Zero loader intact.
 - `data/b70-pcie-and-xpu-smi-20260510.json`: structured PCIe bridge table and `xpu-smi` package state.
 - `configs/vllm/minimax-m27-b70-int4-w4a16-moe-hybrid-20260508.json`: hybrid B70 MoE config for MiniMax AutoRound vLLM/XPU, tuned key `1` plus default prompt-size keys.
@@ -256,8 +258,10 @@ Reproducibility notes, benchmark payloads, and local patches from the Intel Arc 
 - `patches/vllm-minimax-graph-shaped-c158-floor-20260510.patch`: current MiniMax graph-shaped source state after the AOT regression: keeps timing boundaries/default-off Q/K RMS helper and uses the simple K-norm constructor that recovers the reproducible `c15860...` floor for this MiniMax M2.7 TP4 config.
 - `patches/llm-scaler-minimax-u4-down-htile-negative-20260510.patch`: negative llm-scaler htile experiment artifact; includes the prior u4 MiniMax work plus the failed htile addition, so do not reverse-apply it over the active runtime.
 - `patches/vllm-minimax-qk-var-allreduce-dtype-negative-20260510.patch`: negative MiniMax Q/K variance dtype experiment; FP16 variance collectives compiled but underperformed and were reverted from the active runtime.
+- `patches/vllm-source-b70-minimax-moe-config-20260510.patch`: source-tree B70 MiniMax MoE config needed for fair `/home/steve/src/vllm` import tests.
 - `plans/2026-05-10-minimax-60tok-roadmap.md`: raised MiniMax AutoRound target ladder and next workstreams for quality-preserving 4x B70 optimization.
 - `notes/2026-05-10-minimax-dflash-fast-nvme-retest.md`: fast-NVMe DFlash retest; load/compile works, generation still stalls before any throughput result.
+- `notes/2026-05-10-minimax-source-ir-fusedadd-screen.md`: source-tree IR fused-add RMS screen; mechanically works but remains below the installed-runtime reference.
 
 ## Notes
 

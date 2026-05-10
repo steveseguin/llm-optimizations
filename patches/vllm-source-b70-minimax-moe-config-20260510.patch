@@ -1,0 +1,33 @@
+diff --git a/vllm/model_executor/layers/fused_moe/configs/E=256,N=384,device_name=Intel(R)_Graphics_[0xe223],dtype=int4_w4a16.json b/vllm/model_executor/layers/fused_moe/configs/E=256,N=384,device_name=Intel(R)_Graphics_[0xe223],dtype=int4_w4a16.json
+new file mode 100644
+index 000000000..e8ebaf001
+--- /dev/null
++++ b/vllm/model_executor/layers/fused_moe/configs/E=256,N=384,device_name=Intel(R)_Graphics_[0xe223],dtype=int4_w4a16.json
+@@ -0,0 +1,25 @@
++{
++  "triton_version": "3.7.0",
++  "1": {
++    "BLOCK_SIZE_M": 16,
++    "BLOCK_SIZE_N": 64,
++    "BLOCK_SIZE_K": 128,
++    "GROUP_SIZE_M": 1,
++    "num_warps": 4,
++    "num_stages": 4,
++    "SPLIT_K": 1
++  },
++  "64": {
++    "BLOCK_SIZE_M": 64,
++    "GROUP_SIZE_M": 1,
++    "SPLIT_K": 1
++  },
++  "256": {
++    "BLOCK_SIZE_M": 64,
++    "GROUP_SIZE_M": 1,
++    "SPLIT_K": 1
++  },
++  "512": {
++    "BLOCK_SIZE_M": 64,
++    "GROUP_SIZE_M": 1,
++    "SPLIT_K": 1
++  }
++}

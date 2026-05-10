@@ -43,6 +43,10 @@ The u4 MoE bridge is no longer the only ceiling. Existing timing notes put MiniM
    - Stock vLLM `fuse_allreduce_rms` is not useful for this stack today: XPU disables it, and the current implementation is CUDA/FlashInfer/ROCm oriented.
    - Build a B70/XPU-specific path around Level Zero/XCCL-visible tensors instead of trying to enable the CUDA pass.
    - Start with post-attention and post-MoE boundaries where the hidden-state allreduce feeds residual add and RMSNorm.
+   - Plain provider swapping is not enough: installed `+rms_norm` and
+     source-tree `fused_add_rms_norm=["xpu_kernels"]` both stayed below the
+     installed-runtime reference. Future work needs to fuse the collective
+     boundary with adjacent epilogue work, not just replace the RMSNorm kernel.
 
 2. Q/K RMS variance fusion
    - Standalone helper kernels and standalone mailbox allreduce were negative.
