@@ -14,7 +14,8 @@ Revised targets:
 
 - Near-term repeatable target: `45 tok/s` output at p512/n1536 without changing model quality.
 - Main target: `60 tok/s` output at p512/n1536 on 4x B70 with the MiniMax AutoRound INT4 model.
-- Stretch target: `75+ tok/s` only if achieved by verified speculative decoding, MTP-style target-compatible drafting, or deeper source-level fusion that preserves target logits.
+- First stretch target: `75+ tok/s` only if achieved by verified speculative decoding, MTP-style target-compatible drafting, or deeper source-level fusion that preserves target logits.
+- Secondary stretch target: `90+ tok/s` if speculative acceptance is high enough and the run records target verification, acceptance behavior, total tok/s, output tok/s, and TTFT/prefill data where available.
 
 These targets should move upward with quantization/runtime changes. The
 AutoRound INT4 path is materially faster than the GGUF capacity path, so the
@@ -216,6 +217,28 @@ Current code-direction preference after the latest negative screens:
    hidden-state allreduce followed immediately by residual add/RMSNorm.
 4. If a fusion cannot beat the current p512/n1536 anchor, archive it as a
    negative and leave the env flag unset.
+
+## DP4+EP Status
+
+DP4+expert-parallel is now partially unblocked. A local XPU worker patch that
+sets `CCL_LOCAL_RANK` and `CCL_LOCAL_SIZE` from the DP/TP/PP topology lets
+four local DP ranks initialize oneCCL under vLLM serving.
+
+Current status:
+
+- DP4+EP eager no-scaler smoke completed at p16/n8, proving initialization and
+  generation.
+- DP4+EP eager llm-scaler safe-id smoke also completed, but was slower than the
+  no-scaler smoke.
+- DP4+EP compiled mode failed even with max autotune disabled and
+  `MAX_BATCHED_TOKENS=128`: each rank loaded about `30.81 GiB` of model state,
+  leaving only about `677 MiB` free, then Inductor tried to allocate about
+  `1.15 GiB`.
+
+Decision: keep the CCL local-rank patch archived as a real reproducibility fix.
+Do not promote EP as a speed path yet. The current four-B70 MiniMax speed work
+returns to TP4 collective-boundary fusion unless we find a way to reduce EP
+runtime memory enough for compiled mode.
 
 ## 2026-05-10 Refresh
 

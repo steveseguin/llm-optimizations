@@ -1,0 +1,52 @@
+{
+  "date": "2026-05-10",
+  "model": {
+    "hfId": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+    "localPath": "/mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround",
+    "quantization": "AutoRound INT4 W4A16",
+    "dtype": "float16"
+  },
+  "hardware": "4x Intel Arc Pro B70 32GB, Ubuntu 24.04",
+  "engine": {
+    "name": "vllm",
+    "backend": "xpu",
+    "tensorParallel": 4,
+    "pipelineParallel": 1,
+    "llmScalerMoe": true,
+    "xpuGraph": false,
+    "cclP2P": true,
+    "maxModelLen": 2048,
+    "maxNumBatchedTokens": 1024,
+    "maxNumSeqs": 1
+  },
+  "benchmark": {
+    "command": "vllm bench latency",
+    "promptTokens": 512,
+    "outputTokens": 128,
+    "batchSize": 1,
+    "warmupIterations": 1,
+    "measuredIterations": 3,
+    "avgLatencySec": 3.665656348336294,
+    "p50LatencySec": 3.6628412200079765,
+    "p90LatencySec": 3.6736114544037264,
+    "requestTotalTokS": 174.59358351673126,
+    "outputEquivalentTokS": 34.91871670334625,
+    "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-latency-p512n128/vllm-minimax-m27-autoround-latency-tp4-p512n128-20260510T223048Z.log",
+    "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-latency-p512n128/vllm-minimax-m27-autoround-latency-tp4-p512n128-20260510T223048Z.json"
+  },
+  "loadDiagnostics": {
+    "modelLoadTimeSec": 71.16049,
+    "gpuModelMemoryGiBPerWorker": 28.11,
+    "gpuKvCacheTokens": 17216,
+    "maxConcurrencyFor2048Tokens": 8.41,
+    "majorPageFaults": 816261,
+    "fileSystemInputsKiB": 244909632,
+    "observation": "System RAM was nearly exhausted during load, so model reloads are I/O/page-fault heavy. This does not explain steady-state decode, but it makes full-run experiments expensive."
+  },
+  "prefillDecodeReporting": {
+    "ttftMs": null,
+    "tokSPrefill": null,
+    "reason": "vllm bench latency reports full request latency only for this path. Do not derive TTFT or prefill rate from this result without an explicit serving trace or benchmark hook."
+  },
+  "decision": "Useful latency/reporting artifact, not a LocalMaxxing submission because it is not an improvement and lacks true TTFT/prefill split."
+}

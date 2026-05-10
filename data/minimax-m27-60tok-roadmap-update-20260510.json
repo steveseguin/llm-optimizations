@@ -10,8 +10,9 @@
   "targets": {
     "nearTermOutputTokS": 45,
     "mainOutputTokS": 60,
-    "stretchOutputTokS": 75,
-    "stretchCondition": "Only count 75+ tok/s if achieved through target-verified speculative decoding/MTP or deeper source-level fusion that preserves target logits."
+    "firstStretchOutputTokS": 75,
+    "secondaryStretchOutputTokS": 90,
+    "stretchCondition": "Only count 75+ tok/s or 90+ tok/s if achieved through target-verified speculative decoding/MTP or deeper source-level fusion that preserves target logits. Record acceptance behavior and prefill/TTFT fields where the benchmark source exposes them."
   },
   "currentQualityAnchors": [
     {

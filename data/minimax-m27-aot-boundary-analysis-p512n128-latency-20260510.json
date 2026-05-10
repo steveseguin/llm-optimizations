@@ -1,0 +1,132 @@
+{
+  "allreduceCount": 187,
+  "byClassification": {
+    "moe": 63,
+    "qk_rms_apply": 62,
+    "rms_norm": 62
+  },
+  "byShape": {
+    "f16[s72, 3072]": 125,
+    "f32[s72, 2]": 62
+  },
+  "byShapeClassification": {
+    "f16[s72, 3072] -> moe": 63,
+    "f16[s72, 3072] -> rms_norm": 62,
+    "f32[s72, 2] -> qk_rms_apply": 62
+  },
+  "file": "/home/steve/.cache/vllm/torch_compile_cache/4e4b550b71/rank_0_0/backbone/computation_graph.py",
+  "samples": [
+    {
+      "classification": "rms_norm",
+      "line": 1304,
+      "name": "all_reduce",
+      "next_code": "self.weight.data if self.has_weight else None,",
+      "next_expr": "torch._C._autograd._get_data_attr(l_self_modules_layers_modules_0_modules_post_attention_layernorm_parameters_weight_);  l_self_modules_layers_modules_0_modules_post_attention_layernorm_parameters_weight_ = None",
+      "next_file": "vllm/model_executor/layers/layernorm.py:253 in forward_native",
+      "next_op": "_get_data_attr",
+      "pre_context": [
+        {
+          "code": "return input_, ~vocab_mask",
+          "file": "vllm/model_executor/layers/vocab_parallel_embedding.py:187 in get_masked_input_and_mask"
+        },
+        {
+          "code": "output_parallel = self.quant_method.embedding(self, masked_input.long())",
+          "file": "vllm/model_executor/layers/vocab_parallel_embedding.py:484 in forward"
+        },
+        {
+          "code": "return F.embedding(input_, layer.weight)",
+          "file": "vllm/model_executor/layers/vocab_parallel_embedding.py:78 in embedding"
+        },
+        {
+          "code": "output_parallel.masked_fill_(input_mask.unsqueeze(-1), 0)",
+          "file": "vllm/model_executor/layers/vocab_parallel_embedding.py:487 in forward"
+        },
+        {
+          "code": "output = input_.clone() if torch.compiler.is_compiling() else input_",
+          "file": "vllm/distributed/device_communicators/xpu_communicator.py:53 in all_reduce"
+        },
+        {
+          "code": "tensor = torch.ops._c10d_functional.all_reduce(self, reduceOp.lower(), group_name)",
+          "file": "torch/distributed/_functional_collectives.py:173 in all_reduce"
+        }
+      ],
+      "shape": "f16[s72, 3072]"
+    },
+    {
+      "classification": "qk_rms_apply",
+      "line": 1355,
+      "name": "all_reduce_1",
+      "next_code": "qk_var = tensor_model_parallel_all_reduce(qk_var) / q_norm.tp_world",
+      "next_expr": "clone_1 / 4;  clone_1 = None",
+      "next_file": "vllm/model_executor/layers/mamba/linear_attn.py:114 in forward_qk",
+      "next_op": "truediv",
+      "pre_context": [
+        {
+          "code": "k = k.to(torch.float32)",
+          "file": "vllm/model_executor/layers/mamba/linear_attn.py:109 in forward_qk"
+        },
+        {
+          "code": "q_var = q.pow(2).mean(dim=-1, keepdim=True)",
+          "file": "vllm/model_executor/layers/mamba/linear_attn.py:110 in forward_qk"
+        },
+        {
+          "code": "k_var = k.pow(2).mean(dim=-1, keepdim=True)",
+          "file": "vllm/model_executor/layers/mamba/linear_attn.py:111 in forward_qk"
+        },
+        {
+          "code": "qk_var = torch.cat([q_var, k_var], dim=-1)",
+          "file": "vllm/model_executor/layers/mamba/linear_attn.py:113 in forward_qk"
+        },
+        {
+          "code": "output = input_.clone() if torch.compiler.is_compiling() else input_",
+          "file": "vllm/distributed/device_communicators/xpu_communicator.py:53 in all_reduce"
+        },
+        {
+          "code": "tensor = torch.ops._c10d_functional.all_reduce(self, reduceOp.lower(), group_name)",
+          "file": "torch/distributed/_functional_collectives.py:173 in all_reduce"
+        }
+      ],
+      "shape": "f32[s72, 2]"
+    },
+    {
+      "classification": "moe",
+      "line": 1580,
+      "name": "all_reduce_1",
+      "next_code": "return states[..., :trunc_size]",
+      "next_expr": "clone_1[(Ellipsis, slice(None, 3072, None))];  clone_1 = None",
+      "next_file": "vllm/model_executor/layers/fused_moe/runner/moe_runner.py:378 in _maybe_reduce_final_output",
+      "next_op": "getitem",
+      "pre_context": [
+        {
+          "code": "x = x * weight",
+          "file": "vllm/model_executor/layers/layernorm.py:227 in forward_static"
+        },
+        {
+          "code": "hidden_states = hidden_states.view(-1, hidden_dim)",
+          "file": "vllm/model_executor/models/minimax_m2.py:168 in forward"
+        },
+        {
+          "code": "router_logits, _ = self.gate(hidden_states.to(torch.float32))",
+          "file": "vllm/model_executor/models/minimax_m2.py:171 in forward"
+        },
+        {
+          "code": "return super().__torch_function__(func, types, args, kwargs)",
+          "file": "vllm/model_executor/parameter.py:126 in __torch_function__"
+        },
+        {
+          "code": "result = self._forward_entry(",
+          "file": "vllm/model_executor/layers/fused_moe/runner/moe_runner.py:586 in forward"
+        },
+        {
+          "code": "output = input_.clone() if torch.compiler.is_compiling() else input_",
+          "file": "vllm/distributed/device_communicators/xpu_communicator.py:53 in all_reduce"
+        },
+        {
+          "code": "tensor = torch.ops._c10d_functional.all_reduce(self, reduceOp.lower(), group_name)",
+          "file": "torch/distributed/_functional_collectives.py:173 in all_reduce"
+        }
+      ],
+      "shape": "f16[s72, 3072]"
+    }
+  ]
+}

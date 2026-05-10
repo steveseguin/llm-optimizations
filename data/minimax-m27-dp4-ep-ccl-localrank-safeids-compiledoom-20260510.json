@@ -1,0 +1,103 @@
+{
+  "date": "2026-05-10",
+  "model": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+  "hardware": {
+    "gpu": "Intel Arc Pro B70 32GB",
+    "gpu_count": 4,
+    "power_limit_changed": false
+  },
+  "objective": "Test DP4 + expert parallel + EP weight filtering on 4x B70 as a possible path beyond the TP4 quality-cleared baseline.",
+  "reference_quality_cleared_tp4": {
+    "prompt_tokens": 512,
+    "output_tokens": 1536,
+    "output_tok_s": 37.552538,
+    "total_tok_s": 50.070051,
+    "localmaxxing_id": "cmozow03v005wlo01q81bnspx",
+    "notes": "No speculation, no expert dropping, Q/K TP variance allreduce enabled."
+  },
+  "updated_targets": {
+    "near_term_non_spec_output_tok_s": 45,
+    "main_non_spec_output_tok_s": 60,
+    "verified_speculative_output_tok_s": 75,
+    "stretch_speculative_output_tok_s": 90
+  },
+  "patches": [
+    {
+      "name": "xpu_worker CCL local-rank env patch",
+      "status": "keep",
+      "reason": "Allows local DP/EP oneCCL ranks to initialize correctly under vLLM XPU multiprocess serving."
+    },
+    {
+      "name": "moe_wna16 safe-id masking for EP llm-scaler path",
+      "status": "diagnostic",
+      "reason": "The llm-scaler tiny kernels already handle negative expert ids, and the tiny smoke was slower with safe-id masking."
+    }
+  ],
+  "runs": [
+    {
+      "name": "dp4_ep_eager_no_scaler_fit64_p16n8",
+      "path": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-serve-dp4-ep-ccl-localrank-ofi-fit64-eager-p2p0-noscaler/vllm-minimax-m27-autoround-serve-tp1-p16n8-np1-20260510T230827Z.json",
+      "mode": "eager",
+      "tp": 1,
+      "dp": 4,
+      "expert_parallel": true,
+      "ep_weight_filter": true,
+      "llm_scaler_moe": false,
+      "input_tokens": 16,
+      "output_tokens": 8,
+      "completed": 1,
+      "output_tok_s": 4.321792013527813,
+      "total_tok_s": 12.96537604058344,
+      "mean_ttft_ms": 936.3262519909767,
+      "mean_tpot_ms": 130.62648928566236,
+      "interpretation": "Stability proof only; DP4+EP can initialize and generate after the CCL local-rank patch."
+    },
+    {
+      "name": "dp4_ep_eager_scaler_safeids_fit64_p16n8",
+      "path": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-serve-dp4-ep-ccl-localrank-ofi-fit64-eager-p2p0-scaler-safeids/vllm-minimax-m27-autoround-serve-tp1-p16n8-np1-20260510T231121Z.json",
+      "mode": "eager",
+      "tp": 1,
+      "dp": 4,
+      "expert_parallel": true,
+      "ep_weight_filter": true,
+      "llm_scaler_moe": true,
+      "safe_id_masking": true,
+      "input_tokens": 16,
+      "output_tokens": 8,
+      "completed": 1,
+      "output_tok_s": 2.9951367720918953,
+      "total_tok_s": 8.985410316275686,
+      "mean_ttft_ms": 1146.6840259963647,
+      "mean_tpot_ms": 217.6969524298329,
+      "interpretation": "Stability proof only; safe-id masking appears slower and is not promoted."
+    },
+    {
+      "name": "dp4_ep_compiled_scaler_safeids_p64n128_noautotune",
+      "path": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-serve-dp4-ep-ccl-localrank-ofi-compiled-noautotune-p64n128-scaler-safeids/vllm-minimax-m27-autoround-serve-server-tp1-p64n128-np1-20260510T231811Z.log",
+      "mode": "compiled",
+      "tp": 1,
+      "dp": 4,
+      "expert_parallel": true,
+      "ep_weight_filter": true,
+      "llm_scaler_moe": true,
+      "input_tokens": 64,
+      "output_tokens": 128,
+      "completed": 0,
+      "failure": "XPU out of memory during Inductor autotuning/compile block",
+      "attempted_allocation_gib": 1.15,
+      "free_memory_mib_at_failure": 677,
+      "pytorch_allocated_gib": 30.81,
+      "interpretation": "Compiled DP4+EP is memory blocked on 32GB B70s in the current runtime shape."
+    }
+  ],
+  "localmaxxing": {
+    "submitted": false,
+    "reason": "Only tiny smoke/stability data and a failed compiled run; no meaningful shareable throughput result."
+  },
+  "next": [
+    "Keep CCL local-rank fix archived.",
+    "Treat safe-id masking as diagnostic and likely revert for performance unless correctness requires it.",
+    "Return primary performance work to TP4 collective-boundary fusion and low-overhead timing.",
+    "Revisit DP4+EP only if runtime memory can be reduced enough for compiled mode or if eager EP gets a credible decode path."
+  ]
+}

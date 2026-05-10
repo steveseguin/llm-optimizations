@@ -1,0 +1,33 @@
+{
+  "date": "2026-05-10",
+  "model": "/mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround",
+  "approxCheckpointBytesByCategory": {
+    "moeExpertWeightsGiB": 108.712,
+    "embeddingLmHeadGiB": 2.29,
+    "attentionGiB": 1.322,
+    "routerGateGiB": 0.091,
+    "normsGiB": 0.001,
+    "otherGiB": 0.0,
+    "totalGiB": 112.415
+  },
+  "derivedFitEstimate": {
+    "denseNonMoeGiB": 3.703,
+    "denseReplicatedPlusMoeShardedAcross4PerGpuGiB": 30.881,
+    "interpretation": "A TP=1, DP=4, EP=true layout should fit barely in 32GB because non-MoE dense weights are small and experts dominate the checkpoint."
+  },
+  "whyThisMatters": [
+    "Current TP4 quality path has 187 collectives per rank per compiled decode graph: 125 hidden-state f16 reductions plus 62 Q/K f32 reductions.",
+    "vLLM's FusedMoEParallelConfig comments state TP=1, DP=4, EP=true creates four engine instances with experts split between devices.",
+    "If XPU can run this layout for a single request, dense attention/projection weights are replicated instead of tensor-parallel, so it may remove Q/K variance and o_proj TP collectives while preserving all experts."
+  ],
+  "risk": [
+    "The fit margin is tight: estimated weights are about 30.9 GiB before KV cache, runtime workspaces, and fragmentation.",
+    "vLLM's DP scheduler may route benchmark requests differently from a true single-session serving path.",
+    "The XPU all2all/AgRs EP path was slower in TP4+EP mode; DP4+EP must be measured separately."
+  ],
+  "nextTest": {
+    "shape": "p64/n32 smoke first",
+    "flags": "--tensor-parallel-size 1 --data-parallel-size 4 --enable-expert-parallel --all2all-backend allgather_reducescatter --gpu-memory-utilization 0.98",
+    "successCriteria": "loads without OOM, produces correct throughput JSON, then compare short-run output tok/s and AOT collective census against TP4 baseline"
+  }
+}
