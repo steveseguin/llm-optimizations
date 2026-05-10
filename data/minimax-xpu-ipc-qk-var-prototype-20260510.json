@@ -1,0 +1,32 @@
+{
+  "prototype": "minimax_qk_rms_xpu_ipc",
+  "hardware": "4x Intel Arc Pro B70 32GB",
+  "api": "PyTorch XPU + SYCL + Level Zero IPC",
+  "date_utc": "2026-05-10",
+  "source_dir": "experiments/minimax_qk_rms_xpu_ipc",
+  "build": {
+    "compiler": "oneAPI 2025.3 icpx",
+    "command": "CXX=/opt/intel/oneapi/compiler/2025.3/bin/icpx CC=/opt/intel/oneapi/compiler/2025.3/bin/icx /home/steve/.venvs/vllm-xpu/bin/python setup.py build_ext --inplace",
+    "status": "passed"
+  },
+  "tests": [
+    {
+      "name": "single_kernel_write_spin_read",
+      "world_size": 4,
+      "payload_shape": "[4, 2]",
+      "status": "failed",
+      "symptom": "Some ranks read stale sentinel/old peer values; late-launching rank often succeeds.",
+      "interpretation": "Cross-device ordering/visibility inside one kernel is not solved by a host barrier before launch."
+    },
+    {
+      "name": "two_phase_mailbox_write_then_peer_read_reduce",
+      "world_size": 4,
+      "payload_shape": "[4, 2]",
+      "expected": [[2.5, 25.0], [2.5, 25.0], [2.5, 25.0], [2.5, 25.0]],
+      "status": "passed",
+      "output_summary": "All four ranks printed ok=True with qk_var rows [2.5, 25.0]."
+    }
+  ],
+  "decision": "The B70 stack supports PyTorch tensor Level Zero IPC handles and SYCL peer mailbox reads across four worker processes. Continue with a real sequence/mailbox protocol before attempting vLLM MiniMax integration."
+}
+
