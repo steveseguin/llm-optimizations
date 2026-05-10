@@ -1,0 +1,59 @@
+{
+  "date": "2026-05-10",
+  "model": {
+    "hfId": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+    "base": "MiniMaxAI/MiniMax-M2.7",
+    "quantization": "INT4 AutoRound W4A16"
+  },
+  "hardware": {
+    "gpu": "Intel Arc Pro B70",
+    "gpuCount": 4,
+    "vramGbPerGpu": 32,
+    "os": "Ubuntu 24.04.4 LTS"
+  },
+  "screens": [
+    {
+      "name": "ccl_worker_count_2",
+      "env": {
+        "CCL_WORKER_COUNT": "2",
+        "CCL_ATL_TRANSPORT": "ofi",
+        "CCL_TOPO_P2P_ACCESS": "1",
+        "VLLM_XPU_USE_LLM_SCALER_MOE": "1",
+        "VLLM_XPU_ENABLE_XPU_GRAPH": "0"
+      },
+      "shape": {
+        "tensorParallel": 4,
+        "promptTokens": 512,
+        "outputTokens": 512,
+        "maxModelLen": 2048,
+        "maxNumBatchedTokens": 1024,
+        "maxNumSeqs": 1,
+        "dtype": "float16"
+      },
+      "status": "killed",
+      "reason": "Hung during XCCL initialization before model weight loading.",
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-ccl-workers/vllm-minimax-m27-autoround-tp4-p512n512-20260510T131627Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-ccl-workers/vllm-minimax-m27-autoround-tp4-p512n512-20260510T131627Z.json",
+      "result": null,
+      "decision": "Keep default CCL_WORKER_COUNT=1 for vLLM TP4."
+    },
+    {
+      "name": "builtin_vllm_fuse_allreduce_rms",
+      "status": "not_run",
+      "reason": "vLLM's XPU platform disables this pass, and the pass implementation is FlashInfer/ROCm-oriented rather than Level Zero/XCCL-backed.",
+      "sourceFiles": [
+        "/home/steve/src/vllm/vllm/platforms/xpu.py",
+        "/home/steve/src/vllm/vllm/compilation/passes/fusion/allreduce_rms_fusion.py"
+      ],
+      "decision": "Do not force-enable; build an XPU-specific fusion instead."
+    }
+  ],
+  "references": [
+    "https://www.intel.com/content/www/us/en/docs/oneccl/developer-guide-reference/2021-15/environment-variables.html",
+    "https://www.intel.com/content/www/us/en/docs/oneccl/developer-guide-reference/2021-14/execution-of-communication-operations.html"
+  ],
+  "localmaxxing": {
+    "submitted": false,
+    "reason": "Diagnostic negatives with no valid throughput result."
+  }
+}
