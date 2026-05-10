@@ -1,0 +1,48 @@
+{
+  "label": "minimax-m27-ccl-p2p-off-negative",
+  "date_utc": "2026-05-10",
+  "model": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+  "local_model_path": "/mnt/corsair-external/llm-models/minimax-m2.7-int4-autoround",
+  "hardware": {
+    "gpu": "Intel Arc Pro B70",
+    "gpu_count": 4,
+    "vram_gb_per_gpu": 32
+  },
+  "engine": {
+    "name": "vllm",
+    "backend": "xpu",
+    "tensor_parallel": 4,
+    "dtype": "bfloat16",
+    "quantization": "int4 AutoRound W4A16",
+    "llm_scaler_u4_decode_bridge": true
+  },
+  "command_environment": {
+    "CCL_ATL_TRANSPORT": "ofi",
+    "CCL_TOPO_P2P_ACCESS": "0",
+    "USE_LLM_SCALER_MOE": "1",
+    "XPU_GRAPH": "0",
+    "INPUT_LEN": 512,
+    "OUTPUT_LEN": 256,
+    "MAX_MODEL_LEN": 2048,
+    "MAX_BATCHED_TOKENS": 1024,
+    "MAX_NUM_SEQS": 1,
+    "NUM_PROMPTS": 1,
+    "TP": 4
+  },
+  "status": "hung_after_warmup_stopped",
+  "result": {
+    "output_tok_s": null,
+    "total_tok_s": null,
+    "model_load_memory_gib": 28.96,
+    "weight_load_s": 348.12
+  },
+  "logs": {
+    "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n256-20260510T001921Z.log"
+  },
+  "failure_signature": [
+    "Initial profiling/warmup run took 1.28 s",
+    "No available shared memory broadcast block found in 60 seconds",
+    "Parent process exited, terminating worker queues"
+  ],
+  "interpretation": "Disabling oneCCL P2P access is not viable for this MiniMax TP=4 vLLM/XPU path. Workers reached warmup, then the benchmark hung during/after request dispatch with repeated shared-memory broadcast stalls. Keep the default CCL_TOPO_P2P_ACCESS=1."
+}
