@@ -1,0 +1,38 @@
+{
+  "date": "2026-05-10",
+  "model": "/mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround",
+  "aot_hash": "4799a3c8468de261861723fba07480ef61e010f504245a62e5e93f4e9aef8e22",
+  "cache": "/home/steve/.cache/vllm/torch_compile_cache/torch_aot_compile/4799a3c8468de261861723fba07480ef61e010f504245a62e5e93f4e9aef8e22/inductor_cache",
+  "counts": {
+    "all_reduce_comment_lines": 40,
+    "all_reduce_call_lines": 36,
+    "wait_tensor_call_lines": 56,
+    "rms_int4_lines": 16,
+    "fused_add_rms_lines": 0
+  },
+  "representative_layer": {
+    "file": "inductor_cache/gc/cgcvvvkxqdbfobm4wttvo4tw5j5y2k7iipn47xb4qwg5osr6btcd.py",
+    "observed_sequence": [
+      "int4_gemm_w4a16 -> f16[s72, 3072]",
+      "_c10d_functional.all_reduce_",
+      "_c10d_functional.wait_tensor",
+      "Triton fused residual/RMSNorm/MoE-prep",
+      "vllm.moe_forward",
+      "_c10d_functional.all_reduce_",
+      "_c10d_functional.wait_tensor",
+      "Triton fused residual/RMSNorm/QKV int4_gemm_w4a16",
+      "Q/K variance into f32[s72, 2]",
+      "_c10d_functional.all_reduce_",
+      "_c10d_functional.wait_tensor"
+    ]
+  },
+  "external_references": [
+    "https://huggingface.co/Lasimeri/MiniMax-M2.7-int4-AutoRound",
+    "https://docs.vllm.ai/en/latest/features/torch_compile.html"
+  ],
+  "local_references": [
+    "/home/steve/src/vllm/vllm/platforms/xpu.py",
+    "/home/steve/src/vllm/vllm/compilation/passes/fusion/allreduce_rms_fusion.py"
+  ],
+  "conclusion": "The next useful MiniMax speed patch should be an XPU-specific fused allreduce/residual/RMSNorm boundary. Stock vLLM fuse_allreduce_rms is disabled on XPU and FlashInfer/AITER oriented; oneCCL flag tuning is not enough."
+}
