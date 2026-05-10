@@ -25,8 +25,25 @@
       "expected": [[2.5, 25.0], [2.5, 25.0], [2.5, 25.0], [2.5, 25.0]],
       "status": "passed",
       "output_summary": "All four ranks printed ok=True with qk_var rows [2.5, 25.0]."
+    },
+    {
+      "name": "single_kernel_sequence_counter_write_poll_reduce",
+      "world_size": 4,
+      "payload_shape": "[32, 2]",
+      "iterations": 50,
+      "timeout_iters": 100000,
+      "command_env": {
+        "MINIMAX_QK_IPC_SINGLE_KERNEL": "1",
+        "MINIMAX_QK_IPC_SEQ": "1",
+        "MINIMAX_QK_IPC_ITERS": "50",
+        "MINIMAX_QK_IPC_TOKENS": "32",
+        "MINIMAX_QK_IPC_TIMEOUT_ITERS": "100000"
+      },
+      "expected_final_row": [51.5, 515.0],
+      "status": "passed",
+      "output_summary": "All four ranks printed ok=True at iteration 49 with qk_var rows [51.5, 515.0].",
+      "caveat": "The earlier 500M spin timeout made failures or slow visibility look like hangs during experiments; the timeout is now tunable."
     }
   ],
-  "decision": "The B70 stack supports PyTorch tensor Level Zero IPC handles and SYCL peer mailbox reads across four worker processes. Continue with a real sequence/mailbox protocol before attempting vLLM MiniMax integration."
+  "decision": "The B70 stack supports PyTorch tensor Level Zero IPC handles and SYCL peer mailbox reads across four worker processes. A sequence-counter single-kernel write/poll/reduce prototype is correct under 4-rank stress, so the next step is default-off vLLM MiniMax integration and logits comparison against the oneCCL path."
 }
-
