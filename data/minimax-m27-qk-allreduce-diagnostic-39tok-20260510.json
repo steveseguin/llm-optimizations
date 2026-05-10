@@ -129,7 +129,23 @@
       "localMaxxingId": "cmoz8cow60001pd010klrb8g8",
       "payload": "data/localmaxxing-minimax-m27-autoround-u4-decode-fp16-fast-nvme-p512n1536-20260510.payload.json",
       "response": "data/localmaxxing-responses/minimax-m27-autoround-u4-decode-fp16-fast-nvme-p512n1536-20260510.response.json"
+    },
+    {
+      "name": "normal_qk_allreduce_p512n1536_max_model_len4096_capacity",
+      "promptTokens": 512,
+      "outputTokens": 1536,
+      "maxModelLen": 4096,
+      "gpuKvCacheTokens": 9408,
+      "maxConcurrency": 2.3,
+      "tokSOut": 33.25822679365025,
+      "tokSTotal": 44.344302391533674,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260510T034709Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260510T034709Z.json",
+      "submittedToLocalMaxxing": true,
+      "localMaxxingId": "cmoz8k9z40008pd01rhu50c0n",
+      "payload": "data/localmaxxing-minimax-m27-autoround-u4-decode-fp16-fast-nvme-maxlen4096-p512n1536-20260510.payload.json",
+      "response": "data/localmaxxing-responses/minimax-m27-autoround-u4-decode-fp16-fast-nvme-maxlen4096-p512n1536-20260510.response.json"
     }
   ],
-  "conclusion": "The correctness-breaking Q/K TP-allreduce skip is slower and invalid. The normal quality path repeated near 39.5-39.6 output tok/s at p512/n512, 39.9-40.3 output tok/s at p512/n1024, and 40.9-41.1 output tok/s at p512/n1536. Best rows for each shape were submitted to LocalMaxxing."
+  "conclusion": "The correctness-breaking Q/K TP-allreduce skip is slower and invalid. The normal quality path repeated near 39.5-39.6 output tok/s at p512/n512, 39.9-40.3 output tok/s at p512/n1024, and 40.9-41.1 output tok/s at p512/n1536. Setting max_model_len=4096 drops the same p512/n1536 request to 33.26 output tok/s because KV headroom/concurrency shrink. Best rows and the 4096 capacity datapoint were submitted to LocalMaxxing."
 }

@@ -1,0 +1,40 @@
+{
+  "hfId": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+  "modelRevision": "main",
+  "hardware": {
+    "hwClass": "DISCRETE_GPU",
+    "gpuName": "Intel Arc Pro B70",
+    "gpuCount": 4,
+    "vramGb": 32,
+    "cpu": "AMD EPYC 9015",
+    "ramGb": 16,
+    "os": "Ubuntu 24.04.4"
+  },
+  "engineName": "vllm",
+  "engineVersion": "0.20.1-local",
+  "quantization": "INT4 AutoRound W4A16",
+  "promptTokens": 512,
+  "outputTokens": 1536,
+  "contextLength": 4096,
+  "batchSize": 1,
+  "peakVramGb": 28.11,
+  "tokSOut": 33.25822679365025,
+  "tokSTotal": 44.344302391533674,
+  "notes": "MiniMax M2.7 AutoRound W4A16 on 4x Intel Arc Pro B70 via vLLM/XPU TP4. Valid larger-context capacity datapoint with max_model_len=4096, FP16 activations, fast ext4 NVMe model path, installed B70 MoE config, experimental llm-scaler u4 decode-only ESIMD INT4 MoE path, XPU graph disabled, no speculative decode, no power-limit change. Same p512/n1536 request at max_model_len=2048 reached 41.13 tok/s; max_model_len=4096 reduces GPU KV cache to 9408 tokens and output speed to 33.26 tok/s.",
+  "engineFlags": {
+    "commandSnippet": "VLLM_XPU_USE_LLM_SCALER_MOE=1 CCL_IPC=default XPU_GRAPH=0 vllm bench throughput --backend vllm --model /mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround --tokenizer /mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround --trust-remote-code --dtype float16 --tensor-parallel-size 4 --distributed-executor-backend mp --max-model-len 4096 --max-num-batched-tokens 1024 --max-num-seqs 1 --dataset-name random --random-input-len 512 --random-output-len 1536 --random-range-ratio 0 --num-prompts 1 --disable-log-stats",
+    "tensorParallel": 4,
+    "gpuLayers": 999,
+    "contextLength": 4096,
+    "concurrency": 1,
+    "flashAttn": true,
+    "attentionBackend": "flash_attn",
+    "contBatching": true,
+    "chunkedPrefill": true,
+    "prefillChunkSize": 1024,
+    "gpuMemUtil": 0.9,
+    "engineQuant": "inc",
+    "specDecoding": false,
+    "extraFlags": "XPU/Level Zero; CCL_ATL_TRANSPORT=ofi; CCL_TOPO_P2P_ACCESS=1; CCL_ZE_IPC_EXCHANGE unset/default; VLLM_XPU_ENABLE_XPU_GRAPH=0; VLLM_XPU_USE_LLM_SCALER_MOE=1; PYTHONPATH includes /home/steve/src/llm-scaler/vllm/custom-esimd-kernels-vllm/python; dtype=float16; llm-scaler u4 decode-only patch; installed B70 MoE config; GPU KV cache 9408 tokens; maximum concurrency 2.30x for 4096-token requests; model loading memory 28.11 GiB"
+  }
+}
