@@ -1,0 +1,42 @@
+{
+  "label": "minimax-m27-qk-var-allreduce-dtype-negative-20260510",
+  "date": "2026-05-10",
+  "model": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+  "hardware": "4x Intel Arc Pro B70 32GB",
+  "engine": "vLLM/XPU TP4",
+  "experiment": "Cast MiniMax Q/K RMS variance allreduce payload from FP32 to FP16 via VLLM_MINIMAX_QK_VAR_ALLREDUCE_DTYPE=fp16.",
+  "qualityStatus": "not_promoted_precision_tradeoff",
+  "localMaxxing": {
+    "submitted": false,
+    "reason": "Negative throughput result and a potential normalization-precision tradeoff."
+  },
+  "runs": [
+    {
+      "name": "cold isolated cache",
+      "inputTokens": 512,
+      "outputTokens": 512,
+      "elapsedSeconds": 18.551228157994046,
+      "tokSOut": 27.59925087651786,
+      "tokSTotal": 55.19850175303572,
+      "gpuKvCacheTokens": 9408,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-qk-var-dtype/vllm-minimax-m27-autoround-tp4-p512n512-20260510T114034Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-qk-var-dtype/vllm-minimax-m27-autoround-tp4-p512n512-20260510T114034Z.json"
+    },
+    {
+      "name": "warm direct-load cache",
+      "inputTokens": 512,
+      "outputTokens": 512,
+      "elapsedSeconds": 14.49760434700147,
+      "tokSOut": 35.31617967667166,
+      "tokSTotal": 70.63235935334332,
+      "gpuKvCacheTokens": 17216,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-qk-var-dtype/vllm-minimax-m27-autoround-tp4-p512n512-20260510T114410Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-qk-var-dtype/vllm-minimax-m27-autoround-tp4-p512n512-20260510T114410Z.json"
+    }
+  ],
+  "artifactPaths": {
+    "compileCache": "/mnt/fast-ai/vllm-cache-exp/minimax-qk-var-fp16-20260510",
+    "patch": "patches/vllm-minimax-qk-var-allreduce-dtype-negative-20260510.patch",
+    "note": "notes/2026-05-10-minimax-qk-var-dtype-negative.md"
+  }
+}

@@ -58,6 +58,7 @@ Reproducibility notes, benchmark payloads, and local patches from the Intel Arc 
 - MiniMax DFlash speculative decoding is negative on the current TP4 XPU stack. `MirecX/MiniMax-M2.7-L3H5-DFlash` loads, compiles, shares target embeddings/lm head, and selects the expected target taps `(2, 16, 30, 43, 57)`, but retries with `num_speculative_tokens=3` were blocked by KV memory pressure, one Level Zero `UR_RESULT_ERROR_DEVICE_LOST`, and a generation hang after KV allocation. The drafter card reports `m_accept ~= 1.38`, already below expected break-even, so keep MiniMax optimization focused on non-speculative Q/K collective fusion and MoE decode work for now.
 - MiniMax AutoRound EP with a non-local expert skip is functional but not useful yet. Keeping non-local expert ids as `-1` and skipping them inside the llm-scaler u4 kernels only moved a BF16 p1/n8 EP smoke from `16.795602` to `16.883004` total tok/s, far below the stable non-EP BF16 u4 p512/n512 result of `36.607699` output tok/s. Treat EP loss as communication/scheduler/all-to-all dominated until proven otherwise.
 - The guarded `VLLM_XPU_ALLREDUCE_ASYNC_WAIT=1` hook completed a full BF16 0.95 MiniMax p512/n512 run at `35.949` output tok/s, but the hook is disabled inside compiled collectives. It stays as an eager-only diagnostic, not a speed setting or LocalMaxxing result.
+- Casting the MiniMax Q/K RMS variance allreduce payload from FP32 to FP16 is also negative: the graph changed to `f16[s72,2]` variance collectives, but warm p512/n512 reached only `35.316` output tok/s and carries a normalization-precision tradeoff. The active runtime was reverted to FP32 variance allreduce; keep `VLLM_MINIMAX_QK_VAR_ALLREDUCE_DTYPE` unset.
 - Intel llm-scaler branch `origin/fix_27b_kernel` (`db05b45`) fixes a large-`N` dense INT4 ResAddNormGEMV race reported on Qwen3.6-27B `gate_up` (`N=8704,K=5120,TP=4`). It is relevant if we return to dense Qwen3.6 INT4 AutoRound/sym-int4, but not to the current MiniMax u4 MoE bridge, Qwen Q4_0 GGUF, or Qwen static FP8 paths.
 
 ## Layout
@@ -228,6 +229,7 @@ Reproducibility notes, benchmark payloads, and local patches from the Intel Arc 
 - `patches/vllm-minimax-remove-qk-apply-rope-branch-restore-c158-20260510.patch`: active-runtime cleanup that removes the default-off Q/K apply+RoPE helper branch and restores the fast `c15860...` AOT graph cache.
 - `patches/vllm-minimax-graph-shaped-c158-floor-20260510.patch`: current MiniMax graph-shaped source state after the AOT regression: keeps timing boundaries/default-off Q/K RMS helper and uses the simple K-norm constructor that recovers the reproducible `c15860...` floor for this MiniMax M2.7 TP4 config.
 - `patches/llm-scaler-minimax-u4-down-htile-negative-20260510.patch`: negative llm-scaler htile experiment artifact; includes the prior u4 MiniMax work plus the failed htile addition, so do not reverse-apply it over the active runtime.
+- `patches/vllm-minimax-qk-var-allreduce-dtype-negative-20260510.patch`: negative MiniMax Q/K variance dtype experiment; FP16 variance collectives compiled but underperformed and were reverted from the active runtime.
 
 ## Notes
 
