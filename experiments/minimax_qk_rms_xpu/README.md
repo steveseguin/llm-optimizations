@@ -42,3 +42,10 @@ Status on 2026-05-10: `apply_qk_rope` is numerically valid as a small standalone
 FP16 helper, but the vLLM compiled p512/n512 path regressed from `39.610585` to
 `35.681825` output tok/s when enabled with
 `VLLM_MINIMAX_QK_APPLY_ROPE_XPU_HELPER=1`. It remains default-off.
+
+Plain `var`/`apply` was retested after the AOT-cache regression work. A fresh
+isolated p512/n512 compile reproduced the cold KV-cache artifact (`9,408` GPU KV
+tokens, `28.664` output tok/s), while warmed reloads reached `35.722` output
+tok/s at p512/n512 and `36.572` output tok/s at p512/n1536. This is still below
+the stock path and the accepted `41.130667` MiniMax high, so
+`VLLM_MINIMAX_QK_RMS_XPU_HELPER` should also stay unset.

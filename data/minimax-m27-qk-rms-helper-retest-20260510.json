@@ -1,0 +1,95 @@
+{
+  "date": "2026-05-10",
+  "model": {
+    "hfId": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+    "base": "MiniMaxAI/MiniMax-M2.7",
+    "quantization": "INT4 AutoRound W4A16"
+  },
+  "hardware": {
+    "gpu": "Intel Arc Pro B70",
+    "gpuCount": 4,
+    "vramGbPerGpu": 32,
+    "os": "Ubuntu 24.04.4 LTS"
+  },
+  "runtime": {
+    "engine": "vllm",
+    "engineVersion": "0.20.1-local",
+    "backend": "xpu",
+    "tensorParallel": 4,
+    "dtype": "float16",
+    "maxModelLen": 2048,
+    "maxNumBatchedTokens": 1024,
+    "maxNumSeqs": 1,
+    "xpuGraph": false,
+    "llmScalerU4DecodeMoe": true,
+    "speculativeDecoding": false,
+    "powerLimitRaised": false
+  },
+  "experiment": {
+    "name": "standalone_minimax_qk_rms_xpu_var_apply_helper_retest",
+    "env": {
+      "VLLM_MINIMAX_QK_RMS_XPU_HELPER": "1",
+      "VLLM_MINIMAX_QK_RMS_XPU_HELPER_MAX_TOKENS": "4"
+    },
+    "cacheRoot": "/mnt/fast-ai/vllm-cache-exp/minimax-qk-rms-helper-plain-20260510T092859Z",
+    "patches": [
+      "patches/vllm-minimax-qk-rms-xpu-helper-20260509.patch",
+      "patches/vllm-xpu-kernels-minimax-qk-rms-helper-20260509.patch"
+    ],
+    "standaloneExtension": "experiments/minimax_qk_rms_xpu"
+  },
+  "results": [
+    {
+      "label": "fresh_isolated_compile_p512n512",
+      "promptTokens": 512,
+      "outputTokens": 512,
+      "contextLength": 2048,
+      "gpuKvCacheTokens": 9408,
+      "aotHash": "e13662bdd56519570c985b2d34d319756e89cdfd3013f9c9b89feb905ed5a09f",
+      "elapsedSeconds": 17.86229442200056,
+      "tokSTotal": 57.327461736313325,
+      "tokSOut": 28.663730868156663,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n512-20260510T092859Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n512-20260510T092859Z.json",
+      "interpretation": "Cold isolated AOT artifact: KV cache fell to 9408 tokens and throughput was not valid as a speed record."
+    },
+    {
+      "label": "warmed_aot_reload_p512n512",
+      "promptTokens": 512,
+      "outputTokens": 512,
+      "contextLength": 2048,
+      "gpuKvCacheTokens": 17216,
+      "aotHash": "e13662bdd56519570c985b2d34d319756e89cdfd3013f9c9b89feb905ed5a09f",
+      "elapsedSeconds": 14.332854995998787,
+      "tokSTotal": 71.44424472904133,
+      "tokSOut": 35.722122364520665,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n512-20260510T093213Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n512-20260510T093213Z.json",
+      "interpretation": "Functional warmed helper, but slower than the pre-regression p512/n512 high of 39.610585 output tok/s."
+    },
+    {
+      "label": "warmed_aot_reload_p512n1536",
+      "promptTokens": 512,
+      "outputTokens": 1536,
+      "contextLength": 2048,
+      "gpuKvCacheTokens": 17216,
+      "aotHash": "e13662bdd56519570c985b2d34d319756e89cdfd3013f9c9b89feb905ed5a09f",
+      "elapsedSeconds": 41.999582210999506,
+      "tokSTotal": 48.762389818812004,
+      "tokSOut": 36.571792364109,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260510T093513Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260510T093513Z.json",
+      "interpretation": "Long-output helper retest is slower than the current live floor and the accepted 41.130667 output tok/s high."
+    }
+  ],
+  "comparisons": {
+    "currentLiveDefaultP512N1536TokSOut": 37.05,
+    "acceptedHighP512N1536TokSOut": 41.13066701938602,
+    "preRegressionP512N512TokSOut": 39.610585
+  },
+  "decision": "Do not enable VLLM_MINIMAX_QK_RMS_XPU_HELPER for real benchmarks. The helper is functional but slower because it keeps the TP allreduce boundary and appears to worsen compiled scheduling.",
+  "localmaxxing": {
+    "submitted": false,
+    "reason": "Negative diagnostic below existing submitted MiniMax AutoRound results."
+  }
+}
