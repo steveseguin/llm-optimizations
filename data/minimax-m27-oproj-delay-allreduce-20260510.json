@@ -1,0 +1,101 @@
+{
+  "date": "2026-05-10",
+  "model": {
+    "hfId": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+    "base": "MiniMaxAI/MiniMax-M2.7",
+    "quantization": "INT4 AutoRound W4A16"
+  },
+  "hardware": {
+    "gpu": "Intel Arc Pro B70",
+    "gpuCount": 4,
+    "vramGbPerGpu": 32,
+    "os": "Ubuntu 24.04.4 LTS"
+  },
+  "runtime": {
+    "engine": "vllm",
+    "engineVersion": "0.20.1-local",
+    "backend": "xpu",
+    "tensorParallel": 4,
+    "dtype": "float16",
+    "maxModelLen": 2048,
+    "maxNumBatchedTokens": 1024,
+    "maxNumSeqs": 1,
+    "xpuGraph": false,
+    "llmScalerU4DecodeMoe": true,
+    "speculativeDecoding": false,
+    "powerLimitRaised": false
+  },
+  "experiment": {
+    "name": "delay_attention_output_projection_allreduce_to_decoder_layer",
+    "env": {
+      "VLLM_MINIMAX_O_PROJ_DELAY_ALLREDUCE": "1",
+      "VLLM_CACHE_ROOT": "/mnt/fast-ai/vllm-cache/minimax-oproj-delay-20260510"
+    },
+    "patch": "patches/vllm-minimax-oproj-delay-allreduce-20260510.patch",
+    "commandScript": "scripts/bench-vllm-minimax-autoround-xpu.sh",
+    "qualityPreserving": true
+  },
+  "reference": {
+    "sameShapeP512N512": {
+      "promptTokens": 512,
+      "outputTokens": 512,
+      "gpuKvCacheTokens": 17216,
+      "aotHash": "4799a3c8468de261861723fba07480ef61e010f504245a62e5e93f4e9aef8e22",
+      "elapsedSeconds": 14.293667791003827,
+      "tokSTotal": 71.64011469781653,
+      "tokSOut": 35.820057348908264,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-post-xpusmi/vllm-minimax-m27-autoround-tp4-p512n512-20260510T121708Z.log"
+    },
+    "qualityConservativeP512N1536TokSOut": 37.552538,
+    "qualityConservativeP512N1536TokSTotal": 50.070051
+  },
+  "results": [
+    {
+      "label": "fresh_isolated_compile_p512n512",
+      "promptTokens": 512,
+      "outputTokens": 512,
+      "contextLength": 2048,
+      "gpuKvCacheTokens": 9408,
+      "aotHash": "0f11865519156b38cd62ebcdb29469d3b0b00d5874875a3a4cef5f46cc1cf1fd",
+      "elapsedSeconds": 17.774552068003686,
+      "tokSTotal": 57.61045319636055,
+      "tokSOut": 28.805226598180276,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-oproj-delay/vllm-minimax-m27-autoround-tp4-p512n512-20260510T123405Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-oproj-delay/vllm-minimax-m27-autoround-tp4-p512n512-20260510T123405Z.json",
+      "interpretation": "Cold isolated AOT artifact with reduced KV cache."
+    },
+    {
+      "label": "warmed_aot_reload_p512n512",
+      "promptTokens": 512,
+      "outputTokens": 512,
+      "contextLength": 2048,
+      "gpuKvCacheTokens": 17216,
+      "aotHash": "0f11865519156b38cd62ebcdb29469d3b0b00d5874875a3a4cef5f46cc1cf1fd",
+      "elapsedSeconds": 14.011950667001656,
+      "tokSTotal": 73.0804742562743,
+      "tokSOut": 36.54023712813715,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-oproj-delay/vllm-minimax-m27-autoround-tp4-p512n512-20260510T123713Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-oproj-delay/vllm-minimax-m27-autoround-tp4-p512n512-20260510T123713Z.json",
+      "interpretation": "Small same-shape gain over immediate p512/n512 baseline, but not enough to promote without long-output support."
+    },
+    {
+      "label": "warmed_aot_reload_p512n1536",
+      "promptTokens": 512,
+      "outputTokens": 1536,
+      "contextLength": 2048,
+      "gpuKvCacheTokens": 16448,
+      "aotHash": "0f11865519156b38cd62ebcdb29469d3b0b00d5874875a3a4cef5f46cc1cf1fd",
+      "elapsedSeconds": 42.141094934995635,
+      "tokSTotal": 48.59864232666769,
+      "tokSOut": 36.448981745000765,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-oproj-delay/vllm-minimax-m27-autoround-tp4-p512n1536-20260510T123959Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-oproj-delay/vllm-minimax-m27-autoround-tp4-p512n1536-20260510T123959Z.json",
+      "interpretation": "Long-output comparison is slower than the quality-conservative reference; treat as mixed/negative."
+    }
+  ],
+  "decision": "Archive only. Moving the same output-projection allreduce is not enough; future work should fuse post-projection allreduce with residual/RMSNorm or projection epilogue work.",
+  "localmaxxing": {
+    "submitted": false,
+    "reason": "Mixed/negative diagnostic below existing submitted MiniMax AutoRound quality-conservative result."
+  }
+}
