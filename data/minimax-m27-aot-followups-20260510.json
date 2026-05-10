@@ -1,0 +1,98 @@
+{
+  "model": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+  "hardware": "4x Intel Arc Pro B70 32GB",
+  "engine": "vllm 0.20.1-local XPU TP4",
+  "baseline_reference": {
+    "accepted_localmaxxing_id": "cmoz8cow60001pd010klrb8g8",
+    "shape": "p512/n1536",
+    "tok_s_out": 41.13066701938602,
+    "notes": "Valid FP16 u4 decode path before the favorable c15860 AOT payload was overwritten."
+  },
+  "runs": [
+    {
+      "label": "layer_boundaries_negative",
+      "timestamp_utc": "2026-05-10T06:56:38Z",
+      "prompt_tokens": 512,
+      "output_tokens": 512,
+      "change": "Added disabled timed_region boundaries around MiniMax layer input_layernorm, self_attn_total, post_attention_layernorm, and moe_total.",
+      "cache_key": "151eae70b1",
+      "aot_hash_prefix": "d6e4bdfe",
+      "gpu_kv_cache_tokens": 9408,
+      "tok_s_total": 56.05181848036113,
+      "tok_s_out": 28.03,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n512-20260510T065638Z.log",
+      "result": "negative"
+    },
+    {
+      "label": "archived_c158_payload_check",
+      "timestamp_utc": "2026-05-10T07:01:55Z",
+      "prompt_tokens": 512,
+      "output_tokens": 512,
+      "change": "Copied c15860...slow-after-timing-noop AOT payload into an isolated VLLM cache root.",
+      "cache_key": "1d97049441",
+      "aot_hash_prefix": "c15860dd",
+      "gpu_kv_cache_tokens": 17216,
+      "tok_s_total": 70.4490640212327,
+      "tok_s_out": 35.22,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n512-20260510T070155Z.log",
+      "result": "not the old fast binary"
+    },
+    {
+      "label": "live_default_repeat",
+      "timestamp_utc": "2026-05-10T07:04:38Z",
+      "prompt_tokens": 512,
+      "output_tokens": 1536,
+      "change": "Live default cache repeat after reverting layer-boundary experiment.",
+      "cache_key": "1d97049441",
+      "aot_hash_prefix": "c15860dd",
+      "gpu_kv_cache_tokens": 17216,
+      "tok_s_total": 49.39988592956875,
+      "tok_s_out": 37.05,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260510T070438Z.log",
+      "result": "current floor repeat"
+    },
+    {
+      "label": "topology_bypass_retest",
+      "timestamp_utc": "2026-05-10T07:08:56Z",
+      "prompt_tokens": 512,
+      "output_tokens": 512,
+      "change": "CCL_TOPO_FABRIC_VERTEX_CONNECTION_CHECK=0",
+      "cache_key": "1d97049441",
+      "aot_hash_prefix": "c15860dd",
+      "gpu_kv_cache_tokens": 17216,
+      "tok_s_total": 72.25932122444699,
+      "tok_s_out": 36.13,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n512-20260510T070856Z.log",
+      "result": "no recovery"
+    },
+    {
+      "label": "aggressive_inductor_autotune_default_memory",
+      "timestamp_utc": "2026-05-10T07:12:10Z",
+      "prompt_tokens": 512,
+      "output_tokens": 512,
+      "change": "TORCHINDUCTOR_MAX_AUTOTUNE=1, MAX_AUTOTUNE_POINTWISE=1, MAX_AUTOTUNE_GEMM=1, coordinate descent enabled, autotune subprocess enabled.",
+      "cache_key": "8e4f15faa1",
+      "aot_hash_prefix": "c15860dd",
+      "available_kv_cache_gb": -0.96,
+      "tok_s_total": null,
+      "tok_s_out": null,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n512-20260510T071210Z.log",
+      "result": "failed: no available memory for cache blocks"
+    },
+    {
+      "label": "aggressive_inductor_autotune_gpu_mem_095",
+      "timestamp_utc": "2026-05-10T07:17:38Z",
+      "prompt_tokens": 512,
+      "output_tokens": 512,
+      "change": "Reused aggressive autotune cache root with gpu_memory_utilization=0.95.",
+      "cache_key": "5c94c78739",
+      "aot_hash_prefix": "new compile in same cache root",
+      "gpu_kv_cache_tokens": 29824,
+      "tok_s_total": 46.30465702265843,
+      "tok_s_out": 23.15,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n512-20260510T071738Z.log",
+      "result": "very negative"
+    }
+  ],
+  "decision": "Do not submit these runs to LocalMaxxing. Keep the accepted 41.130667 tok/s run as the public high and continue source-level work toward a graph-safe XPU Q/K allreduce+RMS fusion."
+}
