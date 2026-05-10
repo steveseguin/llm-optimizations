@@ -1,0 +1,73 @@
+{
+  "date": "2026-05-10",
+  "model": {
+    "hfId": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+    "base": "MiniMaxAI/MiniMax-M2.7",
+    "quantization": "INT4 AutoRound W4A16"
+  },
+  "hardware": {
+    "gpu": "Intel Arc Pro B70",
+    "gpuCount": 4,
+    "vramGbPerGpu": 32,
+    "os": "Ubuntu 24.04.4 LTS"
+  },
+  "runtime": {
+    "engine": "vllm",
+    "backend": "xpu",
+    "tensorParallel": 4,
+    "dtype": "float16",
+    "maxModelLen": 2048,
+    "maxNumBatchedTokens": 1024,
+    "outputTokensRequested": 1536,
+    "xpuGraph": false,
+    "llmScalerU4DecodeMoe": true,
+    "powerLimitRaised": false
+  },
+  "trace": {
+    "malformedAllDeviceTrace": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-xpusmi-trace/xpusmi-stats-p512n1536-20260510T130348Z.jsonl",
+    "usablePerDeviceTrace": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-xpusmi-trace/xpusmi-stats-perdev-p512n1536-20260510T130756Z.jsonl",
+    "benchLog": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-xpusmi-trace/vllm-minimax-m27-autoround-tp4-p512n1536-20260510T130756Z.log",
+    "benchJson": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-xpusmi-trace/vllm-minimax-m27-autoround-tp4-p512n1536-20260510T130756Z.json",
+    "validBenchmark": false,
+    "reason": "Per-device xpu-smi polling perturbed the run; vLLM emitted a 60-second shared-memory broadcast warning and the run was killed."
+  },
+  "sampleWindow": {
+    "startUtc": "2026-05-10T13:09:41Z",
+    "samplesPerDevice": 44,
+    "deviceSummaries": [
+      {
+        "deviceId": 0,
+        "avgPowerW": 94.9,
+        "maxPowerW": 96.33,
+        "frequencyMhz": 2800,
+        "avgMemoryUtilPct": 96.03
+      },
+      {
+        "deviceId": 1,
+        "avgPowerW": 114.04,
+        "maxPowerW": 115.71,
+        "frequencyMhz": 2800,
+        "avgMemoryUtilPct": 95.32
+      },
+      {
+        "deviceId": 2,
+        "avgPowerW": 115.02,
+        "maxPowerW": 116.47,
+        "frequencyMhz": 2800,
+        "avgMemoryUtilPct": 95.31
+      },
+      {
+        "deviceId": 3,
+        "avgPowerW": 96.43,
+        "maxPowerW": 97.89,
+        "frequencyMhz": 2800,
+        "avgMemoryUtilPct": 95.32
+      }
+    ]
+  },
+  "conclusion": "No frequency-throttle signal in the sampled window. xpu-smi live polling is too intrusive for official benchmark runs; use lower-overhead kernel or Level Zero tracing for future profiling.",
+  "localmaxxing": {
+    "submitted": false,
+    "reason": "Diagnostic trace only; benchmark was perturbed and killed."
+  }
+}
