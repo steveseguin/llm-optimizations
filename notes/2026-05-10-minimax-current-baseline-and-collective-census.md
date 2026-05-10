@@ -34,10 +34,15 @@ Scheduler shape follow-up:
 | Shape | `max_num_batched_tokens` | Total tok/s | Output tok/s | GPU KV tokens | Outcome | Log |
 | --- | ---: | ---: | ---: | ---: | --- | --- |
 | p512/n1536 | 2048 | `45.166742` | `33.88` | 9,344 | Regression | `/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-mbt-sweep/vllm-minimax-m27-autoround-tp4-p512n1536-20260510T173025Z.log` |
+| p512/n1536 | 768 | `43.880692` | `32.91` | 9,280 | Regression | `/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-mbt-sweep/vllm-minimax-m27-autoround-tp4-p512n1536-20260510T173856Z.log` |
 
 The 2048-token compile range used AOT `f9abbefd...`, took `36.84 s` to
-compile, and cut KV headroom almost in half. Keep `MAX_BATCHED_TOKENS=1024`
-for this p512/n1536 speed path.
+compile, and cut KV headroom almost in half. The 768-token compile range used
+isolated cache root
+`/mnt/fast-ai/vllm-cache/minimax-m2.7-autoround-mbt768-20260510T173856Z`,
+compiled AOT `e08a2767...`, and still produced the same 187 allreduce/wait
+boundaries, but the runtime shape was slower than both 1024 and 2048. Keep
+`MAX_BATCHED_TOKENS=1024` for this p512/n1536 speed path.
 
 ## AOT Collective Census
 
