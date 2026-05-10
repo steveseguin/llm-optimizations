@@ -1,0 +1,99 @@
+{
+  "date": "2026-05-10",
+  "model": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+  "hardware": "4x Intel Arc Pro B70 32GB",
+  "engine": "vLLM 0.20.1-local XPU",
+  "experiment": "Opt XPU into vLLM opaque collective custom ops via VLLM_XPU_USE_CUSTOM_OP_COLLECTIVES=1",
+  "patch": "patches/vllm-xpu-custom-op-collectives-experiment-20260510.patch",
+  "quality_guardrails": [
+    "No speculative decode",
+    "No expert dropping",
+    "No Q/K RMS TP variance allreduce skip",
+    "No GPU power-limit change"
+  ],
+  "common_env": {
+    "TP": 4,
+    "DTYPE": "float16",
+    "USE_LLM_SCALER_MOE": 1,
+    "CCL_P2P": 1,
+    "XPU_GRAPH": 0,
+    "VLLM_XPU_USE_CUSTOM_OP_COLLECTIVES": 1,
+    "HF_HOME": "/mnt/fast-ai/llm-cache/hf"
+  },
+  "runs": [
+    {
+      "name": "customop_collectives_p64n32_cold",
+      "shape": "p64/n32",
+      "max_model_len": 512,
+      "max_batched_tokens": 256,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-xpu-customop-collectives/vllm-minimax-m27-autoround-tp4-p64n32-20260510T180956Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-xpu-customop-collectives/vllm-minimax-m27-autoround-tp4-p64n32-20260510T180956Z.json",
+      "elapsed_s": 5.054373693004891,
+      "tok_s_total": 18.993451183251697,
+      "tok_s_output": 6.331150394417232,
+      "gpu_kv_tokens": 9472,
+      "cache_state": "fresh compile"
+    },
+    {
+      "name": "customop_collectives_p64n32_warm",
+      "shape": "p64/n32",
+      "max_model_len": 512,
+      "max_batched_tokens": 256,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-xpu-customop-collectives/vllm-minimax-m27-autoround-tp4-p64n32-20260510T181307Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-xpu-customop-collectives/vllm-minimax-m27-autoround-tp4-p64n32-20260510T181307Z.json",
+      "elapsed_s": 1.2814812119977432,
+      "tok_s_total": 74.91331055126625,
+      "tok_s_output": 24.97110351708875,
+      "cache_state": "AOT reload"
+    },
+    {
+      "name": "customop_collectives_p512n512_cold",
+      "shape": "p512/n512",
+      "max_model_len": 2048,
+      "max_batched_tokens": 1024,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-xpu-customop-collectives/vllm-minimax-m27-autoround-tp4-p512n512-20260510T181527Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-xpu-customop-collectives/vllm-minimax-m27-autoround-tp4-p512n512-20260510T181527Z.json",
+      "elapsed_s": 19.061636501995963,
+      "tok_s_total": 53.72046623031427,
+      "tok_s_output": 26.860233115157136,
+      "gpu_kv_tokens": 9408,
+      "cache_state": "fresh compile",
+      "aot_hash": "679011672fb322d8dc186c528582d5f2bee43d3132510c02990580dbc9a4ccbf"
+    },
+    {
+      "name": "customop_collectives_p512n512_warm",
+      "shape": "p512/n512",
+      "max_model_len": 2048,
+      "max_batched_tokens": 1024,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-xpu-customop-collectives/vllm-minimax-m27-autoround-tp4-p512n512-20260510T181909Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-xpu-customop-collectives/vllm-minimax-m27-autoround-tp4-p512n512-20260510T181909Z.json",
+      "elapsed_s": 14.636870308000653,
+      "tok_s_total": 69.9603110810015,
+      "tok_s_output": 34.98015554050075,
+      "gpu_kv_tokens": 17280,
+      "cache_state": "AOT reload",
+      "aot_hash": "679011672fb322d8dc186c528582d5f2bee43d3132510c02990580dbc9a4ccbf"
+    }
+  ],
+  "aot_census": {
+    "cache": "/mnt/fast-ai/vllm-cache/minimax-m2.7-autoround-xpu-customop-coll-p512-20260510T181527Z/torch_compile_cache/torch_aot_compile/679011672fb322d8dc186c528582d5f2bee43d3132510c02990580dbc9a4ccbf/inductor_cache",
+    "all_reduce_comment_lines": 40,
+    "all_reduce_call_lines_c10d_functional": 0,
+    "wait_tensor_call_lines_c10d_functional": 0,
+    "rms_int4_lines": 16,
+    "fused_add_rms_lines": 0,
+    "collective_source": "vllm.all_reduce opaque custom op"
+  },
+  "comparison": {
+    "current_clean_p512n512_refresh_output_tok_s": 35.64751959100672,
+    "accepted_p512n512_high_output_tok_s": 39.610585,
+    "customop_collectives_p512n512_warm_output_tok_s": 34.98015554050075
+  },
+  "observations": [
+    "The graph did change: _c10d_functional all_reduce and wait_tensor call lines disappeared, replaced by vllm.all_reduce custom op sites.",
+    "The runtime emitted PyTorch aliasing warnings because vllm::all_reduce returned a tensor aliasing the input in this XPU path.",
+    "Warm p512/n512 recovered from the low-KV cold-cache artifact but remained slightly slower than the current clean refresh and materially slower than the accepted p512/n512 high.",
+    "Removing visible wait_tensor nodes is not sufficient; the opaque Python custom-op collective boundary costs about as much as it saves."
+  ],
+  "decision": "Keep VLLM_XPU_USE_CUSTOM_OP_COLLECTIVES unset for real MiniMax benchmarks. Do not submit to LocalMaxxing. Future collective work should be C++/SYCL or backend-level, not Python opaque custom op wrappers."
+}

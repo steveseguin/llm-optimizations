@@ -1,0 +1,15 @@
+diff --git a/vllm/platforms/xpu.py b/vllm/platforms/xpu.py
+index bd9006f3f..3833e1c13 100644
+--- a/vllm/platforms/xpu.py
++++ b/vllm/platforms/xpu.py
+@@ -343,6 +343,10 @@ class XPUPlatform(Platform):
+             )
+         return "vllm.distributed.device_communicators.xpu_communicator.XpuCommunicator"  # noqa
+ 
++    @classmethod
++    def use_custom_op_collectives(cls) -> bool:
++        return os.environ.get("VLLM_XPU_USE_CUSTOM_OP_COLLECTIVES", "0") == "1"
++
+     @classmethod
+     def supports_fp8(cls) -> bool:
+         return True

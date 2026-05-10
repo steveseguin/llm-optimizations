@@ -67,6 +67,13 @@ The u4 MoE bridge is no longer the only ceiling. Existing timing notes put MiniM
      reached `35.64` output tok/s versus the accepted `39.610585` reference.
      Cleaner functional allreduce tracing is not enough; keep this closed as a
      negative unless paired with a real fused epilogue.
+   - An env-gated XPU `torch.ops.vllm.all_reduce` custom-op collective screen
+     also changed the graph shape, replacing `_c10d_functional.all_reduce` and
+     `wait_tensor` call sites with opaque `vllm.all_reduce` sites. It still
+     warmed to only `34.980` output tok/s at p512/n512, and emitted PyTorch
+     aliasing warnings because the Python op returns an input alias. Treat this
+     as evidence that the next useful collective path must be C++/SYCL or
+     backend-level, not another Python/opaque wrapper.
 
 2. Q/K RMS variance fusion
    - Standalone helper kernels and standalone mailbox allreduce were negative.
@@ -116,6 +123,11 @@ The u4 MoE bridge is no longer the only ceiling. Existing timing notes put MiniM
   and context-length tooling. We should continue mining it for kernel and
   scheduling ideas, but local B70 measurements still decide whether a path is
   useful.
+- vLLM's current fusion documentation lists MiniMax QK Norm as a
+  MiniMax-specific pass for Q/K variance allreduce plus RMSNorm, off by default
+  and currently requiring the CUDA `minimax_allreduce_rms_qk` custom op. That
+  validates our local direction: port or replace this boundary for XPU rather
+  than enabling CUDA/ROCm fusion passes globally.
 - Public MiniMax M2.7 hardware reports for non-Intel systems are higher than
   our current B70 result: one recent 32k-context llama.cpp report lists about
   `71.52 tok/s` on 4x RTX 4090, `118.74 tok/s` on one RTX PRO 6000, and
