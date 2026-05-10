@@ -171,6 +171,23 @@
       "tokSTotal": 54.92963620725372,
       "tokSOut": 36.61975747150248,
       "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1024-20260510T021000Z.log"
+    },
+    {
+      "name": "fast-nvme-p512-n1024-gpu-mem-util-0.93-unstable",
+      "promptTokens": 512,
+      "outputTokens": 1024,
+      "maxModelLen": 2048,
+      "maxNumBatchedTokens": 1024,
+      "gpuMemoryUtilization": 0.93,
+      "xpuGraph": false,
+      "installedMoeConfig": "configs/vllm/minimax-m27-b70-int4-w4a16-moe-hybrid-20260508.json",
+      "loadSeconds": 65.822806,
+      "kvCacheMemoryGiB": 1.34,
+      "gpuKvCacheTokens": 22592,
+      "status": "interrupted after repeated shared-memory broadcast wait warnings during generation",
+      "tokSTotal": null,
+      "tokSOut": null,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1024-20260510T021408Z.log"
     }
   ],
   "observations": [
@@ -179,6 +196,7 @@
     "max-num-batched-tokens is performance-sensitive on this stack: 1536 and 512 both reduced KV allocation and hurt decode.",
     "XPU graph remains negative for TP4 because vLLM reports communication capture is unsupported, disables graph mode, and loses KV headroom.",
     "gpu-memory-utilization 0.95 doubles KV capacity to 33,408 tokens while keeping decode over 36 tok/s, so it is useful for larger-context serving even though default is slightly faster.",
-    "Installing the archived B70 MoE config under vLLM's exact expected filename removes the missing-config warning and produced 36.88 then 36.62 output tok/s on repeat p512/n1024 runs. Treat it as neutral-to-small-positive for the current llm-scaler decode path, not as a clear new speed breakthrough."
+    "Installing the archived B70 MoE config under vLLM's exact expected filename removes the missing-config warning and produced 36.88 then 36.62 output tok/s on repeat p512/n1024 runs. Treat it as neutral-to-small-positive for the current llm-scaler decode path, not as a clear new speed breakthrough.",
+    "gpu-memory-utilization 0.93 increased KV cache to 22,592 tokens, but the generation hung with repeated shared-memory broadcast wait warnings. This middle setting is currently less attractive than either default speed mode or the completed 0.95 capacity mode."
   ]
 }

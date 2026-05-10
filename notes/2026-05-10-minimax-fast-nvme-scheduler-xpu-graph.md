@@ -30,6 +30,7 @@ All results use:
 | p1/n1024 | 1024 | default | 9,408 | 31.880 | 31.911 | 77.13s |
 | p512/n1024 | 1024 | installed B70 MoE config, run 1 | 17,216 | 36.876 | 55.314 | 73.17s |
 | p512/n1024 | 1024 | installed B70 MoE config, run 2 | 17,216 | 36.620 | 54.930 | 78.06s |
+| p512/n1024 | 1024 | `--gpu-memory-utilization 0.93`, unstable | 22,592 | hung | hung | 65.82s |
 
 ## Findings
 
@@ -40,6 +41,8 @@ The NVMe move is a large iteration-speed win. Comparable p512/n1024 load time fe
 `XPU_GRAPH=1` remains negative for this TP4 path. vLLM reports that XPU graph does not support communication-op capture and disables graph mode. The run still lost KV headroom and p512/n512 fell from 35.30 to 26.32 output tok/s.
 
 `--gpu-memory-utilization 0.95` is useful for context capacity rather than raw speed. It increased KV cache from 17,216 to 33,408 tokens and still held 36.02 output tok/s on p512/n1024. For raw decode speed, default gpu-memory-utilization is slightly better.
+
+`--gpu-memory-utilization 0.93` is currently unstable. It increased KV cache to 22,592 tokens, but generation did not advance and vLLM emitted two shared-memory broadcast wait warnings before manual interruption. Do not use 0.93 as a serving setting without a repeat/profiling pass.
 
 PCIe reporting is still odd at the endpoint level. The B70 endpoints and downstream internal Intel bridge ports report 2.5 GT/s x1, but the root-to-card upstream links report PCIe 5.0 x16. Treat the endpoint x1 field as an internal/reporting artifact unless a direct bandwidth test proves otherwise.
 
@@ -100,7 +103,7 @@ TP=4 \
 
 ## Next Work
 
-- Test whether `gpu-memory-utilization` around 0.92-0.94 gives most of the KV increase without the small speed loss seen at 0.95.
+- Treat `gpu-memory-utilization` default as the raw-speed setting and 0.95 as the larger-KV setting; 0.93 hung and needs lower-level profiling before more midpoint sweeps.
 - Add or tune a MiniMax-specific `fused_moe` config for `E=256,N=384,device_name=Intel(R)_Graphics_[0xe223],dtype=int4_w4a16`.
 - Keep XPU graph disabled for TP4 until communication-op capture support changes.
 - Prefer `/mnt/fast-ai` for active benchmarks and use the external drive as colder storage.
