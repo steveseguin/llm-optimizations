@@ -1,0 +1,171 @@
+{
+  "title": "MiniMax M2.7 AutoRound AOT cache and graph-shape regression",
+  "date": "2026-05-10",
+  "hardware": {
+    "gpu": "Intel Arc Pro B70",
+    "gpu_count": 4,
+    "vram_gb_each": 32,
+    "os": "Ubuntu 24.04.4 LTS"
+  },
+  "model": {
+    "hf_id": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+    "local_path": "/mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround",
+    "quantization": "INT4 AutoRound W4A16"
+  },
+  "runtime": {
+    "engine": "vllm",
+    "engine_version": "0.20.1-local",
+    "backend": "xpu",
+    "tensor_parallel": 4,
+    "dtype": "float16",
+    "max_model_len": 2048,
+    "max_num_batched_tokens": 1024,
+    "max_num_seqs": 1,
+    "llm_scaler_u4_decode": true,
+    "xpu_graph": false,
+    "ccl_ipc": "default",
+    "power_limit_changes": false
+  },
+  "runs": [
+    {
+      "label": "timing_helper_noop",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n512-20260510T060419Z.json",
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n512-20260510T060419Z.log",
+      "prompt_tokens": 512,
+      "output_tokens": 512,
+      "tok_s_out": 36.18,
+      "tok_s_total": 72.35442372192661,
+      "compile_cache": "b3633d6ffb",
+      "aot_hash": "c15860ddb8a1077c5ba1a1ae2d0f86552a357eb56772cdbf02828195b5a363ec",
+      "interpretation": "Negative. Reducing disabled timing-helper Python overhead did not improve compiled throughput."
+    },
+    {
+      "label": "restored_helper_but_regenerated_aot",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n512-20260510T061025Z.json",
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n512-20260510T061025Z.log",
+      "prompt_tokens": 512,
+      "output_tokens": 512,
+      "tok_s_out": 35.75,
+      "tok_s_total": 71.50325865710167,
+      "compile_cache": "1d97049441",
+      "aot_hash": "c15860ddb8a1077c5ba1a1ae2d0f86552a357eb56772cdbf02828195b5a363ec",
+      "interpretation": "The same graph cache plus regenerated c158 AOT no longer reproduces the old 39-40 tok/s behavior."
+    },
+    {
+      "label": "fresh_c158_rebuild",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n512-20260510T061546Z.json",
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n512-20260510T061546Z.log",
+      "prompt_tokens": 512,
+      "output_tokens": 512,
+      "tok_s_out": 35.64,
+      "tok_s_total": 71.2874449676345,
+      "compile_cache": "b5636051eb",
+      "aot_hash": "c15860ddb8a1077c5ba1a1ae2d0f86552a357eb56772cdbf02828195b5a363ec",
+      "interpretation": "Moving c158 aside and recompiling did not recover the old fast artifact."
+    },
+    {
+      "label": "compile_cache_disabled",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n512-20260510T062032Z.json",
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n512-20260510T062032Z.log",
+      "prompt_tokens": 512,
+      "output_tokens": 512,
+      "tok_s_out": 35.58,
+      "tok_s_total": 71.15578285984178,
+      "compile_cache": null,
+      "aot_hash": null,
+      "interpretation": "Disabling compile cache did not recover the old schedule."
+    },
+    {
+      "label": "clean_minimax_source_no_timing_wrappers",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n512-20260510T062607Z.json",
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n512-20260510T062607Z.log",
+      "prompt_tokens": 512,
+      "output_tokens": 512,
+      "tok_s_out": 28.64,
+      "tok_s_total": 57.28914160276029,
+      "compile_cache": "dca8eb83bf",
+      "aot_hash": "8ab1171d76683e4cddc531479fe8837787e94846f4f59981eb780a60964a7887",
+      "interpretation": "Very negative. The disabled timing wrappers are beneficial graph-shaping boundaries for the compiled path."
+    },
+    {
+      "label": "source_knorm_branch_synced",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n512-20260510T063116Z.json",
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n512-20260510T063116Z.log",
+      "prompt_tokens": 512,
+      "output_tokens": 512,
+      "tok_s_out": 26.69,
+      "tok_s_total": 53.37860561368933,
+      "compile_cache": "6fadc05593",
+      "aot_hash": "221552dedb6d033ff55086fd1967e9623e3eb3a51d613d9eec5ffa79fd7e3349",
+      "interpretation": "Very negative for the current graph. The branch is logically equivalent for this MiniMax M2.7 TP4 config but changes the compile hash and generated code."
+    },
+    {
+      "label": "floor_recovered_simple_knorm",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n512-20260510T063512Z.json",
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n512-20260510T063512Z.log",
+      "prompt_tokens": 512,
+      "output_tokens": 512,
+      "tok_s_out": 35.50,
+      "tok_s_total": 70.99862483920309,
+      "compile_cache": "1d97049441",
+      "aot_hash": "c15860ddb8a1077c5ba1a1ae2d0f86552a357eb56772cdbf02828195b5a363ec",
+      "interpretation": "Recovered the current reproducible floor, still below the old accepted high."
+    },
+    {
+      "label": "inductor_no_autotune",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n512-20260510T063845Z.json",
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n512-20260510T063845Z.log",
+      "prompt_tokens": 512,
+      "output_tokens": 512,
+      "tok_s_out": 27.47,
+      "tok_s_total": 54.9486866773815,
+      "compile_cache": "00a89c9e85",
+      "aot_hash": "6d8ea006288eab558dcc27fd16ab324465d48b01f5891ec3c5203a3ea2aea348",
+      "interpretation": "Negative. Keep max autotune and coordinate descent enabled."
+    },
+    {
+      "label": "inductor_combo_kernels_off",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n512-20260510T064158Z.json",
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n512-20260510T064158Z.log",
+      "prompt_tokens": 512,
+      "output_tokens": 512,
+      "tok_s_out": 28.32,
+      "tok_s_total": 56.634120411478904,
+      "compile_cache": "dec3ebf310",
+      "aot_hash": "660e960082bbf997a5dc8153d940c15f46cb5cbe85ee7d0ad0c3ee071f5c8f02",
+      "interpretation": "Negative. Keep combo kernels enabled."
+    },
+    {
+      "label": "floor_gpumem095_p512n512",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n512-20260510T064500Z.json",
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n512-20260510T064500Z.log",
+      "prompt_tokens": 512,
+      "output_tokens": 512,
+      "tok_s_out": 35.64,
+      "tok_s_total": 71.27660294438856,
+      "gpu_memory_utilization": 0.95,
+      "compile_cache": "1d97049441",
+      "aot_hash": "c15860ddb8a1077c5ba1a1ae2d0f86552a357eb56772cdbf02828195b5a363ec",
+      "interpretation": "Neutral for short output. Useful mainly for KV capacity."
+    },
+    {
+      "label": "floor_gpumem095_p512n1536",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260510T064725Z.json",
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260510T064725Z.log",
+      "prompt_tokens": 512,
+      "output_tokens": 1536,
+      "tok_s_out": 36.56,
+      "tok_s_total": 48.74810613459103,
+      "gpu_memory_utilization": 0.95,
+      "gpu_kv_cache_tokens": 33408,
+      "compile_cache": "1d97049441",
+      "aot_hash": "c15860ddb8a1077c5ba1a1ae2d0f86552a357eb56772cdbf02828195b5a363ec",
+      "interpretation": "Current reproducible long-output floor after fast AOT loss. Below the accepted 41.130667 p512/n1536 high."
+    }
+  ],
+  "conclusion": "The current MiniMax runtime is back to a quality-preserving 35-36 tok/s floor, but the previous 39-41 tok/s compiled artifact was overwritten. Isolate future compile experiments with VLLM_CACHE_ROOT and prioritize deterministic graph partitioning/fusion over more environment-toggle sweeps.",
+  "localmaxxing": {
+    "submitted": false,
+    "reason": "All new runs are below already accepted MiniMax p512/n1536 high cmoz8cow60001pd010klrb8g8 and are primarily regression diagnostics."
+  }
+}
