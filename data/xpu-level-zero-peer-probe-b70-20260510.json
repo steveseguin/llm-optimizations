@@ -1,0 +1,66 @@
+{
+  "hardware": "4x Intel Arc Pro B70 32GB",
+  "api": "Level Zero",
+  "date_utc": "2026-05-10",
+  "source": "experiments/xpu_level_zero_peer_probe/peer_probe.cpp",
+  "build_command": "g++ -std=c++17 -O2 peer_probe.cpp -lze_loader -o peer_probe",
+  "run_commands": [
+    "./peer_probe",
+    "./peer_probe --p2p-fill-test",
+    "./peer_probe --ipc-fork-test"
+  ],
+  "devices": [
+    {
+      "index": 0,
+      "name": "Intel(R) Graphics [0xe223]",
+      "vendor": "0x8086",
+      "device": "0xe223",
+      "uuid": "868023e2000000000300000000000000",
+      "max_alloc_mib": 31023,
+      "external_memory_export": "DMA_BUF",
+      "external_memory_import": "DMA_BUF"
+    },
+    {
+      "index": 1,
+      "name": "Intel(R) Graphics [0xe223]",
+      "vendor": "0x8086",
+      "device": "0xe223",
+      "uuid": "868023e2000000008300000000000000",
+      "max_alloc_mib": 31023,
+      "external_memory_export": "DMA_BUF",
+      "external_memory_import": "DMA_BUF"
+    },
+    {
+      "index": 2,
+      "name": "Intel(R) Graphics [0xe223]",
+      "vendor": "0x8086",
+      "device": "0xe223",
+      "uuid": "868023e200000000a300000000000000",
+      "max_alloc_mib": 31023,
+      "external_memory_export": "DMA_BUF",
+      "external_memory_import": "DMA_BUF"
+    },
+    {
+      "index": 3,
+      "name": "Intel(R) Graphics [0xe223]",
+      "vendor": "0x8086",
+      "device": "0xe223",
+      "uuid": "868023e200000000e300000000000000",
+      "max_alloc_mib": 31023,
+      "external_memory_export": "DMA_BUF",
+      "external_memory_import": "DMA_BUF"
+    }
+  ],
+  "p2p": {
+    "all_pairs_can_access": true,
+    "self_pairs_flags": "ACCESS|ATOMICS",
+    "cross_card_flags": "ACCESS",
+    "cross_card_atomics": false
+  },
+  "functional_tests": {
+    "p2p_fill_all_16_pairs": "passed",
+    "ipc_fork_open_fill_verify_all_16_pairs": "passed"
+  },
+  "interpretation": "Peer-visible Level Zero workspace memory is viable on this four-B70 host. Cross-card remote atomics are not advertised, so the next MiniMax Q/K RMS fusion should use per-rank mailbox slots and sentinel/sequence writes rather than remote atomic operations."
+}
+
