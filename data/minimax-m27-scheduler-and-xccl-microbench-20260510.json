@@ -1,0 +1,134 @@
+{
+  "date": "2026-05-10",
+  "model": "MiniMax M2.7 INT4 AutoRound",
+  "hardware": {
+    "gpus": "4x Intel Arc Pro B70 32GB",
+    "os": "Ubuntu 24.04.4"
+  },
+  "vllm_screens": {
+    "baseline_p512n512": {
+      "total_tok_s": 79.22117,
+      "output_tok_s": 39.610585,
+      "gpu_kv_cache_tokens": 17216,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n512-20260510T011816Z.log"
+    },
+    "no_async_scheduling": {
+      "extra_args": "--no-async-scheduling",
+      "total_tok_s": 54.618106,
+      "output_tok_s": 27.309053,
+      "gpu_kv_cache_tokens": 9408,
+      "outcome": "very_negative",
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n512-20260510T045547Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n512-20260510T045547Z.json"
+    },
+    "static_compile_size_1": {
+      "extra_args": "--compilation-config={\"compile_sizes\":[1]}",
+      "total_tok_s": 61.443969,
+      "output_tok_s": 30.721984,
+      "outcome": "negative",
+      "compile_ranges_seen": [
+        [1, 1],
+        [1, 1024]
+      ],
+      "failed_shorthand": "-cc.compile_sizes+ 1 parsed 1 as a string and failed pydantic validation",
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n512-20260510T045930Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n512-20260510T045930Z.json"
+    }
+  },
+  "xccl_microbench": {
+    "script": "benchmarks/b70_xccl_allreduce_bench.py",
+    "world_size": 4,
+    "sizes_bytes": [8, 64, 1024, 4096, 6144, 8192, 65536, 1048576, 16777216, 67108864, 268435456],
+    "runs": [
+      {
+        "name": "default",
+        "env": {
+          "CCL_ATL_TRANSPORT": "ofi",
+          "CCL_TOPO_P2P_ACCESS": "1"
+        },
+        "log": "/mnt/fast-ai/bench-results/xccl-allreduce/b70-xccl-allreduce-default-20260510T050341Z.log",
+        "avg_ms": {
+          "8": 0.016,
+          "64": 0.015,
+          "1024": 0.015,
+          "4096": 0.015,
+          "6144": 0.014,
+          "8192": 0.015,
+          "65536": 0.015,
+          "1048576": 0.044,
+          "16777216": 0.611,
+          "67108864": 2.419,
+          "268435456": 9.627
+        }
+      },
+      {
+        "name": "direct",
+        "env": {
+          "CCL_ALLREDUCE": "direct",
+          "CCL_ATL_TRANSPORT": "ofi",
+          "CCL_TOPO_P2P_ACCESS": "1"
+        },
+        "log": "/mnt/fast-ai/bench-results/xccl-allreduce/b70-xccl-allreduce-direct-20260510T050355Z.log",
+        "avg_ms": {
+          "8": 0.098,
+          "64": 0.097,
+          "1024": 0.099,
+          "4096": 0.101,
+          "6144": 0.103,
+          "8192": 0.105,
+          "65536": 0.148,
+          "1048576": 0.680,
+          "16777216": 16.261,
+          "67108864": 63.331,
+          "268435456": 256.967
+        }
+      },
+      {
+        "name": "topo_fabric_vertex_connection_check_0",
+        "env": {
+          "CCL_TOPO_FABRIC_VERTEX_CONNECTION_CHECK": "0",
+          "CCL_ATL_TRANSPORT": "ofi",
+          "CCL_TOPO_P2P_ACCESS": "1"
+        },
+        "log": "/mnt/fast-ai/bench-results/xccl-allreduce/b70-xccl-allreduce-topo-fabric-check0-20260510T050422Z.log",
+        "avg_ms": {
+          "8": 0.016,
+          "6144": 0.014,
+          "1048576": 0.043,
+          "268435456": 9.643
+        }
+      },
+      {
+        "name": "sycl_allreduce_tmp_buf_1",
+        "env": {
+          "CCL_SYCL_ALLREDUCE_TMP_BUF": "1",
+          "CCL_ATL_TRANSPORT": "ofi",
+          "CCL_TOPO_P2P_ACCESS": "1"
+        },
+        "log": "/mnt/fast-ai/bench-results/xccl-allreduce/b70-xccl-allreduce-tmpbuf1-20260510T050435Z.log",
+        "avg_ms": {
+          "8": 0.016,
+          "6144": 0.015,
+          "1048576": 0.043,
+          "268435456": 9.663
+        }
+      },
+      {
+        "name": "allreduce_small_threshold_0",
+        "env": {
+          "CCL_ALLREDUCE_SMALL_THRESHOLD": "0",
+          "CCL_ATL_TRANSPORT": "ofi",
+          "CCL_TOPO_P2P_ACCESS": "1"
+        },
+        "log": "/mnt/fast-ai/bench-results/xccl-allreduce/b70-xccl-allreduce-smallthreshold0-20260510T050448Z.log",
+        "avg_ms": {
+          "8": 0.016,
+          "6144": 0.015,
+          "1048576": 0.043,
+          "268435456": 9.641
+        }
+      }
+    ]
+  },
+  "conclusion": "Default XCCL allreduce is already low-latency for MiniMax decode tensor sizes. The next speed target is vLLM graph/fence/collective placement or an exact compiled fusion, not further oneCCL algorithm environment toggles."
+}
