@@ -195,6 +195,7 @@ Reproducibility notes, benchmark payloads, and local patches from the Intel Arc 
 - `scripts/submit_localmaxxing_results.py`: LocalMaxxing submission helper. Requires `LMX_API_KEY` in the environment; no API key is stored in this repo.
 - `benchmarks/b70_xccl_allreduce_bench.py`: XPU all-reduce/P2P microbenchmark.
 - `data/localmaxxing_payloads.json`: sanitized benchmark payloads submitted or queued for LocalMaxxing.
+- `notes/2026-05-10-fast-nvme-model-placement.md`: model placement update after moving the MiniMax GGUF shards to `/mnt/fast-ai` and preserving the original path as a symlink.
 - `data/qwen36-q4-eventbarrier-20260504.json`: structured Q4_0 event-barrier validation data.
 - `data/minimax-m27-row-split-ncmoe-staircase-20260504.json`: structured MiniMax staircase failure data.
 - `data/2026-05-05-negative-followups.json`: structured negative follow-up screens.
