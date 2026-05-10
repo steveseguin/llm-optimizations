@@ -1,0 +1,24 @@
+diff --git a/vllm/model_executor/layers/mamba/linear_attn.py b/vllm/model_executor/layers/mamba/linear_attn.py
+index b277c9ed6..2cf0f0c1 100644
+--- a/vllm/model_executor/layers/mamba/linear_attn.py
++++ b/vllm/model_executor/layers/mamba/linear_attn.py
+@@ -2,6 +2,7 @@
+ # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
+ 
+ import math
++import os
+ from collections.abc import Callable
+ from functools import partial
+ 
+@@ -111,7 +112,10 @@ class MiniMaxText01RMSNormTP(CustomOp):
+         k = k.to(torch.float32)
+         q_var = q.pow(2).mean(dim=-1, keepdim=True)
+         k_var = k.pow(2).mean(dim=-1, keepdim=True)
+-        if q_norm.tp_world > 1:
++        if (
++            q_norm.tp_world > 1
++            and os.environ.get("VLLM_MINIMAX_QK_SKIP_TP_ALLREDUCE", "0") != "1"
++        ):
+             qk_var = torch.cat([q_var, k_var], dim=-1)
+             qk_var = tensor_model_parallel_all_reduce(qk_var) / q_norm.tp_world
+             q_var, k_var = qk_var.chunk(2, dim=-1)
