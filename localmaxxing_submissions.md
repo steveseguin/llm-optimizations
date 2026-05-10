@@ -12,8 +12,11 @@ Model: `Lasimeri/MiniMax-M2.7-int4-AutoRound`, AutoRound W4A16 safetensors, vLLM
 | `vllm-minimax-m27-autoround-ngram2-negative-p512-n256` | `cmoz0imyo004atl01ilhq45t4` | 4 | 512 | 256 | 12.267 | 36.800 |
 | `vllm-minimax-m27-autoround-u4-decode-p512-n1024` | `cmoz1rowm004ztl01x4gt4y6d` | 4 | 512 | 1024 | 35.933 | 53.900 |
 | `vllm-minimax-m27-autoround-u4-decode-fast-nvme-p512-n512` | `cmoz7rs2w0077tl01o3f1kxnm` | 4 | 512 | 512 | 39.611 | 79.221 |
+| `vllm-minimax-m27-autoround-u4-decode-fast-nvme-p512-n1024-refresh` | `cmoz82i2f007itl01fkno9or1` | 4 | 512 | 1024 | 40.304 | 60.456 |
 
-Note: `cmoz7rs2w0077tl01o3f1kxnm` is the current best MiniMax AutoRound result on the four B70 system. It uses the unsigned llm-scaler u4 decode-only MoE path with FP16 activations, fast ext4 NVMe model storage, the installed B70 MoE config, normal Q/K TP allreduce, no speculative decoding, no expert dropping, and no power-limit changes. Immediate p512/n512 repeat was `39.516` output tok/s.
+Note: `cmoz82i2f007itl01fkno9or1` is the current best MiniMax AutoRound result on the four B70 system. It uses the unsigned llm-scaler u4 decode-only MoE path with FP16 activations, fast ext4 NVMe model storage, the installed B70 MoE config, normal Q/K TP allreduce, no speculative decoding, no expert dropping, and no power-limit changes. Two refreshed p512/n1024 samples were `39.894` and `40.304` output tok/s.
+
+Note: `cmoz7rs2w0077tl01o3f1kxnm` is the matching p512/n512 fast-NVMe validation. It uses the same quality path and repeated at `39.516` output tok/s.
 
 Note: `cmoyzvknv003ttl01q9vsyytb` is the larger-prompt validation for the BF16 llm-scaler u4 decode bridge. It keeps the same quality-preserving target path and reaches `31.833 tok/s` output at `p1024/n256`, but also records the current capacity boundary: vLLM reports only `0.16 GiB` available KV memory at `max_model_len=2048`, while a `p1536/n256` attempt failed with no available KV cache blocks.
 
@@ -232,7 +235,10 @@ Model: `Lasimeri/MiniMax-M2.7-int4-AutoRound`, AutoRound W4A16 safetensors.
 | --- | --- | ---: | ---: | ---: | ---: | ---: |
 | `vllm-minimax-m27-autoround-int4-xpu-tp4-fast-nvme-p512-n1024` | `cmoz4qkc3005htl01t70cd8l7` | 4 | 512 | 1024 | 36.670 | 55.005 |
 | `vllm-minimax-m27-autoround-u4-decode-fast-nvme-p512-n512` | `cmoz7rs2w0077tl01o3f1kxnm` | 4 | 512 | 512 | 39.611 | 79.221 |
+| `vllm-minimax-m27-autoround-u4-decode-fast-nvme-p512-n1024-refresh` | `cmoz82i2f007itl01fkno9or1` | 4 | 512 | 1024 | 40.304 | 60.456 |
 
 Note: `cmoz4qkc3005htl01t70cd8l7` is the corrected fast-NVMe p512/n1024 MiniMax AutoRound validation. It keeps the same vLLM/XPU TP4 llm-scaler u4 decode-only path as the prior long-output run, but moves the checkpoint from the external NTFS USB drive to ext4 PCIe 5.0 NVMe. Comparable model load time dropped from `348.18s` to `84.39s`, and decode improved from `35.933` to `36.670` output tok/s. The key scheduler lesson is that `--max-num-batched-tokens 1024` is the current sweet spot for this shape; `1536` fell to `29.478` output tok/s and `512` fell to `31.862`. `XPU_GRAPH=1` remains negative because communication capture is unsupported and the run loses KV headroom.
 
 Note: `cmoz7rs2w0077tl01o3f1kxnm` is the current fast-NVMe p512/n512 MiniMax AutoRound high. It uses the normal quality path with Q/K TP allreduce, no speculative decode, and no power-limit changes. A diagnostic `VLLM_MINIMAX_QK_SKIP_TP_ALLREDUCE=1` run intentionally broke Q/K TP RMSNorm math and was slower at `26.158` output tok/s, so it was not submitted. The valid p512/n512 repeat reached `39.516` output tok/s.
+
+Note: `cmoz82i2f007itl01fkno9or1` is the refreshed p512/n1024 long-output high. It supersedes the older `cmoz4qkc3005htl01t70cd8l7` p512/n1024 row under the same quality path; refreshed samples were `39.894` and `40.304` output tok/s.

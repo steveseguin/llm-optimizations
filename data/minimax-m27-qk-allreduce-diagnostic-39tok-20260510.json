@@ -79,7 +79,32 @@
       "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n512-20260510T032448Z.log",
       "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n512-20260510T032448Z.json",
       "submittedToLocalMaxxing": false
+    },
+    {
+      "name": "normal_qk_allreduce_p512n1024_run1",
+      "promptTokens": 512,
+      "outputTokens": 1024,
+      "gpuKvCacheTokens": 17216,
+      "tokSOut": 39.894083087231444,
+      "tokSTotal": 59.84112463084717,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1024-20260510T033148Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1024-20260510T033148Z.json",
+      "submittedToLocalMaxxing": false
+    },
+    {
+      "name": "normal_qk_allreduce_p512n1024_run2",
+      "promptTokens": 512,
+      "outputTokens": 1024,
+      "gpuKvCacheTokens": 17216,
+      "tokSOut": 40.3037302779233,
+      "tokSTotal": 60.45559541688495,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1024-20260510T033429Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1024-20260510T033429Z.json",
+      "submittedToLocalMaxxing": true,
+      "localMaxxingId": "cmoz82i2f007itl01fkno9or1",
+      "payload": "data/localmaxxing-minimax-m27-autoround-u4-decode-fp16-fast-nvme-p512n1024-20260510-refresh.payload.json",
+      "response": "data/localmaxxing-responses/minimax-m27-autoround-u4-decode-fp16-fast-nvme-p512n1024-20260510-refresh.response.json"
     }
   ],
-  "conclusion": "The correctness-breaking Q/K TP-allreduce skip is slower and invalid. The normal quality path repeated near 39.5-39.6 output tok/s at p512/n512 and was submitted to LocalMaxxing."
+  "conclusion": "The correctness-breaking Q/K TP-allreduce skip is slower and invalid. The normal quality path repeated near 39.5-39.6 output tok/s at p512/n512 and 39.9-40.3 output tok/s at p512/n1024; both best rows were submitted to LocalMaxxing."
 }
