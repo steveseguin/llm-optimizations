@@ -1,0 +1,125 @@
+{
+  "date": "2026-05-10",
+  "host": "4x Intel Arc Pro B70 32GB, Ubuntu 24.04",
+  "model": {
+    "hfId": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+    "localPath": "/mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround",
+    "quantization": "AutoRound INT4 W4A16",
+    "dtype": "float16"
+  },
+  "baseline": {
+    "label": "quality-cleared TP4 llm-scaler U4 decode",
+    "promptTokens": 512,
+    "outputTokens": 512,
+    "contextLength": 2048,
+    "tensorParallel": 4,
+    "pipelineParallel": 1,
+    "tokSOut": 39.610585,
+    "tokSTotal": 79.221171,
+    "notes": "Accepted p512/n512 comparison target. Longer accepted p512/n1536 quality-conservative anchor is 37.552538 tok/s output."
+  },
+  "runs": [
+    {
+      "label": "direct XPU Q/K RMS helper",
+      "result": "regression",
+      "promptTokens": 512,
+      "outputTokens": 512,
+      "contextLength": 2048,
+      "tensorParallel": 4,
+      "pipelineParallel": 1,
+      "tokSOut": 28.036348,
+      "tokSTotal": 56.072695,
+      "elapsedSec": 18.262008,
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-qk-direct/vllm-minimax-m27-autoround-tp4-p512n512-20260510T152342Z.json",
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-qk-direct/vllm-minimax-m27-autoround-tp4-p512n512-20260510T152342Z.log",
+      "flags": "TP=4 USE_LLM_SCALER_MOE=1 VLLM_MINIMAX_QK_NORM_XPU_DIRECT=1 XPU_GRAPH=0 CCL_P2P=1",
+      "learning": "The helper is active in AOT but breaks better existing compile fusion around INT4 GEMM/RMS while preserving the tiny Q/K allreduce boundary."
+    },
+    {
+      "label": "llm-scaler MoE logits decode path",
+      "result": "regression",
+      "promptTokens": 512,
+      "outputTokens": 512,
+      "contextLength": 2048,
+      "tensorParallel": 4,
+      "pipelineParallel": 1,
+      "tokSOut": 35.899368,
+      "tokSTotal": 71.798735,
+      "elapsedSec": 14.26209,
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-llmscaler-logits/vllm-minimax-m27-autoround-tp4-p512n512-20260510T152801Z.json",
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-llmscaler-logits/vllm-minimax-m27-autoround-tp4-p512n512-20260510T152801Z.log",
+      "flags": "TP=4 USE_LLM_SCALER_MOE=1 VLLM_XPU_USE_LLM_SCALER_MOE_LOGITS=1 XPU_GRAPH=0 CCL_P2P=1",
+      "learning": "Fusing router top-k into the decode MoE kernel did not beat the existing split router + U4 decode path."
+    },
+    {
+      "label": "TP2/PP2 four-card layout",
+      "result": "regression",
+      "promptTokens": 512,
+      "outputTokens": 512,
+      "contextLength": 2048,
+      "tensorParallel": 2,
+      "pipelineParallel": 2,
+      "tokSOut": 24.976409,
+      "tokSTotal": 49.952818,
+      "elapsedSec": 20.499344,
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-tp2pp2/vllm-minimax-m27-autoround-tp2-p512n512-20260510T153144Z.json",
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-tp2pp2/vllm-minimax-m27-autoround-tp2-p512n512-20260510T153144Z.log",
+      "flags": "TP=2 --pipeline-parallel-size 2 USE_LLM_SCALER_MOE=1 XPU_GRAPH=0 CCL_P2P=1",
+      "learning": "The smaller TP allreduce group did not compensate for single-request pipeline idle time. This layout is not useful for single-session latency on MiniMax."
+    },
+    {
+      "label": "KV cache fp8 generic",
+      "result": "regression",
+      "promptTokens": 512,
+      "outputTokens": 512,
+      "contextLength": 2048,
+      "tensorParallel": 4,
+      "pipelineParallel": 1,
+      "tokSOut": 28.103614,
+      "tokSTotal": 56.207227,
+      "elapsedSec": 18.218298,
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-kvfp8/vllm-minimax-m27-autoround-tp4-p512n512-20260510T153914Z.json",
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-kvfp8/vllm-minimax-m27-autoround-tp4-p512n512-20260510T153914Z.log",
+      "flags": "TP=4 USE_LLM_SCALER_MOE=1 --kv-cache-dtype fp8 XPU_GRAPH=0 CCL_P2P=1",
+      "learning": "Generic FP8 KV is accepted by the XPU stack, but at 512 context it is slower and has possible quality risk, so it is not a primary path."
+    },
+    {
+      "label": "KV cache fp8_e5m2 explicit",
+      "result": "backend failure",
+      "promptTokens": 512,
+      "outputTokens": 512,
+      "contextLength": 2048,
+      "tensorParallel": 4,
+      "pipelineParallel": 1,
+      "tokSOut": null,
+      "tokSTotal": null,
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-kvfp8/vllm-minimax-m27-autoround-tp4-p512n512-20260510T153634Z.json",
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-kvfp8/vllm-minimax-m27-autoround-tp4-p512n512-20260510T153634Z.log",
+      "flags": "TP=4 USE_LLM_SCALER_MOE=1 --kv-cache-dtype fp8_e5m2 XPU_GRAPH=0 CCL_P2P=1",
+      "learning": "XPU FlashAttention metadata path raises ValueError: Unrecognized FP8 dtype: fp8_e5m2."
+    }
+  ],
+  "external_references": [
+    {
+      "title": "vLLM speculative decoding documentation",
+      "url": "https://docs.vllm.ai/en/latest/features/speculative_decoding/",
+      "note": "Model-based methods such as EAGLE/MTP/draft-model are the likely path to quality-preserving speculative gains; n-gram is expected to be modest."
+    },
+    {
+      "title": "MiniMax-M2.7 NVFP4 model card",
+      "url": "https://huggingface.co/NinjaBoffin/MiniMax-M2.7-NVFP4",
+      "note": "Blackwell reference reports high throughput using TP2/EP2, FP8 KV, and specialized MoE runners; useful as an architecture target but not directly portable to XPU."
+    },
+    {
+      "title": "MiniMaxAI/MiniMax-M2.7 model card",
+      "url": "https://huggingface.co/MiniMaxAI/MiniMax-M2.7",
+      "note": "Upstream recommends vLLM/SGLang and temperature=1.0, top_p=0.95, top_k=40 for inference quality."
+    }
+  ],
+  "next_steps": [
+    "Do not promote the direct Q/K helper without fusing it back into the existing INT4 GEMM/RMS compiled region or eliminating the tiny allreduce wait.",
+    "Avoid TP2/PP2 for single-session MiniMax unless running multiple concurrent sequences to fill the pipeline.",
+    "Investigate XPU support for fp8_e5m2 KV separately; generic fp8 is not a throughput win at 512 context.",
+    "Focus next on true allreduce+RMS/projection fusion, XPU communication scheduling, and llm-scaler INT4 MoE kernel internals."
+  ]
+}

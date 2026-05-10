@@ -71,6 +71,7 @@ Reproducibility notes, benchmark payloads, and local patches from the Intel Arc 
 - Casting the MiniMax Q/K RMS variance allreduce payload from FP32 to FP16 is also negative: the graph changed to `f16[s72,2]` variance collectives, but warm p512/n512 reached only `35.316` output tok/s and carries a normalization-precision tradeoff. The active runtime was reverted to FP32 variance allreduce; keep `VLLM_MINIMAX_QK_VAR_ALLREDUCE_DTYPE` unset.
 - Inlining `MiniMaxText01LinearAttention` is not applicable to the active MiniMax M2 AutoRound model: it uses `minimax_m2.py` normal attention, produced the same `4799a3c8...` AOT hash, and the temporary gate was removed.
 - Intel llm-scaler branch `origin/fix_27b_kernel` (`db05b45`) fixes a large-`N` dense INT4 ResAddNormGEMV race reported on Qwen3.6-27B `gate_up` (`N=8704,K=5120,TP=4`). It is relevant if we return to dense Qwen3.6 INT4 AutoRound/sym-int4, but not to the current MiniMax u4 MoE bridge, Qwen Q4_0 GGUF, or Qwen static FP8 paths.
+- Latest MiniMax negative screens keep the optimization target pointed at source-level fusion rather than launch flags. Direct XPU Q/K RMS helper (`28.036` tok/s), llm-scaler MoE logits path (`35.899`), TP2/PP2 (`24.976`), and generic FP8 KV (`28.104`) all underperformed the quality-cleared TP4 p512/n512 reference (`39.611`). Explicit `fp8_e5m2` KV fails in the XPU FlashAttention metadata path. These were not submitted to LocalMaxxing; they are recorded as pruning data.
 
 ## Layout
 
@@ -176,6 +177,10 @@ Reproducibility notes, benchmark payloads, and local patches from the Intel Arc 
 - `data/minimax-m27-ccl-worker-affinity-negative-20260510.json`: structured oneCCL worker-affinity screen data.
 - `notes/2026-05-10-minimax-aot-collective-inspection.md`: MiniMax AOT graph inspection identifying allreduce/wait boundaries as the source-level fusion target.
 - `data/minimax-m27-aot-collective-inspection-20260510.json`: structured AOT collective/RMS inspection data.
+- `notes/2026-05-10-minimax-negative-screens.md`: direct Q/K helper, MoE logits, TP2/PP2, and FP8 KV negative screens after raising the MiniMax target to 60 tok/s.
+- `data/minimax-m27-negative-screens-20260510.json`: structured data for those negative screens and external reference notes.
+- `benchmarks/b70_minimax_qk_boundary_bench.py`: XCCL/QK variance/helper microbench for MiniMax TP4 layer shapes.
+- `data/minimax-m27-qk-boundary-microbench-20260510.json`: structured microbench data explaining why the direct helper looked promising in isolation but regressed in the full compiled model.
 - `data/localmaxxing-submission-minimax-m27-autoround-bf16-u4-decode-20260509.json`: LocalMaxxing response for the BF16 u4 decode p512/n512 result.
 - `data/localmaxxing-minimax-m27-autoround-u4-decode-bf16-gpumem095-p512n1024-20260510.payload.json`: LocalMaxxing payload for the fast-NVMe BF16 0.95 MiniMax capacity-mode result.
 - `data/localmaxxing-responses/minimax-m27-autoround-u4-decode-bf16-gpumem095-p512n1024-20260510.response.json`: LocalMaxxing response for the fast-NVMe BF16 0.95 MiniMax capacity-mode result.

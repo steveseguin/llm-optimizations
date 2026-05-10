@@ -1,0 +1,48 @@
+{
+  "date": "2026-05-10",
+  "host": "4x Intel Arc Pro B70 32GB, Ubuntu 24.04",
+  "script": "benchmarks/b70_minimax_qk_boundary_bench.py",
+  "command": "python -m torch.distributed.run --standalone --nproc-per-node=4 /home/steve/llm-optimizations-publish/benchmarks/b70_minimax_qk_boundary_bench.py",
+  "environment": {
+    "CCL_P2P": "1",
+    "B70_MINIMAX_BOUNDARY_TOKENS": "1,72,512",
+    "B70_MINIMAX_BOUNDARY_DTYPE": "float16"
+  },
+  "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-boundary/b70-minimax-qk-boundary-tp4-20260510T150340Z.jsonl",
+  "shape": {
+    "qSizePerRank": 1536,
+    "kvSizePerRank": 256,
+    "hiddenSize": 3072,
+    "worldSize": 4
+  },
+  "results": [
+    {
+      "tokens": 1,
+      "tiny_allreduce_ms": 0.0169,
+      "qk_var_ms": 0.00382,
+      "qk_var_allreduce_ms": 0.0261,
+      "qk_full_helper_ms": 0.0297,
+      "torch_qk_reference_ms": 0.1746,
+      "hidden_allreduce_ms": 0.0145
+    },
+    {
+      "tokens": 72,
+      "tiny_allreduce_ms": 0.0149,
+      "qk_var_ms": 0.00374,
+      "qk_var_allreduce_ms": 0.0233,
+      "qk_full_helper_ms": 0.028,
+      "torch_qk_reference_ms": 0.1761,
+      "hidden_allreduce_ms": 0.0206
+    },
+    {
+      "tokens": 512,
+      "tiny_allreduce_ms": 0.0151,
+      "qk_var_ms": 0.00555,
+      "qk_var_allreduce_ms": 0.0238,
+      "qk_full_helper_ms": 0.02845,
+      "torch_qk_reference_ms": 0.1777,
+      "hidden_allreduce_ms": 0.1188
+    }
+  ],
+  "interpretation": "The isolated Q/K helper is much faster than the torch reference at layer-sized shapes, but full vLLM runs regressed because the helper broke existing compiled INT4 GEMM/RMS fusion and kept the allreduce wait boundary."
+}
