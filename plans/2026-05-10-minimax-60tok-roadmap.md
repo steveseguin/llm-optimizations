@@ -261,3 +261,34 @@ External references checked today:
   for reference, but local provider swaps alone have already benchmarked below
   the current MiniMax reference. The missing piece remains collective-boundary
   fusion, not just a faster standalone norm kernel.
+
+## 2026-05-10 Follow-Up Decisions
+
+Native MiniMax MTP is blocked for the current AutoRound checkpoint. The config
+advertises `use_mtp=true`, `num_mtp_modules=3`, and `num_hidden_layers=62`, but
+the safetensors index has no `model.layers.62+` weights. The local vLLM MTP
+speculative mapping also does not include `minimax_m2`. Do not treat the config
+flag as usable MTP unless a checkpoint with MTP weights appears or a compatible
+drafter is implemented and target-verified.
+
+Suffix decoding remains interesting, especially for repetitive coding or agentic
+workloads, but it should be isolated. The active XPU venv does not have
+`arctic_inference`, and the current PyPI package is source-only with build
+metadata that pins `torch==2.7.0`. Do not install it blindly into
+`/home/steve/.venvs/vllm-xpu`; use a separate venv or source checkout first.
+
+DP4+EP compiled mode was retested with lower KV reservation and with Inductor
+combo kernels disabled. Both probes failed at the same point: after each rank
+loaded about `30.81 GiB` of model state, Inductor attempted a `1.15 GiB` XPU
+allocation with only about `0.65-0.68 GiB` free. Keep DP4+EP compiled closed
+until per-rank model memory drops or the XPU compile/autotune path avoids that
+scratch allocation. The CCL local-rank patch is still worth preserving because
+it makes DP4+EP eager initialize and generate, but EP is not a speed path yet.
+
+Current implementation focus stays on TP4:
+
+- Q/K variance allreduce plus RMS apply fusion.
+- Hidden-state allreduce plus residual/RMSNorm fusion.
+- MoE output allreduce plus downstream epilogue fusion.
+- Attention/KV scheduling only where it removes a visible launch, fence, or
+  collective boundary.

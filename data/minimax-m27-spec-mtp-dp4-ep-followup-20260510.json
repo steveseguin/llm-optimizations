@@ -1,0 +1,84 @@
+{
+  "date": "2026-05-10",
+  "model": {
+    "hfId": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+    "base": "MiniMaxAI/MiniMax-M2.7",
+    "localPath": "/mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround",
+    "quantization": "INT4 AutoRound W4A16"
+  },
+  "hardware": {
+    "gpuName": "Intel Arc Pro B70 32GB",
+    "gpuCount": 4,
+    "os": "Ubuntu 24.04.4 LTS"
+  },
+  "targets": {
+    "qualityPreservingNonSpecOutputTokS": 60,
+    "verifiedSpeculativeOutputTokS": 75,
+    "qualityConstraints": [
+      "no expert dropping",
+      "no skipped Q/K TP variance allreduce",
+      "no root-residual ordering shortcut",
+      "no unverified speculative result"
+    ]
+  },
+  "mtp": {
+    "configAdvertisesMtp": true,
+    "config": {
+      "use_mtp": true,
+      "num_mtp_modules": 3,
+      "mtp_transformer_layers": 1,
+      "num_hidden_layers": 62
+    },
+    "weightsPresentAboveTargetLayers": false,
+    "highestTargetLayerPresent": 61,
+    "vllmMtpMappingForMinimaxM2": false,
+    "decision": "blocked for this checkpoint; config advertises MTP but required MTP weights are absent and vLLM does not map minimax_m2 to an MTP drafter"
+  },
+  "suffixDecoding": {
+    "arcticInferenceInstalledInActiveVenv": false,
+    "pypiPackage": "arctic-inference==0.1.1",
+    "packageDistribution": "source-only sdist",
+    "risk": "build metadata requires torch==2.7.0 and build tooling, so blind installation into the active XPU vLLM venv may disturb the working runtime",
+    "decision": "future isolated-venv experiment only"
+  },
+  "dp4EpCompiledProbes": [
+    {
+      "name": "compiled_lowutil_noscaler",
+      "status": "failed",
+      "promptTokens": 16,
+      "outputTokens": 8,
+      "maxModelLen": 64,
+      "maxNumBatchedTokens": 32,
+      "gpuMemoryUtilization": 0.9,
+      "useLlmScalerMoe": false,
+      "extraServerArgs": "--data-parallel-size 4 --data-parallel-size-local 4 --enable-expert-parallel --enable-ep-weight-filter --all2all-backend allgather_reducescatter --api-server-count 1",
+      "failure": "Inductor autotuning XPU OOM: tried to allocate 1.15 GiB with about 0.68 GiB free after 30.81 GiB PyTorch allocation",
+      "serverLog": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-serve-dp4-ep-compiled-lowutil-noscaler/vllm-minimax-m27-autoround-serve-server-tp1-p16n8-np1-20260510T233752Z.log"
+    },
+    {
+      "name": "compiled_nocombo_noscaler",
+      "status": "failed",
+      "promptTokens": 16,
+      "outputTokens": 8,
+      "maxModelLen": 64,
+      "maxNumBatchedTokens": 32,
+      "gpuMemoryUtilization": 0.9,
+      "useLlmScalerMoe": false,
+      "extraServerArgs": "--data-parallel-size 4 --data-parallel-size-local 4 --enable-expert-parallel --enable-ep-weight-filter --all2all-backend allgather_reducescatter --api-server-count 1 --compilation-config '{\"inductor_compile_config\":{\"combo_kernels\":false,\"benchmark_combo_kernel\":false}}'",
+      "failure": "Inductor autotuning XPU OOM persists despite disabling combo_kernels and benchmark_combo_kernel",
+      "serverLog": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-serve-dp4-ep-compiled-nocombo-noscaler/vllm-minimax-m27-autoround-serve-server-tp1-p16n8-np1-20260510T234120Z.log"
+    }
+  ],
+  "decision": "Do not submit these diagnostic failures to LocalMaxxing. Keep DP4+EP compiled closed until model allocation is reduced or Inductor/XPU avoids the 1.15 GiB compile scratch allocation.",
+  "nextPriority": [
+    "TP4 Q/K variance allreduce plus RMS fusion",
+    "TP4 hidden-state allreduce plus residual/RMSNorm fusion",
+    "MoE output allreduce plus downstream epilogue fusion",
+    "attention/KV scheduling only where it removes a visible graph boundary"
+  ],
+  "references": [
+    "https://docs.vllm.ai/en/stable/features/speculative_decoding/suffix/",
+    "https://arcticinference.readthedocs.io/en/latest/suffix-decoding.html",
+    "https://docs.vllm.ai/projects/recipes/en/latest/MiniMax/MiniMax-M2.html"
+  ]
+}
