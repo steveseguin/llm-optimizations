@@ -9,10 +9,13 @@ Model: `Lasimeri/MiniMax-M2.7-int4-AutoRound`, AutoRound W4A16 safetensors, vLLM
 | `vllm-minimax-m27-autoround-u4-decode-p512-n128` | `cmoxptkfd00hsml01hf2ajhhp` | 4 | 512 | 128 | 29.748 | 148.742 |
 | `vllm-minimax-m27-autoround-u4-decode-p512-n256` | `cmoxq7cww00i8ml019ihbeqc9` | 4 | 512 | 256 | 33.034 | 99.101 |
 | `vllm-minimax-m27-autoround-bf16-u4-p1024-n256` | `cmoyzvknv003ttl01q9vsyytb` | 4 | 1024 | 256 | 31.833 | 159.166 |
+| `vllm-minimax-m27-autoround-ngram2-negative-p512-n256` | `cmoz0imyo004atl01ilhq45t4` | 4 | 512 | 256 | 12.267 | 36.800 |
 
 Note: this is the current best MiniMax AutoRound result on the four B70 system. It uses the unsigned llm-scaler u4 decode-only MoE path with FP16 activations, keeps prompt/prefill on vLLM fused experts, and does not use speculative decoding, expert dropping, sampling changes, or power-limit changes.
 
 Note: `cmoyzvknv003ttl01q9vsyytb` is the larger-prompt validation for the BF16 llm-scaler u4 decode bridge. It keeps the same quality-preserving target path and reaches `31.833 tok/s` output at `p1024/n256`, but also records the current capacity boundary: vLLM reports only `0.16 GiB` available KV memory at `max_model_len=2048`, while a `p1536/n256` attempt failed with no available KV cache blocks.
+
+Note: `cmoz0imyo004atl01ilhq45t4` is a deliberate negative n-gram speculative result. The target model quality path is unchanged and vLLM verifies speculative tokens, but for random-token p512/n256 it disables async scheduling, requires `gpu_memory_utilization=0.95` to fit, and drops output throughput to `12.267 tok/s`. A deeper n-gram-4 attempt failed before generation with no KV memory.
 
 Date: 2026-05-03
 
