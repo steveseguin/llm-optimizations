@@ -1,0 +1,111 @@
+{
+  "date": "2026-05-10",
+  "model": {
+    "hfId": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+    "base": "MiniMaxAI/MiniMax-M2.7",
+    "path": "/mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround"
+  },
+  "hardware": {
+    "gpu": "Intel Arc Pro B70",
+    "gpuCount": 4,
+    "vramGbEach": 32,
+    "os": "Ubuntu 24.04.4 LTS"
+  },
+  "engine": {
+    "name": "vllm",
+    "version": "0.20.1-local",
+    "backend": "xpu",
+    "dtype": "float16",
+    "tensorParallel": 4,
+    "quantization": "INT4 AutoRound W4A16",
+    "llmScalerMoe": true
+  },
+  "change": {
+    "summary": "Opt-in XPU fallback for vLLM MiniMax Q/K norm fusion pass using minimax_qk_rms_xpu helper extension.",
+    "patch": "patches/vllm-minimax-qk-pass-xpu-helper-20260510.patch",
+    "env": {
+      "VLLM_MINIMAX_QK_NORM_XPU_HELPER_FUSION": "1",
+      "pass_config.fuse_minimax_qk_norm": true
+    }
+  },
+  "failures": [
+    {
+      "label": "cuda-workspace-not-skipped",
+      "timestampUtc": "2026-05-10T10:33:21Z",
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-qk-pass/vllm-minimax-m27-autoround-tp4-p1n8-20260510T103321Z.log",
+      "error": "CUDA Lamport workspace allocation failed with cudaErrorInsufficientDriver on XPU-only system."
+    },
+    {
+      "label": "torchbind-pattern-object",
+      "timestampUtc": "2026-05-10T10:38:47Z",
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-qk-pass/vllm-minimax-m27-autoround-tp4-p1n8-20260510T103847Z.log",
+      "error": "Pattern generation failed on get_attr torchbind group object before switching to torch.ops.vllm.all_reduce(..., group_name)."
+    }
+  ],
+  "runs": [
+    {
+      "label": "qk-pass-smoke-p1n8",
+      "timestampUtc": "2026-05-10T10:41:45Z",
+      "promptTokens": 1,
+      "outputTokens": 8,
+      "maxModelLen": 64,
+      "maxBatchedTokens": 64,
+      "gpuKvCacheTokens": 9408,
+      "aotHash": "cf4951af2f1de1b08cc2cd2642de3848537e2bed0c20860c4a5bea507e526c02",
+      "tokSTotal": 3.0675481077089723,
+      "tokSOut": 2.73,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-qk-pass/vllm-minimax-m27-autoround-tp4-p1n8-20260510T104145Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-qk-pass/vllm-minimax-m27-autoround-tp4-p1n8-20260510T104145Z.json",
+      "result": "liveness only"
+    },
+    {
+      "label": "qk-pass-cold-p512n512",
+      "timestampUtc": "2026-05-10T10:44:47Z",
+      "promptTokens": 512,
+      "outputTokens": 512,
+      "maxModelLen": 2048,
+      "maxBatchedTokens": 1024,
+      "gpuKvCacheTokens": 9408,
+      "aotHash": "2655f1c85227bceafff9f5b9f245e1e6206bdc911f95bba87bf857269c309e7c",
+      "torchCompileCache": "e5d63204a4",
+      "tokSTotal": 56.505086417612546,
+      "tokSOut": 28.25,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-qk-pass/vllm-minimax-m27-autoround-tp4-p512n512-20260510T104447Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-qk-pass/vllm-minimax-m27-autoround-tp4-p512n512-20260510T104447Z.json",
+      "result": "cold compile artifact"
+    },
+    {
+      "label": "qk-pass-warm-p512n512",
+      "timestampUtc": "2026-05-10T10:47:56Z",
+      "promptTokens": 512,
+      "outputTokens": 512,
+      "maxModelLen": 2048,
+      "maxBatchedTokens": 1024,
+      "gpuKvCacheTokens": 17216,
+      "aotHash": "2655f1c85227bceafff9f5b9f245e1e6206bdc911f95bba87bf857269c309e7c",
+      "torchCompileCache": "b624e23ba9",
+      "tokSTotal": 72.87049669193539,
+      "tokSOut": 36.44,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-qk-pass/vllm-minimax-m27-autoround-tp4-p512n512-20260510T104756Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-qk-pass/vllm-minimax-m27-autoround-tp4-p512n512-20260510T104756Z.json",
+      "result": "current floor; no LocalMaxxing submission"
+    },
+    {
+      "label": "qk-pass-warm-p512n1536",
+      "timestampUtc": "2026-05-10T10:50:26Z",
+      "promptTokens": 512,
+      "outputTokens": 1536,
+      "maxModelLen": 2048,
+      "maxBatchedTokens": 1024,
+      "gpuKvCacheTokens": 17216,
+      "aotHash": "2655f1c85227bceafff9f5b9f245e1e6206bdc911f95bba87bf857269c309e7c",
+      "torchCompileCache": "b624e23ba9",
+      "tokSTotal": 49.6546798590328,
+      "tokSOut": 37.24,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-qk-pass/vllm-minimax-m27-autoround-tp4-p512n1536-20260510T105026Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-qk-pass/vllm-minimax-m27-autoround-tp4-p512n1536-20260510T105026Z.json",
+      "result": "current floor; no LocalMaxxing submission"
+    }
+  ],
+  "conclusion": "The opt-in XPU Q/K fusion pass now works mechanically, but helper-backed var + allreduce + apply does not beat the current MiniMax floor."
+}

@@ -1,0 +1,203 @@
+diff --git a/vllm/compilation/passes/fusion/minimax_qk_norm_fusion.py b/vllm/compilation/passes/fusion/minimax_qk_norm_fusion.py
+index 7445028da..e2deec833 100644
+--- a/vllm/compilation/passes/fusion/minimax_qk_norm_fusion.py
++++ b/vllm/compilation/passes/fusion/minimax_qk_norm_fusion.py
+@@ -26,6 +26,8 @@ is_applicable_for_range: only fires for compile_range.end <= max_decode_tokens
+ so that large prefill batches fall through to the original forward_qk (= main).
+ """
+ 
++import os
++
+ import torch
+ import torch._inductor.pattern_matcher as pm
+ import torch.fx as fx
+@@ -37,6 +39,7 @@ from vllm.distributed import tensor_model_parallel_all_reduce
+ from vllm.distributed.parallel_state import (
+     get_tensor_model_parallel_rank,
+     get_tensor_model_parallel_world_size,
++    get_tp_group,
+ )
+ from vllm.logger import init_logger
+ from vllm.utils.torch_utils import direct_register_custom_op
+@@ -49,7 +52,12 @@ logger = init_logger(__name__)
+ MAX_TOKEN_NUM = 2048
+ 
+ _MINIMAX_QK_NORM_FUSED_OP = None
+-if hasattr(torch.ops._C, "minimax_allreduce_rms_qk"):
++_MINIMAX_QK_NORM_USES_LAMPORT_WORKSPACE = False
++if (
++    os.environ.get("VLLM_MINIMAX_QK_NORM_XPU_HELPER_FUSION", "0") != "1"
++    and hasattr(torch.ops._C, "minimax_allreduce_rms_qk")
++):
++    _MINIMAX_QK_NORM_USES_LAMPORT_WORKSPACE = True
+ 
+     def _minimax_qk_norm_fused(
+         qkv: torch.Tensor,
+@@ -109,6 +117,78 @@ if hasattr(torch.ops._C, "minimax_allreduce_rms_qk"):
+         mutates_args=[],
+     )
+     _MINIMAX_QK_NORM_FUSED_OP = torch.ops.vllm.minimax_qk_norm_fused.default
++if os.environ.get("VLLM_MINIMAX_QK_NORM_XPU_HELPER_FUSION", "0") == "1":
++    try:
++        import minimax_qk_rms_xpu  # noqa: F401
++
++        if hasattr(torch.ops, "minimax_qk_rms_xpu"):
++
++            def _minimax_qk_norm_fused_xpu_helper(
++                qkv: torch.Tensor,
++                norm_weight_q: torch.Tensor,
++                norm_weight_k: torch.Tensor,
++                q_size: int,
++                kv_size: int,
++                rank: int,
++                nranks: int,
++                eps: float,
++                max_tokens: int,
++            ) -> tuple[torch.Tensor, torch.Tensor]:
++                qk_var = torch.empty(
++                    (qkv.shape[0], 2), dtype=torch.float32, device=qkv.device
++                )
++                torch.ops.minimax_qk_rms_xpu.var(qkv, qk_var, q_size, kv_size)
++                if nranks > 1:
++                    qk_var = tensor_model_parallel_all_reduce(qk_var) / nranks
++                q_out = torch.empty(
++                    (qkv.shape[0], q_size), dtype=qkv.dtype, device=qkv.device
++                )
++                k_out = torch.empty(
++                    (qkv.shape[0], kv_size), dtype=qkv.dtype, device=qkv.device
++                )
++                torch.ops.minimax_qk_rms_xpu.apply(
++                    qkv,
++                    qk_var,
++                    norm_weight_q,
++                    norm_weight_k,
++                    q_out,
++                    k_out,
++                    q_size,
++                    kv_size,
++                    eps,
++                )
++                return q_out, k_out
++
++            def _minimax_qk_norm_fused_xpu_helper_fake(
++                qkv: torch.Tensor,
++                norm_weight_q: torch.Tensor,
++                norm_weight_k: torch.Tensor,
++                q_size: int,
++                kv_size: int,
++                rank: int,
++                nranks: int,
++                eps: float,
++                max_tokens: int,
++            ) -> tuple[torch.Tensor, torch.Tensor]:
++                T = qkv.shape[0]
++                return (
++                    torch.empty([T, q_size], dtype=qkv.dtype, device=qkv.device),
++                    torch.empty([T, kv_size], dtype=qkv.dtype, device=qkv.device),
++                )
++
++            direct_register_custom_op(
++                op_name="minimax_qk_norm_fused_xpu_helper",
++                op_func=_minimax_qk_norm_fused_xpu_helper,
++                fake_impl=_minimax_qk_norm_fused_xpu_helper_fake,
++                mutates_args=[],
++            )
++            _MINIMAX_QK_NORM_FUSED_OP = (
++                torch.ops.vllm.minimax_qk_norm_fused_xpu_helper.default
++            )
++    except Exception as e:
++        logger.warning_once(
++            "MiniMax XPU QK helper fusion unavailable: %s", str(e)
++        )
+ 
+ 
+ class MiniMaxQKNormPattern:
+@@ -126,6 +206,7 @@ class MiniMaxQKNormPattern:
+         max_tokens: int,
+         dtype: torch.dtype,
+         device: str | None,
++        group_name: str,
+     ) -> None:
+         self.q_size = q_size
+         self.kv_size = kv_size
+@@ -135,6 +216,7 @@ class MiniMaxQKNormPattern:
+         self.max_tokens = max_tokens
+         self.dtype = dtype
+         self.device = device
++        self.group_name = group_name
+ 
+     def get_inputs(self) -> list[torch.Tensor]:
+         T = 4
+@@ -155,6 +237,7 @@ class MiniMaxQKNormPattern:
+         max_tokens = self.max_tokens
+         tp_rank = self.tp_rank
+         dtype = self.dtype
++        group_name = self.group_name
+ 
+         def pattern(
+             qkv: torch.Tensor,
+@@ -167,7 +250,7 @@ class MiniMaxQKNormPattern:
+             q_var = q_fp32.pow(2).mean(dim=-1, keepdim=True)
+             k_var = k_fp32.pow(2).mean(dim=-1, keepdim=True)
+             qk_var = torch.cat([q_var, k_var], dim=-1)
+-            qk_var = tensor_model_parallel_all_reduce(qk_var) / tp_world
++            qk_var = torch.ops.vllm.all_reduce(qk_var, group_name) / tp_world
+             q_var, k_var = qk_var.chunk(2, dim=-1)
+             q_out = (q_fp32 * torch.rsqrt(q_var + eps) * q_weight).to(dtype)
+             k_out = (k_fp32 * torch.rsqrt(k_var + eps) * k_weight).to(dtype)
+@@ -179,7 +262,7 @@ class MiniMaxQKNormPattern:
+             k_weight: torch.Tensor,
+         ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+             assert _MINIMAX_QK_NORM_FUSED_OP is not None
+-            q_out, k_out = torch.ops.vllm.minimax_qk_norm_fused(
++            q_out, k_out = _MINIMAX_QK_NORM_FUSED_OP(
+                 qkv,
+                 q_weight,
+                 k_weight,
+@@ -214,7 +297,7 @@ class MiniMaxQKNormPattern:
+             q_var = q_fp32.pow(2).mean(dim=-1, keepdim=True)
+             k_var = k_fp32.pow(2).mean(dim=-1, keepdim=True)
+             qk_var = torch.cat([q_var, k_var], dim=-1)
+-            qk_var = tensor_model_parallel_all_reduce(qk_var) / tp_world
++            qk_var = torch.ops.vllm.all_reduce(qk_var, group_name) / tp_world
+             q_var, k_var = qk_var.chunk(2, dim=-1)
+             q_out = (q_fp32 * torch.rsqrt(q_var + eps) * q_weight).to(dtype)
+             k_out = (k_fp32 * torch.rsqrt(k_var + eps) * k_weight).to(dtype)
+@@ -283,18 +366,18 @@ class MiniMaxQKNormPass(VllmPatternMatcherPass):
+         )
+ 
+         tp_rank = get_tensor_model_parallel_rank()
+-        # Allocate Lamport workspace first.
+-        from vllm.distributed.parallel_state import get_tp_group
+-        from vllm.model_executor.layers.mamba.lamport_workspace import (
+-            get_allreduce_workspace,
+-        )
++        if _MINIMAX_QK_NORM_USES_LAMPORT_WORKSPACE:
++            # Allocate Lamport workspace first.
++            from vllm.model_executor.layers.mamba.lamport_workspace import (
++                get_allreduce_workspace,
++            )
+ 
+-        get_allreduce_workspace(
+-            rank=tp_rank,
+-            world_size=tp_world,
+-            max_tokens=self.max_token_num,
+-            process_group=get_tp_group().cpu_group,
+-        )
++            get_allreduce_workspace(
++                rank=tp_rank,
++                world_size=tp_world,
++                max_tokens=self.max_token_num,
++                process_group=get_tp_group().cpu_group,
++            )
+ 
+         self.patterns: PatternMatcherPass = PatternMatcherPass(
+             pass_name="minimax_qk_norm_pass"
+@@ -321,6 +404,7 @@ class MiniMaxQKNormPass(VllmPatternMatcherPass):
+             max_tokens=self.max_token_num,
+             dtype=self.model_dtype,
+             device=self.device,
++            group_name=get_tp_group().unique_name,
+         ).register(self.patterns)
+ 
+     def is_applicable_for_range(self, compile_range: Range) -> bool:
