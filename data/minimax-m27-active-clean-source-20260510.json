@@ -1,0 +1,79 @@
+{
+  "date": "2026-05-10",
+  "model": {
+    "hfId": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+    "base": "MiniMaxAI/MiniMax-M2.7",
+    "path": "/mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround"
+  },
+  "hardware": {
+    "gpu": "Intel Arc Pro B70",
+    "gpuCount": 4,
+    "vramGbEach": 32,
+    "os": "Ubuntu 24.04.4 LTS"
+  },
+  "engine": {
+    "name": "vllm",
+    "version": "0.20.1-local",
+    "backend": "xpu",
+    "dtype": "float16",
+    "tensorParallel": 4,
+    "quantization": "INT4 AutoRound W4A16",
+    "llmScalerMoe": true
+  },
+  "change": {
+    "summary": "Active MiniMax model source reduced to K-norm TP replication fix only; dormant helper/router/timing branches removed from active runtime.",
+    "patch": "patches/vllm-minimax-active-clean-knorm-only-20260510.patch",
+    "vllmCacheRoot": "/mnt/fast-ai/vllm-cache-exp/minimax-clean-source-20260510T100729Z"
+  },
+  "runs": [
+    {
+      "label": "clean-source-cold-p512n512",
+      "timestampUtc": "2026-05-10T10:07:29Z",
+      "promptTokens": 512,
+      "outputTokens": 512,
+      "maxModelLen": 2048,
+      "maxBatchedTokens": 1024,
+      "gpuKvCacheTokens": 9408,
+      "aotHash": "4799a3c8468de261861723fba07480ef61e010f504245a62e5e93f4e9aef8e22",
+      "torchCompileCache": "2d59d0e621",
+      "tokSTotal": 54.93188936565009,
+      "tokSOut": 27.47,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-clean-source/vllm-minimax-m27-autoround-tp4-p512n512-20260510T100729Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-clean-source/vllm-minimax-m27-autoround-tp4-p512n512-20260510T100729Z.json",
+      "result": "cold compile artifact"
+    },
+    {
+      "label": "clean-source-warm-p512n512",
+      "timestampUtc": "2026-05-10T10:10:40Z",
+      "promptTokens": 512,
+      "outputTokens": 512,
+      "maxModelLen": 2048,
+      "maxBatchedTokens": 1024,
+      "gpuKvCacheTokens": 17216,
+      "aotHash": "4799a3c8468de261861723fba07480ef61e010f504245a62e5e93f4e9aef8e22",
+      "torchCompileCache": "cf667763cb",
+      "tokSTotal": 72.2756275358868,
+      "tokSOut": 36.14,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-clean-source/vllm-minimax-m27-autoround-tp4-p512n512-20260510T101040Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-clean-source/vllm-minimax-m27-autoround-tp4-p512n512-20260510T101040Z.json",
+      "result": "current floor; no LocalMaxxing submission"
+    },
+    {
+      "label": "clean-source-warm-p512n1536",
+      "timestampUtc": "2026-05-10T10:13:09Z",
+      "promptTokens": 512,
+      "outputTokens": 1536,
+      "maxModelLen": 2048,
+      "maxBatchedTokens": 1024,
+      "gpuKvCacheTokens": 17216,
+      "aotHash": "4799a3c8468de261861723fba07480ef61e010f504245a62e5e93f4e9aef8e22",
+      "torchCompileCache": "cf667763cb",
+      "tokSTotal": 48.83855277502005,
+      "tokSOut": 36.63,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-clean-source/vllm-minimax-m27-autoround-tp4-p512n1536-20260510T101309Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-clean-source/vllm-minimax-m27-autoround-tp4-p512n1536-20260510T101309Z.json",
+      "result": "current floor; no LocalMaxxing submission"
+    }
+  ],
+  "conclusion": "Removing dormant helper/router/timing branches from active MiniMax source restores a clean runtime state but does not recover the prior 41.130667 tok/s AOT schedule."
+}
