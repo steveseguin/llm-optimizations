@@ -199,6 +199,12 @@ The u4 MoE bridge is no longer the only ceiling. Existing timing notes put MiniM
 6. Do not enable `--enforce-eager` for MiniMax throughput. It is mentioned in
    Intel AutoRound deployment docs, but local p64/n128 throughput dropped from
    `33.745` output tok/s compiled to `18.007` output tok/s eager.
+7. Keep a smaller MoE-router fusion track alive: MiniMax has `top_k=8`, `256`
+   local experts, and no shared experts, so llm-scaler shared-expert kernels
+   are not quality-equivalent. The next quality-preserving MoE screen is a
+   MiniMax-specific routed `top8 from logits -> u4 tiny MoE` path that avoids
+   the generic router allocation boundary without changing selected experts or
+   dropping any expert work.
 
 Current code-direction preference after the latest negative screens:
 
@@ -210,3 +216,25 @@ Current code-direction preference after the latest negative screens:
    hidden-state allreduce followed immediately by residual add/RMSNorm.
 4. If a fusion cannot beat the current p512/n1536 anchor, archive it as a
    negative and leave the env flag unset.
+
+## 2026-05-10 Refresh
+
+The AutoRound MiniMax target is now explicitly higher than the old GGUF target.
+For the full MiniMax AutoRound model on four B70s, treat `60 tok/s` p512/n1536
+decode as the main software target and `75+ tok/s` as a speculation-only stretch
+that must still be target-verified. Current useful public results should include
+both output tok/s and total tok/s so prefill effects are visible.
+
+External references checked today:
+
+- `intel/llm-scaler-vllm:0.14.0-b8.2.1` is the current public llm-scaler vLLM
+  image tag visible on Docker Hub, while the April 2026 B70 release notes and
+  reports describe official Arc Pro B70 support in the `0.14.0-b8.2` family.
+- vLLM's current fusion docs list sequence parallelism as
+  `AllReduce -> RMSNorm` to `ReduceScatter -> local RMSNorm -> AllGather`, but
+  the docs frame it as CUDA-tested and not a ready XPU path.
+- vLLM's XPU kernel package has moved normalization kernels such as RMSNorm and
+  fused add-RMSNorm into an out-of-tree importable kernel package. That is useful
+  for reference, but local provider swaps alone have already benchmarked below
+  the current MiniMax reference. The missing piece remains collective-boundary
+  fusion, not just a faster standalone norm kernel.

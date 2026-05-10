@@ -1,0 +1,91 @@
+diff --git a/vllm/compilation/passes/fusion/sequence_parallelism.py b/vllm/compilation/passes/fusion/sequence_parallelism.py
+index 2c7a1390b..34f4f3080 100644
+--- a/vllm/compilation/passes/fusion/sequence_parallelism.py
++++ b/vllm/compilation/passes/fusion/sequence_parallelism.py
+@@ -396,13 +396,16 @@ class SequenceParallelismPass(VllmPatternMatcherPass):
+         )
+ 
+         for epsilon in [1e-5, 1e-6]:
+-            # RMSNorm + Static FP8 quantization patterns
+-            FirstAllReduceRMSNormStaticFP8Pattern(
+-                epsilon, self.model_dtype, self.device
+-            ).register(self.patterns)
+-            MiddleAllReduceRMSNormStaticFP8Pattern(
+-                epsilon, self.model_dtype, self.device
+-            ).register(self.patterns)
++            from vllm.platforms import current_platform
++
++            if not current_platform.is_xpu():
++                # RMSNorm + Static FP8 quantization patterns
++                FirstAllReduceRMSNormStaticFP8Pattern(
++                    epsilon, self.model_dtype, self.device
++                ).register(self.patterns)
++                MiddleAllReduceRMSNormStaticFP8Pattern(
++                    epsilon, self.model_dtype, self.device
++                ).register(self.patterns)
+ 
+             # Normal RMSNorm patterns
+             FirstAllReduceRMSNormPattern(
+diff --git a/vllm/compilation/passes/pass_manager.py b/vllm/compilation/passes/pass_manager.py
+index 5d4355a5b..3e4a1a5c9 100644
+--- a/vllm/compilation/passes/pass_manager.py
++++ b/vllm/compilation/passes/pass_manager.py
+@@ -39,11 +39,17 @@ if current_platform.is_cuda_alike():
+     from .fusion.sequence_parallelism import SequenceParallelismPass
+     from .utility.scatter_split_replace import ScatterSplitReplacementPass
+     from .utility.split_coalescing import SplitCoalescingPass
++elif current_platform.is_xpu():
++    from .fusion.sequence_parallelism import SequenceParallelismPass
+ 
+ if current_platform.is_cuda():
+     from .fusion.allreduce_rms_fusion import AllReduceFusionPass
+     from .fusion.collective_fusion import AsyncTPPass
++
++try:
+     from .fusion.minimax_qk_norm_fusion import MiniMaxQKNormPass
++except Exception:
++    MiniMaxQKNormPass = None
+ 
+ from .inductor_pass import (
+     CustomGraphPass,
+@@ -149,7 +155,12 @@ class PostGradPassManager(CustomGraphPass):  # type: ignore[misc]
+                     self.passes += [AllReduceFusionPass(config)]
+ 
+             if self.pass_config.fuse_minimax_qk_norm:
+-                self.passes += [MiniMaxQKNormPass(config)]
++                if MiniMaxQKNormPass is None:
++                    logger.warning_once(
++                        "MiniMaxQKNormPass unavailable on this platform/build."
++                    )
++                else:
++                    self.passes += [MiniMaxQKNormPass(config)]
+ 
+             if self.pass_config.fuse_norm_quant:
+                 if rocm_aiter_ops.is_enabled():
+diff --git a/vllm/platforms/xpu.py b/vllm/platforms/xpu.py
+index bd9006f3f..51641014a 100644
+--- a/vllm/platforms/xpu.py
++++ b/vllm/platforms/xpu.py
+@@ -225,6 +225,11 @@ class XPUPlatform(Platform):
+             "fuse_act_padding": "Activation + padding fusion",
+             "fuse_rope_kvcache": "RoPE + KV cache fusion",
+         }
++        if os.getenv("VLLM_XPU_EXPERIMENTAL_ENABLE_SP", "0") == "1":
++            fusion_passes_to_disable.pop("enable_sp", None)
++        if os.getenv("VLLM_XPU_EXPERIMENTAL_FUSE_GEMM_COMMS", "0") == "1":
++            fusion_passes_to_disable.pop("enable_sp", None)
++            fusion_passes_to_disable.pop("fuse_gemm_comms", None)
+         for flag, feature_name in fusion_passes_to_disable.items():
+             if getattr(pass_config, flag):
+                 logger.warning(
+@@ -343,6 +348,10 @@ class XPUPlatform(Platform):
+             )
+         return "vllm.distributed.device_communicators.xpu_communicator.XpuCommunicator"  # noqa
+ 
++    @classmethod
++    def use_custom_op_collectives(cls) -> bool:
++        return os.environ.get("VLLM_XPU_USE_CUSTOM_OP_COLLECTIVES", "0") == "1"
++
+     @classmethod
+     def supports_fp8(cls) -> bool:
+         return True

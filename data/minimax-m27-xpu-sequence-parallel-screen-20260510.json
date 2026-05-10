@@ -1,0 +1,70 @@
+{
+  "date": "2026-05-10",
+  "model": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+  "hardware": "4x Intel Arc Pro B70 32GB",
+  "engine": "vLLM XPU",
+  "experiment": "Sequence parallelism and TP communication-boundary screen",
+  "qualityPreserved": true,
+  "submittedToLocalMaxxing": false,
+  "localmaxxingReason": "Negative engineering result; not a useful leaderboard datapoint.",
+  "patch": "patches/vllm-xpu-sequence-parallel-screen-20260510.patch",
+  "runs": [
+    {
+      "name": "sp_default_allreduce_import_missing",
+      "status": "failed",
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-sp-screen-p64n32/vllm-minimax-m27-autoround-tp4-p64n32-20260510T193112Z.log",
+      "error": "NameError: name 'SequenceParallelismPass' is not defined"
+    },
+    {
+      "name": "sp_import_patch_static_fp8_pattern_failure",
+      "status": "failed",
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-sp-screen-p64n32-retry/vllm-minimax-m27-autoround-tp4-p64n32-20260510T193356Z.log",
+      "error": "TorchInductor pattern matcher NotImplementedError on torchbind get_attr while registering static-FP8 SP pattern"
+    },
+    {
+      "name": "sp_normalpatterns_default_allreduce_failure",
+      "status": "failed",
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-sp-normalpatterns-p64n32/vllm-minimax-m27-autoround-tp4-p64n32-20260510T193649Z.log",
+      "error": "TorchInductor pattern matcher NotImplementedError on torchbind get_attr while registering normal allreduce/RMS SP pattern"
+    },
+    {
+      "name": "sp_custom_collectives_completed_negative",
+      "status": "completed_negative",
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-sp-customar-p64n32/vllm-minimax-m27-autoround-tp4-p64n32-20260510T193942Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-sp-customar-p64n32/vllm-minimax-m27-autoround-tp4-p64n32-20260510T193942Z.json",
+      "promptTokens": 64,
+      "outputTokens": 32,
+      "contextLength": 512,
+      "totalTokS": 17.19690577090031,
+      "outputTokS": 5.732301923633438,
+      "elapsedSeconds": 5.58239960600622,
+      "compileSeconds": 103.06,
+      "env": {
+        "VLLM_XPU_EXPERIMENTAL_ENABLE_SP": "1",
+        "VLLM_XPU_USE_CUSTOM_OP_COLLECTIVES": "1",
+        "VLLM_XPU_USE_LLM_SCALER_MOE": "1",
+        "XPU_GRAPH": "0"
+      },
+      "extraArgs": "-cc.pass_config.enable_sp=True -cc.pass_config.sp_min_token_num=1"
+    },
+    {
+      "name": "post_sp_patch_env_off_clean_smoke",
+      "status": "completed_reference",
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-post-sp-clean-smoke-p64n32/vllm-minimax-m27-autoround-tp4-p64n32-20260510T194412Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-post-sp-clean-smoke-p64n32/vllm-minimax-m27-autoround-tp4-p64n32-20260510T194412Z.json",
+      "promptTokens": 64,
+      "outputTokens": 32,
+      "contextLength": 512,
+      "totalTokS": 76.2677033538617,
+      "outputTokS": 25.42256778462057,
+      "elapsedSeconds": 1.2587241489964072,
+      "env": {
+        "VLLM_XPU_EXPERIMENTAL_ENABLE_SP": "unset",
+        "VLLM_XPU_USE_CUSTOM_OP_COLLECTIVES": "unset",
+        "VLLM_XPU_USE_LLM_SCALER_MOE": "1",
+        "XPU_GRAPH": "0"
+      }
+    }
+  ],
+  "conclusion": "Do not promote upstream sequence parallelism on B70 today. Use it as a design reference for XPU-native allreduce/residual/RMS or QK RMS fusion."
+}
