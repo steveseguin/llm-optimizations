@@ -1,0 +1,90 @@
+{
+  "model": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+  "hardware": "4x Intel Arc Pro B70 32GB",
+  "engine": "vllm 0.20.1-local XPU TP4",
+  "date_utc": "2026-05-10",
+  "baseline_reference": {
+    "accepted_localmaxxing_id": "cmoz8cow60001pd010klrb8g8",
+    "shape": "p512/n1536",
+    "tok_s_out": 41.13066701938602,
+    "notes": "Valid FP16 u4 decode path before the favorable c15860 AOT payload was overwritten."
+  },
+  "runs": [
+    {
+      "label": "default_fresh_compile",
+      "timestamp_utc": "2026-05-10T07:31:35Z",
+      "prompt_tokens": 512,
+      "output_tokens": 512,
+      "change": "Fresh isolated VLLM_CACHE_ROOT default compile.",
+      "vllm_cache_root": "/mnt/fast-ai/vllm-cache-exp/minimax-default-recompile-20260510T073135Z-r1",
+      "cache_key": "b5636051eb",
+      "aot_hash_prefix": "c15860dd",
+      "gpu_kv_cache_tokens": 9408,
+      "tok_s_total": 54.45,
+      "tok_s_out": 27.23,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n512-20260510T073135Z.log",
+      "result": "cold compile artifact"
+    },
+    {
+      "label": "default_warmed_cache",
+      "timestamp_utc": "2026-05-10T07:34:55Z",
+      "prompt_tokens": 512,
+      "output_tokens": 512,
+      "change": "Reused same isolated default AOT cache.",
+      "vllm_cache_root": "/mnt/fast-ai/vllm-cache-exp/minimax-default-recompile-20260510T073135Z-r1",
+      "cache_key": "1d97049441",
+      "aot_hash_prefix": "c15860dd",
+      "gpu_kv_cache_tokens": 17216,
+      "tok_s_total": 70.84,
+      "tok_s_out": 35.42,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n512-20260510T073455Z.log",
+      "result": "current floor repeat"
+    },
+    {
+      "label": "inplace_allreduce_fresh_compile",
+      "timestamp_utc": "2026-05-10T07:38:06Z",
+      "prompt_tokens": 512,
+      "output_tokens": 512,
+      "change": "Tested reverted experiment VLLM_XPU_ALLREDUCE_INPLACE_COMPILED=1.",
+      "vllm_cache_root": "/mnt/fast-ai/vllm-cache-exp/minimax-inplace-allreduce-20260510T073806Z-r1",
+      "cache_key": "8b13139f79",
+      "aot_hash_prefix": "c15860dd",
+      "gpu_kv_cache_tokens": 9408,
+      "tok_s_total": 53.90,
+      "tok_s_out": 26.95,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n512-20260510T073806Z.log",
+      "result": "cold compile artifact"
+    },
+    {
+      "label": "inplace_allreduce_warmed_cache_p512n512",
+      "timestamp_utc": "2026-05-10T07:41:10Z",
+      "prompt_tokens": 512,
+      "output_tokens": 512,
+      "change": "Reused same in-place-allreduce AOT cache.",
+      "vllm_cache_root": "/mnt/fast-ai/vllm-cache-exp/minimax-inplace-allreduce-20260510T073806Z-r1",
+      "cache_key": "1daccf0db0",
+      "aot_hash_prefix": "c15860dd",
+      "gpu_kv_cache_tokens": 17216,
+      "tok_s_total": 71.44,
+      "tok_s_out": 35.72,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n512-20260510T074110Z.log",
+      "result": "neutral"
+    },
+    {
+      "label": "inplace_allreduce_warmed_cache_p512n1536",
+      "timestamp_utc": "2026-05-10T07:43:39Z",
+      "prompt_tokens": 512,
+      "output_tokens": 1536,
+      "change": "Longer decode window with same in-place-allreduce AOT cache.",
+      "vllm_cache_root": "/mnt/fast-ai/vllm-cache-exp/minimax-inplace-allreduce-20260510T073806Z-r1",
+      "cache_key": "1daccf0db0",
+      "aot_hash_prefix": "c15860dd",
+      "gpu_kv_cache_tokens": 17216,
+      "tok_s_total": 48.92,
+      "tok_s_out": 36.69,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260510T074339Z.log",
+      "result": "slightly negative vs default p512/n1536 floor"
+    }
+  ],
+  "decision": "Do not submit these diagnostic runs to LocalMaxxing. Reverted the in-place compiled allreduce experiment from the active runtime and continue toward a Level Zero IPC/P2P-backed XPU MiniMax Q/K allreduce+RMS fusion prototype."
+}
