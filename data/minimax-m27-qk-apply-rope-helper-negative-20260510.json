@@ -1,0 +1,77 @@
+{
+  "date": "2026-05-10",
+  "model": {
+    "name": "MiniMax M2.7 INT4 AutoRound",
+    "path": "/mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround"
+  },
+  "hardware": {
+    "gpus": "4x Intel Arc Pro B70 32GB",
+    "storage": "/mnt/fast-ai"
+  },
+  "engine": {
+    "name": "vLLM",
+    "backend": "xpu",
+    "tensor_parallel": 4,
+    "dtype": "float16",
+    "custom_decode_moe": "llm-scaler unsigned u4 bridge",
+    "xpu_graph": false,
+    "speculative_decode": false
+  },
+  "experiment": {
+    "name": "MiniMax Q/K RMS apply plus RoPE XPU helper",
+    "env_flag": "VLLM_MINIMAX_QK_APPLY_ROPE_XPU_HELPER=1",
+    "max_tokens_default": 4,
+    "extension": "experiments/minimax_qk_rms_xpu/minimax_qk_rms_xpu.cpp",
+    "vllm_patch": "patches/vllm-minimax-qk-apply-rope-xpu-helper-20260510.patch",
+    "status": "default_off_negative"
+  },
+  "build": {
+    "working_compiler_env": "/opt/intel/oneapi/compiler/2025.3/env/vars.sh",
+    "working_compiler": "/opt/intel/oneapi/compiler/2025.3/bin/icpx",
+    "pip_flags": "--no-build-isolation -e",
+    "negative_build_note": "Building after sourcing /opt/intel/oneapi/setvars.sh while compiler/latest pointed at 2026.0 produced an undefined sycl::queue::submit_with_event_impl symbol on import."
+  },
+  "standalone_validation": {
+    "fp16_q_max_diff": 0.001953125,
+    "fp16_k_max_diff": 0.001953125,
+    "bf16_smoke": "finite_outputs"
+  },
+  "vllm_runs": [
+    {
+      "shape": "p32/n8",
+      "result": "smoke_passed_not_a_benchmark",
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p32n8-20260510T043923Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p32n8-20260510T043923Z.json"
+    },
+    {
+      "shape": "p512/n512",
+      "env": "VLLM_MINIMAX_QK_APPLY_ROPE_XPU_HELPER=1",
+      "total_tok_s": 71.363649,
+      "output_tok_s": 35.681825,
+      "baseline_output_tok_s": 39.610585,
+      "outcome": "negative",
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n512-20260510T044214Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n512-20260510T044214Z.json"
+    },
+    {
+      "shape": "p512/n4",
+      "env": "VLLM_MINIMAX_QK_APPLY_ROPE_XPU_HELPER=1, VLLM_XPU_DECODE_TIMING=1, --enforce-eager",
+      "not_a_benchmark": true,
+      "rank0_last_qk_norm_ms": 0.211401,
+      "rank0_last_runner_forward_ms": 50.183584,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n4-20260510T044449Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n4-20260510T044449Z.json"
+    }
+  ],
+  "oneccl_direct_screen": {
+    "source": "https://www.intel.com/content/www/us/en/docs/oneccl/developer-guide-reference/2021-15/environment-variables.html",
+    "env": "CCL_ALLREDUCE=direct",
+    "shape": "p512/n512",
+    "total_tok_s": 32.290690,
+    "output_tok_s": 16.145345,
+    "outcome": "very_negative",
+    "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n512-20260510T044829Z.log",
+    "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n512-20260510T044829Z.json"
+  },
+  "conclusion": "The apply+RoPE helper is numerically correct and improves eager timing, but it regresses the compiled throughput path. Keep it default-off and move toward a true XPU peer-memory Q/K allreduce/RMS fusion or an inductor fusion that preserves the compiled graph schedule."
+}

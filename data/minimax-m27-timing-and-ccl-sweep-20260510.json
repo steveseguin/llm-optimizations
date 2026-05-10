@@ -1,0 +1,93 @@
+{
+  "date": "2026-05-10",
+  "model": {
+    "name": "MiniMax M2.7 INT4 AutoRound",
+    "path": "/mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround"
+  },
+  "hardware": {
+    "gpus": "4x Intel Arc Pro B70 32GB",
+    "storage": "/mnt/fast-ai"
+  },
+  "engine": {
+    "name": "vLLM",
+    "backend": "xpu",
+    "tensor_parallel": 4,
+    "dtype": "float16",
+    "custom_decode_moe": "llm-scaler unsigned u4 bridge",
+    "xpu_graph": false,
+    "speculative_decode": false
+  },
+  "baseline": {
+    "shape": "p512/n512",
+    "total_tok_s": 79.22117,
+    "output_tok_s": 39.610585,
+    "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n512-20260510T011816Z.log"
+  },
+  "timing_diagnostics": [
+    {
+      "shape": "p512/n64",
+      "mode": "compiled_with_synchronizing_timing_summary",
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n64-20260510T041444Z.log",
+      "not_a_benchmark": true,
+      "observations": {
+        "runner_forward_avg_ms": 45.675,
+        "moe_quant_apply_total_ms": 1564,
+        "moe_fused_experts_fallback_total_ms": 615.9,
+        "moe_llm_scaler_u4_bridge_total_ms": 601.6,
+        "moe_router_select_total_ms": 270.5
+      }
+    },
+    {
+      "shape": "p512/n4",
+      "mode": "eager_with_per_label_synchronizing_timing",
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n4-20260510T041943Z.log",
+      "not_a_benchmark": true,
+      "last_steady_rank0_samples_ms": {
+        "minimax.attn.qk_norm": 0.464702,
+        "tp.all_reduce.direct_typical": "0.084-0.088",
+        "minimax.attn.kv_attention": 0.285331,
+        "attn.unified_attention_total": 0.091680,
+        "moe.llm_scaler_u4_bridge": 0.105740,
+        "minimax.moe.experts_total": 0.579922,
+        "runner.forward": 138.788797
+      }
+    }
+  ],
+  "oneccl_sweep": [
+    {
+      "change": "CCL_SYCL_ALLREDUCE_TMP_BUF=1",
+      "shape": "p512/n512",
+      "total_tok_s": 78.815625,
+      "output_tok_s": 39.407813,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n512-20260510T042255Z.log",
+      "outcome": "neutral_to_negative"
+    },
+    {
+      "change": "CCL_TOPO_FABRIC_VERTEX_CONNECTION_CHECK=0",
+      "shape": "p512/n512",
+      "total_tok_s": 78.624438,
+      "output_tok_s": 39.312219,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n512-20260510T042517Z.log",
+      "outcome": "negative"
+    },
+    {
+      "change": "CCL_ALLREDUCE_SMALL_THRESHOLD=0",
+      "shape": "p512/n512",
+      "total_tok_s": 77.370316,
+      "output_tok_s": 38.685158,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n512-20260510T042741Z.log",
+      "outcome": "negative"
+    }
+  ],
+  "conclusion": "The current MiniMax TP4 decode ceiling is distributed across Q/K RMS plus collectives, attention/KV, projections, MoE, and compiled graph boundaries. Easy oneCCL environment toggles did not improve the fast-NVMe FP16 u4 decode path.",
+  "next_candidates": [
+    "Default-off XPU helper that keeps the Q/K variance allreduce but fuses post-allreduce RMS application with RoPE.",
+    "Higher-risk XPU equivalent of CUDA minimax_allreduce_rms_qk with strict logits validation.",
+    "Decode-sized TP allreduce fast path after per-op correctness and deadlock tests."
+  ],
+  "sources": [
+    "https://www.intel.com/content/www/us/en/docs/oneccl/developer-guide-reference/2021-16/environment-variables.html",
+    "https://www.intel.com/content/www/us/en/docs/oneccl/developer-guide-reference/2021-16/main.html",
+    "https://www.intel.com/content/www/us/en/docs/oneccl/developer-guide-reference/2021-16/low-precision.html"
+  ]
+}
