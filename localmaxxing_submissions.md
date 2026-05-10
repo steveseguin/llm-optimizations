@@ -222,3 +222,13 @@ Note: `cmox6tys30085ml0125gihg18` was the first strong vLLM/XPU MiniMax AutoRoun
 Note: `cmox94fsm0095ml01tjeb20rr` is the current best MiniMax AutoRound vLLM/XPU result. It adds a hybrid B70 MoE config in `configs/vllm/minimax-m27-b70-int4-w4a16-moe-hybrid-20260508.json`: tuned key `1` for decode and default prompt-size keys `64`, `256`, and `512`. The accepted LocalMaxxing row omits `backend=xpu` because the API currently rejects that backend enum; XPU/Level Zero details are retained in `engineFlags.extraFlags` and in the archived payload/response files.
 
 Not submitted: `GGML_SYCL_MOE_UP_GATE_PAIR_DOT=1` paired up/gate dot loop for MiniMax `MOE_FUSED_UP_GATE` produced `16.840924 tok/s` with high variance (`15.8979`, `17.3159`, `17.3090`). This was neutral/slower than `cmowt5ciy00d0o201f1mcrg3q`, so it remains a negative/noise experiment rather than a public benchmark result.
+
+Date: 2026-05-10
+
+Model: `Lasimeri/MiniMax-M2.7-int4-AutoRound`, AutoRound W4A16 safetensors.
+
+| Label | LocalMaxxing ID | GPUs | Input | Output | tok/s out | tok/s total |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| `vllm-minimax-m27-autoround-int4-xpu-tp4-fast-nvme-p512-n1024` | `cmoz4qkc3005htl01t70cd8l7` | 4 | 512 | 1024 | 36.670 | 55.005 |
+
+Note: `cmoz4qkc3005htl01t70cd8l7` is the corrected fast-NVMe p512/n1024 MiniMax AutoRound validation. It keeps the same vLLM/XPU TP4 llm-scaler u4 decode-only path as the prior long-output run, but moves the checkpoint from the external NTFS USB drive to ext4 PCIe 5.0 NVMe. Comparable model load time dropped from `348.18s` to `84.39s`, and decode improved from `35.933` to `36.670` output tok/s. The key scheduler lesson is that `--max-num-batched-tokens 1024` is the current sweet spot for this shape; `1536` fell to `29.478` output tok/s and `512` fell to `31.862`. `XPU_GRAPH=1` remains negative because communication capture is unsupported and the run loses KV headroom.

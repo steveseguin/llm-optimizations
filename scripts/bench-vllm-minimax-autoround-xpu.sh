@@ -17,7 +17,12 @@ CCL_P2P="${CCL_P2P:-1}"
 XPU_GRAPH="${XPU_GRAPH:-0}"
 USE_LLM_SCALER_MOE="${USE_LLM_SCALER_MOE:-0}"
 LLM_SCALER_KERNELS="${LLM_SCALER_KERNELS:-/home/steve/src/llm-scaler/vllm/custom-esimd-kernels-vllm/python}"
+GPU_MEMORY_UTILIZATION="${GPU_MEMORY_UTILIZATION:-}"
 EXTRA_ARGS="${EXTRA_ARGS:-}"
+
+if [ -n "$GPU_MEMORY_UTILIZATION" ]; then
+  EXTRA_ARGS="$EXTRA_ARGS --gpu-memory-utilization $GPU_MEMORY_UTILIZATION"
+fi
 
 mkdir -p "$OUTDIR"
 ts="$(date -u +%Y%m%dT%H%M%SZ)"
