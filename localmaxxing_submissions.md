@@ -15,6 +15,7 @@ Model: `Lasimeri/MiniMax-M2.7-int4-AutoRound`, AutoRound W4A16 safetensors, vLLM
 | `vllm-minimax-m27-autoround-u4-decode-fast-nvme-p512-n1024-refresh` | `cmoz82i2f007itl01fkno9or1` | 4 | 512 | 1024 | 40.304 | 60.456 |
 | `vllm-minimax-m27-autoround-u4-decode-fast-nvme-p512-n1536` | `cmoz8cow60001pd010klrb8g8` | 4 | 512 | 1536 | 41.131 | 54.841 |
 | `vllm-minimax-m27-autoround-u4-decode-fast-nvme-maxlen4096-p512-n1536` | `cmoz8k9z40008pd01rhu50c0n` | 4 | 512 | 1536 | 33.258 | 44.344 |
+| `vllm-minimax-m27-autoround-u4-decode-fast-nvme-maxlen4096-gpumem095-p512-n1536` | `cmoz8ryb9000bpd014xhl3pxu` | 4 | 512 | 1536 | 36.616 | 48.822 |
 
 Note: `cmoz8cow60001pd010klrb8g8` is the current best MiniMax AutoRound result on the four B70 system. It uses the unsigned llm-scaler u4 decode-only MoE path with FP16 activations, fast ext4 NVMe model storage, the installed B70 MoE config, normal Q/K TP allreduce, no speculative decoding, no expert dropping, and no power-limit changes. It covers the full `max_model_len=2048` request window with p512/n1536 and repeated at `40.864` then `41.131` output tok/s.
 
@@ -23,6 +24,8 @@ Note: `cmoz82i2f007itl01fkno9or1` is the matching p512/n1024 long-output validat
 Note: `cmoz7rs2w0077tl01o3f1kxnm` is the matching p512/n512 fast-NVMe validation. It uses the same quality path and repeated at `39.516` output tok/s.
 
 Note: `cmoz8k9z40008pd01rhu50c0n` is a larger-context capacity datapoint, not a speed record. Raising `max_model_len` to 4096 reduced GPU KV cache from 17,216 to 9,408 tokens and lowered the same p512/n1536 request from `41.131` to `33.258` output tok/s.
+
+Note: `cmoz8ryb9000bpd014xhl3pxu` is the better 4096-context capacity recipe. Adding `gpu_memory_utilization=0.95` raises GPU KV cache to 33,408 tokens and improves the same p512/n1536 request to `36.616` output tok/s, still below the 2048-window speed path.
 
 Note: `cmoyzvknv003ttl01q9vsyytb` is the larger-prompt validation for the BF16 llm-scaler u4 decode bridge. It keeps the same quality-preserving target path and reaches `31.833 tok/s` output at `p1024/n256`, but also records the current capacity boundary: vLLM reports only `0.16 GiB` available KV memory at `max_model_len=2048`, while a `p1536/n256` attempt failed with no available KV cache blocks.
 
@@ -244,6 +247,7 @@ Model: `Lasimeri/MiniMax-M2.7-int4-AutoRound`, AutoRound W4A16 safetensors.
 | `vllm-minimax-m27-autoround-u4-decode-fast-nvme-p512-n1024-refresh` | `cmoz82i2f007itl01fkno9or1` | 4 | 512 | 1024 | 40.304 | 60.456 |
 | `vllm-minimax-m27-autoround-u4-decode-fast-nvme-p512-n1536` | `cmoz8cow60001pd010klrb8g8` | 4 | 512 | 1536 | 41.131 | 54.841 |
 | `vllm-minimax-m27-autoround-u4-decode-fast-nvme-maxlen4096-p512-n1536` | `cmoz8k9z40008pd01rhu50c0n` | 4 | 512 | 1536 | 33.258 | 44.344 |
+| `vllm-minimax-m27-autoround-u4-decode-fast-nvme-maxlen4096-gpumem095-p512-n1536` | `cmoz8ryb9000bpd014xhl3pxu` | 4 | 512 | 1536 | 36.616 | 48.822 |
 
 Note: `cmoz4qkc3005htl01t70cd8l7` is the corrected fast-NVMe p512/n1024 MiniMax AutoRound validation. It keeps the same vLLM/XPU TP4 llm-scaler u4 decode-only path as the prior long-output run, but moves the checkpoint from the external NTFS USB drive to ext4 PCIe 5.0 NVMe. Comparable model load time dropped from `348.18s` to `84.39s`, and decode improved from `35.933` to `36.670` output tok/s. The key scheduler lesson is that `--max-num-batched-tokens 1024` is the current sweet spot for this shape; `1536` fell to `29.478` output tok/s and `512` fell to `31.862`. `XPU_GRAPH=1` remains negative because communication capture is unsupported and the run loses KV headroom.
 
@@ -254,3 +258,5 @@ Note: `cmoz82i2f007itl01fkno9or1` is the refreshed p512/n1024 long-output high. 
 Note: `cmoz8cow60001pd010klrb8g8` is the full-window p512/n1536 high at `max_model_len=2048`. It repeated at `40.864` and `41.131` output tok/s under the same normal quality path.
 
 Note: `cmoz8k9z40008pd01rhu50c0n` is the `max_model_len=4096` capacity check. It remains valid but is slower because KV headroom/concurrency shrink materially at the larger configured context.
+
+Note: `cmoz8ryb9000bpd014xhl3pxu` keeps `max_model_len=4096` but sets `gpu_memory_utilization=0.95`, recovering much of the lost KV headroom and improving throughput to `36.616` output tok/s.
