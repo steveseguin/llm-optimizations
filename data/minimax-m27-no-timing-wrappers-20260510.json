@@ -1,0 +1,79 @@
+{
+  "date": "2026-05-10",
+  "model": {
+    "hfId": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+    "base": "MiniMaxAI/MiniMax-M2.7",
+    "path": "/mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround"
+  },
+  "hardware": {
+    "gpu": "Intel Arc Pro B70",
+    "gpuCount": 4,
+    "vramGbEach": 32,
+    "os": "Ubuntu 24.04.4 LTS"
+  },
+  "engine": {
+    "name": "vllm",
+    "version": "0.20.1-local",
+    "backend": "xpu",
+    "dtype": "float16",
+    "tensorParallel": 4,
+    "quantization": "INT4 AutoRound W4A16",
+    "llmScalerMoe": true
+  },
+  "change": {
+    "summary": "Removed local timed_region wrappers from active allreduce, attention, MoE, and runner runtime paths.",
+    "patch": "patches/vllm-active-minimax-no-timing-current-20260510.patch",
+    "vllmCacheRoot": "/mnt/fast-ai/vllm-cache-exp/minimax-no-timing-wrappers-20260510T102156Z"
+  },
+  "runs": [
+    {
+      "label": "no-timing-cold-p512n512",
+      "timestampUtc": "2026-05-10T10:21:56Z",
+      "promptTokens": 512,
+      "outputTokens": 512,
+      "maxModelLen": 2048,
+      "maxBatchedTokens": 1024,
+      "gpuKvCacheTokens": 9408,
+      "aotHash": "4799a3c8468de261861723fba07480ef61e010f504245a62e5e93f4e9aef8e22",
+      "torchCompileCache": "4997925c5f",
+      "tokSTotal": 56.0979422937105,
+      "tokSOut": 28.05,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-no-timing/vllm-minimax-m27-autoround-tp4-p512n512-20260510T102156Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-no-timing/vllm-minimax-m27-autoround-tp4-p512n512-20260510T102156Z.json",
+      "result": "cold compile artifact"
+    },
+    {
+      "label": "no-timing-warm-p512n512",
+      "timestampUtc": "2026-05-10T10:25:02Z",
+      "promptTokens": 512,
+      "outputTokens": 512,
+      "maxModelLen": 2048,
+      "maxBatchedTokens": 1024,
+      "gpuKvCacheTokens": 17216,
+      "aotHash": "4799a3c8468de261861723fba07480ef61e010f504245a62e5e93f4e9aef8e22",
+      "torchCompileCache": "4a91a7e50a",
+      "tokSTotal": 71.70568996169968,
+      "tokSOut": 35.85,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-no-timing/vllm-minimax-m27-autoround-tp4-p512n512-20260510T102502Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-no-timing/vllm-minimax-m27-autoround-tp4-p512n512-20260510T102502Z.json",
+      "result": "current floor; no LocalMaxxing submission"
+    },
+    {
+      "label": "no-timing-warm-p512n1536",
+      "timestampUtc": "2026-05-10T10:27:31Z",
+      "promptTokens": 512,
+      "outputTokens": 1536,
+      "maxModelLen": 2048,
+      "maxBatchedTokens": 1024,
+      "gpuKvCacheTokens": 17216,
+      "aotHash": "4799a3c8468de261861723fba07480ef61e010f504245a62e5e93f4e9aef8e22",
+      "torchCompileCache": "4a91a7e50a",
+      "tokSTotal": 49.825122302912035,
+      "tokSOut": 37.37,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-no-timing/vllm-minimax-m27-autoround-tp4-p512n1536-20260510T102731Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-no-timing/vllm-minimax-m27-autoround-tp4-p512n1536-20260510T102731Z.json",
+      "result": "current floor; no LocalMaxxing submission"
+    }
+  ],
+  "conclusion": "Timing-wrapper cleanup is good active-runtime hygiene but not a speed recovery path; the next useful work remains Q/K collective or attention/KV graph-level optimization."
+}
