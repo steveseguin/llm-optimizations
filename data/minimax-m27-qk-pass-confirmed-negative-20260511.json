@@ -1,0 +1,49 @@
+{
+  "date": "2026-05-11",
+  "model": {
+    "hfId": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+    "localPath": "/mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround",
+    "quantization": "INT4 AutoRound W4A16"
+  },
+  "hardware": {
+    "gpu": "Intel Arc Pro B70",
+    "gpuCount": 4,
+    "vramGbEach": 32,
+    "os": "Ubuntu 24.04"
+  },
+  "runtime": {
+    "engine": "vLLM",
+    "engineVersion": "0.20.1-local",
+    "backend": "xpu",
+    "tensorParallel": 4,
+    "dtype": "float16",
+    "llmScalerMoe": true,
+    "env": {
+      "VLLM_MINIMAX_QK_NORM_XPU_HELPER_FUSION": "1",
+      "VLLM_XPU_ENABLE_XPU_GRAPH": "0"
+    },
+    "extraArgs": "--compilation-config {\"mode\":3,\"pass_config\":{\"fuse_minimax_qk_norm\":true}}"
+  },
+  "run": {
+    "promptTokens": 64,
+    "outputTokens": 128,
+    "totalTokens": 192,
+    "maxModelLen": 512,
+    "maxBatchedTokens": 256,
+    "elapsedSeconds": 7.607427474998985,
+    "tokSTotal": 25.23849233278765,
+    "tokSOut": 16.825661555191768,
+    "gpuKvCacheTokens": 9472,
+    "torchCompileSeconds": 32.43,
+    "cacheRoot": "/mnt/fast-ai/vllm-cache/minimax-qkpass-20260511T005639Z",
+    "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-qkpass-20260511/vllm-minimax-m27-autoround-tp4-p64n128-20260511T005639Z.log",
+    "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-qkpass-20260511/vllm-minimax-m27-autoround-tp4-p64n128-20260511T005639Z.json"
+  },
+  "priorContext": {
+    "plainP64N128ReferenceTokSTotal": 50.41863670712918,
+    "plainP64N128ReferenceTokSOut": 33.61,
+    "priorWarmQkPassP512N1536TokSOut": 37.24,
+    "acceptedAnchorP512N1536TokSOut": 37.552538
+  },
+  "conclusion": "Confirmed negative for the current XPU helper-backed MiniMax Q/K norm fusion pass. It is not a LocalMaxxing submission candidate."
+}

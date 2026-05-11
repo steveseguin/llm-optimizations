@@ -34,8 +34,11 @@ retest.
   behavior on this stack produced misleading KV-cache artifacts.
 - `fuse_minimax_qk_norm`: vLLM source has a MiniMax-specific Q/K norm fusion
   pass, but the upstream implementation expects non-XPU custom ops. Local helper
-  and direct-call XPU experiments were negative. A clean retest is still useful
-  only if it ports the boundary into a real XPU kernel or compiler lowering.
+  and direct-call XPU experiments were negative. A 2026-05-11 retest with the
+  helper-backed pass reached only `25.238492` total tok/s and `16.826` output
+  tok/s at p64/n128 in an isolated cold cache, consistent with the prior warm
+  p512/n1536 helper-pass floor. Revisit only if it ports the boundary into a
+  real XPU kernel or compiler lowering.
 - `kv-cache-dtype fp8_e5m2` with `--block-size 128`: keep as a longer-context
   capacity/debug screen. It should not be promoted as a decode improvement until
   `sample_tokens` stability is fixed.
@@ -59,4 +62,3 @@ work focused on communication boundaries:
 3. MoE/output-projection epilogues where collective waits force graph breaks.
 4. Speculative decoding only after target verification and acceptance behavior
    can be measured on XPU.
-
