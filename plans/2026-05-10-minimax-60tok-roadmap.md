@@ -131,6 +131,12 @@ The u4 MoE bridge is no longer the only ceiling. Existing timing notes put MiniM
      still stalled before generating a p64/n32 sample. Storage was not the
      blocker.
    - Revisit speculation only with a draft that has target-model verification and a measured acceptance rate high enough to beat the extra scheduler and KV pressure.
+   - vLLM's native suffix speculative path is now technically runnable on this
+     XPU stack via a minimal Arctic `suffix_decoding` subset. A p64/n16 random
+     smoke was effectively tied with no-spec: `18.322240` total tok/s with
+     suffix versus `18.192808` total tok/s without suffix. Because suffix
+     disables async scheduling, this is not a speed result; revisit only with
+     repetitive/cache-friendly prompts and acceptance behavior recorded.
    - If speculation works, publish both decode tok/s and total/prefill tok/s to LocalMaxxing with the spec method and draft model recorded.
    - Raise the speculative aspiration above the non-spec target: if target
      verification works and acceptance is high enough, `75+` output tok/s is a
