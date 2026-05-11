@@ -1,0 +1,108 @@
+{
+  "date": "2026-05-11",
+  "title": "MiniMax generated AOT analyzer update and env-constant screen",
+  "model": {
+    "hfId": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+    "localPath": "/mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround",
+    "quantization": "AutoRound INT4 W4A16"
+  },
+  "hardware": {
+    "gpu": "Intel Arc Pro B70",
+    "gpuCount": 4,
+    "vramGbPerGpu": 32,
+    "parallelism": "TP4"
+  },
+  "reference": {
+    "shape": "p512/n1536",
+    "outputTokS": 37.55253824718782,
+    "totalTokS": 50.07005099625042,
+    "localmaxxingId": "cmozow03v005wlo01q81bnspx",
+    "qualityGuardrail": "Q/K TP variance allreduce visible; no speculation; no expert dropping; no power-limit change."
+  },
+  "analyzer": {
+    "script": "scripts/analyze-vllm-aot-allreduce-boundaries.py",
+    "change": "Add generated Inductor cache support when computation_graph.py is absent.",
+    "generatedLayoutCaveat": "Counts executable representative generated-cache allreduce sites, not the old full FX graph allreduce census.",
+    "currentControlAotHash": "9f17ebe807f2af99c6ac3ed190604297eeb080e3ea142066c2a2ba6c764a3c09",
+    "currentControlSummary": {
+      "layout": "generated_inductor_cache",
+      "allreduceCount": 28,
+      "byShape": {
+        "f16[s72, 3072]": 20,
+        "f32[s72, 2]": 8
+      },
+      "byClassification": {
+        "embedding_to_rms_int4_gemm": 4,
+        "hidden_to_moe": 8,
+        "hidden_to_rms": 8,
+        "qk_variance": 8
+      },
+      "byShapeClassification": {
+        "f16[s72, 3072] -> embedding_to_rms_int4_gemm": 4,
+        "f16[s72, 3072] -> hidden_to_moe": 8,
+        "f16[s72, 3072] -> hidden_to_rms": 8,
+        "f32[s72, 2] -> qk_variance": 8
+      }
+    }
+  },
+  "runs": [
+    {
+      "label": "current_control_warm_p512_n1536",
+      "shape": "p512/n1536",
+      "aotHash": "9f17ebe807f2af99c6ac3ed190604297eeb080e3ea142066c2a2ba6c764a3c09",
+      "gpuKvTokens": 17216,
+      "totalTokS": 48.924829161931996,
+      "outputTokS": 36.693621871449,
+      "elapsedSeconds": 41.860135948998504,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-current-20260511/vllm-minimax-m27-autoround-tp4-p512n1536-20260511T032123Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-current-20260511/vllm-minimax-m27-autoround-tp4-p512n1536-20260511T032123Z.json",
+      "status": "below_reference"
+    },
+    {
+      "label": "env_constant_cold_p512_n512",
+      "shape": "p512/n512",
+      "aotHash": "6f26d7dcd42c12cfbfe33fdb63d3db60c1b70389922b35184bea592393df5aa2",
+      "gpuKvTokens": 9408,
+      "totalTokS": 55.4866958916171,
+      "outputTokS": 27.74334794580855,
+      "elapsedSeconds": 18.45487433600647,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-envconst-20260511/vllm-minimax-m27-autoround-tp4-p512n512-20260511T032522Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-envconst-20260511/vllm-minimax-m27-autoround-tp4-p512n512-20260511T032522Z.json",
+      "status": "cold_aot_kv_artifact"
+    },
+    {
+      "label": "env_constant_warm_p512_n512",
+      "shape": "p512/n512",
+      "aotHash": "6f26d7dcd42c12cfbfe33fdb63d3db60c1b70389922b35184bea592393df5aa2",
+      "gpuKvTokens": 17216,
+      "totalTokS": 70.95429557429408,
+      "outputTokS": 35.47714778714704,
+      "elapsedSeconds": 14.431825328007108,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-envconst-20260511/vllm-minimax-m27-autoround-tp4-p512n512-20260511T032834Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-envconst-20260511/vllm-minimax-m27-autoround-tp4-p512n512-20260511T032834Z.json",
+      "status": "short_shape_small_lift"
+    },
+    {
+      "label": "env_constant_warm_p512_n1536",
+      "shape": "p512/n1536",
+      "aotHash": "6f26d7dcd42c12cfbfe33fdb63d3db60c1b70389922b35184bea592393df5aa2",
+      "gpuKvTokens": 17216,
+      "totalTokS": 48.60012011596111,
+      "outputTokS": 36.45009008697084,
+      "elapsedSeconds": 42.13981354600401,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-envconst-20260511/vllm-minimax-m27-autoround-tp4-p512n1536-20260511T033118Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-envconst-20260511/vllm-minimax-m27-autoround-tp4-p512n1536-20260511T033118Z.json",
+      "status": "long_shape_regression"
+    }
+  ],
+  "envConstantPatch": {
+    "tested": true,
+    "revertedFromActiveRuntime": true,
+    "summary": "Converted VLLM_MINIMAX_QK_NORM_XPU_DIRECT and VLLM_MINIMAX_AR_FUSED_ADD_RMS_XPU helper checks to import-time constants. The comparison shape regressed, so the patch was not kept."
+  },
+  "localmaxxing": {
+    "submitted": false,
+    "reason": "No improved valid benchmark; env-constant comparison run was below the accepted quality-cleared MiniMax result."
+  },
+  "decision": "Keep the analyzer update. Do not keep the env-constant MiniMax runtime change."
+}

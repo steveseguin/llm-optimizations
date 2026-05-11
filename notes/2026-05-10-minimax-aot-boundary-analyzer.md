@@ -8,6 +8,14 @@ Purpose: classify compiled vLLM AOT allreduce boundaries so each experiment can
 record whether it changes the communication graph instead of relying on manual
 inspection.
 
+2026-05-11 update: the script now also supports the newer generated Inductor
+cache layout where `computation_graph.py` is absent. In that mode it scans
+generated `inductor_cache/**/*.py` files for executable `_c10d_functional`
+allreduce/wait sites and classifies the following generated boundary. The count
+is a representative generated-code count, not directly comparable to the old
+full FX graph count, but it is enough to confirm the presence of Q/K variance
+collectives and hidden-state allreduce/RMS/MoE categories.
+
 Example:
 
 ```bash
