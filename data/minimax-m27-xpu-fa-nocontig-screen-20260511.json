@@ -1,0 +1,45 @@
+{
+  "date": "2026-05-11",
+  "objective": "Screen upstream vLLM XPU FlashAttention no-contiguous-copy patch for MiniMax M2.7 AutoRound TP4.",
+  "upstreamPatch": {
+    "repo": "vllm-project/vllm",
+    "commit": "be0dcc29dcfa83659e6857dd73cb527b5986a7f9",
+    "title": "[XPU] remove q/k/v force contiguous for flash_attn (#40356)",
+    "localAction": "Applied to active source and venv for a p64/n128 smoke, then reverted because the warm result was neutral/slightly negative."
+  },
+  "reference": {
+    "shape": "p64/n128",
+    "totalTokS": 50.618235,
+    "outputTokS": 33.74549,
+    "source": "2026-05-10 clean baseline from notes/2026-05-10-minimax-llmscaler-core-spec-screens.md"
+  },
+  "runs": [
+    {
+      "name": "nocontig_cold_p64_n128",
+      "inputTokens": 64,
+      "outputTokens": 128,
+      "maxModelLen": 512,
+      "maxNumBatchedTokens": 256,
+      "gpuKvTokens": 9472,
+      "aotHash": "ec6e2b34b8ca5da0af5e376979a1bfa7df9c53bc35cfad80c2c400922cbaf018",
+      "totalTokS": 25.51897818673235,
+      "outputTokS": 17.01265212448823,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-xpu-fa-nocontig-20260511/vllm-minimax-m27-autoround-tp4-p64n128-20260511T013813Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-xpu-fa-nocontig-20260511/vllm-minimax-m27-autoround-tp4-p64n128-20260511T013813Z.json"
+    },
+    {
+      "name": "nocontig_warm_p64_n128",
+      "inputTokens": 64,
+      "outputTokens": 128,
+      "maxModelLen": 512,
+      "maxNumBatchedTokens": 256,
+      "gpuKvTokens": 18880,
+      "aotHash": "ec6e2b34b8ca5da0af5e376979a1bfa7df9c53bc35cfad80c2c400922cbaf018",
+      "totalTokS": 49.98873043122551,
+      "outputTokS": 33.32582028748367,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-xpu-fa-nocontig-20260511/vllm-minimax-m27-autoround-tp4-p64n128-20260511T014111Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-xpu-fa-nocontig-20260511/vllm-minimax-m27-autoround-tp4-p64n128-20260511T014111Z.json"
+    }
+  ],
+  "conclusion": "Do not promote for MiniMax on B70. The patch is mechanically compatible but does not improve the short MiniMax quality screen, so it was reverted from the active runtime. No LocalMaxxing submission."
+}
