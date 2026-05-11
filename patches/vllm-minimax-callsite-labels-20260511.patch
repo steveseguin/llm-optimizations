@@ -1,0 +1,60 @@
+diff --git a/vllm/model_executor/layers/mamba/linear_attn.py b/vllm/model_executor/layers/mamba/linear_attn.py
+--- a/vllm/model_executor/layers/mamba/linear_attn.py
++++ b/vllm/model_executor/layers/mamba/linear_attn.py
+@@
+ from vllm.model_executor.layers.mamba.mamba_utils import (
+     MambaStateDtypeCalculator,
+     MambaStateShapeCalculator,
+ )
+ from vllm.model_executor.layers.quantization import QuantizationConfig
++from vllm.utils.xpu_decode_timing import allreduce_label
+ from vllm.utils.torch_utils import direct_register_custom_op
+@@
+         x = x.to(torch.float32)
+         variance = x.pow(2).mean(dim=-1, keepdim=True, dtype=torch.float32)
+         if self.tp_world > 1:
+-            variance = tensor_model_parallel_all_reduce(variance) / self.tp_world
++            with allreduce_label("minimax_text01_rmsnorm_tp"):
++                variance = tensor_model_parallel_all_reduce(variance) / self.tp_world
+@@
+         if q_norm.tp_world > 1:
+             qk_var = torch.cat([q_var, k_var], dim=-1)
+-            qk_var = tensor_model_parallel_all_reduce(qk_var) / q_norm.tp_world
++            with allreduce_label("minimax_qk_var"):
++                qk_var = tensor_model_parallel_all_reduce(qk_var) / q_norm.tp_world
+             q_var, k_var = qk_var.chunk(2, dim=-1)
+diff --git a/vllm/model_executor/models/minimax_m2.py b/vllm/model_executor/models/minimax_m2.py
+--- a/vllm/model_executor/models/minimax_m2.py
++++ b/vllm/model_executor/models/minimax_m2.py
+@@
+ from vllm.sequence import IntermediateTensors
++from vllm.utils.xpu_decode_timing import allreduce_label
+@@
+     torch.ops.minimax_qk_rms_xpu.var(qkv, qk_var, q_size, kv_size)
+     if q_norm.tp_world > 1:
+-        qk_var = tensor_model_parallel_all_reduce(qk_var) / q_norm.tp_world
++        with allreduce_label("minimax_qk_var"):
++            qk_var = tensor_model_parallel_all_reduce(qk_var) / q_norm.tp_world
+@@
+-        hidden_states = self.self_attn(
+-            positions=positions,
+-            hidden_states=hidden_states,
+-        )
++        with allreduce_label("minimax_attn_o_proj"):
++            hidden_states = self.self_attn(
++                positions=positions,
++                hidden_states=hidden_states,
++            )
+@@
+-                hidden_states = tensor_model_parallel_all_reduce(hidden_states)
++                with allreduce_label("minimax_attn_o_proj"):
++                    hidden_states = tensor_model_parallel_all_reduce(hidden_states)
+                 hidden_states, residual = self.post_attention_layernorm(
+                     hidden_states, residual
+                 )
+@@
+-        hidden_states = self.block_sparse_moe(hidden_states)
++        with allreduce_label("minimax_moe_output"):
++            hidden_states = self.block_sparse_moe(hidden_states)
+ 
+         return hidden_states, residual

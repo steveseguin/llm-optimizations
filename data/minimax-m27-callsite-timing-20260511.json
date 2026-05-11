@@ -1,0 +1,75 @@
+{
+  "title": "MiniMax M2.7 AutoRound XPU call-site allreduce timing",
+  "date": "2026-05-11",
+  "model": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+  "localPath": "/mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround",
+  "engine": "vllm 0.20.1-local",
+  "hardware": "4x Intel Arc Pro B70 32GB",
+  "run": {
+    "shape": "p64/n8",
+    "dtype": "float16",
+    "tensorParallel": 4,
+    "enforceEager": true,
+    "timingSync": true,
+    "rank": 0,
+    "totalTokS": 41.78890201036776,
+    "outputTokS": 4.643211334485307,
+    "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-callsite-timing-20260511/vllm-minimax-m27-autoround-tp4-p64n8-20260511T023913Z.json",
+    "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-callsite-timing-20260511/vllm-minimax-m27-autoround-tp4-p64n8-20260511T023913Z.log"
+  },
+  "decodeTokenRows": [
+    {
+      "label": "all_reduce:minimax_qk_var:(1, 2):torch.float32",
+      "count": 496,
+      "totalMs": 55.764909,
+      "avgMs": 0.112429,
+      "maxMs": 2.472629
+    },
+    {
+      "label": "all_reduce:minimax_moe_output:(1, 3072):torch.float16",
+      "count": 496,
+      "totalMs": 54.068999,
+      "avgMs": 0.10901,
+      "maxMs": 2.63289
+    },
+    {
+      "label": "all_reduce:minimax_attn_o_proj:(1, 3072):torch.float16",
+      "count": 496,
+      "totalMs": 51.976626,
+      "avgMs": 0.104792,
+      "maxMs": 0.941847
+    },
+    {
+      "label": "llm_scaler_moe_u4:M1",
+      "count": 496,
+      "totalMs": 322.949079,
+      "avgMs": 0.651107,
+      "maxMs": 270.533416,
+      "steadyAvgMsAfterRemovingMax": 0.10589
+    }
+  ],
+  "prefillAndWarmupRows": [
+    {
+      "label": "all_reduce:(256, 3072):torch.float16",
+      "count": 1,
+      "totalMs": 434.395806,
+      "note": "Unlabeled warmup/profile allreduce outside the MiniMax decoder label scopes."
+    },
+    {
+      "label": "all_reduce:minimax_moe_output:(64, 3072):torch.float16",
+      "count": 62,
+      "totalMs": 41.971369
+    },
+    {
+      "label": "all_reduce:minimax_attn_o_proj:(64, 3072):torch.float16",
+      "count": 62,
+      "totalMs": 33.100513
+    },
+    {
+      "label": "all_reduce:minimax_qk_var:(64, 2):torch.float32",
+      "count": 62,
+      "totalMs": 23.827795
+    }
+  ],
+  "interpretation": "For one-token decode there are 62 Q/K scalar variance allreduces, 62 attention output allreduces, and 62 MoE output allreduces per generated token. On synchronized eager rank-0 timing, those three collective classes alone account for about 20 ms per decode token. The llm-scaler u4 MoE kernel is about 0.106 ms/layer after removing its first-call outlier. The next performance work should reduce or fuse collective boundaries rather than only optimizing the expert matvec."
+}
