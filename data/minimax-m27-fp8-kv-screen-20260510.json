@@ -1,0 +1,55 @@
+{
+  "date": "2026-05-10",
+  "model": {
+    "hfId": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+    "localPath": "/mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround",
+    "quantization": "AutoRound INT4 W4A16"
+  },
+  "hardware": {
+    "gpuName": "Intel Arc Pro B70 32GB",
+    "gpuCount": 4,
+    "vramGb": 32,
+    "os": "Ubuntu 24.04"
+  },
+  "engine": {
+    "engineName": "vllm",
+    "backend": "xpu",
+    "tensorParallel": 4,
+    "kvCacheDtype": "fp8",
+    "maxModelLen": 2048,
+    "maxBatchedTokens": 1024,
+    "maxNumSeqs": 1
+  },
+  "command": "OUTDIR=/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-kvfp8-screen-p512n512 TP=4 PORT=18088 INPUT_LEN=512 OUTPUT_LEN=512 NUM_PROMPTS=1 MAX_MODEL_LEN=2048 MAX_BATCHED_TOKENS=1024 MAX_NUM_SEQS=1 EXTRA_SERVER_ARGS='--kv-cache-dtype fp8' /home/steve/llm-optimizations-publish/scripts/bench-vllm-minimax-autoround-serve-xpu.sh",
+  "result": {
+    "completed": 0,
+    "failedRequests": 1,
+    "promptTokens": 512,
+    "requestedOutputTokens": 512,
+    "totalInputTokens": 0,
+    "totalOutputTokens": 0,
+    "tokSOut": 0.0,
+    "tokSTotal": 0.0,
+    "ttftMs": 0.0,
+    "durationSec": 300.48
+  },
+  "observations": {
+    "modelLoadMemoryGb": 28.11,
+    "modelLoadSec": 73.79,
+    "compileWarmupSec": 20.99,
+    "gpuKvCacheTokens": 34496,
+    "fp16ComparableKvCacheTokensApprox": 17216,
+    "failure": "EngineCore timed out in sample_tokens after repeated shared-memory broadcast stalls.",
+    "localmaxxingSubmitted": false
+  },
+  "logFiles": {
+    "server": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-kvfp8-screen-p512n512/vllm-minimax-m27-autoround-serve-server-tp4-p512n512-np1-20260510T235202Z.log",
+    "bench": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-kvfp8-screen-p512n512/vllm-minimax-m27-autoround-serve-bench-tp4-p512n512-np1-20260510T235202Z.log",
+    "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-kvfp8-screen-p512n512/vllm-minimax-m27-autoround-serve-tp4-p512n512-np1-20260510T235202Z.json"
+  },
+  "nextSteps": [
+    "Do not use fp8 KV for the current quality-preserving MiniMax TP4 speed target.",
+    "Revisit fp8 KV only after an attention/KV XPU debug pass or after upstream XPU fp8 KV fixes.",
+    "Continue TP4 collective and graph-boundary fusion on the standard KV path."
+  ]
+}

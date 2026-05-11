@@ -85,6 +85,11 @@ The u4 MoE bridge is no longer the only ceiling. Existing timing notes put MiniM
    - Avoid live `xpu-smi stats` polling during real benchmarks; it stalled vLLM shared-memory synchronization.
    - Prefer lower-overhead Level Zero events, SYCL event timing, or short synchronized diagnostic runs.
    - Measure whether KV writes, attention kernels, or projection kernels now dominate after the u4 MoE bridge.
+   - FP8 KV is not a current throughput path for MiniMax TP4. It doubled
+     reported KV capacity from roughly `17,216` tokens to `34,496` tokens at
+     `max_model_len=2048`, but the p512/n512 serve benchmark completed zero
+     requests and died in `sample_tokens` after shared-memory broadcast
+     timeouts. Keep it as a future longer-context/debug track only.
 
 4. MoE epilogue fusion
    - Delaying MoE allreduce and output-projection allreduce gave small short-run improvements but did not repeat above the conservative long-run reference.
