@@ -1,0 +1,79 @@
+{
+  "title": "MiniMax M2.7 AutoRound AR+RMS SYCL and XPU graph screen",
+  "date": "2026-05-11",
+  "model": {
+    "hfId": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+    "localPath": "/mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround",
+    "quantization": "INT4 AutoRound W4A16"
+  },
+  "hardware": {
+    "gpu": "Intel Arc Pro B70",
+    "gpuCount": 4,
+    "vramGbPerGpu": 32,
+    "os": "Ubuntu 24.04.4 LTS"
+  },
+  "engine": {
+    "name": "vllm",
+    "version": "0.20.1-local",
+    "backend": "XPU/Level Zero",
+    "tensorParallel": 4,
+    "dtype": "float16",
+    "llmScalerMoe": true,
+    "ccLTopoP2PAccess": "1",
+    "ccLZeIpcExchange": "unset/default"
+  },
+  "reference": {
+    "shape": "p64/n128",
+    "totalTokS": 50.418637,
+    "outputTokS": 33.61,
+    "source": "notes/2026-05-10-minimax-60tok-collective-plan-update.md"
+  },
+  "screens": [
+    {
+      "label": "ar_rms_sycl_standalone_smoke",
+      "status": "pass",
+      "maxAbsDiff": 0.0,
+      "command": "PYTHONPATH=/home/steve/llm-optimizations-publish/experiments torchrun --standalone --nproc-per-node=4 benchmarks/b70_minimax_ar_fused_rms_op_smoke.py",
+      "observation": "The custom op is numerically equivalent to a reference XCCL allreduce followed by vLLM RMSNorm semantics on a four-rank XPU smoke."
+    },
+    {
+      "label": "ar_rms_sycl_cold",
+      "shape": "p64/n128",
+      "totalTokS": 23.42175664541156,
+      "outputTokS": 15.614504430274373,
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-ar-fused-rms-sycl-20260511/vllm-minimax-m27-autoround-tp4-p64n128-20260511T022233Z.json",
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-ar-fused-rms-sycl-20260511/vllm-minimax-m27-autoround-tp4-p64n128-20260511T022233Z.log",
+      "aotCustomOpOccurrences": 125,
+      "status": "negative"
+    },
+    {
+      "label": "ar_rms_sycl_warm",
+      "shape": "p64/n128",
+      "totalTokS": 47.65409874511675,
+      "outputTokS": 31.769399163411165,
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-ar-fused-rms-sycl-20260511/vllm-minimax-m27-autoround-tp4-p64n128-20260511T023148Z.json",
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-ar-fused-rms-sycl-20260511/vllm-minimax-m27-autoround-tp4-p64n128-20260511T023148Z.log",
+      "aotCustomOpOccurrences": 125,
+      "status": "negative"
+    },
+    {
+      "label": "xpu_graph_requested_cold",
+      "shape": "p64/n128",
+      "totalTokS": 24.291036021904116,
+      "outputTokS": 16.194024014602743,
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-xpu-graph1-20260511/vllm-minimax-m27-autoround-tp4-p64n128-20260511T022614Z.json",
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-xpu-graph1-20260511/vllm-minimax-m27-autoround-tp4-p64n128-20260511T022614Z.log",
+      "status": "disabled_by_vllm"
+    },
+    {
+      "label": "xpu_graph_requested_warm",
+      "shape": "p64/n128",
+      "totalTokS": 49.015733487914424,
+      "outputTokS": 32.677155658609614,
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-xpu-graph1-20260511/vllm-minimax-m27-autoround-tp4-p64n128-20260511T022923Z.json",
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-xpu-graph1-20260511/vllm-minimax-m27-autoround-tp4-p64n128-20260511T022923Z.log",
+      "status": "disabled_by_vllm"
+    }
+  ],
+  "decision": "Do not promote either screen. The AR+RMS SYCL custom op is correct but still slower than the compiled native baseline, because wrapping the collective plus post-wait math as an opaque op loses scheduling efficiency. XPU graph capture is still disabled by vLLM for TP4 communication ops, so requesting XPU_GRAPH=1 does not produce a graph-captured speed path."
+}

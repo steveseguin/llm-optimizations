@@ -10,7 +10,7 @@ def _load_extension() -> None:
     if not matches:
         raise ImportError(
             "MiniMax allreduce fused RMS extension is not built. "
-            "Run build.py in this directory first."
+            "Run setup.py build_ext --inplace in this directory first."
         )
     torch.ops.load_library(str(matches[-1]))
 
