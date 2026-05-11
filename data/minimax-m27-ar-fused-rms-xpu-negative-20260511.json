@@ -1,0 +1,68 @@
+{
+  "date_utc": "2026-05-11",
+  "model": {
+    "hf_id": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+    "local_path": "/mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround",
+    "quantization": "AutoRound INT4 W4A16"
+  },
+  "hardware": {
+    "gpu_name": "Intel Arc Pro B70",
+    "gpu_count": 4,
+    "vram_gb_each": 32
+  },
+  "engine": {
+    "name": "vllm",
+    "version": "0.20.1",
+    "backend": "xpu",
+    "tensor_parallel": 4,
+    "llm_scaler_int4_moe": true
+  },
+  "experiment": {
+    "name": "C++ custom op allreduce + residual add + RMSNorm",
+    "env_flag": "VLLM_MINIMAX_AR_FUSED_ADD_RMS_XPU=1",
+    "patch": "patches/vllm-minimax-ar-fused-rms-xpu-negative-20260511.patch",
+    "extension_source": "experiments/minimax_ar_fused_rms_xpu",
+    "quality_preserving_intent": true,
+    "localmaxxing_submission": false,
+    "status": "negative"
+  },
+  "benchmarks": [
+    {
+      "name": "standalone_tp4_smoke",
+      "status": "pass",
+      "command_summary": "torch.distributed.run --standalone --nproc-per-node=4 b70_minimax_ar_fused_rms_op_smoke.py",
+      "observed": {
+        "out_mean": 1.0,
+        "residual_mean": 11.0
+      }
+    },
+    {
+      "name": "vllm_tp4_p1n4_smoke",
+      "status": "pass",
+      "prompt_tokens": 1,
+      "output_tokens": 4,
+      "context_length": 128,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-ar-fused-rms-smoke3/vllm-minimax-m27-autoround-tp4-p1n4-20260511T002707Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-ar-fused-rms-smoke3/vllm-minimax-m27-autoround-tp4-p1n4-20260511T002707Z.json",
+      "tok_s_total": 0.6313124345579062
+    },
+    {
+      "name": "vllm_tp4_p512n512",
+      "status": "regression",
+      "prompt_tokens": 512,
+      "output_tokens": 512,
+      "context_length": 1024,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-ar-fused-rms-p512n512/vllm-minimax-m27-autoround-tp4-p512n512-20260511T003052Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-ar-fused-rms-p512n512/vllm-minimax-m27-autoround-tp4-p512n512-20260511T003052Z.json",
+      "elapsed_s": 25.744329505992937,
+      "tok_s_total": 39.775749442673444,
+      "tok_s_output": 19.887874721336722
+    }
+  ],
+  "graph_observations": {
+    "p512n512_ar_fused_calls": 62,
+    "p512n512_visible_wait_sites": 125,
+    "group_name_fix": "Use get_tp_group().device_group.group_name instead of get_tp_group().unique_name; generated c10d group was '3'."
+  },
+  "lesson": "The post-attention allreduce/residual/RMS boundary is still a valid target, but an opaque CompositeExplicitAutograd custom op is slower than the native compiled graph. Future work needs a real SYCL kernel or Inductor lowering, not another wrapper."
+}

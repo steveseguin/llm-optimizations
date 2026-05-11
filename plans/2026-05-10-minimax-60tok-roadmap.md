@@ -75,6 +75,14 @@ The u4 MoE bridge is no longer the only ceiling. Existing timing notes put MiniM
      aliasing warnings because the Python op returns an input alias. Treat this
      as evidence that the next useful collective path must be C++/SYCL or
      backend-level, not another Python/opaque wrapper.
+   - A C++ `CompositeExplicitAutograd` op for post-attention allreduce plus
+     residual add plus RMSNorm compiled and executed after passing
+     `get_tp_group().device_group.group_name` instead of vLLM's logical
+     `tp:0` name. It inserted `62` fused call sites into the compiled graph,
+     but p512/n512 regressed to `19.89` output tok/s and `39.78` total tok/s.
+     The boundary is still important, but an opaque wrapper around c10d plus
+     ATen math is not enough. The next attempt must own a real SYCL epilogue or
+     compiler lowering.
 
 2. Q/K RMS variance fusion
    - Standalone helper kernels and standalone mailbox allreduce were negative.
