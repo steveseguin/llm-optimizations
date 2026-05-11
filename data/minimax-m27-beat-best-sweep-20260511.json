@@ -1,0 +1,128 @@
+{
+  "date": "2026-05-11",
+  "objective": "Recover or beat the MiniMax M2.7 AutoRound TP4 quality-cleared single-session result after reboot.",
+  "model": {
+    "hfId": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+    "localPath": "/mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround",
+    "quantization": "AutoRound INT4 W4A16"
+  },
+  "hardware": {
+    "gpu": "Intel Arc Pro B70 32GB",
+    "gpuCount": 4,
+    "parallelism": "TP4"
+  },
+  "reference": {
+    "qualityClearedP512N1536OutputTokS": 37.55253824718782,
+    "qualityClearedP512N1536TotalTokS": 50.07005099625042,
+    "localmaxxingId": "cmozow03v005wlo01q81bnspx",
+    "notes": "Q/K TP variance allreduce visible in compiled graph; no speculation; no expert dropping."
+  },
+  "runs": [
+    {
+      "name": "baseline_recovery_cold_p512_n1536",
+      "env": {
+        "VLLM_XPU_USE_LLM_SCALER_MOE": "1",
+        "VLLM_XPU_ENABLE_XPU_GRAPH": "0",
+        "dtype": "float16",
+        "maxModelLen": 2048,
+        "maxNumBatchedTokens": 1024,
+        "maxNumSeqs": 1
+      },
+      "inputTokens": 512,
+      "outputTokens": 1536,
+      "gpuKvTokens": 9408,
+      "aotHash": "18d4c2ce102f693f072eb795778b413b100b583966ca513e458374bcad72a637",
+      "totalTokS": 43.27198107772877,
+      "outputTokS": 32.45717317104578,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-beat-best-20260511/vllm-minimax-m27-autoround-tp4-p512n1536-20260511T011026Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-beat-best-20260511/vllm-minimax-m27-autoround-tp4-p512n1536-20260511T011026Z.json"
+    },
+    {
+      "name": "baseline_recovery_warm_p512_n1536",
+      "env": {
+        "VLLM_XPU_USE_LLM_SCALER_MOE": "1",
+        "VLLM_XPU_ENABLE_XPU_GRAPH": "0",
+        "dtype": "float16",
+        "maxModelLen": 2048,
+        "maxNumBatchedTokens": 1024,
+        "maxNumSeqs": 1
+      },
+      "inputTokens": 512,
+      "outputTokens": 1536,
+      "gpuKvTokens": 17216,
+      "aotHash": "18d4c2ce102f693f072eb795778b413b100b583966ca513e458374bcad72a637",
+      "allreduceCensus": {
+        "total": 187,
+        "f16_s72_3072": 125,
+        "f32_s72_2": 62
+      },
+      "totalTokS": 49.03687402305159,
+      "outputTokS": 36.77763801728869,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-beat-best-20260511/vllm-minimax-m27-autoround-tp4-p512n1536-20260511T011407Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-beat-best-20260511/vllm-minimax-m27-autoround-tp4-p512n1536-20260511T011407Z.json"
+    },
+    {
+      "name": "baseline_recovery_warm_p512_n1024",
+      "env": {
+        "VLLM_XPU_USE_LLM_SCALER_MOE": "1",
+        "VLLM_XPU_ENABLE_XPU_GRAPH": "0",
+        "dtype": "float16",
+        "maxModelLen": 2048,
+        "maxNumBatchedTokens": 1024,
+        "maxNumSeqs": 1
+      },
+      "inputTokens": 512,
+      "outputTokens": 1024,
+      "totalTokS": 54.15291089419976,
+      "outputTokS": 36.101961039784,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-beat-best-20260511/vllm-minimax-m27-autoround-tp4-p512n1024-20260511T012034Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-beat-best-20260511/vllm-minimax-m27-autoround-tp4-p512n1024-20260511T012034Z.json"
+    },
+    {
+      "name": "moe_delay_retest_cold_p512_n1536",
+      "env": {
+        "VLLM_MINIMAX_MOE_DELAY_ALLREDUCE": "1",
+        "VLLM_XPU_USE_LLM_SCALER_MOE": "1",
+        "VLLM_XPU_ENABLE_XPU_GRAPH": "0",
+        "dtype": "float16",
+        "maxModelLen": 2048,
+        "maxNumBatchedTokens": 1024,
+        "maxNumSeqs": 1
+      },
+      "inputTokens": 512,
+      "outputTokens": 1536,
+      "gpuKvTokens": 9408,
+      "aotHash": "4d8f4ba0d94dd3d1e7017778e742dc98423fa858ef92314874f718bb70f1c7ab",
+      "totalTokS": 43.37986995083276,
+      "outputTokS": 32.534902463124574,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-moe-delay-retest-20260511/vllm-minimax-m27-autoround-tp4-p512n1536-20260511T012444Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-moe-delay-retest-20260511/vllm-minimax-m27-autoround-tp4-p512n1536-20260511T012444Z.json"
+    },
+    {
+      "name": "moe_delay_retest_warm_p512_n1536",
+      "env": {
+        "VLLM_MINIMAX_MOE_DELAY_ALLREDUCE": "1",
+        "VLLM_XPU_USE_LLM_SCALER_MOE": "1",
+        "VLLM_XPU_ENABLE_XPU_GRAPH": "0",
+        "dtype": "float16",
+        "maxModelLen": 2048,
+        "maxNumBatchedTokens": 1024,
+        "maxNumSeqs": 1
+      },
+      "inputTokens": 512,
+      "outputTokens": 1536,
+      "gpuKvTokens": 17216,
+      "aotHash": "4d8f4ba0d94dd3d1e7017778e742dc98423fa858ef92314874f718bb70f1c7ab",
+      "allreduceCensus": {
+        "total": 187,
+        "f16_s72_3072": 125,
+        "f32_s72_2": 62
+      },
+      "totalTokS": 48.74193301480428,
+      "outputTokS": 36.55644976110322,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-moe-delay-retest-20260511/vllm-minimax-m27-autoround-tp4-p512n1536-20260511T012823Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-moe-delay-retest-20260511/vllm-minimax-m27-autoround-tp4-p512n1536-20260511T012823Z.json"
+    }
+  ],
+  "conclusion": "No LocalMaxxing submission. All tested 2026-05-11 runs were below the accepted quality-cleared MiniMax p512/n1536 score. The active graphs preserve Q/K TP variance allreduce, so the remaining path is source-level fusion around hidden-state allreduce plus residual/RMS or a graph-safe Q/K allreduce/RMS fusion, not another flag-only sweep."
+}
