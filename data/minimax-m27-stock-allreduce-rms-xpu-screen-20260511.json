@@ -1,0 +1,118 @@
+{
+  "date": "2026-05-11",
+  "title": "MiniMax M2.7 AutoRound stock vLLM allreduce/RMS pass XPU screen",
+  "model": {
+    "hfId": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+    "localPath": "/mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround",
+    "quantization": "AutoRound INT4 W4A16"
+  },
+  "hardware": {
+    "gpu": "Intel Arc Pro B70",
+    "gpuCount": 4,
+    "vramGbPerGpu": 32,
+    "parallelism": "TP4",
+    "os": "Ubuntu 24.04.4 LTS"
+  },
+  "engine": {
+    "name": "vllm",
+    "version": "0.20.1-local",
+    "backend": "XPU/Level Zero",
+    "dtype": "float16",
+    "llmScalerMoe": true,
+    "xpuGraph": false,
+    "cclTopoP2PAccess": "1",
+    "cclZeIpcExchange": "default"
+  },
+  "reference": {
+    "qualityClearedShape": "p512/n1536",
+    "qualityClearedOutputTokS": 37.55253824718782,
+    "qualityClearedTotalTokS": 50.07005099625042,
+    "localmaxxingId": "cmozow03v005wlo01q81bnspx",
+    "notes": "Q/K TP variance allreduce visible in compiled graph; no speculation; no expert dropping; no power-limit change."
+  },
+  "controlRuns": [
+    {
+      "label": "current_control_cold_p512_n512",
+      "inputTokens": 512,
+      "outputTokens": 512,
+      "maxModelLen": 2048,
+      "maxNumBatchedTokens": 1024,
+      "maxNumSeqs": 1,
+      "aotHash": "9f17ebe807f2af99c6ac3ed190604297eeb080e3ea142066c2a2ba6c764a3c09",
+      "gpuKvTokens": 9408,
+      "totalTokS": 55.59094101417558,
+      "outputTokS": 27.79547050708779,
+      "elapsedSeconds": 18.420267427005456,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-current-20260511/vllm-minimax-m27-autoround-tp4-p512n512-20260511T025849Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-current-20260511/vllm-minimax-m27-autoround-tp4-p512n512-20260511T025849Z.json",
+      "status": "cold_aot_kv_artifact"
+    },
+    {
+      "label": "current_control_warm_p512_n512",
+      "inputTokens": 512,
+      "outputTokens": 512,
+      "maxModelLen": 2048,
+      "maxNumBatchedTokens": 1024,
+      "maxNumSeqs": 1,
+      "aotHash": "9f17ebe807f2af99c6ac3ed190604297eeb080e3ea142066c2a2ba6c764a3c09",
+      "gpuKvTokens": 17216,
+      "totalTokS": 69.48812655091834,
+      "outputTokS": 34.74406327545917,
+      "elapsedSeconds": 14.736330518993782,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-current-20260511/vllm-minimax-m27-autoround-tp4-p512n512-20260511T030158Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-current-20260511/vllm-minimax-m27-autoround-tp4-p512n512-20260511T030158Z.json",
+      "status": "valid_control_below_reference"
+    }
+  ],
+  "patch": {
+    "artifact": "patches/vllm-xpu-enable-stock-allreduce-rms-screen-20260511.patch",
+    "envGate": "VLLM_XPU_EXPERIMENTAL_FUSE_ALLREDUCE_RMS",
+    "defaultOff": true,
+    "filesTouchedInActiveRuntime": [
+      "/home/steve/src/vllm/vllm/platforms/xpu.py",
+      "/home/steve/src/vllm/vllm/compilation/passes/pass_manager.py",
+      "/home/steve/.venvs/vllm-xpu/lib/python3.12/site-packages/vllm/platforms/xpu.py",
+      "/home/steve/.venvs/vllm-xpu/lib/python3.12/site-packages/vllm/compilation/passes/pass_manager.py"
+    ]
+  },
+  "screens": [
+    {
+      "label": "fuse_allreduce_rms_no_size",
+      "shape": "p64/n16",
+      "compilationConfig": "{\"pass_config\":{\"fuse_allreduce_rms\":true}}",
+      "status": "failed_validation",
+      "failure": "Torch not compiled with CUDA enabled during config validation/capability lookup.",
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-ar-rms-pass-20260511/vllm-minimax-m27-autoround-tp4-p64n16-20260511T030636Z.log"
+    },
+    {
+      "label": "fuse_allreduce_rms_map_size",
+      "shape": "p64/n16",
+      "compilationConfig": "{\"pass_config\":{\"fuse_allreduce_rms\":true,\"fi_allreduce_fusion_max_size_mb\":{\"4\":2}}}",
+      "status": "failed_schema",
+      "failure": "pass_config.fi_allreduce_fusion_max_size_mb expects a scalar float, not a rank-size map.",
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-ar-rms-pass-20260511/vllm-minimax-m27-autoround-tp4-p64n16-20260511T030722Z.log"
+    },
+    {
+      "label": "fuse_allreduce_rms_scalar_size",
+      "shape": "p64/n16",
+      "compilationConfig": "{\"pass_config\":{\"fuse_allreduce_rms\":true,\"fi_allreduce_fusion_max_size_mb\":2}}",
+      "status": "failed_import",
+      "enabledCustomFusions": [
+        "allreduce_rms"
+      ],
+      "failure": "AllReduceFusionPass imports flashinfer.comm; FlashInfer imports CUDA GDN kernels and calls torch.cuda.get_device_properties(0), which fails in the XPU-only PyTorch build.",
+      "keyTrace": [
+        "from .fusion.allreduce_rms_fusion import AllReduceFusionPass",
+        "import flashinfer.comm as _flashinfer_comm",
+        "torch.cuda.get_device_properties(0)",
+        "AssertionError: Torch not compiled with CUDA enabled"
+      ],
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-ar-rms-pass-20260511/vllm-minimax-m27-autoround-tp4-p64n16-20260511T031029Z.log"
+    }
+  ],
+  "localmaxxing": {
+    "submitted": false,
+    "reason": "No successful or improved benchmark result; this is a negative implementation screen."
+  },
+  "decision": "Keep VLLM_XPU_EXPERIMENTAL_FUSE_ALLREDUCE_RMS unset for real runs. Stock vLLM AllReduceFusionPass is FlashInfer/CUDA-oriented and not usable as a B70/XPU shortcut without a new XPU backend or compiler transform."
+}

@@ -1,0 +1,37 @@
+diff --git a/vllm/platforms/xpu.py b/vllm/platforms/xpu.py
+index bd9006f3f..xpu-ar-rms-gate 100644
+--- a/vllm/platforms/xpu.py
++++ b/vllm/platforms/xpu.py
+@@ -225,6 +225,8 @@ class XPUPlatform(Platform):
+             "fuse_act_padding": "Activation + padding fusion",
+             "fuse_rope_kvcache": "RoPE + KV cache fusion",
+         }
++        if os.getenv("VLLM_XPU_EXPERIMENTAL_FUSE_ALLREDUCE_RMS", "0") == "1":
++            fusion_passes_to_disable.pop("fuse_allreduce_rms", None)
+         for flag, feature_name in fusion_passes_to_disable.items():
+             if getattr(pass_config, flag):
+                 logger.warning(
+diff --git a/vllm/compilation/passes/pass_manager.py b/vllm/compilation/passes/pass_manager.py
+index 5d4355a5b..xpu-ar-rms-gate 100644
+--- a/vllm/compilation/passes/pass_manager.py
++++ b/vllm/compilation/passes/pass_manager.py
+@@ -1,6 +1,7 @@
+ # SPDX-License-Identifier: Apache-2.0
+ # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
+ import functools
++import os
+ from collections.abc import Callable
+ from typing import Any, ParamSpec, TypeVar
+ 
+@@ -41,7 +42,11 @@ if current_platform.is_cuda_alike():
+     from .utility.split_coalescing import SplitCoalescingPass
+ 
+-if current_platform.is_cuda():
++if current_platform.is_cuda() or (
++    current_platform.is_xpu()
++    and os.getenv("VLLM_XPU_EXPERIMENTAL_FUSE_ALLREDUCE_RMS", "0") == "1"
++):
+     from .fusion.allreduce_rms_fusion import AllReduceFusionPass
++if current_platform.is_cuda():
+     from .fusion.collective_fusion import AsyncTPPass
+     from .fusion.minimax_qk_norm_fusion import MiniMaxQKNormPass
