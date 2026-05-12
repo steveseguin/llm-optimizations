@@ -269,6 +269,21 @@ Current code-direction preference after the latest negative screens:
 4. If a fusion cannot beat the current p512/n1536 anchor, archive it as a
    negative and leave the env flag unset.
 
+## 2026-05-12 Static Decode Compile Update
+
+`use_inductor_graph_partition=true` plus `compile_sizes=[1]` is now the best
+quality-cleared MiniMax AutoRound TP4 recipe. Warm p512/n512 reached
+`45.430028` output tok/s and long p512/n1536 repeated at `47.376673` and
+`47.586110` output tok/s (`63.448146` total tok/s on the better repeat).
+LocalMaxxing accepted the repeated long run as `cmp2mf1zw007wrm01op7aimhk`.
+
+This preserves the Q/K RMS variance allreduce path and still uses no
+speculation, no expert dropping, and stock GPU power limits. It also exposed an
+Intel `ocloc` / IGC internal compiler error during the cold static single-token
+compile for `triton_red_fused__to_copy_mm_t_9`; preserve that as a driver
+compiler bug lead. The next target remains `60+` output tok/s through real
+collective/RMS/projection/MoE boundary fusion or a stable speculative path.
+
 ## DP4+EP Status
 
 DP4+expert-parallel is now partially unblocked. A local XPU worker patch that

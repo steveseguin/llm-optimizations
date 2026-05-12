@@ -1,0 +1,97 @@
+{
+  "date": "2026-05-12",
+  "model": {
+    "hfId": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+    "base": "MiniMaxAI/MiniMax-M2.7",
+    "quantization": "INT4 AutoRound W4A16"
+  },
+  "hardware": {
+    "gpuName": "Intel Arc Pro B70 32GB",
+    "gpuCount": 4,
+    "vramGbPerGpu": 32,
+    "cpu": "AMD EPYC 9015 8-Core Processor",
+    "ramGb": 16,
+    "os": "Ubuntu 24.04.4 LTS",
+    "kernel": "6.17.0-23-generic"
+  },
+  "runtime": {
+    "engine": "vllm",
+    "engineVersion": "0.20.1-local",
+    "backend": "xpu",
+    "dtype": "float16",
+    "tensorParallel": 4,
+    "pipelineParallel": 1,
+    "maxModelLen": 2048,
+    "maxNumBatchedTokens": 1024,
+    "maxNumSeqs": 1,
+    "xpuGraph": false,
+    "llmScalerU4DecodeMoe": true,
+    "speculativeDecoding": false,
+    "expertDropping": false,
+    "powerLimitRaised": false,
+    "compilationConfig": {
+      "use_inductor_graph_partition": true,
+      "compile_sizes": [
+        1
+      ]
+    }
+  },
+  "aot": {
+    "hash": "3e2cefa134c3aecc743c56d36960e4cb0a8ac7d2adc73c3f2a078cc8b6164846",
+    "cacheRoot": "/mnt/fast-ai/vllm-cache-exp/minimax-inductor-partition-compile1-p512n512-20260512T122329Z",
+    "qkVarianceAllreducePresent": true,
+    "rank0Analyzer": {
+      "allreduceCount": 187,
+      "byShape": {
+        "f16[s72, 3072]": 125,
+        "f32[s72, 2]": 62
+      }
+    },
+    "compilerCaveat": "Cold compile emitted ocloc/IGC internal compiler errors for triton_red_fused__to_copy_mm_t_9, then completed; warm reloads used the AOT graph successfully."
+  },
+  "results": [
+    {
+      "label": "warm_p512n512",
+      "promptTokens": 512,
+      "outputTokens": 512,
+      "contextLength": 2048,
+      "gpuKvCacheTokens": 16832,
+      "elapsedSeconds": 11.270078953995835,
+      "tokSTotal": 90.86005556659727,
+      "tokSOut": 45.430027783298634,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-inductor-partition-compile1-warm-p512n512-20260512T122930Z/vllm-minimax-m27-autoround-tp4-p512n512-20260512T122930Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-inductor-partition-compile1-warm-p512n512-20260512T122930Z/vllm-minimax-m27-autoround-tp4-p512n512-20260512T122930Z.json"
+    },
+    {
+      "label": "validation_p512n1536",
+      "promptTokens": 512,
+      "outputTokens": 1536,
+      "contextLength": 2048,
+      "gpuKvCacheTokens": 16832,
+      "elapsedSeconds": 32.42101856999943,
+      "tokSTotal": 63.16889753411704,
+      "tokSOut": 47.376673150587784,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-inductor-partition-compile1-p512n1536-20260512T123226Z/vllm-minimax-m27-autoround-tp4-p512n1536-20260512T123226Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-inductor-partition-compile1-p512n1536-20260512T123226Z/vllm-minimax-m27-autoround-tp4-p512n1536-20260512T123226Z.json"
+    },
+    {
+      "label": "validation_p512n1536_repeat",
+      "promptTokens": 512,
+      "outputTokens": 1536,
+      "contextLength": 2048,
+      "gpuKvCacheTokens": 16064,
+      "elapsedSeconds": 32.27832675300306,
+      "tokSTotal": 63.44814635750788,
+      "tokSOut": 47.58610976813091,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-inductor-partition-compile1-repeat-p512n1536-20260512T123539Z/vllm-minimax-m27-autoround-tp4-p512n1536-20260512T123539Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-inductor-partition-compile1-repeat-p512n1536-20260512T123539Z/vllm-minimax-m27-autoround-tp4-p512n1536-20260512T123539Z.json"
+    }
+  ],
+  "localmaxxing": {
+    "submitted": true,
+    "id": "cmp2mf1zw007wrm01op7aimhk",
+    "payload": "data/localmaxxing-minimax-m27-autoround-static-compile1-p512n1536-20260512.payload.json",
+    "response": "data/localmaxxing-responses/minimax-m27-autoround-static-compile1-p512n1536-20260512.response.json"
+  },
+  "decision": "Promote graph partition plus compile_sizes=[1] as the new MiniMax M2.7 AutoRound TP4 four-B70 raw-speed recipe."
+}
