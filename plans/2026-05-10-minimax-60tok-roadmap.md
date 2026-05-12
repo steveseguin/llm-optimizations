@@ -96,7 +96,12 @@ The u4 MoE bridge is no longer the only ceiling. Existing timing notes put MiniM
 
 3. Attention/KV profiling
    - Avoid live `xpu-smi stats` polling during real benchmarks; it stalled vLLM shared-memory synchronization.
-   - Prefer lower-overhead Level Zero events, SYCL event timing, or short synchronized diagnostic runs.
+   - Avoid synchronized full-model decode timing during real benchmarks as
+     well. A p512/n128 run with `VLLM_XPU_DECODE_TIMING_SYNC=1` stalled before
+     normal model-load progress. Use static AOT analysis, standalone
+     microbenchmarks, or narrower hooks instead.
+   - Prefer lower-overhead Level Zero events, SYCL event timing, or tiny
+     standalone synchronized diagnostics that do not load the full vLLM model.
    - Measure whether KV writes, attention kernels, or projection kernels now dominate after the u4 MoE bridge.
    - FP8 KV is not a current throughput path for MiniMax TP4. It doubled
      reported KV capacity from roughly `17,216` tokens to `34,496` tokens at
@@ -113,6 +118,10 @@ The u4 MoE bridge is no longer the only ceiling. Existing timing notes put MiniM
    - Always record cold versus warm behavior and GPU KV-cache tokens.
    - Treat the `9,408` KV-token artifact as a performance smell, not a valid speed floor.
    - Keep dormant helper/timing branches out of active runtime unless the corresponding env flag is being tested.
+   - Forcing oneCCL to assume fabric vertex connectivity with
+    `CCL_TOPO_FABRIC_VERTEX_CONNECTION_CHECK=0` is closed as a negative on this
+    four-B70 host. It reused the same quality-cleared AOT graph but reduced
+    warm p512/n1536 throughput from `38.046755` to `37.210882` output tok/s.
    - DBO is not a current B70 flag path. vLLM rejects `--enable-dbo` without
      DeepEP all-to-all, and upstream documents DBO as requiring DP>1, expert
      parallelism, and DeepEP. Keep DBO as an overlap design reference only.
@@ -230,6 +239,10 @@ The u4 MoE bridge is no longer the only ceiling. Existing timing notes put MiniM
    MiniMax-specific routed `top8 from logits -> u4 tiny MoE` path that avoids
    the generic router allocation boundary without changing selected experts or
    dropping any expert work.
+   The Python/torch candidate top16 repair path is not that path: a p512/n1536
+   long run stalled inside the first request after normal AOT load and emitted
+   shared-memory broadcast warnings. Keep router repair only as a native fused
+   `moe_int4_ops` or compiler-lowered idea.
 
 Current code-direction preference after the latest negative screens:
 

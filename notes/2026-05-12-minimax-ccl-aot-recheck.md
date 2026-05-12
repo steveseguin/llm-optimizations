@@ -49,14 +49,37 @@ no expert dropping, and no power-limit change.
 | CCL ATL smoke | p64/n32 | cold | 9,472 | `18.986` | `6.329` | health check only |
 | CCL ATL cold | p512/n1536 | `3a72...` / cold compile | 9,408 | `45.09` | `33.82` | cold artifact |
 | CCL ATL warm | p512/n1536 | `8b105...` / AOT `3b096...` | 17,216 | `50.729007` | `38.046755` | valid current floor, small improvement |
+| CCL fabric-check disabled cold | p512/n1536 | `3a72...` / cold compile | 9,408 | `45.650833` | `34.238125` | cold artifact |
+| CCL fabric-check disabled warm | p512/n1536 | `8b105...` / AOT `3b096...` | 17,216 | `49.614510` | `37.210882` | negative; forcing assumed XeLinks was slower |
 | no-wrapper fastpath cold | p512/n1536 | `651f...` / cold compile | 5,184 | `45.59` | `34.19` | negative |
 | no-wrapper fastpath warm | p512/n1536 | `9449...` / AOT `243d...` | 17,216 | `49.939924` | `37.454943` | negative; patch removed |
+| candidate router top16 | p512/n1536 | `8b105...` / AOT `3b096...` | 15,680 | n/a | n/a | negative; first request stalled and was terminated |
+| synchronized decode timing | p512/n128 | n/a | n/a | n/a | n/a | negative diagnostic; stalled before normal model load |
 
 The CCL cleanup recovered the ATL-inferred path and produced a valid warm
 `38.046755` output tok/s result, modestly above the earlier
 `37.552538` quality-conservative LocalMaxxing reference and above the
 `37.751056` attention-delay run. It does not recover the old `41.130667`
 speed result.
+
+Forcing oneCCL to assume fabric vertex connectivity with
+`CCL_TOPO_FABRIC_VERTEX_CONNECTION_CHECK=0` was not useful on this four-B70
+host. It preserved the same AOT graph and 17,216-token warm KV cache shape, but
+the warm p512/n1536 result dropped to `37.210882` output tok/s.
+
+The Python/torch candidate-router repair path remains a short-screen idea only.
+It had previously shown zero top-16 misses in a small audit, but the p512/n1536
+long run reached normal AOT load and KV allocation, then stalled inside the
+first request until shared-memory broadcast warnings appeared. Treat this as a
+negative unless the repair is moved into the working `moe_int4_ops` extension
+or another native fused path.
+
+The synchronized timing helper is also too intrusive for this TP4 path. A
+p512/n128 diagnostic with `VLLM_XPU_DECODE_TIMING=1` and
+`VLLM_XPU_DECODE_TIMING_SYNC=1` stalled before reaching the normal safetensors
+model-load progress. Keep synchronized timing out of throughput runs; use
+static AOT boundary analysis, standalone microbenchmarks, or much narrower
+diagnostic hooks instead.
 
 LocalMaxxing submission:
 
@@ -115,7 +138,7 @@ The remaining target is a real XPU/Level Zero-side fusion around either:
 - hidden-state allreduce plus adjacent residual/RMS or MoE epilogue work;
 - MiniMax candidate router repair fused into the existing working
   `moe_int4_ops` extension, not the standalone SYCL module that crashed during
-  device-image registration.
+  device-image registration and not the current Python/torch top16 repair path.
 
 Structured data:
 

@@ -74,6 +74,40 @@
       "decision": "current quality-cleared non-spec floor; above earlier 37.552538 reference but below old suspect 41.130667 result"
     },
     {
+      "label": "ccl_fabric_vertex_check_disabled_p512n1536_cold",
+      "promptTokens": 512,
+      "outputTokens": 1536,
+      "contextLength": 2048,
+      "gpuKvCacheTokens": 9408,
+      "torchCompileCache": "3a72def54e",
+      "aotHash": "3b0962f0af06261f1111081e2233aff35e7dd7899eb46ceced593d08e3d91b71",
+      "tokSTotal": 45.65083291721116,
+      "tokSOut": 34.23812468790837,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-ccl-fabric0-20260512/vllm-minimax-m27-autoround-tp4-p512n1536-20260512T055032Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-ccl-fabric0-20260512/vllm-minimax-m27-autoround-tp4-p512n1536-20260512T055032Z.json",
+      "env": {
+        "CCL_TOPO_FABRIC_VERTEX_CONNECTION_CHECK": "0"
+      },
+      "decision": "cold artifact; not submitted"
+    },
+    {
+      "label": "ccl_fabric_vertex_check_disabled_p512n1536_warm",
+      "promptTokens": 512,
+      "outputTokens": 1536,
+      "contextLength": 2048,
+      "gpuKvCacheTokens": 17216,
+      "torchCompileCache": "8b105d58a9",
+      "aotHash": "3b0962f0af06261f1111081e2233aff35e7dd7899eb46ceced593d08e3d91b71",
+      "tokSTotal": 49.61450959126575,
+      "tokSOut": 37.210882193449315,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-ccl-fabric0-20260512/vllm-minimax-m27-autoround-tp4-p512n1536-20260512T055409Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-ccl-fabric0-20260512/vllm-minimax-m27-autoround-tp4-p512n1536-20260512T055409Z.json",
+      "env": {
+        "CCL_TOPO_FABRIC_VERTEX_CONNECTION_CHECK": "0"
+      },
+      "decision": "negative; forcing assumed XeLinks was slower than ATL topology recognition on this host"
+    },
+    {
       "label": "no_wrapper_fastpath_p512n1536_cold",
       "promptTokens": 512,
       "outputTokens": 1536,
@@ -100,6 +134,43 @@
       "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-fastpath-20260512/vllm-minimax-m27-autoround-tp4-p512n1536-20260512T053409Z.log",
       "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-fastpath-20260512/vllm-minimax-m27-autoround-tp4-p512n1536-20260512T053409Z.json",
       "decision": "negative; patch removed from active source"
+    },
+    {
+      "label": "candidate_router_top16_p512n1536",
+      "promptTokens": 512,
+      "outputTokens": 1536,
+      "contextLength": 2048,
+      "gpuKvCacheTokens": 15680,
+      "torchCompileCache": "8b105d58a9",
+      "aotHash": "3b0962f0af06261f1111081e2233aff35e7dd7899eb46ceced593d08e3d91b71",
+      "tokSTotal": null,
+      "tokSOut": null,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-candidate-top16-20260512T055757Z/vllm-minimax-m27-autoround-tp4-p512n1536-20260512T055757Z.log",
+      "json": null,
+      "env": {
+        "VLLM_MINIMAX_M2_CANDIDATE_ROUTER_TOPM": "16",
+        "VLLM_MINIMAX_M2_CANDIDATE_ROUTER_MAX_TOKENS": "4"
+      },
+      "finding": "Reached normal AOT load and KV allocation, then stalled in the first request until shm_broadcast warnings appeared. The run was terminated rather than submitted.",
+      "decision": "negative; current Python/torch top16 repair path is not a viable long-decode optimization"
+    },
+    {
+      "label": "synchronized_decode_timing_p512n128",
+      "promptTokens": 512,
+      "outputTokens": 128,
+      "contextLength": 2048,
+      "gpuKvCacheTokens": null,
+      "tokSTotal": null,
+      "tokSOut": null,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-timing-20260512T060520Z/vllm-minimax-m27-autoround-tp4-p512n128-20260512T060520Z.log",
+      "json": null,
+      "env": {
+        "VLLM_XPU_DECODE_TIMING": "1",
+        "VLLM_XPU_DECODE_TIMING_SYNC": "1",
+        "VLLM_XPU_DECODE_TIMING_RANK": "0"
+      },
+      "finding": "The diagnostic stalled before normal safetensors loading progress and was terminated. Synchronized timing is too intrusive for the compiled TP4 path.",
+      "decision": "negative diagnostic; keep synchronized timing out of throughput runs"
     }
   ],
   "aotRecheck": {
@@ -142,6 +213,7 @@
   "nextSteps": [
     "Try source-level XPU fusion around Q/K allreduce plus RMS apply while preserving cross-rank variance.",
     "Try hidden-state allreduce plus adjacent residual/RMS or MoE epilogue fusion in a real C++/SYCL or compiler-lowering path.",
-    "Keep candidate router repair as a possible fused moe_int4_ops path; do not use the standalone SYCL router module that crashed during image registration."
+    "Use static AOT boundary analysis, standalone microbenchmarks, or narrower diagnostic hooks instead of synchronized full-model timing.",
+    "Keep candidate router repair only as a possible fused moe_int4_ops path; do not use the standalone SYCL router module that crashed during image registration, and do not use the current Python/torch top16 repair path for long decode."
   ]
 }
