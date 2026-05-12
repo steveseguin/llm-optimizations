@@ -1,0 +1,85 @@
+{
+  "model": {
+    "hfId": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+    "localPath": "/mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround",
+    "quantization": "AutoRound W4A16"
+  },
+  "hardware": {
+    "gpuName": "Intel Arc Pro B70",
+    "gpuCount": 4,
+    "vramGbEach": 32,
+    "os": "Ubuntu 24.04"
+  },
+  "engine": {
+    "engineName": "vllm",
+    "engineVersion": "0.20.1-local",
+    "backend": "xpu",
+    "tensorParallel": 4,
+    "dtype": "float16",
+    "llmScalerMoe": true,
+    "xpuGraph": false,
+    "enforceEager": true
+  },
+  "patch": {
+    "path": "patches/vllm-minimax-fp16-router-audit-20260511.patch",
+    "envFlags": [
+      "VLLM_MINIMAX_M2_FP16_ROUTER",
+      "VLLM_MINIMAX_M2_FP16_ROUTER_AUDIT"
+    ],
+    "compiled": true
+  },
+  "finalAuditRun": {
+    "activeRouter": "fp32",
+    "shadowRouter": "fp16",
+    "routingDecisionCompared": "sigmoid(router_logits) + e_score_correction_bias",
+    "promptTokens": 64,
+    "outputTokens": 16,
+    "maxModelLen": 512,
+    "maxNumBatchedTokens": 128,
+    "batchSize": 1,
+    "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-fp16-router-audit-20260511/vllm-minimax-m27-autoround-tp4-p64n16-20260512T031110Z.log",
+    "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-fp16-router-audit-20260511/vllm-minimax-m27-autoround-tp4-p64n16-20260512T031110Z.json",
+    "auditLines": 496,
+    "prefillLines": 248,
+    "decodeLines": 248,
+    "orderedMismatchSum": 640,
+    "setMismatchSum": 128,
+    "top16CandidateMissSum": 0,
+    "top32CandidateMissSum": 0,
+    "maxAbsLogitDelta": 0.00762177,
+    "maxAbsChoiceDelta": 0.000101447,
+    "representativeMismatch": {
+      "layer": "model.layers.41.mlp",
+      "phase": "prefill",
+      "tokens": 128,
+      "orderedMismatchPerRank": 32,
+      "setMismatchPerRank": 32,
+      "top16CandidateMissPerRank": 0,
+      "top32CandidateMissPerRank": 0
+    }
+  },
+  "priorScreens": [
+    {
+      "name": "fp16_router_warm_speed_screen",
+      "promptTokens": 512,
+      "outputTokens": 1536,
+      "tokSOut": 38.13,
+      "tokSTotal": 50.85,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-fp16-router-20260511/vllm-minimax-m27-autoround-tp4-p512n1536-20260512T024625Z.log",
+      "decision": "do not promote; router set mismatch found in audit"
+    },
+    {
+      "name": "raw_logit_shadow_audit",
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-fp16-router-audit-20260511/vllm-minimax-m27-autoround-tp4-p64n16-20260512T030528Z.log",
+      "setMismatchSum": 136,
+      "top16CandidateMissSum": 0,
+      "decision": "superseded by biased-score audit"
+    }
+  ],
+  "decision": {
+    "directFp16RouterPromoted": false,
+    "localmaxxingSubmitted": false,
+    "reason": "Direct FP16 routing changes the MiniMax expert set. This is a diagnostic and not a new quality-conservative benchmark.",
+    "nextImplementationLead": "Use FP16 only to propose top-16 candidates, then compute exact FP32 candidate scores and pass exact top-k ids/weights into the MoE apply path."
+  }
+}
