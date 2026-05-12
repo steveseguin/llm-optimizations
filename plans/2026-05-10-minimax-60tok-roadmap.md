@@ -12,18 +12,24 @@ Current accepted reference points:
   inference as the default path. The top-level compiled graph contains the
   `f32[s72,2]` Q/K variance allreduce signature. LocalMaxxing:
   `cmp27nihp001orm01dataqtfq`.
-- Current best quality-cleared long-run result: `40.209882` output tok/s and
+- Previous graph-partition-only quality-cleared long-run result: `40.209882` output tok/s and
   `53.613176` total tok/s at p512/n1536 with
   `--compilation-config '{"use_inductor_graph_partition":true}'`, AOT
   `c3f2b10098683775b74b9bb91c9a44570f4df792c7a1b0061b5df73b6ef18f20`, and
   the Q/K variance allreduce preserved. LocalMaxxing:
   `cmp2kd5ux006frm013il4qu13`.
+- Current best quality-cleared long-run result: `47.586110` output tok/s and
+  `63.448146` total tok/s at p512/n1536 with
+  `--compilation-config '{"use_inductor_graph_partition":true,"compile_sizes":[1]}'`,
+  AOT `3e2cefa134c3aecc743c56d36960e4cb0a8ac7d2adc73c3f2a078cc8b6164846`,
+  and the Q/K variance allreduce preserved. LocalMaxxing:
+  `cmp2mf1zw007wrm01op7aimhk`.
 - Accepted short/mid speed points: `39.610585` output tok/s at p512/n512 and `40.303730` output tok/s at p512/n1024 using the fast-NVMe FP16 u4 decode recipe.
 - The earlier `41.130667` p512/n1536 result remains useful as a scheduling clue, but it is not the quality-cleared target because the cached AOT graph did not visibly include the per-layer Q/K RMS variance allreduce.
 
 Revised targets:
 
-- Near-term repeatable target: `45 tok/s` output at p512/n1536 without changing model quality.
+- Near-term repeatable target: `50 tok/s` output at p512/n1536 without changing model quality.
 - Main target: `60 tok/s` output at p512/n1536 on 4x B70 with the MiniMax AutoRound INT4 model.
 - First stretch target: `75+ tok/s` only if achieved by verified speculative decoding, MTP-style target-compatible drafting, or deeper source-level fusion that preserves target logits.
 - Secondary stretch target: `90+ tok/s` if speculative acceptance is high enough and the run records target verification, acceptance behavior, total tok/s, output tok/s, and TTFT/prefill data where available.
@@ -283,6 +289,20 @@ Intel `ocloc` / IGC internal compiler error during the cold static single-token
 compile for `triton_red_fused__to_copy_mm_t_9`; preserve that as a driver
 compiler bug lead. The next target remains `60+` output tok/s through real
 collective/RMS/projection/MoE boundary fusion or a stable speculative path.
+
+Follow-up screens closed several nearby compiler-shape branches. Lowering
+`max_num_batched_tokens` to `512`, adding `compile_ranges_endpoints=[512]`,
+adding static prefill `compile_sizes=[1,512]`, and disabling combo kernels all
+regressed to roughly `30-33` output tok/s or failed during compile/KV setup.
+The useful serving tradeoff is `gpu_memory_utilization=0.95` with the winning
+decode-only graph: p512/n1536 reached `46.86` output tok/s while raising the
+reported KV budget to `33,024` tokens at the default 2k configured window.
+Configured 32k still failed after graph memory overhead (`1.52 GiB` available
+for KV versus `1.94 GiB` required), while configured 24k succeeded with `25,600`
+KV tokens and `33.81` output tok/s at p512/n512; LocalMaxxing accepted the 24k
+capacity datapoint as `cmp2p5jhb009wrm01cmkurcfa`. Forced XPU PIECEWISE graph mode
+remains closed for speed, even with the local no-op communicator graph-capture
+guard: a p64/n32 smoke reached only `4.94` output tok/s.
 
 ## DP4+EP Status
 

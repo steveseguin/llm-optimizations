@@ -1,0 +1,41 @@
+{
+  "hfId": "MiniMaxAI/MiniMax-M2.7",
+  "modelRevision": "main",
+  "hardware": {
+    "hwClass": "DISCRETE_GPU",
+    "gpuName": "Intel Arc Pro B70 32GB",
+    "gpuCount": 4,
+    "vramGb": 32,
+    "cpu": "AMD EPYC 9015 8-Core Processor",
+    "ramGb": 16,
+    "os": "Ubuntu 24.04.4 LTS, kernel 6.17.0-23-generic"
+  },
+  "engineName": "vllm",
+  "engineVersion": "0.20.1-local",
+  "quantization": "INT4 AutoRound W4A16",
+  "promptTokens": 512,
+  "outputTokens": 512,
+  "contextLength": 24576,
+  "batchSize": 1,
+  "tokSOut": 33.80577788729393,
+  "tokSTotal": 67.61155577458786,
+  "peakVramGb": 29.63,
+  "notes": "MiniMax M2.7 AutoRound W4A16 on 4x Intel Arc Pro B70 via vLLM/XPU TP4. Local weights are Lasimeri/MiniMax-M2.7-int4-AutoRound submitted under base MiniMaxAI/MiniMax-M2.7 for consistency. This is a configured 24k context capacity proof, not a new speed best. The same decode-only static compile recipe reached 47.586 output tok/s at p512/n1536 with max_model_len=2048. With gpu_memory_utilization=0.95 and max_model_len=24576, vLLM reported 25,600 GPU KV tokens and maximum concurrency 1.04x for 24,576 tokens/request, then p512/n512 measured 33.81 output tok/s and 67.61 total tok/s. Configured 32k failed after graph memory overhead with 1.52 GiB KV available versus 1.94 GiB required. No speculative decode, no expert dropping, no power-limit changes.",
+  "engineFlags": {
+    "commandSnippet": "VLLM_XPU_USE_LLM_SCALER_MOE=1 CCL_TOPO_P2P_ACCESS=1 VLLM_XPU_ENABLE_XPU_GRAPH=0 vllm bench throughput --backend vllm --model /mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround --tokenizer /mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround --trust-remote-code --dtype float16 --tensor-parallel-size 4 --distributed-executor-backend mp --max-model-len 24576 --max-num-batched-tokens 1024 --max-num-seqs 1 --dataset-name random --random-input-len 512 --random-output-len 512 --random-range-ratio 0 --num-prompts 1 --disable-log-stats --compilation-config '{\"use_inductor_graph_partition\":true,\"compile_sizes\":[1]}' --gpu-memory-utilization 0.95",
+    "tensorParallel": 4,
+    "pipelineParallel": 1,
+    "kvCacheDtype": "auto",
+    "gpuMemUtil": 0.95,
+    "flashAttn": true,
+    "attentionBackend": "flash_attn",
+    "contextLength": 24576,
+    "prefillChunkSize": 1024,
+    "maxRunningSeqs": 1,
+    "concurrency": 1,
+    "specDecoding": false,
+    "mtpEnabled": false,
+    "engineQuant": "inc",
+    "extraFlags": "XPU/Level Zero; B70 tuned MoE config E=256,N=384,dtype=int4_w4a16; llm-scaler u4 MoE decode path for x.shape<=4; CCL_ATL_TRANSPORT=ofi; CCL_TOPO_P2P_ACCESS=1; oneCCL ATL inferred local rank; use_inductor_graph_partition=true; compile_sizes=[1]; gpu_memory_utilization=0.95; max_model_len=24576; 25,600 GPU KV tokens; configured 32k failed KV check; XPU graph disabled; no power-limit change"
+  }
+}
