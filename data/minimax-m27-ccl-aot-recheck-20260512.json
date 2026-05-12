@@ -1,0 +1,147 @@
+{
+  "dateUtc": "2026-05-12",
+  "model": {
+    "hfId": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+    "localPath": "/mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround",
+    "quantization": "INT4 AutoRound W4A16"
+  },
+  "hardware": {
+    "gpuName": "Intel Arc Pro B70",
+    "gpuCount": 4,
+    "vramGbEach": 32,
+    "cpu": "AMD EPYC 9015 8-Core Processor",
+    "ramGb": 16,
+    "os": "Ubuntu 24.04.4 LTS",
+    "powerLimitRaised": false
+  },
+  "software": {
+    "engine": "vllm",
+    "engineVersion": "0.20.1-local",
+    "backend": "XPU/Level Zero",
+    "tensorParallel": 4,
+    "dtype": "float16",
+    "xpuGraph": false,
+    "llmScalerU4Moe": true
+  },
+  "patches": [
+    {
+      "path": "patches/vllm-xpu-worker-ccl-local-rank-optin-20260512.patch",
+      "summary": "Make CCL_PROCESS_LAUNCHER, CCL_LOCAL_RANK, and CCL_LOCAL_SIZE opt-in behind VLLM_XPU_SET_CCL_LOCAL_RANK=1 so default TP4 runs use oneCCL ATL local-rank inference again."
+    }
+  ],
+  "runs": [
+    {
+      "label": "ccl_atl_smoke_p64n32",
+      "promptTokens": 64,
+      "outputTokens": 32,
+      "contextLength": 2048,
+      "gpuKvCacheTokens": 9472,
+      "tokSTotal": 18.986,
+      "tokSOut": 6.329,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-ccl-atl-infer-20260512/vllm-minimax-m27-autoround-tp4-p64n32-20260512T051740Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-ccl-atl-infer-20260512/vllm-minimax-m27-autoround-tp4-p64n32-20260512T051740Z.json",
+      "decision": "health-check only"
+    },
+    {
+      "label": "ccl_atl_p512n1536_cold",
+      "promptTokens": 512,
+      "outputTokens": 1536,
+      "contextLength": 2048,
+      "gpuKvCacheTokens": 9408,
+      "torchCompileCache": "3a72def54e",
+      "aotHash": "3b0962f0af06261f1111081e2233aff35e7dd7899eb46ceced593d08e3d91b71",
+      "tokSTotal": 45.09,
+      "tokSOut": 33.82,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-ccl-atl-infer-20260512/vllm-minimax-m27-autoround-tp4-p512n1536-20260512T052152Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-ccl-atl-infer-20260512/vllm-minimax-m27-autoround-tp4-p512n1536-20260512T052152Z.json",
+      "decision": "cold AOT artifact"
+    },
+    {
+      "label": "ccl_atl_p512n1536_warm",
+      "promptTokens": 512,
+      "outputTokens": 1536,
+      "contextLength": 2048,
+      "gpuKvCacheTokens": 17216,
+      "torchCompileCache": "8b105d58a9",
+      "aotHash": "3b0962f0af06261f1111081e2233aff35e7dd7899eb46ceced593d08e3d91b71",
+      "tokSTotal": 50.72900704895311,
+      "tokSOut": 38.04675528671483,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-ccl-atl-infer-20260512/vllm-minimax-m27-autoround-tp4-p512n1536-20260512T052550Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-ccl-atl-infer-20260512/vllm-minimax-m27-autoround-tp4-p512n1536-20260512T052550Z.json",
+      "localmaxxingId": "cmp27nihp001orm01dataqtfq",
+      "localmaxxingPayload": "data/localmaxxing-minimax-m27-autoround-ccl-atl-qkallreduce-p512n1536-20260512.payload.json",
+      "localmaxxingResponse": "data/localmaxxing-responses/minimax-m27-autoround-ccl-atl-qkallreduce-p512n1536-20260512.response.json",
+      "decision": "current quality-cleared non-spec floor; above earlier 37.552538 reference but below old suspect 41.130667 result"
+    },
+    {
+      "label": "no_wrapper_fastpath_p512n1536_cold",
+      "promptTokens": 512,
+      "outputTokens": 1536,
+      "contextLength": 2048,
+      "gpuKvCacheTokens": 5184,
+      "torchCompileCache": "651fad4a74",
+      "aotHash": "243d404794d6dfa1324fed9d959508ed4069328afe74bf2c02bbc17105c71717",
+      "tokSTotal": 45.59,
+      "tokSOut": 34.19,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-fastpath-20260512/vllm-minimax-m27-autoround-tp4-p512n1536-20260512T053034Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-fastpath-20260512/vllm-minimax-m27-autoround-tp4-p512n1536-20260512T053034Z.json",
+      "decision": "negative"
+    },
+    {
+      "label": "no_wrapper_fastpath_p512n1536_warm",
+      "promptTokens": 512,
+      "outputTokens": 1536,
+      "contextLength": 2048,
+      "gpuKvCacheTokens": 17216,
+      "torchCompileCache": "9449749f94",
+      "aotHash": "243d404794d6dfa1324fed9d959508ed4069328afe74bf2c02bbc17105c71717",
+      "tokSTotal": 49.939924,
+      "tokSOut": 37.454943,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-fastpath-20260512/vllm-minimax-m27-autoround-tp4-p512n1536-20260512T053409Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-fastpath-20260512/vllm-minimax-m27-autoround-tp4-p512n1536-20260512T053409Z.json",
+      "decision": "negative; patch removed from active source"
+    }
+  ],
+  "aotRecheck": {
+    "oldSuspectRun": {
+      "tokSOut": 41.130667019386024,
+      "tokSTotal": 54.84088935918136,
+      "torchCompileCache": "1d97049441",
+      "aotHash": "c15860ddb8a1077c5ba1a1ae2d0f86552a357eb56772cdbf02828195b5a363ec",
+      "archiveRoot": "/mnt/fast-ai/vllm-cache-exp/minimax-c158-archive-20260510T070154Z",
+      "generatedCacheAnalyzer": {
+        "allreduceCount": 40,
+        "byShapeClassification": {
+          "f16[s72, 3072] -> embedding_to_rms_int4_gemm": 8,
+          "f16[s72, 3072] -> hidden_to_moe": 12,
+          "f16[s72, 3072] -> hidden_to_rms": 12,
+          "f32[s72, 2] -> qk_variance": 8
+        }
+      },
+      "topLevelGraphFinding": "rank_0_0/backbone/computation_graph.py shows old linear_attn.py:93-107 Q/K RMS code with local q_var/k_var apply and no visible tensor_model_parallel_all_reduce(qk_var). Treat generated-cache f32 allreduce evidence as mixed/stale-cache evidence, not enough to quality-clear the 41.13 tok/s result."
+    },
+    "currentQualityGraph": {
+      "tokSOut": 38.04675528671483,
+      "tokSTotal": 50.72900704895311,
+      "torchCompileCache": "8b105d58a9",
+      "aotHash": "3b0962f0af06261f1111081e2233aff35e7dd7899eb46ceced593d08e3d91b71",
+      "generatedCacheAnalyzer": {
+        "allreduceCount": 28,
+        "byShapeClassification": {
+          "f16[s72, 3072] -> embedding_to_rms_int4_gemm": 4,
+          "f16[s72, 3072] -> hidden_to_moe": 4,
+          "f16[s72, 3072] -> hidden_to_rms": 8,
+          "f16[s72, 3072] -> hidden_to_rms_int4_gemm": 4,
+          "f32[s72, 2] -> qk_variance": 8
+        }
+      },
+      "topLevelGraphFinding": "rank_0_0/backbone/computation_graph.py shows linear_attn.py:115 qk_var cat, f32[s72,2] _c10d_functional.all_reduce, and linear_attn.py:117 tensor_model_parallel_all_reduce(qk_var) / q_norm.tp_world."
+    }
+  },
+  "decision": "Do not use the 41.13 tok/s c158 result as the quality-cleared MiniMax baseline. Use the 38.046755 tok/s CCL-ATL warm result as the current quality-cleared non-spec floor until a faster graph with the top-level Q/K allreduce signature is validated.",
+  "nextSteps": [
+    "Try source-level XPU fusion around Q/K allreduce plus RMS apply while preserving cross-rank variance.",
+    "Try hidden-state allreduce plus adjacent residual/RMS or MoE epilogue fusion in a real C++/SYCL or compiler-lowering path.",
+    "Keep candidate router repair as a possible fused moe_int4_ops path; do not use the standalone SYCL router module that crashed during image registration."
+  ]
+}

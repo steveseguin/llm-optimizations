@@ -7,6 +7,11 @@ The MiniMax M2.7 AutoRound INT4 path is now the primary four-B70 optimization ta
 Current accepted reference points:
 
 - Conservative long-run anchor: `37.552538` output tok/s and `50.070051` total tok/s at p512/n1536, TP4, no speculation, no expert dropping, no power-limit change, Q/K TP variance allreduce enabled. LocalMaxxing: `cmozow03v005wlo01q81bnspx`.
+- Current post-CCL-cleanup quality floor: `38.046755` output tok/s and
+  `50.729007` total tok/s at p512/n1536 after restoring oneCCL ATL local-rank
+  inference as the default path. The top-level compiled graph contains the
+  `f32[s72,2]` Q/K variance allreduce signature. LocalMaxxing:
+  `cmp27nihp001orm01dataqtfq`.
 - Accepted short/mid speed points: `39.610585` output tok/s at p512/n512 and `40.303730` output tok/s at p512/n1024 using the fast-NVMe FP16 u4 decode recipe.
 - The earlier `41.130667` p512/n1536 result remains useful as a scheduling clue, but it is not the quality-cleared target because the cached AOT graph did not visibly include the per-layer Q/K RMS variance allreduce.
 
