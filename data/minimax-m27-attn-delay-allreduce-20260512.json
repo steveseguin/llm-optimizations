@@ -1,0 +1,122 @@
+{
+  "dateUtc": "2026-05-12",
+  "model": {
+    "hfId": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+    "localPath": "/mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround",
+    "submittedAs": "MiniMaxAI/MiniMax-M2.7",
+    "quantization": "INT4 AutoRound W4A16"
+  },
+  "hardware": {
+    "gpuName": "Intel Arc Pro B70 32GB",
+    "gpuCount": 4,
+    "vramGbEach": 32,
+    "cpu": "AMD EPYC 9015 8-Core Processor",
+    "ramGb": 16,
+    "os": "Ubuntu 24.04.4 LTS"
+  },
+  "software": {
+    "engine": "vLLM",
+    "engineVersion": "0.20.1-local",
+    "backend": "xpu",
+    "dtype": "float16",
+    "llmScalerMoeU4": true,
+    "xpuGraph": false,
+    "powerLimitRaised": false
+  },
+  "experiment": {
+    "name": "MiniMax attention output delayed residual allreduce",
+    "env": {
+      "VLLM_MINIMAX_M2_ATTN_DELAY_ALLREDUCE": "1",
+      "VLLM_XPU_USE_LLM_SCALER_MOE": "1",
+      "VLLM_XPU_ENABLE_XPU_GRAPH": "0",
+      "CCL_ATL_TRANSPORT": "ofi",
+      "CCL_TOPO_P2P_ACCESS": "1"
+    },
+    "mechanism": "MiniMax attention o_proj is constructed with reduce_results=false. The decoder then adds the residual on TP rank 0 before the tensor-parallel allreduce and applies post-attention RMSNorm without the residual argument. MoE allreduce remains unchanged for the promoted run.",
+    "qualityGuardrail": "No expert dropping, no speculative decode, and Q/K RMS variance allreduces remain present. This changes floating-point accumulation order for the attention residual path, so it is quality-conservative but not bitwise-identical."
+  },
+  "shortScreens": [
+    {
+      "name": "control_cold",
+      "shape": "p64/n32",
+      "tokSTotal": 19.887646094091753,
+      "tokSOut": 6.629215364697251,
+      "gpuKvCacheTokens": 9472,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-delay-rank0-20260512-control/vllm-minimax-m27-autoround-tp4-p64n32-20260512T044416Z.log"
+    },
+    {
+      "name": "control_warm",
+      "shape": "p64/n32",
+      "tokSTotal": 77.01574092962706,
+      "tokSOut": 25.67191364320902,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-delay-rank0-20260512-control/vllm-minimax-m27-autoround-tp4-p64n32-20260512T044800Z.log"
+    },
+    {
+      "name": "attention_delay_warm",
+      "shape": "p64/n32",
+      "tokSTotal": 79.61772603776456,
+      "tokSOut": 26.53924201258819,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-delay-rank0-20260512/vllm-minimax-m27-autoround-tp4-p64n32-20260512T045238Z.log"
+    },
+    {
+      "name": "moe_delay_warm",
+      "shape": "p64/n32",
+      "tokSTotal": 74.46370864710504,
+      "tokSOut": 24.82123621570168,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-delay-rank0-20260512/vllm-minimax-m27-autoround-tp4-p64n32-20260512T045457Z.log"
+    },
+    {
+      "name": "attention_plus_moe_delay_warm",
+      "shape": "p64/n32",
+      "tokSTotal": 71.97075168024686,
+      "tokSOut": 23.990250560082285,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-delay-rank0-20260512/vllm-minimax-m27-autoround-tp4-p64n32-20260512T045014Z.log"
+    }
+  ],
+  "promotedRuns": [
+    {
+      "name": "attention_delay_p512n1536_cold",
+      "promptTokens": 512,
+      "outputTokens": 1536,
+      "contextLength": 2048,
+      "maxNumBatchedTokens": 1024,
+      "gpuKvCacheTokens": 9408,
+      "tokSTotal": 45.32986198289075,
+      "tokSOut": 33.99739648716806,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-attn-delay-20260512/vllm-minimax-m27-autoround-tp4-p512n1536-20260512T045719Z.log"
+    },
+    {
+      "name": "attention_delay_p512n1536_warm1",
+      "promptTokens": 512,
+      "outputTokens": 1536,
+      "contextLength": 2048,
+      "maxNumBatchedTokens": 1024,
+      "gpuKvCacheTokens": 17280,
+      "tokSTotal": 49.84854003167321,
+      "tokSOut": 37.386405023754904,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-attn-delay-20260512/vllm-minimax-m27-autoround-tp4-p512n1536-20260512T050104Z.log"
+    },
+    {
+      "name": "attention_delay_p512n1536_warm2",
+      "promptTokens": 512,
+      "outputTokens": 1536,
+      "contextLength": 2048,
+      "maxNumBatchedTokens": 1024,
+      "gpuKvCacheTokens": 17280,
+      "tokSTotal": 50.33474110418786,
+      "tokSOut": 37.7510558281409,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-attn-delay-20260512/vllm-minimax-m27-autoround-tp4-p512n1536-20260512T050404Z.log",
+      "localmaxxingCandidate": true
+    }
+  ],
+  "graphCheck": {
+    "cacheRoot": "/mnt/fast-ai/vllm-cache-exp/minimax-attn-delay-p512n1536-20260512T045718/torch_compile_cache/3a72def54e",
+    "allreduceCount": 187,
+    "byShapeClassification": {
+      "f16[s72, 3072] -> moe": 63,
+      "f16[s72, 3072] -> rms_norm": 62,
+      "f32[s72, 2] -> qk_rms_apply": 62
+    }
+  },
+  "decision": "Promote attention-only delayed residual allreduce as a small throughput improvement over the previous quality-conservative p512/n1536 reference. Do not promote MoE-delay or combined attention+MoE delay."
+}

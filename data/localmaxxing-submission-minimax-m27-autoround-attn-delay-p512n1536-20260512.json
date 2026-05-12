@@ -1,0 +1,11 @@
+{
+  "dateUtc": "2026-05-12T05:10:24.759Z",
+  "endpoint": "POST /api/benchmarks",
+  "payload": "data/localmaxxing-minimax-m27-autoround-attn-delay-p512n1536-20260512.payload.json",
+  "response": "data/localmaxxing-responses/minimax-m27-autoround-attn-delay-p512n1536-20260512.response.json",
+  "localmaxxingId": "cmp269kaf0015rm01tx032dih",
+  "status": "APPROVED",
+  "tokSOut": 37.7510558281409,
+  "tokSTotal": 50.33474110418786,
+  "notes": "API key intentionally not stored. First submission attempt failed validation because backend=xpu is not an accepted backend enum; final payload omits backend and records XPU/Level Zero in notes and extraFlags."
+}

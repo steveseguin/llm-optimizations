@@ -1,0 +1,107 @@
+diff --git a/vllm/model_executor/models/minimax_m2.py b/vllm/model_executor/models/minimax_m2.py
+--- a/vllm/model_executor/models/minimax_m2.py
++++ b/vllm/model_executor/models/minimax_m2.py
+@@
+ from vllm.distributed import (
+     get_pp_group,
++    get_tensor_model_parallel_rank,
+     get_tensor_model_parallel_world_size,
+ )
+@@
+ _MINIMAX_M2_CANDIDATE_ROUTER_XPU_REPAIR = (
+     os.environ.get("VLLM_MINIMAX_M2_CANDIDATE_ROUTER_XPU_REPAIR", "0") == "1"
+ )
++_MINIMAX_M2_ATTN_DELAY_ALLREDUCE = (
++    os.environ.get("VLLM_MINIMAX_M2_ATTN_DELAY_ALLREDUCE", "0") == "1"
++)
++_MINIMAX_M2_MOE_DELAY_ALLREDUCE = (
++    os.environ.get("VLLM_MINIMAX_MOE_DELAY_ALLREDUCE", "0") == "1"
++)
+ _MINIMAX_QK_RMS_XPU_HELPER = (
+     os.environ.get("VLLM_MINIMAX_QK_RMS_XPU_HELPER", "0") == "1"
+ )
+@@
+         self.o_proj = RowParallelLinear(
+             self.total_num_heads * self.head_dim,
+             hidden_size,
+             bias=False,
+             quant_config=quant_config,
+             prefix=f"{prefix}.o_proj",
++            reduce_results=not _MINIMAX_M2_ATTN_DELAY_ALLREDUCE,
+         )
+@@
+         self.block_sparse_moe = MiniMaxM2MoE(
+             config=config,
+             quant_config=quant_config,
+             prefix=f"{prefix}.mlp",
+         )
++        self.tp_rank = get_tensor_model_parallel_rank()
++        self.tp_size = get_tensor_model_parallel_world_size()
+         self.input_layernorm = RMSNorm(config.hidden_size, eps=config.rms_norm_eps)
+         self.post_attention_layernorm = RMSNorm(
+             config.hidden_size, eps=config.rms_norm_eps
+         )
+ 
++    def _allreduce_with_rank0_residual(
++        self, hidden_states: torch.Tensor, residual: torch.Tensor
++    ) -> torch.Tensor:
++        if self.tp_rank == 0:
++            hidden_states = hidden_states + residual
++        return tensor_model_parallel_all_reduce(hidden_states)
++
+     def forward(
+         self,
+         positions: torch.Tensor,
+         hidden_states: torch.Tensor,
+@@
+         if residual is None:
+             residual = hidden_states
+             hidden_states = self.input_layernorm(hidden_states)
++        elif _MINIMAX_M2_MOE_DELAY_ALLREDUCE and self.tp_size > 1:
++            with timed_region("minimax.moe.delayed_residual_allreduce"):
++                hidden_states = self._allreduce_with_rank0_residual(
++                    hidden_states, residual
++                )
++            residual = hidden_states
++            hidden_states = self.input_layernorm(hidden_states)
+         else:
+             hidden_states, residual = self.input_layernorm(hidden_states, residual)
+         hidden_states = self.self_attn(
+             positions=positions,
+             hidden_states=hidden_states,
+         )
+ 
+         # Fully Connected
+-        hidden_states, residual = self.post_attention_layernorm(hidden_states, residual)
++        if _MINIMAX_M2_ATTN_DELAY_ALLREDUCE and self.tp_size > 1:
++            with timed_region("minimax.attn.delayed_residual_allreduce"):
++                hidden_states = self._allreduce_with_rank0_residual(
++                    hidden_states, residual
++                )
++            residual = hidden_states
++            hidden_states = self.post_attention_layernorm(hidden_states)
++        else:
++            hidden_states, residual = self.post_attention_layernorm(
++                hidden_states, residual
++            )
+ 
+         hidden_states = self.block_sparse_moe(hidden_states)
+ 
+         return hidden_states, residual
+@@
+         self.config = config
++        self.tp_rank = get_tensor_model_parallel_rank()
++        self.tp_size = get_tensor_model_parallel_world_size()
+@@
+-        hidden_states, _ = self.norm(hidden_states, residual)
++        if (
++            _MINIMAX_M2_MOE_DELAY_ALLREDUCE
++            and self.tp_size > 1
++            and residual is not None
++        ):
++            if self.tp_rank == 0:
++                hidden_states = hidden_states + residual
++            hidden_states = tensor_model_parallel_all_reduce(hidden_states)
++            hidden_states = self.norm(hidden_states)
++        else:
++            hidden_states, _ = self.norm(hidden_states, residual)
