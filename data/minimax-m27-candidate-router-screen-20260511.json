@@ -1,0 +1,143 @@
+{
+  "model": {
+    "hfId": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+    "localPath": "/mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround",
+    "quantization": "AutoRound W4A16"
+  },
+  "hardware": {
+    "gpuName": "Intel Arc Pro B70",
+    "gpuCount": 4,
+    "vramGbEach": 32,
+    "os": "Ubuntu 24.04"
+  },
+  "engine": {
+    "engineName": "vllm",
+    "engineVersion": "0.20.1-local",
+    "backend": "xpu",
+    "tensorParallel": 4,
+    "dtype": "float16",
+    "llmScalerMoe": true,
+    "xpuGraph": false
+  },
+  "patch": {
+    "path": "patches/vllm-minimax-candidate-router-screen-20260511.patch",
+    "envFlags": [
+      "VLLM_MINIMAX_M2_CANDIDATE_ROUTER_TOPM",
+      "VLLM_MINIMAX_M2_CANDIDATE_ROUTER_MAX_TOKENS"
+    ],
+    "compiled": true
+  },
+  "audit": {
+    "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-candidate-router-20260511/vllm-minimax-m27-autoround-tp4-p64n16-20260512T034350Z.log",
+    "routingDecisionCompared": "sigmoid(router_logits) + e_score_correction_bias",
+    "auditLines": 496,
+    "orderedMismatchSum": 640,
+    "setMismatchSum": 128,
+    "top12CandidateMissSum": 0,
+    "top16CandidateMissSum": 0,
+    "top32CandidateMissSum": 0,
+    "decision": "Direct FP16 routing remains disqualified; candidate repair remains plausible in this smoke."
+  },
+  "benchConfig": {
+    "promptTokens": 512,
+    "outputTokens": 512,
+    "contextLength": 2048,
+    "maxNumBatchedTokens": 1024,
+    "batchSize": 1,
+    "specDecoding": false,
+    "powerLimitChanged": false
+  },
+  "runs": [
+    {
+      "name": "disabled_baseline_cold",
+      "aotHash": "8fc2c1bdef5de625ffcc173e6e30021e9f17c602fea963a9d1485df804a81dca",
+      "candidateTopM": 0,
+      "cacheState": "cold",
+      "gpuKvCacheTokens": 9408,
+      "tokSTotal": 57.73,
+      "tokSOut": 28.87,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-candidate-router-20260511/vllm-minimax-m27-autoround-tp4-p512n512-20260512T033034Z.log"
+    },
+    {
+      "name": "disabled_baseline_warm",
+      "aotHash": "8fc2c1bdef5de625ffcc173e6e30021e9f17c602fea963a9d1485df804a81dca",
+      "candidateTopM": 0,
+      "cacheState": "warm",
+      "gpuKvCacheTokens": 17216,
+      "tokSTotal": 71.07,
+      "tokSOut": 35.54,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-candidate-router-20260511/vllm-minimax-m27-autoround-tp4-p512n512-20260512T033342Z.log"
+    },
+    {
+      "name": "top16_candidate_v1_warm",
+      "aotHash": "8fc2c1bdef5de625ffcc173e6e30021e9f17c602fea963a9d1485df804a81dca",
+      "candidateTopM": 16,
+      "cacheState": "warm",
+      "gpuKvCacheTokens": 15680,
+      "tokSTotal": 72.43,
+      "tokSOut": 36.21,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-candidate-router-20260511/vllm-minimax-m27-autoround-tp4-p512n512-20260512T032741Z.log",
+      "note": "First implementation still computed the full FP32 router before candidate repair."
+    },
+    {
+      "name": "top16_candidate_v2_cold",
+      "aotHash": "0f3c2fd69c5d243b78b5bd1c1f89f44e2609e447c7b1714e1881e95c513cda4c",
+      "candidateTopM": 16,
+      "cacheState": "cold",
+      "gpuKvCacheTokens": 7808,
+      "tokSTotal": 57.08,
+      "tokSOut": 28.54,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-candidate-router-20260511/vllm-minimax-m27-autoround-tp4-p512n512-20260512T033724Z.log"
+    },
+    {
+      "name": "top16_candidate_v2_warm",
+      "aotHash": "0f3c2fd69c5d243b78b5bd1c1f89f44e2609e447c7b1714e1881e95c513cda4c",
+      "candidateTopM": 16,
+      "cacheState": "warm",
+      "gpuKvCacheTokens": 15680,
+      "tokSTotal": 72.53,
+      "tokSOut": 36.27,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-candidate-router-20260511/vllm-minimax-m27-autoround-tp4-p512n512-20260512T034031Z.log"
+    },
+    {
+      "name": "top12_candidate_v2_cold",
+      "aotHash": "0f3c2fd69c5d243b78b5bd1c1f89f44e2609e447c7b1714e1881e95c513cda4c",
+      "candidateTopM": 12,
+      "cacheState": "cold",
+      "gpuKvCacheTokens": 7808,
+      "tokSTotal": 57.72,
+      "tokSOut": 28.86,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-candidate-router-20260511/vllm-minimax-m27-autoround-tp4-p512n512-20260512T034629Z.log"
+    },
+    {
+      "name": "top12_candidate_v2_warm",
+      "aotHash": "0f3c2fd69c5d243b78b5bd1c1f89f44e2609e447c7b1714e1881e95c513cda4c",
+      "candidateTopM": 12,
+      "cacheState": "warm",
+      "gpuKvCacheTokens": 15680,
+      "tokSTotal": 72.33,
+      "tokSOut": 36.17,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-candidate-router-20260511/vllm-minimax-m27-autoround-tp4-p512n512-20260512T034934Z.log"
+    }
+  ],
+  "allreduceAnalyzer": {
+    "aotHash": "0f3c2fd69c5d243b78b5bd1c1f89f44e2609e447c7b1714e1881e95c513cda4c",
+    "allreduceCount": 28,
+    "byShape": {
+      "f16[s72, 3072]": 20,
+      "f32[s72, 2]": 8
+    },
+    "byClassification": {
+      "embedding_to_rms_int4_gemm": 4,
+      "hidden_to_moe": 8,
+      "hidden_to_rms": 8,
+      "qk_variance": 8
+    }
+  },
+  "decision": {
+    "promoted": false,
+    "localmaxxingSubmitted": false,
+    "reason": "Functional but only about 2% faster than the same-code disabled p512/n512 baseline and below prior accepted MiniMax references.",
+    "nextImplementationLead": "Move candidate proposal, exact candidate scoring, top-k repair, and weight normalization into a fused XPU kernel to remove Python-level advanced indexing and graph overhead."
+  }
+}
