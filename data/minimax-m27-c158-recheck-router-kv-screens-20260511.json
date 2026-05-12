@@ -1,0 +1,156 @@
+{
+  "model": {
+    "hfId": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+    "localPath": "/mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround",
+    "quantization": "AutoRound W4A16"
+  },
+  "hardware": {
+    "gpuName": "Intel Arc Pro B70",
+    "gpuCount": 4,
+    "vramGbEach": 32,
+    "os": "Ubuntu 24.04"
+  },
+  "baselineContext": {
+    "acceptedFastLocalMaxxingId": "cmoz8cow60001pd010klrb8g8",
+    "acceptedFastOutputTokS": 41.130667019386024,
+    "acceptedFastTotalTokS": 54.84088935918136,
+    "acceptedQualityConservativeLocalMaxxingId": "cmozow03v005wlo01q81bnspx",
+    "acceptedQualityConservativeOutputTokS": 37.55253824718782,
+    "acceptedQualityConservativeTotalTokS": 50.070050996250425
+  },
+  "c158ArchiveRecheck": {
+    "aotPath": "/mnt/fast-ai/vllm-cache-exp/minimax-c158-archive-20260510T070154Z/torch_compile_cache/torch_aot_compile/c15860ddb8a1077c5ba1a1ae2d0f86552a357eb56772cdbf02828195b5a363ec",
+    "layout": "generated_inductor_cache",
+    "allreduceCount": 40,
+    "byShape": {
+      "f16[s72, 3072]": 32,
+      "f32[s72, 2]": 8
+    },
+    "byClassification": {
+      "embedding_to_rms_int4_gemm": 8,
+      "hidden_to_moe": 12,
+      "hidden_to_rms": 12,
+      "qk_variance": 8
+    },
+    "conclusion": "The archived c15860 fast AOT cache does include the generated-cache Q/K variance allreduce signature. The 41.130667 tok/s LocalMaxxing result is likely quality-valid under the corrected analyzer, although it is not currently reproducible."
+  },
+  "runConfig": {
+    "engineName": "vllm",
+    "engineVersion": "0.20.1-local",
+    "backend": "xpu",
+    "tensorParallel": 4,
+    "dtype": "float16",
+    "contextLength": 2048,
+    "promptTokens": 512,
+    "outputTokens": 1536,
+    "batchSize": 1,
+    "maxNumBatchedTokens": 1024,
+    "xpuGraph": false,
+    "llmScalerMoe": true,
+    "specDecoding": false,
+    "powerLimitChanged": false
+  },
+  "runs": [
+    {
+      "name": "hotpath_clean_cold",
+      "aotHash": "3d762da494e2f0d836e81646e5c97bbf14457abfd1f2314ba3f2014a1d7bca25",
+      "cacheState": "cold",
+      "gpuKvCacheTokens": 9408,
+      "tokSTotal": 44.99,
+      "tokSOut": 33.74,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-hotpath-clean-20260511/vllm-minimax-m27-autoround-tp4-p512n1536-20260512T020901Z.log",
+      "outcome": "negative"
+    },
+    {
+      "name": "moe_python_cleanup_cold",
+      "aotHash": "3d762da494e2f0d836e81646e5c97bbf14457abfd1f2314ba3f2014a1d7bca25",
+      "cacheState": "cold",
+      "gpuKvCacheTokens": 9408,
+      "tokSTotal": 44.89,
+      "tokSOut": 33.67,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-moe-clean-20260511/vllm-minimax-m27-autoround-tp4-p512n1536-20260512T021532Z.log",
+      "outcome": "negative"
+    },
+    {
+      "name": "graph_shaped_recovery_cold",
+      "aotHash": "89322421658655c915f73e0bd10a65675f6f94bf3a3f56903dd4f6e55aeec467",
+      "cacheState": "cold",
+      "gpuKvCacheTokens": 9408,
+      "tokSTotal": 45.05,
+      "tokSOut": 33.78,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-c158-restore-20260511/vllm-minimax-m27-autoround-tp4-p512n1536-20260512T022339Z.log",
+      "outcome": "negative cold artifact"
+    },
+    {
+      "name": "graph_shaped_recovery_warm",
+      "aotHash": "89322421658655c915f73e0bd10a65675f6f94bf3a3f56903dd4f6e55aeec467",
+      "cacheState": "warm",
+      "gpuKvCacheTokens": 17216,
+      "tokSTotal": 50.26,
+      "tokSOut": 37.69,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-c158-restore-20260511/vllm-minimax-m27-autoround-tp4-p512n1536-20260512T022737Z.log",
+      "outcome": "valid but below accepted fast result"
+    },
+    {
+      "name": "kv_fp8_e5m2",
+      "aotHash": "8c5754336099eb0c067872ecea17e1cf8c1a2cb05f8e677de7145a66331f9f05",
+      "cacheState": "cold",
+      "gpuKvCacheTokens": 18816,
+      "kvCacheDtype": "fp8_e5m2",
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-kvfp8-20260511/vllm-minimax-m27-autoround-tp4-p512n1536-20260512T023238Z.log",
+      "outcome": "failed",
+      "error": "XPU FlashAttention raises ValueError: Unrecognized FP8 dtype: fp8_e5m2"
+    },
+    {
+      "name": "kv_fp8_e4m3_cold",
+      "aotHash": "eb4a9f349d43bf4086fe9c0f618f24e52e3bc144c5c327ccadd1050f2f7d59ef",
+      "cacheState": "cold",
+      "gpuKvCacheTokens": 18816,
+      "kvCacheDtype": "fp8",
+      "tokSTotal": 44.76,
+      "tokSOut": 33.57,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-kvfp8e4m3-20260511/vllm-minimax-m27-autoround-tp4-p512n1536-20260512T023548Z.log",
+      "outcome": "negative and quality-risky"
+    },
+    {
+      "name": "kv_fp8_e4m3_warm",
+      "aotHash": "eb4a9f349d43bf4086fe9c0f618f24e52e3bc144c5c327ccadd1050f2f7d59ef",
+      "cacheState": "warm",
+      "gpuKvCacheTokens": 34496,
+      "kvCacheDtype": "fp8",
+      "tokSTotal": 49.53,
+      "tokSOut": 37.15,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-kvfp8e4m3-20260511/vllm-minimax-m27-autoround-tp4-p512n1536-20260512T023925Z.log",
+      "outcome": "negative and quality-risky"
+    },
+    {
+      "name": "fp16_router_cold",
+      "aotHash": "89322421658655c915f73e0bd10a65675f6f94bf3a3f56903dd4f6e55aeec467",
+      "cacheState": "cold",
+      "gpuKvCacheTokens": 7808,
+      "tokSTotal": 46.09,
+      "tokSOut": 34.57,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-fp16-router-20260511/vllm-minimax-m27-autoround-tp4-p512n1536-20260512T024248Z.log",
+      "outcome": "negative cold artifact and quality-risky"
+    },
+    {
+      "name": "fp16_router_warm",
+      "aotHash": "89322421658655c915f73e0bd10a65675f6f94bf3a3f56903dd4f6e55aeec467",
+      "cacheState": "warm",
+      "gpuKvCacheTokens": 15680,
+      "tokSTotal": 50.85,
+      "tokSOut": 38.13,
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-fp16-router-20260511/vllm-minimax-m27-autoround-tp4-p512n1536-20260512T024625Z.log",
+      "outcome": "speed-positive but quality-risky; do not promote without route audit"
+    }
+  ],
+  "localmaxxing": {
+    "submittedThisRound": false,
+    "reason": "No new quality-conservative result exceeded the existing accepted 41.130667 tok/s result; FP16 router changes routing precision and FP8 KV is negative or unsupported."
+  },
+  "nextSteps": [
+    "Build a router route-agreement audit for FP16 or mixed router candidates before considering any router-precision speed path.",
+    "Investigate why the archived c15860 graph has 40 generated allreduce sites and reaches 41.13 tok/s while current reproducible graphs have 28 generated sites and top out around 37-38 tok/s.",
+    "Continue source-level fusion around Q/K RMS and hidden-state collective boundaries rather than launch-flag sweeps."
+  ]
+}
