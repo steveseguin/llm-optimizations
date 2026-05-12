@@ -1,0 +1,41 @@
+{
+  "hfId": "MiniMaxAI/MiniMax-M2.7",
+  "modelRevision": "main",
+  "hardware": {
+    "hwClass": "DISCRETE_GPU",
+    "gpuName": "Intel Arc Pro B70 32GB",
+    "gpuCount": 4,
+    "vramGb": 32,
+    "cpu": "AMD EPYC 9015 8-Core Processor",
+    "ramGb": 16,
+    "os": "Ubuntu 24.04.4 LTS"
+  },
+  "engineName": "vllm",
+  "engineVersion": "0.20.1-local",
+  "quantization": "INT4 AutoRound W4A16",
+  "promptTokens": 512,
+  "outputTokens": 1536,
+  "contextLength": 2048,
+  "batchSize": 1,
+  "tokSOut": 40.2098822280064,
+  "tokSTotal": 53.61317630400853,
+  "peakVramGb": 28.11,
+  "notes": "MiniMax M2.7 AutoRound W4A16 on 4x Intel Arc Pro B70 via vLLM/XPU TP4. Local weights are Lasimeri/MiniMax-M2.7-int4-AutoRound submitted under base MiniMaxAI/MiniMax-M2.7 for consistency. New quality-cleared improvement uses use_inductor_graph_partition=true with AOT c3f2b10098683775b74b9bb91c9a44570f4df792c7a1b0061b5df73b6ef18f20. Repeat p512/n1536 runs: 39.88 and 40.21 output tok/s; submitted the better repeat. Generated-cache analyzer sees f32[s72,2] -> qk_variance allreduce sites, and top-level graph shows torch.cat qk_var, _c10d_functional.all_reduce, /4, chunk. No expert dropping, no speculative decode, no power-limit changes. Total tok/s includes prompt+decode throughput.",
+  "engineFlags": {
+    "commandSnippet": "VLLM_XPU_USE_LLM_SCALER_MOE=1 CCL_TOPO_P2P_ACCESS=1 VLLM_XPU_ENABLE_XPU_GRAPH=0 vllm bench throughput --backend vllm --model /mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround --tokenizer /mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround --trust-remote-code --dtype float16 --tensor-parallel-size 4 --distributed-executor-backend mp --max-model-len 2048 --max-num-batched-tokens 1024 --max-num-seqs 1 --dataset-name random --random-input-len 512 --random-output-len 1536 --random-range-ratio 0 --num-prompts 1 --disable-log-stats --compilation-config '{\"use_inductor_graph_partition\":true}'",
+    "tensorParallel": 4,
+    "pipelineParallel": 1,
+    "kvCacheDtype": "auto",
+    "gpuMemUtil": 0.9,
+    "flashAttn": true,
+    "attentionBackend": "flash_attn",
+    "contextLength": 2048,
+    "prefillChunkSize": 1024,
+    "maxRunningSeqs": 1,
+    "concurrency": 1,
+    "specDecoding": false,
+    "mtpEnabled": false,
+    "engineQuant": "inc",
+    "extraFlags": "XPU/Level Zero; B70 tuned MoE config E=256,N=384,dtype=int4_w4a16; llm-scaler u4 MoE decode path for x.shape<=4; CCL_ATL_TRANSPORT=ofi; CCL_TOPO_P2P_ACCESS=1; oneCCL ATL inferred local rank; use_inductor_graph_partition=true; AOT c3f2b10098683775b74b9bb91c9a44570f4df792c7a1b0061b5df73b6ef18f20; Q/K RMS variance tensor_model_parallel_all_reduce preserved; XPU graph disabled; no power-limit change"
+  }
+}

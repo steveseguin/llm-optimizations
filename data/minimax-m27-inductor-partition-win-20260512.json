@@ -1,0 +1,112 @@
+{
+  "date": "2026-05-12",
+  "model": "MiniMax M2.7 AutoRound INT4 W4A16",
+  "hardware": "4x Intel Arc Pro B70 32GB",
+  "engine": {
+    "name": "vLLM",
+    "version": "0.20.1-local",
+    "device": "xpu",
+    "tensorParallel": 4,
+    "dtype": "float16",
+    "llmScalerMoe": true,
+    "xpuGraph": false
+  },
+  "acceptedBaseline": {
+    "shape": "p512/n1536",
+    "tokSOut": 38.04675528671483,
+    "tokSTotal": 50.72900704895311,
+    "localmaxxingId": "cmp27nihp001orm01dataqtfq"
+  },
+  "winningConfig": {
+    "shape": "p512/n1536",
+    "compilationConfig": {
+      "use_inductor_graph_partition": true
+    },
+    "aot": "c3f2b10098683775b74b9bb91c9a44570f4df792c7a1b0061b5df73b6ef18f20",
+    "cacheRoot": "/mnt/fast-ai/vllm-cache-exp/minimax-inductor-partition-p512n512-20260512T112942Z",
+    "tokSOut": 40.2098822280064,
+    "tokSTotal": 53.61317630400853,
+    "improvementVsBaselinePct": 5.685435880456246,
+    "promptTokens": 512,
+    "outputTokens": 1536,
+    "contextLength": 2048,
+    "batchSize": 1,
+    "kvCacheTokens": 16832,
+    "qualityChecks": [
+      "generated-cache analyzer sees f32[s72, 2] -> qk_variance allreduce sites",
+      "top-level graph shows torch.cat qk_var, _c10d_functional.all_reduce, divide by tp_world=4, and chunk",
+      "no expert dropping",
+      "no speculative decode",
+      "no power-limit change"
+    ],
+    "localmaxxing": {
+      "submitted": true,
+      "id": "cmp2kd5ux006frm013il4qu13",
+      "status": "APPROVED",
+      "payload": "data/localmaxxing-minimax-m27-autoround-inductor-partition-p512n1536-20260512.payload.json",
+      "response": "data/localmaxxing-responses/minimax-m27-autoround-inductor-partition-p512n1536-20260512.response.json"
+    }
+  },
+  "runs": [
+    {
+      "name": "graph_partition_cold_p512n512",
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-inductor-partition-p512n512-20260512T112942Z/vllm-minimax-m27-autoround-tp4-p512n512-20260512T112942Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-inductor-partition-p512n512-20260512T112942Z/vllm-minimax-m27-autoround-tp4-p512n512-20260512T112942Z.json",
+      "kvCacheTokens": 9408,
+      "tokSTotal": 59.276635820863916,
+      "tokSOut": 29.638317910431958,
+      "decision": "cold artifact"
+    },
+    {
+      "name": "graph_partition_warm_p512n512",
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-inductor-partition-warm-p512n512-20260512T113409Z/vllm-minimax-m27-autoround-tp4-p512n512-20260512T113409Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-inductor-partition-warm-p512n512-20260512T113409Z/vllm-minimax-m27-autoround-tp4-p512n512-20260512T113409Z.json",
+      "kvCacheTokens": 16832,
+      "tokSTotal": 77.19614066495666,
+      "tokSOut": 38.59807033247833,
+      "decision": "near miss versus p512/n512 accepted reference"
+    },
+    {
+      "name": "graph_partition_warm_p512n1536",
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-inductor-partition-p512n1536-20260512T113651Z/vllm-minimax-m27-autoround-tp4-p512n1536-20260512T113651Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-inductor-partition-p512n1536-20260512T113651Z/vllm-minimax-m27-autoround-tp4-p512n1536-20260512T113651Z.json",
+      "kvCacheTokens": 16832,
+      "tokSTotal": 53.175092788748536,
+      "tokSOut": 39.8813195915614,
+      "decision": "beats long baseline"
+    },
+    {
+      "name": "graph_partition_repeat_p512n1536",
+      "log": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-inductor-partition-repeat-p512n1536-20260512T114022Z/vllm-minimax-m27-autoround-tp4-p512n1536-20260512T114022Z.log",
+      "json": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-inductor-partition-repeat-p512n1536-20260512T114022Z/vllm-minimax-m27-autoround-tp4-p512n1536-20260512T114022Z.json",
+      "kvCacheTokens": 16832,
+      "tokSTotal": 53.61317630400853,
+      "tokSOut": 40.2098822280064,
+      "decision": "submitted to LocalMaxxing"
+    }
+  ],
+  "negativeRetries": [
+    {
+      "name": "direct_qk_helper_max_tokens_1",
+      "shape": "p512/n512",
+      "tokSTotal": 72.32991678641257,
+      "tokSOut": 36.164958393206286,
+      "decision": "negative"
+    },
+    {
+      "name": "inductor_combo_kernels_disabled",
+      "shape": "p512/n512",
+      "tokSTotal": 70.89153450287931,
+      "tokSOut": 35.445767251439655,
+      "decision": "negative"
+    },
+    {
+      "name": "ir_enable_torch_wrap_false",
+      "shape": "p512/n512",
+      "tokSTotal": 72.52529049892492,
+      "tokSOut": 36.26264524946246,
+      "decision": "negative"
+    }
+  ],
+  "decision": "Promote use_inductor_graph_partition=true as the current best MiniMax non-spec long-run flag; keep testing before making it the global default."
+}

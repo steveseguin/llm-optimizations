@@ -12,6 +12,12 @@ Current accepted reference points:
   inference as the default path. The top-level compiled graph contains the
   `f32[s72,2]` Q/K variance allreduce signature. LocalMaxxing:
   `cmp27nihp001orm01dataqtfq`.
+- Current best quality-cleared long-run result: `40.209882` output tok/s and
+  `53.613176` total tok/s at p512/n1536 with
+  `--compilation-config '{"use_inductor_graph_partition":true}'`, AOT
+  `c3f2b10098683775b74b9bb91c9a44570f4df792c7a1b0061b5df73b6ef18f20`, and
+  the Q/K variance allreduce preserved. LocalMaxxing:
+  `cmp2kd5ux006frm013il4qu13`.
 - Accepted short/mid speed points: `39.610585` output tok/s at p512/n512 and `40.303730` output tok/s at p512/n1024 using the fast-NVMe FP16 u4 decode recipe.
 - The earlier `41.130667` p512/n1536 result remains useful as a scheduling clue, but it is not the quality-cleared target because the cached AOT graph did not visibly include the per-layer Q/K RMS variance allreduce.
 
@@ -246,6 +252,11 @@ The u4 MoE bridge is no longer the only ceiling. Existing timing notes put MiniM
    vLLM refuses the old binary with `Source code has changed since the last
    compilation` and recompiles current `3b096...`. Treat the old `41.130667`
    p512/n1536 number only as a scheduling clue.
+9. `use_inductor_graph_partition=true` is the first post-CCL quality-preserving
+   software win. It changes the compiled graph to AOT `c3f2...`, keeps Q/K
+   variance allreduce visible, and repeated at `39.881` then `40.210` output
+   tok/s for p512/n1536. Keep it as the preferred long-run benchmark flag while
+   we analyze why p512/n512 remains below the older short-run reference.
 
 Current code-direction preference after the latest negative screens:
 
