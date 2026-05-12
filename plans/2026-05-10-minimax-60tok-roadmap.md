@@ -233,16 +233,19 @@ The u4 MoE bridge is no longer the only ceiling. Existing timing notes put MiniM
 6. Do not enable `--enforce-eager` for MiniMax throughput. It is mentioned in
    Intel AutoRound deployment docs, but local p64/n128 throughput dropped from
    `33.745` output tok/s compiled to `18.007` output tok/s eager.
-7. Keep a smaller MoE-router fusion track alive: MiniMax has `top_k=8`, `256`
-   local experts, and no shared experts, so llm-scaler shared-expert kernels
-   are not quality-equivalent. The next quality-preserving MoE screen is a
-   MiniMax-specific routed `top8 from logits -> u4 tiny MoE` path that avoids
-   the generic router allocation boundary without changing selected experts or
-   dropping any expert work.
-   The Python/torch candidate top16 repair path is not that path: a p512/n1536
-   long run stalled inside the first request after normal AOT load and emitted
-   shared-memory broadcast warnings. Keep router repair only as a native fused
-   `moe_int4_ops` or compiler-lowered idea.
+7. The smaller MoE-router fusion track is now mostly closed for this runtime.
+   A MiniMax-specific native `top8 from logits -> u4 tiny MoE` path matched the
+   exact sigmoid+bias routing rule in synthetic XPU checks, but warmed p512/n512
+   reached only `37.948` output tok/s versus the accepted `39.610585`
+   reference. A native candidate-repair op registered inside the working
+   `moe_int4_ops` extension and matched exact PyTorch candidate repair
+   (`ids_equal=True`, max weight diff about `3e-8`), but top16 warmed to only
+   `36.324` output tok/s and top12 to `35.942`. Keep both as patch artifacts,
+   not active runtime paths.
+8. The old c158 cache lead is closed as non-reproducible with current source.
+   vLLM refuses the old binary with `Source code has changed since the last
+   compilation` and recompiles current `3b096...`. Treat the old `41.130667`
+   p512/n1536 number only as a scheduling clue.
 
 Current code-direction preference after the latest negative screens:
 

@@ -1,0 +1,195 @@
+{
+  "date": "2026-05-12",
+  "host": "4x Intel Arc Pro B70 32GB",
+  "model": "MiniMax M2.7 AutoRound INT4 W4A16",
+  "engine": {
+    "name": "vLLM",
+    "version": "0.20.1-local",
+    "backend": "xpu",
+    "tensorParallel": 4,
+    "dtype": "float16",
+    "xpuGraph": false,
+    "llmScalerMoe": true
+  },
+  "baselines": {
+    "p512n1536QualityClearedTokSOut": 38.046755,
+    "p512n512AcceptedTokSOut": 39.610585
+  },
+  "experiments": [
+    {
+      "name": "u4_work_sharing",
+      "env": {
+        "VLLM_XPU_USE_LLM_SCALER_MOE_WS": "1"
+      },
+      "runs": [
+        {
+          "shape": "p512/n512",
+          "tokSTotalApprox": 68.37,
+          "tokSOutApprox": 34.18,
+          "decision": "negative"
+        }
+      ]
+    },
+    {
+      "name": "native_minimax_logits_to_u4_moe",
+      "env": {
+        "VLLM_XPU_USE_LLM_SCALER_MOE_MINIMAX_LOGITS": "1"
+      },
+      "correctness": {
+        "syntheticXpuMaxAbsDiff": 0.0,
+        "syntheticXpuMeanAbsDiff": 0.0,
+        "notes": "Compared native MiniMax sigmoid+bias top8 path against exact PyTorch topk for the same random tensors."
+      },
+      "runs": [
+        {
+          "shape": "p64/n16",
+          "cache": "cold ca72",
+          "tokSTotal": 17.15,
+          "tokSOut": 3.43,
+          "decision": "cold smoke only"
+        },
+        {
+          "shape": "p64/n16",
+          "cache": "warm ca72",
+          "kvCacheTokens": 18432,
+          "tokSTotal": 99.93,
+          "tokSOut": 19.99,
+          "decision": "healthy smoke"
+        },
+        {
+          "shape": "p512/n512",
+          "cache": "stale current AOT 3b096",
+          "tokSTotal": 74.03,
+          "tokSOut": 37.01,
+          "decision": "not clean due stale-cache caveat"
+        },
+        {
+          "shape": "p512/n512",
+          "cache": "isolated cold 3b096",
+          "kvCacheTokens": 9408,
+          "tokSTotal": 56.90320977343386,
+          "tokSOut": 28.45160488671693,
+          "decision": "cold artifact"
+        },
+        {
+          "shape": "p512/n512",
+          "cache": "isolated warm 3b096",
+          "kvCacheTokens": 17216,
+          "tokSTotal": 75.89674069803985,
+          "tokSOut": 37.948370349019925,
+          "decision": "negative versus p512/n512 accepted reference"
+        }
+      ],
+      "decision": "Do not promote; exact but slower than current compiled router plus u4 MoE path."
+    },
+    {
+      "name": "native_candidate_router_repair",
+      "env": {
+        "VLLM_MINIMAX_M2_CANDIDATE_ROUTER_XPU_REPAIR": "1"
+      },
+      "correctness": {
+        "opRegistered": true,
+        "idsEqual": true,
+        "syntheticXpuMaxAbsDiff": 2.9802322387695312e-8,
+        "syntheticXpuMeanAbsDiff": 1.257285475730896e-8,
+        "notes": "Compared torch.ops.moe_int4_ops.minimax_m2_candidate_repair_topk against exact PyTorch candidate repair."
+      },
+      "runs": [
+        {
+          "shape": "p64/n16",
+          "candidateCount": 16,
+          "cache": "cold 6a952",
+          "kvCacheTokens": 7936,
+          "tokSTotal": 16.490200329803038,
+          "tokSOut": 3.2980400659606078,
+          "decision": "cold smoke only"
+        },
+        {
+          "shape": "p64/n16",
+          "candidateCount": 16,
+          "cache": "warm 6a952",
+          "kvCacheTokens": 16832,
+          "tokSTotal": 100.99507301979507,
+          "tokSOut": 20.199014603959015,
+          "decision": "healthy smoke"
+        },
+        {
+          "shape": "p512/n512",
+          "candidateCount": 16,
+          "cache": "cold 3b096",
+          "kvCacheTokens": 7808,
+          "tokSTotal": 56.241644094773356,
+          "tokSOut": 28.120822047386678,
+          "decision": "cold artifact"
+        },
+        {
+          "shape": "p512/n512",
+          "candidateCount": 16,
+          "cache": "warm 3b096",
+          "kvCacheTokens": 15680,
+          "tokSTotal": 72.64862175049139,
+          "tokSOut": 36.324310875245695,
+          "decision": "negative"
+        },
+        {
+          "shape": "p512/n512",
+          "candidateCount": 12,
+          "cache": "cold 3b096",
+          "kvCacheTokens": 7808,
+          "tokSTotal": 55.66556165003315,
+          "tokSOut": 27.832780825016574,
+          "decision": "cold artifact"
+        },
+        {
+          "shape": "p512/n512",
+          "candidateCount": 12,
+          "cache": "warm 3b096",
+          "kvCacheTokens": 15680,
+          "tokSTotal": 71.88459207238203,
+          "tokSOut": 35.942296036191016,
+          "decision": "negative"
+        }
+      ],
+      "decision": "Keep as patch artifact only; native repair is correct but slower in full vLLM p512/n512 decode."
+    },
+    {
+      "name": "c158_archive_recheck",
+      "archive": "/mnt/fast-ai/vllm-cache-exp/minimax-c158-archive-20260510T070154Z",
+      "oldAot": "c15860ddb8a1077c5ba1a1ae2d0f86552a357eb56772cdbf02828195b5a363ec",
+      "runs": [
+        {
+          "shape": "p512/n1536",
+          "cacheRoot": "/mnt/fast-ai/vllm-cache-exp/minimax-c158-archive-20260510T070154Z",
+          "observedBehavior": "current source computed cache key 3a72 and saved current AOT 3b096 into the archive",
+          "kvCacheTokens": 9408,
+          "tokSTotal": 44.57861123859511,
+          "tokSOut": 33.43395842894633,
+          "decision": "not c158; cold current artifact"
+        },
+        {
+          "shape": "p512/n1536",
+          "cacheRoot": "/mnt/fast-ai/vllm-cache-exp/minimax-c158-forced-3b096-20260512T071035Z",
+          "observedBehavior": "vLLM rejected old c158 binary under current hash: Source code has changed since the last compilation",
+          "kvCacheTokens": 17216,
+          "tokSTotal": 49.57903103461954,
+          "tokSOut": 37.184273275964655,
+          "decision": "diagnostic only; recompiled current source"
+        }
+      ],
+      "decision": "Close c158 as non-reproducible with current source; keep old 41.130667 tok/s as scheduling clue only."
+    }
+  ],
+  "patchArtifacts": [
+    "patches/llm-scaler-minimax-router-and-u4-experiments-20260512.patch",
+    "patches/vllm-minimax-router-and-moe-experiments-20260512.patch"
+  ],
+  "localmaxxing": {
+    "submitted": false,
+    "reason": "No quality-preserving improvement over current submitted MiniMax baselines."
+  },
+  "next": [
+    "Return to XPU Q/K variance allreduce plus RMS fusion.",
+    "Inspect current 3b096 generated-cache boundaries rather than stale c158 binaries.",
+    "Target hidden-state allreduce plus residual/RMS or MoE epilogue fusion with a real SYCL/compiler lowering."
+  ]
+}

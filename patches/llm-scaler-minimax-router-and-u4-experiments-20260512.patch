@@ -1,0 +1,1532 @@
+diff --git a/vllm/custom-esimd-kernels-vllm/csrc/moe_batch/moe_int4.sycl b/vllm/custom-esimd-kernels-vllm/csrc/moe_batch/moe_int4.sycl
+index cb77d85..08e9c50 100644
+--- a/vllm/custom-esimd-kernels-vllm/csrc/moe_batch/moe_int4.sycl
++++ b/vllm/custom-esimd-kernels-vllm/csrc/moe_batch/moe_int4.sycl
+@@ -18,11 +18,16 @@
+ #include <c10/xpu/XPUStream.h>
+ #include <sycl/ext/intel/esimd.hpp>
+ #include <sycl/ext/intel/experimental/esimd/memory.hpp>
++#include <chrono>
++#include <cstdlib>
++#include <iostream>
++#include <type_traits>
+ 
+ #include "moe_topk.h"
+ #include "../xpu/esimd_kernels/moe_ops.h"  // TopK V2 vectorized argmax
+ 
+ using fp16 = sycl::half;
++using bf16 = sycl::ext::oneapi::bfloat16;
+ using namespace sycl::ext::intel::esimd;
+ using namespace sycl::ext::intel::esimd::xmx;
+ namespace xesimd = sycl::ext::intel::experimental::esimd;
+@@ -32,7 +37,18 @@ static inline sycl::event submit_kernel(
+     const torch::Device& device,
+     const char* desc) {
+     sycl::queue& queue = c10::xpu::getCurrentXPUStream(device.index()).queue();
+-    return queue.submit(kernel);
++    sycl::event event = queue.submit(kernel);
++    static const bool trace_kernels =
++        std::getenv("LLM_SCALER_MOE_TRACE_KERNELS") != nullptr;
++    if (trace_kernels) {
++        auto start = std::chrono::steady_clock::now();
++        event.wait();
++        auto end = std::chrono::steady_clock::now();
++        double ms = std::chrono::duration<double, std::milli>(end - start).count();
++        std::cerr << "[llm-scaler][moe-kernel] device=" << static_cast<int>(device.index())
++                  << " kernel=\"" << desc << "\" wait_ms=" << ms << std::endl;
++    }
++    return event;
+ }
+ 
+ // ═══════════════════════════════════════════════════════════════════════════════
+@@ -1436,9 +1452,9 @@ template <typename IndexT>
+ class MoeRouteCountInt4;
+ template <typename IndexT>
+ class MoeRouteFillInt4;
+-template <typename IndexT>
++template <typename IndexT, typename DataT>
+ class MoeTinyMUpCutlassInt4;
+-template <typename IndexT>
++template <typename IndexT, typename WeightT, typename DataT>
+ class MoeTinyMDownCutlassInt4;
+ template <typename IndexT>
+ class MoeTinyMDownCutlassInt4WithSharedFP16;
+@@ -1667,15 +1683,22 @@ static inline int decode_s4_nibble(uint8_t nibble) {
+     return v >= 8 ? v - 16 : v;
+ }
+ 
+-template <typename IndexT>
++static inline int decode_u4_nibble(uint8_t nibble) {
++    return (int)(nibble & 0x0F) - 8;
++}
++
++template <typename IndexT, typename DataT> class MoeTinyMUpCutlassInt4;
++
++template <typename IndexT, typename DataT>
+ void moe_tiny_m_up_cutlass_int4_kernel(
+-    const fp16* x,
++    const DataT* x,
+     const uint8_t* w13,
+     const fp16* w13_scales,
+     const IndexT* topk_idx,
+-    fp16* intermediates,
++    DataT* intermediates,
+     const int n_tokens, const int top_k, const int hidden_size, const int intermediate_size,
+-    const torch::Device& device) {
++    const torch::Device& device,
++    const bool signed_compact = true) {
+ 
+     const int two_inter = 2 * intermediate_size;
+     const int k_bytes = hidden_size / 2;
+@@ -1687,7 +1710,7 @@ void moe_tiny_m_up_cutlass_int4_kernel(
+         sycl::local_accessor<float, 1> up_acc(sycl::range<1>(WG_SIZE), cgh);
+         const int groups_per_token = top_k * intermediate_size;
+         const int groups = n_tokens * groups_per_token;
+-        cgh.parallel_for<class MoeTinyMUpCutlassInt4<IndexT>>(
++        cgh.parallel_for<class MoeTinyMUpCutlassInt4<IndexT, DataT>>(
+             sycl::nd_range<1>(sycl::range<1>(groups * WG_SIZE),
+                               sycl::range<1>(WG_SIZE)),
+             [=](sycl::nd_item<1> item) {
+@@ -1698,7 +1721,13 @@ void moe_tiny_m_up_cutlass_int4_kernel(
+                 const int route = token_group / intermediate_size;
+                 const int col = token_group - route * intermediate_size;
+                 const int expert = (int)topk_idx[(size_t)token * top_k + route];
+-                const fp16* x_row = x + (size_t)token * hidden_size;
++                if (expert < 0) {
++                    if (lid == 0) {
++                        intermediates[((size_t)token * top_k + route) * intermediate_size + col] = DataT(0);
++                    }
++                    return;
++                }
++                const DataT* x_row = x + (size_t)token * hidden_size;
+ 
+                 const uint8_t* gate_row = w13 + ((size_t)expert * two_inter + col) * k_bytes;
+                 const uint8_t* up_row = w13 + ((size_t)expert * two_inter + intermediate_size + col) * k_bytes;
+@@ -1712,10 +1741,10 @@ void moe_tiny_m_up_cutlass_int4_kernel(
+                     int group = kb >> 6;
+                     uint8_t gate_packed = gate_row[kb];
+                     uint8_t up_packed = up_row[kb];
+-                    int gate0 = decode_s4_nibble(gate_packed & 0x0F);
+-                    int gate1 = decode_s4_nibble((gate_packed >> 4) & 0x0F);
+-                    int up0 = decode_s4_nibble(up_packed & 0x0F);
+-                    int up1 = decode_s4_nibble((up_packed >> 4) & 0x0F);
++                    int gate0 = signed_compact ? decode_s4_nibble(gate_packed & 0x0F) : decode_u4_nibble(gate_packed & 0x0F);
++                    int gate1 = signed_compact ? decode_s4_nibble((gate_packed >> 4) & 0x0F) : decode_u4_nibble((gate_packed >> 4) & 0x0F);
++                    int up0 = signed_compact ? decode_s4_nibble(up_packed & 0x0F) : decode_u4_nibble(up_packed & 0x0F);
++                    int up1 = signed_compact ? decode_s4_nibble((up_packed >> 4) & 0x0F) : decode_u4_nibble((up_packed >> 4) & 0x0F);
+                     float x0 = (float)x_row[k0];
+                     float x1 = (float)x_row[k0 + 1];
+                     gate_sum += x0 * ((float)gate0 * (float)gate_s[group]);
+@@ -1738,7 +1767,7 @@ void moe_tiny_m_up_cutlass_int4_kernel(
+                     float gate = gate_acc[0];
+                     float up = up_acc[0];
+                     float silu = gate / (1.0f + sycl::exp(-gate));
+-                    intermediates[((size_t)token * top_k + route) * intermediate_size + col] = fp16(silu * up);
++                    intermediates[((size_t)token * top_k + route) * intermediate_size + col] = DataT(silu * up);
+                 }
+             });
+     };
+@@ -1910,7 +1939,8 @@ static void moe_ws_up_routed_cutlass_int4_kernel(
+     const fp16* x, const uint8_t* w13, const fp16* w13_scales,
+     const IndexT* topk_idx, fp16* routed_intermediates,
+     const int n_tokens, const int top_k, const int hidden_size,
+-    const int intermediate_size, const torch::Device& device) {
++    const int intermediate_size, const torch::Device& device,
++    const bool signed_compact = true) {
+ 
+     const int two_inter = 2 * intermediate_size;
+     const int k_bytes = hidden_size / 2;
+@@ -1955,10 +1985,17 @@ static void moe_ws_up_routed_cutlass_int4_kernel(
+                         simd<float, VL> g_hi = convert<float>((g16 >> 4) & 0x0Fu);
+                         simd<float, VL> u_lo = convert<float>(u16 & 0x0Fu);
+                         simd<float, VL> u_hi = convert<float>((u16 >> 4) & 0x0Fu);
+-                        g_lo.merge(g_lo - 16.f, g_lo >= 8.f);
+-                        g_hi.merge(g_hi - 16.f, g_hi >= 8.f);
+-                        u_lo.merge(u_lo - 16.f, u_lo >= 8.f);
+-                        u_hi.merge(u_hi - 16.f, u_hi >= 8.f);
++                        if (signed_compact) {
++                            g_lo.merge(g_lo - 16.f, g_lo >= 8.f);
++                            g_hi.merge(g_hi - 16.f, g_hi >= 8.f);
++                            u_lo.merge(u_lo - 16.f, u_lo >= 8.f);
++                            u_hi.merge(u_hi - 16.f, u_hi >= 8.f);
++                        } else {
++                            g_lo = g_lo - 8.f;
++                            g_hi = g_hi - 8.f;
++                            u_lo = u_lo - 8.f;
++                            u_hi = u_hi - 8.f;
++                        }
+ 
+                         float gs = (float)(w13_scales + ((size_t)expert * two_inter + col) * k_groups)[group];
+                         float us = (float)(w13_scales + ((size_t)expert * two_inter + intermediate_size + col) * k_groups)[group];
+@@ -1980,6 +2017,31 @@ static void moe_ws_up_routed_cutlass_int4_kernel(
+     submit_kernel(cgf, device, "moe ws up routed cutlass int4");
+ }
+ 
++template <typename IndexT>
++static void moe_ws_up_cutlass_int4_kernel(
++    const fp16* x, const uint8_t* w13, const fp16* w13_scales,
++    const IndexT* topk_idx, fp16* routed_intermediates,
++    const int n_tokens, const int top_k, const int hidden_size,
++    const int intermediate_size, const torch::Device& device,
++    const bool signed_compact = true) {
++    if (n_tokens <= 2) {
++        moe_ws_up_routed_cutlass_int4_kernel<IndexT, 2>(
++            x, w13, w13_scales, topk_idx, routed_intermediates,
++            n_tokens, top_k, hidden_size, intermediate_size, device,
++            signed_compact);
++    } else if (n_tokens <= 4) {
++        moe_ws_up_routed_cutlass_int4_kernel<IndexT, 4>(
++            x, w13, w13_scales, topk_idx, routed_intermediates,
++            n_tokens, top_k, hidden_size, intermediate_size, device,
++            signed_compact);
++    } else {
++        moe_ws_up_routed_cutlass_int4_kernel<IndexT, 8>(
++            x, w13, w13_scales, topk_idx, routed_intermediates,
++            n_tokens, top_k, hidden_size, intermediate_size, device,
++            signed_compact);
++    }
++}
++
+ template <typename IndexT> class MoeWsUpSharedFP16;
+ 
+ template <typename IndexT>
+@@ -2152,17 +2214,213 @@ void moe_ws_down_cutlass_int4_with_shared_fp16_kernel(
+ }
+ 
+ 
++template <typename IndexT, typename WeightT, int HT>
++class MoeWsDownCutlassInt4;
+ 
+-template <typename IndexT>
++template <typename IndexT, typename WeightT, int H_TILE>
++void moe_ws_down_cutlass_int4_kernel(
++    const fp16* routed_intermediates, const uint8_t* w2,
++    const fp16* w2_scales, const WeightT* topk_weight,
++    const IndexT* topk_idx, fp16* output,
++    const int n_tokens, const int top_k, const int hidden_size,
++    const int intermediate_size, const torch::Device& device,
++    const bool signed_compact = true) {
++
++    const int k_bytes = intermediate_size / 2;
++    const int k_groups = intermediate_size / 128;
++    const int h_tiles = hidden_size / H_TILE;
++
++    auto cgf = [&](sycl::handler& cgh) {
++        cgh.parallel_for<class MoeWsDownCutlassInt4<IndexT, WeightT, H_TILE>>(
++            sycl::range<2>(n_tokens, h_tiles),
++            [=](sycl::id<2> idx) SYCL_ESIMD_KERNEL {
++                const int token = (int)idx[0];
++                const int h_tile = (int)idx[1];
++                const int h_base = h_tile * H_TILE;
++                constexpr int VL = 64;
++                float sum[H_TILE];
++                #pragma unroll
++                for (int hh = 0; hh < H_TILE; ++hh) sum[hh] = 0.f;
++
++                for (int route = 0; route < top_k; ++route) {
++                    int expert = (int)topk_idx[(size_t)token * top_k + route];
++                    const fp16* in_row = routed_intermediates
++                        + ((size_t)token * top_k + route) * intermediate_size;
++                    float rw = (float)topk_weight[(size_t)token * top_k + route];
++                    simd<float, VL> acc[H_TILE];
++                    #pragma unroll
++                    for (int hh = 0; hh < H_TILE; ++hh) acc[hh] = 0.f;
++
++                    for (int kb = 0; kb < k_bytes; kb += VL) {
++                        simd<fp16, 2 * VL> in_chunk =
++                            block_load<fp16, 2 * VL>(in_row + kb * 2);
++                        simd<float, VL> ief = in_chunk.select<VL, 2>(0);
++                        simd<float, VL> iof = in_chunk.select<VL, 2>(1);
++                        int group = kb / 64;
++                        #pragma unroll
++                        for (int hh = 0; hh < H_TILE; ++hh) {
++                            int h = h_base + hh;
++                            simd<uint8_t, VL> raw = block_load<uint8_t, VL>(
++                                w2 + ((size_t)expert * hidden_size + h)
++                                         * k_bytes
++                                    + kb);
++                            simd<uint16_t, VL> raw16 = convert<uint16_t>(raw);
++                            simd<float, VL> lo = convert<float>(raw16 & 0x0Fu);
++                            simd<float, VL> hi =
++                                convert<float>((raw16 >> 4) & 0x0Fu);
++                            if (signed_compact) {
++                                lo.merge(lo - 16.f, lo >= 8.f);
++                                hi.merge(hi - 16.f, hi >= 8.f);
++                            } else {
++                                lo = lo - 8.f;
++                                hi = hi - 8.f;
++                            }
++                            float s = (float)(w2_scales
++                                + ((size_t)expert * hidden_size + h)
++                                      * k_groups)[group];
++                            acc[hh] += ief * (lo * s) + iof * (hi * s);
++                        }
++                    }
++                    #pragma unroll
++                    for (int hh = 0; hh < H_TILE; ++hh) {
++                        sum[hh] += rw * sycl::ext::intel::esimd::detail::sum<
++                                            float, float, VL>(acc[hh]);
++                    }
++                }
++
++                #pragma unroll
++                for (int hh = 0; hh < H_TILE; ++hh) {
++                    output[(size_t)token * hidden_size + h_base + hh] =
++                        fp16(sum[hh]);
++                }
++            });
++    };
++    submit_kernel(cgf, device, "moe ws down cutlass int4");
++}
++
++
++
++template <typename IndexT, typename WeightT, typename DataT> class MoeTinyMDownCutlassInt4;
++
++template <typename LogitT>
++class MoeTop2SoftmaxInt4;
++
++template <typename LogitT>
++void moe_top2_softmax_int4_kernel(
++    const LogitT* router_logits,
++    float* topk_weight,
++    int32_t* topk_idx,
++    const int n_tokens,
++    const int num_experts,
++    const torch::Device& device) {
++    auto cgf = [&](sycl::handler& cgh) {
++        cgh.parallel_for<class MoeTop2SoftmaxInt4<LogitT>>(
++            sycl::range<1>(n_tokens),
++            [=](sycl::id<1> id) {
++                const int token = (int)id[0];
++                const LogitT* row = router_logits + (size_t)token * num_experts;
++                float best0 = -3.402823466e+38f;
++                float best1 = -3.402823466e+38f;
++                int idx0 = 0;
++                int idx1 = 0;
++
++                for (int expert = 0; expert < num_experts; ++expert) {
++                    float value = (float)row[expert];
++                    if (value > best0) {
++                        best1 = best0;
++                        idx1 = idx0;
++                        best0 = value;
++                        idx0 = expert;
++                    } else if (value > best1) {
++                        best1 = value;
++                        idx1 = expert;
++                    }
++                }
++
++                float shifted1 = sycl::exp(best1 - best0);
++                float denom = 1.0f + shifted1;
++                topk_weight[(size_t)token * 2] = 1.0f / denom;
++                topk_weight[(size_t)token * 2 + 1] = shifted1 / denom;
++                topk_idx[(size_t)token * 2] = idx0;
++                topk_idx[(size_t)token * 2 + 1] = idx1;
++            });
++    };
++    submit_kernel(cgf, device, "moe top2 softmax int4");
++}
++
++template <typename LogitT>
++class MoeTopKSoftmaxInt4;
++
++template <typename LogitT>
++void moe_topk_softmax_int4_kernel(
++    const LogitT* router_logits,
++    float* topk_weight,
++    int32_t* topk_idx,
++    const int n_tokens,
++    const int num_experts,
++    const int top_k,
++    const torch::Device& device) {
++    TORCH_CHECK(top_k > 0 && top_k <= 16,
++        "moe topk softmax int4 supports 1 <= top_k <= 16");
++    auto cgf = [&](sycl::handler& cgh) {
++        cgh.parallel_for<class MoeTopKSoftmaxInt4<LogitT>>(
++            sycl::range<1>(n_tokens),
++            [=](sycl::id<1> id) {
++                const int token = (int)id[0];
++                const LogitT* row = router_logits + (size_t)token * num_experts;
++                float best_val[16];
++                int best_idx[16];
++
++                for (int k = 0; k < 16; ++k) {
++                    best_val[k] = -3.402823466e+38f;
++                    best_idx[k] = 0;
++                }
++
++                for (int expert = 0; expert < num_experts; ++expert) {
++                    float value = (float)row[expert];
++                    int insert = -1;
++                    for (int k = 0; k < top_k; ++k) {
++                        if (value > best_val[k]) {
++                            insert = k;
++                            break;
++                        }
++                    }
++                    if (insert >= 0) {
++                        for (int k = top_k - 1; k > insert; --k) {
++                            best_val[k] = best_val[k - 1];
++                            best_idx[k] = best_idx[k - 1];
++                        }
++                        best_val[insert] = value;
++                        best_idx[insert] = expert;
++                    }
++                }
++
++                float max_v = best_val[0];
++                float denom = 0.0f;
++                for (int k = 0; k < top_k; ++k) {
++                    denom += sycl::exp(best_val[k] - max_v);
++                }
++                for (int k = 0; k < top_k; ++k) {
++                    topk_weight[(size_t)token * top_k + k] =
++                        sycl::exp(best_val[k] - max_v) / denom;
++                    topk_idx[(size_t)token * top_k + k] = best_idx[k];
++                }
++            });
++    };
++    submit_kernel(cgf, device, "moe topk softmax int4");
++}
++
++template <typename IndexT, typename WeightT, typename DataT>
+ void moe_tiny_m_down_cutlass_int4_kernel(
+-    const fp16* intermediates,
++    const DataT* intermediates,
+     const uint8_t* w2,
+     const fp16* w2_scales,
+-    const fp16* topk_weight,
++    const WeightT* topk_weight,
+     const IndexT* topk_idx,
+-    fp16* output,
++    DataT* output,
+     const int n_tokens, const int top_k, const int hidden_size, const int intermediate_size,
+-    const torch::Device& device) {
++    const torch::Device& device,
++    const bool signed_compact = true) {
+ 
+     const int k_bytes = intermediate_size / 2;
+     const int k_groups = intermediate_size / 128;
+@@ -2170,7 +2428,7 @@ void moe_tiny_m_down_cutlass_int4_kernel(
+ 
+     auto cgf = [&](sycl::handler& cgh) {
+         sycl::local_accessor<float, 1> local_acc(sycl::range<1>(WG_SIZE), cgh);
+-        cgh.parallel_for<class MoeTinyMDownCutlassInt4<IndexT>>(
++        cgh.parallel_for<class MoeTinyMDownCutlassInt4<IndexT, WeightT, DataT>>(
+             sycl::nd_range<1>(sycl::range<1>(n_tokens * hidden_size * WG_SIZE),
+                               sycl::range<1>(WG_SIZE)),
+             [=](sycl::nd_item<1> item) {
+@@ -2181,14 +2439,17 @@ void moe_tiny_m_down_cutlass_int4_kernel(
+                 float sum = 0.0f;
+                 for (int route = 0; route < top_k; ++route) {
+                     int expert = (int)topk_idx[(size_t)token * top_k + route];
++                    if (expert < 0) {
++                        continue;
++                    }
+                     const uint8_t* w_row = w2 + ((size_t)expert * hidden_size + h) * k_bytes;
+                     const fp16* s_row = w2_scales + ((size_t)expert * hidden_size + h) * k_groups;
+-                    const fp16* in_row = intermediates + ((size_t)token * top_k + route) * intermediate_size;
++                    const DataT* in_row = intermediates + ((size_t)token * top_k + route) * intermediate_size;
+                     float route_weight = (float)topk_weight[(size_t)token * top_k + route];
+                     for (int k = lid; k < intermediate_size; k += WG_SIZE) {
+                         uint8_t packed = w_row[k >> 1];
+                         uint8_t nibble = (k & 1) ? ((packed >> 4) & 0x0F) : (packed & 0x0F);
+-                        int v = decode_s4_nibble(nibble);
++                        int v = signed_compact ? decode_s4_nibble(nibble) : decode_u4_nibble(nibble);
+                         float scale = (float)s_row[k >> 7];
+                         sum += route_weight * (float)in_row[k] * ((float)v * scale);
+                     }
+@@ -2203,7 +2464,7 @@ void moe_tiny_m_down_cutlass_int4_kernel(
+                     item.barrier(sycl::access::fence_space::local_space);
+                 }
+                 if (lid == 0) {
+-                    output[(size_t)token * hidden_size + h] = fp16(local_acc[0]);
++                    output[(size_t)token * hidden_size + h] = DataT(local_acc[0]);
+                 }
+             });
+     };
+@@ -2383,14 +2644,160 @@ void moe_tiny_m_down_cutlass_int4_with_shared_fp16_htile_kernel(
+     submit_kernel(cgf, device, "moe tiny m down cutlass int4 with shared fp16 htile");
+ }
+ 
+-torch::Tensor moe_forward_tiny_cutlass_nmajor_int4(
++static torch::Tensor moe_forward_tiny_cutlass_nmajor_int4_impl(
+     torch::Tensor x,
+     torch::Tensor w13_qweight_s4,
+     torch::Tensor w13_scales,
+     torch::Tensor w2_qweight_s4,
+     torch::Tensor w2_scales,
+     torch::Tensor topk_weight,
+-    torch::Tensor topk_idx) {
++    torch::Tensor topk_idx,
++    const bool signed_compact) {
++
++    TORCH_CHECK(x.dim() == 2 && x.size(0) >= 1 && x.size(0) <= 64 && x.is_contiguous());
++    TORCH_CHECK(x.scalar_type() == torch::kHalf || x.scalar_type() == torch::kBFloat16);
++    TORCH_CHECK(w13_qweight_s4.scalar_type() == torch::kByte && w13_qweight_s4.is_contiguous());
++    TORCH_CHECK(w2_qweight_s4.scalar_type() == torch::kByte && w2_qweight_s4.is_contiguous());
++    TORCH_CHECK(w13_scales.scalar_type() == torch::kHalf && w13_scales.is_contiguous());
++    TORCH_CHECK(w2_scales.scalar_type() == torch::kHalf && w2_scales.is_contiguous());
++    TORCH_CHECK(topk_weight.dim() == 2 && topk_weight.size(0) == x.size(0) && topk_weight.is_contiguous());
++    TORCH_CHECK(topk_weight.scalar_type() == torch::kHalf || topk_weight.scalar_type() == torch::kBFloat16 || topk_weight.scalar_type() == torch::kFloat);
++    TORCH_CHECK(topk_idx.dim() == 2 && topk_idx.size(0) == x.size(0) && topk_idx.is_contiguous());
++    TORCH_CHECK(topk_idx.scalar_type() == torch::kInt || topk_idx.scalar_type() == torch::kLong);
++
++    int hidden_size = x.size(1);
++    int n_tokens = x.size(0);
++    int top_k = topk_idx.size(1);
++    int two_inter = w13_qweight_s4.size(1);
++    int intermediate_size = two_inter / 2;
++    TORCH_CHECK(w13_qweight_s4.size(2) == hidden_size / 2);
++    TORCH_CHECK(w2_qweight_s4.size(1) == hidden_size);
++    TORCH_CHECK(w2_qweight_s4.size(2) == intermediate_size / 2);
++
++    auto intermediates = torch::empty({n_tokens * top_k, intermediate_size},
++        torch::device(x.device()).dtype(x.scalar_type()));
++    auto output = torch::empty({n_tokens, hidden_size},
++        torch::device(x.device()).dtype(x.scalar_type()));
++
++    if (topk_idx.scalar_type() == torch::kInt) {
++        const int32_t* idx_ptr = topk_idx.data_ptr<int32_t>();
++        if (x.scalar_type() == torch::kBFloat16) {
++            moe_tiny_m_up_cutlass_int4_kernel<int32_t, bf16>(
++                (const bf16*)x.data_ptr(), (const uint8_t*)w13_qweight_s4.data_ptr(),
++                (const fp16*)w13_scales.data_ptr(), idx_ptr,
++                (bf16*)intermediates.data_ptr(), n_tokens, top_k, hidden_size,
++                intermediate_size, x.device(), signed_compact);
++            if (topk_weight.scalar_type() == torch::kFloat) {
++                moe_tiny_m_down_cutlass_int4_kernel<int32_t, float, bf16>(
++                    (const bf16*)intermediates.data_ptr(), (const uint8_t*)w2_qweight_s4.data_ptr(),
++                    (const fp16*)w2_scales.data_ptr(), (const float*)topk_weight.data_ptr(),
++                    idx_ptr, (bf16*)output.data_ptr(), n_tokens, top_k, hidden_size,
++                    intermediate_size, x.device(), signed_compact);
++            } else if (topk_weight.scalar_type() == torch::kBFloat16) {
++                moe_tiny_m_down_cutlass_int4_kernel<int32_t, bf16, bf16>(
++                    (const bf16*)intermediates.data_ptr(), (const uint8_t*)w2_qweight_s4.data_ptr(),
++                    (const fp16*)w2_scales.data_ptr(), (const bf16*)topk_weight.data_ptr(),
++                    idx_ptr, (bf16*)output.data_ptr(), n_tokens, top_k, hidden_size,
++                    intermediate_size, x.device(), signed_compact);
++            } else {
++                moe_tiny_m_down_cutlass_int4_kernel<int32_t, fp16, bf16>(
++                    (const bf16*)intermediates.data_ptr(), (const uint8_t*)w2_qweight_s4.data_ptr(),
++                    (const fp16*)w2_scales.data_ptr(), (const fp16*)topk_weight.data_ptr(),
++                    idx_ptr, (bf16*)output.data_ptr(), n_tokens, top_k, hidden_size,
++                    intermediate_size, x.device(), signed_compact);
++            }
++        } else {
++            moe_tiny_m_up_cutlass_int4_kernel<int32_t, fp16>(
++                (const fp16*)x.data_ptr(), (const uint8_t*)w13_qweight_s4.data_ptr(),
++                (const fp16*)w13_scales.data_ptr(), idx_ptr,
++                (fp16*)intermediates.data_ptr(), n_tokens, top_k, hidden_size,
++                intermediate_size, x.device(), signed_compact);
++            if (topk_weight.scalar_type() == torch::kFloat) {
++                moe_tiny_m_down_cutlass_int4_kernel<int32_t, float, fp16>(
++                    (const fp16*)intermediates.data_ptr(), (const uint8_t*)w2_qweight_s4.data_ptr(),
++                    (const fp16*)w2_scales.data_ptr(), (const float*)topk_weight.data_ptr(),
++                    idx_ptr, (fp16*)output.data_ptr(), n_tokens, top_k, hidden_size,
++                    intermediate_size, x.device(), signed_compact);
++            } else if (topk_weight.scalar_type() == torch::kBFloat16) {
++                moe_tiny_m_down_cutlass_int4_kernel<int32_t, bf16, fp16>(
++                    (const fp16*)intermediates.data_ptr(), (const uint8_t*)w2_qweight_s4.data_ptr(),
++                    (const fp16*)w2_scales.data_ptr(), (const bf16*)topk_weight.data_ptr(),
++                    idx_ptr, (fp16*)output.data_ptr(), n_tokens, top_k, hidden_size,
++                    intermediate_size, x.device(), signed_compact);
++            } else {
++                moe_tiny_m_down_cutlass_int4_kernel<int32_t, fp16, fp16>(
++                    (const fp16*)intermediates.data_ptr(), (const uint8_t*)w2_qweight_s4.data_ptr(),
++                    (const fp16*)w2_scales.data_ptr(), (const fp16*)topk_weight.data_ptr(),
++                    idx_ptr, (fp16*)output.data_ptr(), n_tokens, top_k, hidden_size,
++                    intermediate_size, x.device(), signed_compact);
++            }
++        }
++    } else {
++        const int64_t* idx_ptr = topk_idx.data_ptr<int64_t>();
++        if (x.scalar_type() == torch::kBFloat16) {
++            moe_tiny_m_up_cutlass_int4_kernel<int64_t, bf16>(
++                (const bf16*)x.data_ptr(), (const uint8_t*)w13_qweight_s4.data_ptr(),
++                (const fp16*)w13_scales.data_ptr(), idx_ptr,
++                (bf16*)intermediates.data_ptr(), n_tokens, top_k, hidden_size,
++                intermediate_size, x.device(), signed_compact);
++            if (topk_weight.scalar_type() == torch::kFloat) {
++                moe_tiny_m_down_cutlass_int4_kernel<int64_t, float, bf16>(
++                    (const bf16*)intermediates.data_ptr(), (const uint8_t*)w2_qweight_s4.data_ptr(),
++                    (const fp16*)w2_scales.data_ptr(), (const float*)topk_weight.data_ptr(),
++                    idx_ptr, (bf16*)output.data_ptr(), n_tokens, top_k, hidden_size,
++                    intermediate_size, x.device(), signed_compact);
++            } else if (topk_weight.scalar_type() == torch::kBFloat16) {
++                moe_tiny_m_down_cutlass_int4_kernel<int64_t, bf16, bf16>(
++                    (const bf16*)intermediates.data_ptr(), (const uint8_t*)w2_qweight_s4.data_ptr(),
++                    (const fp16*)w2_scales.data_ptr(), (const bf16*)topk_weight.data_ptr(),
++                    idx_ptr, (bf16*)output.data_ptr(), n_tokens, top_k, hidden_size,
++                    intermediate_size, x.device(), signed_compact);
++            } else {
++                moe_tiny_m_down_cutlass_int4_kernel<int64_t, fp16, bf16>(
++                    (const bf16*)intermediates.data_ptr(), (const uint8_t*)w2_qweight_s4.data_ptr(),
++                    (const fp16*)w2_scales.data_ptr(), (const fp16*)topk_weight.data_ptr(),
++                    idx_ptr, (bf16*)output.data_ptr(), n_tokens, top_k, hidden_size,
++                    intermediate_size, x.device(), signed_compact);
++            }
++        } else {
++            moe_tiny_m_up_cutlass_int4_kernel<int64_t, fp16>(
++                (const fp16*)x.data_ptr(), (const uint8_t*)w13_qweight_s4.data_ptr(),
++                (const fp16*)w13_scales.data_ptr(), idx_ptr,
++                (fp16*)intermediates.data_ptr(), n_tokens, top_k, hidden_size,
++                intermediate_size, x.device(), signed_compact);
++            if (topk_weight.scalar_type() == torch::kFloat) {
++                moe_tiny_m_down_cutlass_int4_kernel<int64_t, float, fp16>(
++                    (const fp16*)intermediates.data_ptr(), (const uint8_t*)w2_qweight_s4.data_ptr(),
++                    (const fp16*)w2_scales.data_ptr(), (const float*)topk_weight.data_ptr(),
++                    idx_ptr, (fp16*)output.data_ptr(), n_tokens, top_k, hidden_size,
++                    intermediate_size, x.device(), signed_compact);
++            } else if (topk_weight.scalar_type() == torch::kBFloat16) {
++                moe_tiny_m_down_cutlass_int4_kernel<int64_t, bf16, fp16>(
++                    (const fp16*)intermediates.data_ptr(), (const uint8_t*)w2_qweight_s4.data_ptr(),
++                    (const fp16*)w2_scales.data_ptr(), (const bf16*)topk_weight.data_ptr(),
++                    idx_ptr, (fp16*)output.data_ptr(), n_tokens, top_k, hidden_size,
++                    intermediate_size, x.device(), signed_compact);
++            } else {
++                moe_tiny_m_down_cutlass_int4_kernel<int64_t, fp16, fp16>(
++                    (const fp16*)intermediates.data_ptr(), (const uint8_t*)w2_qweight_s4.data_ptr(),
++                    (const fp16*)w2_scales.data_ptr(), (const fp16*)topk_weight.data_ptr(),
++                    idx_ptr, (fp16*)output.data_ptr(), n_tokens, top_k, hidden_size,
++                    intermediate_size, x.device(), signed_compact);
++            }
++        }
++    }
++    return output;
++}
++
++static torch::Tensor moe_forward_tiny_cutlass_nmajor_int4_ws_impl(
++    torch::Tensor x,
++    torch::Tensor w13_qweight_s4,
++    torch::Tensor w13_scales,
++    torch::Tensor w2_qweight_s4,
++    torch::Tensor w2_scales,
++    torch::Tensor topk_weight,
++    torch::Tensor topk_idx,
++    const bool signed_compact) {
+ 
+     TORCH_CHECK(x.dim() == 2 && x.size(0) >= 1 && x.size(0) <= 64 && x.is_contiguous());
+     TORCH_CHECK(x.scalar_type() == torch::kHalf);
+@@ -2399,7 +2806,7 @@ torch::Tensor moe_forward_tiny_cutlass_nmajor_int4(
+     TORCH_CHECK(w13_scales.scalar_type() == torch::kHalf && w13_scales.is_contiguous());
+     TORCH_CHECK(w2_scales.scalar_type() == torch::kHalf && w2_scales.is_contiguous());
+     TORCH_CHECK(topk_weight.dim() == 2 && topk_weight.size(0) == x.size(0) && topk_weight.is_contiguous());
+-    TORCH_CHECK(topk_weight.scalar_type() == torch::kHalf);
++    TORCH_CHECK(topk_weight.scalar_type() == torch::kHalf || topk_weight.scalar_type() == torch::kFloat);
+     TORCH_CHECK(topk_idx.dim() == 2 && topk_idx.size(0) == x.size(0) && topk_idx.is_contiguous());
+     TORCH_CHECK(topk_idx.scalar_type() == torch::kInt || topk_idx.scalar_type() == torch::kLong);
+ 
+@@ -2419,32 +2826,603 @@ torch::Tensor moe_forward_tiny_cutlass_nmajor_int4(
+ 
+     if (topk_idx.scalar_type() == torch::kInt) {
+         const int32_t* idx_ptr = topk_idx.data_ptr<int32_t>();
+-        moe_tiny_m_up_cutlass_int4_kernel<int32_t>(
++        moe_ws_up_cutlass_int4_kernel<int32_t>(
+             (const fp16*)x.data_ptr(), (const uint8_t*)w13_qweight_s4.data_ptr(),
+             (const fp16*)w13_scales.data_ptr(), idx_ptr,
+             (fp16*)intermediates.data_ptr(), n_tokens, top_k, hidden_size,
+-            intermediate_size, x.device());
+-        moe_tiny_m_down_cutlass_int4_kernel<int32_t>(
+-            (const fp16*)intermediates.data_ptr(), (const uint8_t*)w2_qweight_s4.data_ptr(),
+-            (const fp16*)w2_scales.data_ptr(), (const fp16*)topk_weight.data_ptr(),
+-            idx_ptr, (fp16*)output.data_ptr(), n_tokens, top_k, hidden_size,
+-            intermediate_size, x.device());
++            intermediate_size, x.device(), signed_compact);
++        if (topk_weight.scalar_type() == torch::kFloat) {
++            if (n_tokens <= 2) {
++                moe_ws_down_cutlass_int4_kernel<int32_t, float, 4>(
++                    (const fp16*)intermediates.data_ptr(), (const uint8_t*)w2_qweight_s4.data_ptr(),
++                    (const fp16*)w2_scales.data_ptr(), (const float*)topk_weight.data_ptr(),
++                    idx_ptr, (fp16*)output.data_ptr(), n_tokens, top_k, hidden_size,
++                    intermediate_size, x.device(), signed_compact);
++            } else {
++                moe_ws_down_cutlass_int4_kernel<int32_t, float, 8>(
++                    (const fp16*)intermediates.data_ptr(), (const uint8_t*)w2_qweight_s4.data_ptr(),
++                    (const fp16*)w2_scales.data_ptr(), (const float*)topk_weight.data_ptr(),
++                    idx_ptr, (fp16*)output.data_ptr(), n_tokens, top_k, hidden_size,
++                    intermediate_size, x.device(), signed_compact);
++            }
++        } else {
++            if (n_tokens <= 2) {
++                moe_ws_down_cutlass_int4_kernel<int32_t, fp16, 4>(
++                    (const fp16*)intermediates.data_ptr(), (const uint8_t*)w2_qweight_s4.data_ptr(),
++                    (const fp16*)w2_scales.data_ptr(), (const fp16*)topk_weight.data_ptr(),
++                    idx_ptr, (fp16*)output.data_ptr(), n_tokens, top_k, hidden_size,
++                    intermediate_size, x.device(), signed_compact);
++            } else {
++                moe_ws_down_cutlass_int4_kernel<int32_t, fp16, 8>(
++                    (const fp16*)intermediates.data_ptr(), (const uint8_t*)w2_qweight_s4.data_ptr(),
++                    (const fp16*)w2_scales.data_ptr(), (const fp16*)topk_weight.data_ptr(),
++                    idx_ptr, (fp16*)output.data_ptr(), n_tokens, top_k, hidden_size,
++                    intermediate_size, x.device(), signed_compact);
++            }
++        }
+     } else {
+         const int64_t* idx_ptr = topk_idx.data_ptr<int64_t>();
+-        moe_tiny_m_up_cutlass_int4_kernel<int64_t>(
++        moe_ws_up_cutlass_int4_kernel<int64_t>(
+             (const fp16*)x.data_ptr(), (const uint8_t*)w13_qweight_s4.data_ptr(),
+             (const fp16*)w13_scales.data_ptr(), idx_ptr,
+             (fp16*)intermediates.data_ptr(), n_tokens, top_k, hidden_size,
+-            intermediate_size, x.device());
+-        moe_tiny_m_down_cutlass_int4_kernel<int64_t>(
+-            (const fp16*)intermediates.data_ptr(), (const uint8_t*)w2_qweight_s4.data_ptr(),
+-            (const fp16*)w2_scales.data_ptr(), (const fp16*)topk_weight.data_ptr(),
+-            idx_ptr, (fp16*)output.data_ptr(), n_tokens, top_k, hidden_size,
+-            intermediate_size, x.device());
++            intermediate_size, x.device(), signed_compact);
++        if (topk_weight.scalar_type() == torch::kFloat) {
++            if (n_tokens <= 2) {
++                moe_ws_down_cutlass_int4_kernel<int64_t, float, 4>(
++                    (const fp16*)intermediates.data_ptr(), (const uint8_t*)w2_qweight_s4.data_ptr(),
++                    (const fp16*)w2_scales.data_ptr(), (const float*)topk_weight.data_ptr(),
++                    idx_ptr, (fp16*)output.data_ptr(), n_tokens, top_k, hidden_size,
++                    intermediate_size, x.device(), signed_compact);
++            } else {
++                moe_ws_down_cutlass_int4_kernel<int64_t, float, 8>(
++                    (const fp16*)intermediates.data_ptr(), (const uint8_t*)w2_qweight_s4.data_ptr(),
++                    (const fp16*)w2_scales.data_ptr(), (const float*)topk_weight.data_ptr(),
++                    idx_ptr, (fp16*)output.data_ptr(), n_tokens, top_k, hidden_size,
++                    intermediate_size, x.device(), signed_compact);
++            }
++        } else {
++            if (n_tokens <= 2) {
++                moe_ws_down_cutlass_int4_kernel<int64_t, fp16, 4>(
++                    (const fp16*)intermediates.data_ptr(), (const uint8_t*)w2_qweight_s4.data_ptr(),
++                    (const fp16*)w2_scales.data_ptr(), (const fp16*)topk_weight.data_ptr(),
++                    idx_ptr, (fp16*)output.data_ptr(), n_tokens, top_k, hidden_size,
++                    intermediate_size, x.device(), signed_compact);
++            } else {
++                moe_ws_down_cutlass_int4_kernel<int64_t, fp16, 8>(
++                    (const fp16*)intermediates.data_ptr(), (const uint8_t*)w2_qweight_s4.data_ptr(),
++                    (const fp16*)w2_scales.data_ptr(), (const fp16*)topk_weight.data_ptr(),
++                    idx_ptr, (fp16*)output.data_ptr(), n_tokens, top_k, hidden_size,
++                    intermediate_size, x.device(), signed_compact);
++            }
++        }
+     }
+     return output;
+ }
+ 
++torch::Tensor moe_forward_tiny_cutlass_nmajor_int4(
++    torch::Tensor x,
++    torch::Tensor w13_qweight_s4,
++    torch::Tensor w13_scales,
++    torch::Tensor w2_qweight_s4,
++    torch::Tensor w2_scales,
++    torch::Tensor topk_weight,
++    torch::Tensor topk_idx) {
++    return moe_forward_tiny_cutlass_nmajor_int4_impl(
++        x, w13_qweight_s4, w13_scales, w2_qweight_s4, w2_scales,
++        topk_weight, topk_idx, true);
++}
++
++torch::Tensor moe_forward_tiny_cutlass_nmajor_int4_u4(
++    torch::Tensor x,
++    torch::Tensor w13_qweight_u4,
++    torch::Tensor w13_scales,
++    torch::Tensor w2_qweight_u4,
++    torch::Tensor w2_scales,
++    torch::Tensor topk_weight,
++    torch::Tensor topk_idx) {
++    return moe_forward_tiny_cutlass_nmajor_int4_impl(
++        x, w13_qweight_u4, w13_scales, w2_qweight_u4, w2_scales,
++        topk_weight, topk_idx, false);
++}
++
++torch::Tensor moe_forward_tiny_cutlass_nmajor_int4_u4_logits(
++    torch::Tensor x,
++    torch::Tensor w13_qweight_u4,
++    torch::Tensor w13_scales,
++    torch::Tensor w2_qweight_u4,
++    torch::Tensor w2_scales,
++    torch::Tensor router_logits) {
++    TORCH_CHECK(router_logits.dim() == 2 && router_logits.is_contiguous());
++    TORCH_CHECK(router_logits.size(0) == x.size(0));
++    TORCH_CHECK(router_logits.scalar_type() == torch::kHalf ||
++                router_logits.scalar_type() == torch::kBFloat16 ||
++                router_logits.scalar_type() == torch::kFloat);
++    TORCH_CHECK(w13_qweight_u4.size(0) == router_logits.size(1));
++
++    const int n_tokens = x.size(0);
++    const int num_experts = router_logits.size(1);
++    auto topk_weight = torch::empty({n_tokens, 2},
++        torch::device(router_logits.device()).dtype(torch::kFloat32));
++    auto topk_idx = torch::empty({n_tokens, 2},
++        torch::device(router_logits.device()).dtype(torch::kInt32));
++
++    if (router_logits.scalar_type() == torch::kBFloat16) {
++        moe_top2_softmax_int4_kernel<bf16>(
++            (const bf16*)router_logits.data_ptr(),
++            topk_weight.data_ptr<float>(),
++            topk_idx.data_ptr<int32_t>(),
++            n_tokens, num_experts, router_logits.device());
++    } else if (router_logits.scalar_type() == torch::kFloat) {
++        moe_top2_softmax_int4_kernel<float>(
++            router_logits.data_ptr<float>(),
++            topk_weight.data_ptr<float>(),
++            topk_idx.data_ptr<int32_t>(),
++            n_tokens, num_experts, router_logits.device());
++    } else {
++        moe_top2_softmax_int4_kernel<fp16>(
++            (const fp16*)router_logits.data_ptr(),
++            topk_weight.data_ptr<float>(),
++            topk_idx.data_ptr<int32_t>(),
++            n_tokens, num_experts, router_logits.device());
++    }
++
++    return moe_forward_tiny_cutlass_nmajor_int4_impl(
++        x, w13_qweight_u4, w13_scales, w2_qweight_u4, w2_scales,
++        topk_weight, topk_idx, false);
++}
++
++torch::Tensor moe_forward_tiny_cutlass_nmajor_int4_u4_logits_topk(
++    torch::Tensor x,
++    torch::Tensor w13_qweight_u4,
++    torch::Tensor w13_scales,
++    torch::Tensor w2_qweight_u4,
++    torch::Tensor w2_scales,
++    torch::Tensor router_logits,
++    int64_t top_k) {
++    TORCH_CHECK(router_logits.dim() == 2 && router_logits.is_contiguous());
++    TORCH_CHECK(router_logits.size(0) == x.size(0));
++    TORCH_CHECK(router_logits.scalar_type() == torch::kHalf ||
++                router_logits.scalar_type() == torch::kBFloat16 ||
++                router_logits.scalar_type() == torch::kFloat);
++    TORCH_CHECK(w13_qweight_u4.size(0) == router_logits.size(1));
++    TORCH_CHECK(top_k > 0 && top_k <= 16);
++
++    const int n_tokens = x.size(0);
++    const int num_experts = router_logits.size(1);
++    auto topk_weight = torch::empty({n_tokens, top_k},
++        torch::device(router_logits.device()).dtype(torch::kFloat32));
++    auto topk_idx = torch::empty({n_tokens, top_k},
++        torch::device(router_logits.device()).dtype(torch::kInt32));
++
++    if (router_logits.scalar_type() == torch::kBFloat16) {
++        moe_topk_softmax_int4_kernel<bf16>(
++            (const bf16*)router_logits.data_ptr(),
++            topk_weight.data_ptr<float>(),
++            topk_idx.data_ptr<int32_t>(),
++            n_tokens, num_experts, (int)top_k, router_logits.device());
++    } else if (router_logits.scalar_type() == torch::kFloat) {
++        moe_topk_softmax_int4_kernel<float>(
++            router_logits.data_ptr<float>(),
++            topk_weight.data_ptr<float>(),
++            topk_idx.data_ptr<int32_t>(),
++            n_tokens, num_experts, (int)top_k, router_logits.device());
++    } else {
++        moe_topk_softmax_int4_kernel<fp16>(
++            (const fp16*)router_logits.data_ptr(),
++            topk_weight.data_ptr<float>(),
++            topk_idx.data_ptr<int32_t>(),
++            n_tokens, num_experts, (int)top_k, router_logits.device());
++    }
++
++    return moe_forward_tiny_cutlass_nmajor_int4_impl(
++        x, w13_qweight_u4, w13_scales, w2_qweight_u4, w2_scales,
++        topk_weight, topk_idx, false);
++}
++
++template<int C>
++SYCL_ESIMD_FUNCTION inline void minimax_argmax_and_suppress(
++    simd<float, C>& vals, int base_idx, float& out_val, int32_t& out_idx) {
++
++    float mx = h_max<float, C>(vals);
++    union { float f; int32_t i; } mx_bits;
++    mx_bits.f = mx;
++
++    simd<int32_t, C> vals_as_int = vals.template bit_cast_view<int32_t>().read();
++    simd_mask<C> mask = (vals_as_int == mx_bits.i);
++    simd<int32_t, C> cand(999999);
++    cand.merge(simd<int32_t, C>(base_idx, 1), mask);
++    int32_t found_idx = h_min<int32_t, C>(cand);
++
++    out_val = mx;
++    out_idx = found_idx;
++
++    int local_pos = found_idx - base_idx;
++    simd_mask<C> suppress_mask = (simd<int32_t, C>(0, 1) == local_pos);
++    vals.merge(simd<float, C>(-3.402823466e+38f), suppress_mask);
++}
++
++template<int NUM_EXPERTS, int TOPK, typename LogitsT>
++struct MiniMaxM2TopKSigmoidBiasKernel {
++    const LogitsT* router_logits;
++    const float* e_score_bias;
++    float* top_values;
++    int32_t* top_indices;
++    int T;
++    bool norm;
++
++    void operator()(sycl::nd_item<1> item) const SYCL_ESIMD_KERNEL {
++        static_assert(NUM_EXPERTS % 64 == 0, "NUM_EXPERTS must be multiple of 64");
++        static_assert(TOPK <= 16, "TOPK must be <= 16");
++        constexpr int C = 64;
++        constexpr int N_CHUNKS = NUM_EXPERTS / C;
++
++        int row = item.get_group(0);
++        if (row >= T) return;
++
++        const LogitsT* row_ptr = router_logits + (size_t)row * NUM_EXPERTS;
++        simd<float, C> choice[N_CHUNKS];
++        simd<float, C> weights[N_CHUNKS];
++
++        #pragma unroll
++        for (int c = 0; c < N_CHUNKS; c++) {
++            simd<float, C> raw;
++            if constexpr (std::is_same_v<LogitsT, float>) {
++                raw = block_load<float, C>((const float*)row_ptr + c * C);
++            } else {
++                simd<LogitsT, C> raw_h = block_load<LogitsT, C>(row_ptr + c * C);
++                raw = convert<float>(raw_h);
++            }
++            simd<float, C> score =
++                1.0f / (1.0f + esimd_math::exp<float, C>(-raw));
++            weights[c] = score;
++            choice[c] = score + block_load<float, C>(e_score_bias + c * C);
++        }
++
++        float tv[16];
++        float tw[16];
++        int32_t ti[16];
++
++        #pragma unroll
++        for (int k = 0; k < TOPK; k++) {
++            float best_val = -3.402823466e+38f;
++            int best_chunk = 0;
++            #pragma unroll
++            for (int c = 0; c < N_CHUNKS; c++) {
++                float m = h_max<float, C>(choice[c]);
++                if (m > best_val) {
++                    best_val = m;
++                    best_chunk = c;
++                }
++            }
++
++            float selected_choice;
++            int32_t selected_idx;
++            minimax_argmax_and_suppress<C>(
++                choice[best_chunk], best_chunk * C, selected_choice, selected_idx);
++            tv[k] = selected_choice;
++            ti[k] = selected_idx;
++            tw[k] = weights[best_chunk][selected_idx - best_chunk * C];
++        }
++
++        float denom = 0.0f;
++        #pragma unroll
++        for (int k = 0; k < TOPK; k++) {
++            denom += tw[k];
++        }
++        float inv = (norm && denom > 0.0f) ? (1.0f / denom) : 1.0f;
++
++        float* vp = top_values + (size_t)row * TOPK;
++        int32_t* ip = top_indices + (size_t)row * TOPK;
++        if constexpr (TOPK >= 8) {
++            simd<float, 8> sv8;
++            simd<int32_t, 8> si8;
++            #pragma unroll
++            for (int i = 0; i < 8; i++) {
++                sv8[i] = tw[i] * inv;
++                si8[i] = ti[i];
++            }
++            block_store<float, 8>(vp, sv8);
++            block_store<int32_t, 8>(ip, si8);
++        }
++        if constexpr (TOPK > 8) {
++            #pragma unroll
++            for (int i = 8; i < TOPK; i++) {
++                block_store<float, 1>(vp + i, simd<float, 1>(tw[i] * inv));
++                block_store<int32_t, 1>(ip + i, simd<int32_t, 1>(ti[i]));
++            }
++        }
++    }
++};
++
++template<typename LogitsT>
++static void minimax_m2_top8_sigmoid_bias_host(
++    const LogitsT* router_logits,
++    const float* e_score_bias,
++    float* top_values,
++    int32_t* top_indices,
++    int n_tokens,
++    bool norm,
++    sycl::queue& queue) {
++
++    queue.submit([&](sycl::handler& cgh) {
++        cgh.parallel_for(
++            sycl::nd_range<1>({(size_t)n_tokens}, {1}),
++            MiniMaxM2TopKSigmoidBiasKernel<256, 8, LogitsT>{
++                router_logits, e_score_bias, top_values, top_indices, n_tokens, norm});
++        });
++}
++
++template <typename DataT, typename IndexT>
++class MiniMaxM2CandidateScores;
++
++template <typename DataT, typename IndexT>
++static void minimax_m2_candidate_scores_kernel(
++    const DataT* x,
++    const IndexT* candidate_idx,
++    const float* gate_weight,
++    const float* e_score_bias,
++    float* exact_scores,
++    float* choice_scores,
++    const int n_tokens,
++    const int hidden_size,
++    const int top_m,
++    const torch::Device& device) {
++
++    auto cgf = [&](sycl::handler& cgh) {
++        cgh.parallel_for<MiniMaxM2CandidateScores<DataT, IndexT>>(
++            sycl::range<2>(n_tokens, top_m),
++            [=](sycl::id<2> id) {
++                const int token = (int)id[0];
++                const int pos = (int)id[1];
++                const int expert = (int)candidate_idx[(size_t)token * top_m + pos];
++
++                float acc = 0.0f;
++                const DataT* x_row = x + (size_t)token * hidden_size;
++                const float* w_row = gate_weight + (size_t)expert * hidden_size;
++                for (int k = 0; k < hidden_size; ++k) {
++                    acc += (float)x_row[k] * w_row[k];
++                }
++
++                const float score = 1.0f / (1.0f + sycl::exp(-acc));
++                const size_t out = (size_t)token * top_m + pos;
++                exact_scores[out] = score;
++                choice_scores[out] = score + e_score_bias[expert];
++            });
++    };
++    submit_kernel(cgf, device, "minimax m2 candidate scores");
++}
++
++template <typename IndexT>
++class MiniMaxM2CandidateTopK;
++
++template <typename IndexT>
++static void minimax_m2_candidate_topk_kernel(
++    const IndexT* candidate_idx,
++    const float* exact_scores,
++    const float* choice_scores,
++    float* topk_weight,
++    int32_t* topk_idx,
++    const int n_tokens,
++    const int top_m,
++    const int top_k,
++    const bool norm,
++    const torch::Device& device) {
++
++    auto cgf = [&](sycl::handler& cgh) {
++        cgh.parallel_for<MiniMaxM2CandidateTopK<IndexT>>(
++            sycl::range<1>(n_tokens),
++            [=](sycl::id<1> id) {
++                const int token = (int)id[0];
++                float best_choice[16];
++                float best_weight[16];
++                int best_idx[16];
++
++                for (int k = 0; k < 16; ++k) {
++                    best_choice[k] = -3.402823466e+38f;
++                    best_weight[k] = 0.0f;
++                    best_idx[k] = 0;
++                }
++
++                for (int pos = 0; pos < top_m; ++pos) {
++                    const size_t off = (size_t)token * top_m + pos;
++                    const float choice = choice_scores[off];
++                    int insert = -1;
++                    for (int k = 0; k < top_k; ++k) {
++                        if (choice > best_choice[k]) {
++                            insert = k;
++                            break;
++                        }
++                    }
++                    if (insert >= 0) {
++                        for (int k = top_k - 1; k > insert; --k) {
++                            best_choice[k] = best_choice[k - 1];
++                            best_weight[k] = best_weight[k - 1];
++                            best_idx[k] = best_idx[k - 1];
++                        }
++                        best_choice[insert] = choice;
++                        best_weight[insert] = exact_scores[off];
++                        best_idx[insert] =
++                            (int)candidate_idx[(size_t)token * top_m + pos];
++                    }
++                }
++
++                float denom = 0.0f;
++                for (int k = 0; k < top_k; ++k) {
++                    denom += best_weight[k];
++                }
++                const float inv = (norm && denom > 0.0f) ? (1.0f / denom) : 1.0f;
++
++                for (int k = 0; k < top_k; ++k) {
++                    topk_weight[(size_t)token * top_k + k] = best_weight[k] * inv;
++                    topk_idx[(size_t)token * top_k + k] = best_idx[k];
++                }
++            });
++    };
++    submit_kernel(cgf, device, "minimax m2 candidate topk");
++}
++
++std::tuple<torch::Tensor, torch::Tensor> minimax_m2_candidate_repair_topk(
++    torch::Tensor x,
++    torch::Tensor candidate_idx,
++    torch::Tensor gate_weight,
++    torch::Tensor e_score_bias,
++    int64_t top_k,
++    bool norm) {
++
++    TORCH_CHECK(x.dim() == 2, "x must be [n_tokens, hidden_size]");
++    TORCH_CHECK(candidate_idx.dim() == 2, "candidate_idx must be [n_tokens, top_m]");
++    TORCH_CHECK(gate_weight.dim() == 2, "gate_weight must be [n_experts, hidden_size]");
++    TORCH_CHECK(e_score_bias.dim() == 1, "e_score_bias must be [n_experts]");
++    TORCH_CHECK(x.device().is_xpu(), "x must be on XPU");
++    TORCH_CHECK(candidate_idx.device() == x.device(), "candidate_idx must be on x device");
++    TORCH_CHECK(gate_weight.device() == x.device(), "gate_weight must be on x device");
++    TORCH_CHECK(e_score_bias.device() == x.device(), "e_score_bias must be on x device");
++    TORCH_CHECK(x.scalar_type() == torch::kHalf || x.scalar_type() == torch::kBFloat16,
++        "x must be fp16 or bf16");
++    TORCH_CHECK(candidate_idx.scalar_type() == torch::kInt ||
++                    candidate_idx.scalar_type() == torch::kLong,
++        "candidate_idx must be int32 or int64");
++    TORCH_CHECK(gate_weight.scalar_type() == torch::kFloat,
++        "gate_weight must be fp32");
++    TORCH_CHECK(e_score_bias.scalar_type() == torch::kFloat,
++        "e_score_bias must be fp32");
++    TORCH_CHECK(top_k > 0 && top_k <= 16, "top_k must be in [1, 16]");
++
++    x = x.contiguous();
++    candidate_idx = candidate_idx.contiguous();
++    gate_weight = gate_weight.contiguous();
++    e_score_bias = e_score_bias.contiguous();
++
++    const int n_tokens = (int)x.size(0);
++    const int hidden_size = (int)x.size(1);
++    const int top_m = (int)candidate_idx.size(1);
++    const int n_experts = (int)gate_weight.size(0);
++    TORCH_CHECK(candidate_idx.size(0) == n_tokens, "candidate_idx token count mismatch");
++    TORCH_CHECK(gate_weight.size(1) == hidden_size, "gate_weight hidden size mismatch");
++    TORCH_CHECK(e_score_bias.size(0) == n_experts, "bias expert count mismatch");
++    TORCH_CHECK(top_m >= top_k, "top_m must be >= top_k");
++
++    auto fopts = torch::device(x.device()).dtype(torch::kFloat);
++    auto iopts = torch::device(x.device()).dtype(torch::kInt32);
++    auto exact_scores = torch::empty({n_tokens, top_m}, fopts);
++    auto choice_scores = torch::empty({n_tokens, top_m}, fopts);
++    auto topk_weight = torch::empty({n_tokens, top_k}, fopts);
++    auto topk_idx = torch::empty({n_tokens, top_k}, iopts);
++
++    if (x.scalar_type() == torch::kHalf) {
++        if (candidate_idx.scalar_type() == torch::kInt) {
++            minimax_m2_candidate_scores_kernel<fp16, int32_t>(
++                (const fp16*)x.data_ptr(), candidate_idx.data_ptr<int32_t>(),
++                gate_weight.data_ptr<float>(), e_score_bias.data_ptr<float>(),
++                exact_scores.data_ptr<float>(), choice_scores.data_ptr<float>(),
++                n_tokens, hidden_size, top_m, x.device());
++            minimax_m2_candidate_topk_kernel<int32_t>(
++                candidate_idx.data_ptr<int32_t>(), exact_scores.data_ptr<float>(),
++                choice_scores.data_ptr<float>(), topk_weight.data_ptr<float>(),
++                topk_idx.data_ptr<int32_t>(), n_tokens, top_m, (int)top_k,
++                norm, x.device());
++        } else {
++            minimax_m2_candidate_scores_kernel<fp16, int64_t>(
++                (const fp16*)x.data_ptr(), candidate_idx.data_ptr<int64_t>(),
++                gate_weight.data_ptr<float>(), e_score_bias.data_ptr<float>(),
++                exact_scores.data_ptr<float>(), choice_scores.data_ptr<float>(),
++                n_tokens, hidden_size, top_m, x.device());
++            minimax_m2_candidate_topk_kernel<int64_t>(
++                candidate_idx.data_ptr<int64_t>(), exact_scores.data_ptr<float>(),
++                choice_scores.data_ptr<float>(), topk_weight.data_ptr<float>(),
++                topk_idx.data_ptr<int32_t>(), n_tokens, top_m, (int)top_k,
++                norm, x.device());
++        }
++    } else {
++        if (candidate_idx.scalar_type() == torch::kInt) {
++            minimax_m2_candidate_scores_kernel<bf16, int32_t>(
++                (const bf16*)x.data_ptr(), candidate_idx.data_ptr<int32_t>(),
++                gate_weight.data_ptr<float>(), e_score_bias.data_ptr<float>(),
++                exact_scores.data_ptr<float>(), choice_scores.data_ptr<float>(),
++                n_tokens, hidden_size, top_m, x.device());
++            minimax_m2_candidate_topk_kernel<int32_t>(
++                candidate_idx.data_ptr<int32_t>(), exact_scores.data_ptr<float>(),
++                choice_scores.data_ptr<float>(), topk_weight.data_ptr<float>(),
++                topk_idx.data_ptr<int32_t>(), n_tokens, top_m, (int)top_k,
++                norm, x.device());
++        } else {
++            minimax_m2_candidate_scores_kernel<bf16, int64_t>(
++                (const bf16*)x.data_ptr(), candidate_idx.data_ptr<int64_t>(),
++                gate_weight.data_ptr<float>(), e_score_bias.data_ptr<float>(),
++                exact_scores.data_ptr<float>(), choice_scores.data_ptr<float>(),
++                n_tokens, hidden_size, top_m, x.device());
++            minimax_m2_candidate_topk_kernel<int64_t>(
++                candidate_idx.data_ptr<int64_t>(), exact_scores.data_ptr<float>(),
++                choice_scores.data_ptr<float>(), topk_weight.data_ptr<float>(),
++                topk_idx.data_ptr<int32_t>(), n_tokens, top_m, (int)top_k,
++                norm, x.device());
++        }
++    }
++
++    return {topk_weight, topk_idx};
++}
++
++torch::Tensor moe_forward_tiny_cutlass_nmajor_int4_u4_minimax(
++    torch::Tensor x,
++    torch::Tensor w13_qweight_u4,
++    torch::Tensor w13_scales,
++    torch::Tensor w2_qweight_u4,
++    torch::Tensor w2_scales,
++    torch::Tensor router_logits,
++    torch::Tensor e_score_bias,
++    int64_t top_k,
++    bool norm) {
++
++    TORCH_CHECK(x.dim() == 2 && x.size(0) >= 1 && x.size(0) <= 4 && x.is_contiguous());
++    TORCH_CHECK(router_logits.dim() == 2 && router_logits.size(0) == x.size(0) &&
++                router_logits.is_contiguous());
++    TORCH_CHECK(router_logits.scalar_type() == torch::kFloat ||
++                router_logits.scalar_type() == torch::kHalf);
++    TORCH_CHECK(router_logits.size(1) == 256,
++                "MiniMax M2 fast path currently expects 256 routed experts");
++    TORCH_CHECK(e_score_bias.dim() == 1 && e_score_bias.size(0) == 256 &&
++                e_score_bias.scalar_type() == torch::kFloat &&
++                e_score_bias.is_contiguous());
++    TORCH_CHECK(top_k == 8, "MiniMax M2 fast path currently expects top_k=8");
++
++    const int n_tokens = (int)x.size(0);
++    auto topk_weight = torch::empty({n_tokens, top_k},
++        torch::device(router_logits.device()).dtype(torch::kFloat32));
++    auto topk_idx = torch::empty({n_tokens, top_k},
++        torch::device(router_logits.device()).dtype(torch::kInt32));
++
++    sycl::queue& queue = c10::xpu::getCurrentXPUStream(router_logits.device().index()).queue();
++    if (router_logits.scalar_type() == torch::kFloat) {
++        minimax_m2_top8_sigmoid_bias_host<float>(
++            router_logits.data_ptr<float>(), e_score_bias.data_ptr<float>(),
++            topk_weight.data_ptr<float>(), topk_idx.data_ptr<int32_t>(),
++            n_tokens, norm, queue);
++    } else {
++        minimax_m2_top8_sigmoid_bias_host<fp16>(
++            (const fp16*)router_logits.data_ptr(), e_score_bias.data_ptr<float>(),
++            topk_weight.data_ptr<float>(), topk_idx.data_ptr<int32_t>(),
++            n_tokens, norm, queue);
++    }
++
++    return moe_forward_tiny_cutlass_nmajor_int4_impl(
++        x, w13_qweight_u4, w13_scales, w2_qweight_u4, w2_scales,
++        topk_weight, topk_idx, false);
++}
++
++torch::Tensor moe_forward_tiny_cutlass_nmajor_int4_u4_ws(
++    torch::Tensor x,
++    torch::Tensor w13_qweight_u4,
++    torch::Tensor w13_scales,
++    torch::Tensor w2_qweight_u4,
++    torch::Tensor w2_scales,
++    torch::Tensor topk_weight,
++    torch::Tensor topk_idx) {
++    return moe_forward_tiny_cutlass_nmajor_int4_ws_impl(
++        x, w13_qweight_u4, w13_scales, w2_qweight_u4, w2_scales,
++        topk_weight, topk_idx, false);
++}
++
+ torch::Tensor moe_tiny_cutlass_nmajor_int4_up(
+     torch::Tensor x,
+     torch::Tensor w13_qweight_s4,
+@@ -2511,13 +3489,13 @@ torch::Tensor moe_tiny_cutlass_nmajor_int4_down(
+         torch::device(intermediates.device()).dtype(torch::kHalf));
+ 
+     if (topk_idx.scalar_type() == torch::kInt) {
+-        moe_tiny_m_down_cutlass_int4_kernel<int32_t>(
++        moe_tiny_m_down_cutlass_int4_kernel<int32_t, fp16>(
+             (const fp16*)intermediates.data_ptr(), (const uint8_t*)w2_qweight_s4.data_ptr(),
+             (const fp16*)w2_scales.data_ptr(), (const fp16*)topk_weight.data_ptr(),
+             topk_idx.data_ptr<int32_t>(), (fp16*)output.data_ptr(), n_tokens, top_k,
+             hidden_size, intermediate_size, intermediates.device());
+     } else {
+-        moe_tiny_m_down_cutlass_int4_kernel<int64_t>(
++        moe_tiny_m_down_cutlass_int4_kernel<int64_t, fp16>(
+             (const fp16*)intermediates.data_ptr(), (const uint8_t*)w2_qweight_s4.data_ptr(),
+             (const fp16*)w2_scales.data_ptr(), (const fp16*)topk_weight.data_ptr(),
+             topk_idx.data_ptr<int64_t>(), (fp16*)output.data_ptr(), n_tokens, top_k,
+@@ -3585,6 +4563,18 @@ TORCH_LIBRARY_FRAGMENT(moe_int4_ops, m) {
+     m.def("moe_route_gather_int4(Tensor route_output, Tensor sorted_rows, Tensor sorted_weights, int n_tokens) -> Tensor");
+         m.def("moe_forward_tiny_cutlass_nmajor_int4(Tensor x, Tensor w13_qweight_s4, Tensor w13_scales, "
+             "Tensor w2_qweight_s4, Tensor w2_scales, Tensor topk_weight, Tensor topk_idx) -> Tensor");
++        m.def("moe_forward_tiny_cutlass_nmajor_int4_u4(Tensor x, Tensor w13_qweight_u4, Tensor w13_scales, "
++            "Tensor w2_qweight_u4, Tensor w2_scales, Tensor topk_weight, Tensor topk_idx) -> Tensor");
++        m.def("moe_forward_tiny_cutlass_nmajor_int4_u4_logits(Tensor x, Tensor w13_qweight_u4, Tensor w13_scales, "
++            "Tensor w2_qweight_u4, Tensor w2_scales, Tensor router_logits) -> Tensor");
++        m.def("moe_forward_tiny_cutlass_nmajor_int4_u4_logits_topk(Tensor x, Tensor w13_qweight_u4, Tensor w13_scales, "
++            "Tensor w2_qweight_u4, Tensor w2_scales, Tensor router_logits, int top_k) -> Tensor");
++        m.def("moe_forward_tiny_cutlass_nmajor_int4_u4_minimax(Tensor x, Tensor w13_qweight_u4, Tensor w13_scales, "
++            "Tensor w2_qweight_u4, Tensor w2_scales, Tensor router_logits, Tensor e_score_bias, int top_k, bool norm) -> Tensor");
++        m.def("moe_forward_tiny_cutlass_nmajor_int4_u4_ws(Tensor x, Tensor w13_qweight_u4, Tensor w13_scales, "
++            "Tensor w2_qweight_u4, Tensor w2_scales, Tensor topk_weight, Tensor topk_idx) -> Tensor");
++        m.def("minimax_m2_candidate_repair_topk(Tensor x, Tensor candidate_idx, "
++            "Tensor gate_weight, Tensor e_score_bias, int top_k, bool norm) -> (Tensor, Tensor)");
+         m.def("moe_tiny_cutlass_nmajor_int4_up(Tensor x, Tensor w13_qweight_s4, Tensor w13_scales, Tensor topk_idx) -> Tensor");
+         m.def("moe_tiny_cutlass_nmajor_int4_down(Tensor intermediates, Tensor w2_qweight_s4, Tensor w2_scales, "
+                     "Tensor topk_weight, Tensor topk_idx) -> Tensor");
+@@ -3627,6 +4617,12 @@ TORCH_LIBRARY_IMPL(moe_int4_ops, XPU, m) {
+     m.impl("moe_silu_mul_int4", &moe_silu_mul_int4);
+     m.impl("moe_route_gather_int4", &moe_route_gather_int4);
+     m.impl("moe_forward_tiny_cutlass_nmajor_int4", &moe_forward_tiny_cutlass_nmajor_int4);
++    m.impl("moe_forward_tiny_cutlass_nmajor_int4_u4", &moe_forward_tiny_cutlass_nmajor_int4_u4);
++    m.impl("moe_forward_tiny_cutlass_nmajor_int4_u4_logits", &moe_forward_tiny_cutlass_nmajor_int4_u4_logits);
++    m.impl("moe_forward_tiny_cutlass_nmajor_int4_u4_logits_topk", &moe_forward_tiny_cutlass_nmajor_int4_u4_logits_topk);
++    m.impl("moe_forward_tiny_cutlass_nmajor_int4_u4_minimax", &moe_forward_tiny_cutlass_nmajor_int4_u4_minimax);
++    m.impl("moe_forward_tiny_cutlass_nmajor_int4_u4_ws", &moe_forward_tiny_cutlass_nmajor_int4_u4_ws);
++    m.impl("minimax_m2_candidate_repair_topk", &minimax_m2_candidate_repair_topk);
+     m.impl("moe_tiny_cutlass_nmajor_int4_up", &moe_tiny_cutlass_nmajor_int4_up);
+     m.impl("moe_tiny_cutlass_nmajor_int4_down", &moe_tiny_cutlass_nmajor_int4_down);
+     m.impl("moe_forward_tiny_cutlass_nmajor_int4_full_fp16_shared", &moe_forward_tiny_cutlass_nmajor_int4_full_fp16_shared);
+@@ -3647,6 +4643,12 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
+     m.def("moe_silu_mul_int4", &moe_silu_mul_int4);
+     m.def("moe_route_gather_int4", &moe_route_gather_int4);
+     m.def("moe_forward_tiny_cutlass_nmajor_int4", &moe_forward_tiny_cutlass_nmajor_int4);
++    m.def("moe_forward_tiny_cutlass_nmajor_int4_u4", &moe_forward_tiny_cutlass_nmajor_int4_u4);
++    m.def("moe_forward_tiny_cutlass_nmajor_int4_u4_logits", &moe_forward_tiny_cutlass_nmajor_int4_u4_logits);
++    m.def("moe_forward_tiny_cutlass_nmajor_int4_u4_logits_topk", &moe_forward_tiny_cutlass_nmajor_int4_u4_logits_topk);
++    m.def("moe_forward_tiny_cutlass_nmajor_int4_u4_minimax", &moe_forward_tiny_cutlass_nmajor_int4_u4_minimax);
++    m.def("moe_forward_tiny_cutlass_nmajor_int4_u4_ws", &moe_forward_tiny_cutlass_nmajor_int4_u4_ws);
++    m.def("minimax_m2_candidate_repair_topk", &minimax_m2_candidate_repair_topk);
+     m.def("moe_tiny_cutlass_nmajor_int4_up", &moe_tiny_cutlass_nmajor_int4_up);
+     m.def("moe_tiny_cutlass_nmajor_int4_down", &moe_tiny_cutlass_nmajor_int4_down);
+     m.def("moe_forward_tiny_cutlass_nmajor_int4_full_fp16_shared", &moe_forward_tiny_cutlass_nmajor_int4_full_fp16_shared);
+diff --git a/vllm/custom-esimd-kernels-vllm/python/custom_esimd_kernels_vllm/__init__.py b/vllm/custom-esimd-kernels-vllm/python/custom_esimd_kernels_vllm/__init__.py
+index ad1bbb8..96ef1c2 100644
+--- a/vllm/custom-esimd-kernels-vllm/python/custom_esimd_kernels_vllm/__init__.py
++++ b/vllm/custom-esimd-kernels-vllm/python/custom_esimd_kernels_vllm/__init__.py
+@@ -1,19 +1,29 @@
++import importlib
++
+ import torch
+ 
++
++def _optional_import(name):
++    try:
++        return importlib.import_module(f"{__name__}.{name}")
++    except ImportError:
++        return None
++
++
+ # Core ESIMD kernels (4 compiled modules)
+-from custom_esimd_kernels_vllm import custom_esimd_kernels
+-from custom_esimd_kernels_vllm import custom_esimd_kernels_lgrf
+-from custom_esimd_kernels_vllm import custom_esimd_kernels_moe
+-from custom_esimd_kernels_vllm import custom_esimd_kernels_gemm
++custom_esimd_kernels = _optional_import("custom_esimd_kernels")
++custom_esimd_kernels_lgrf = _optional_import("custom_esimd_kernels_lgrf")
++custom_esimd_kernels_moe = _optional_import("custom_esimd_kernels_moe")
++custom_esimd_kernels_gemm = _optional_import("custom_esimd_kernels_gemm")
+ 
+-# Eagle kernels — registers torch.ops.eagle_ops.*
+-from custom_esimd_kernels_vllm import eagle_ops
++# Eagle kernels - registers torch.ops.eagle_ops.*
++eagle_ops = _optional_import("eagle_ops")
+ 
+-# MoE Batch kernels — registers torch.ops.moe_ops.*
+-from custom_esimd_kernels_vllm import moe_ops
++# MoE Batch kernels - registers torch.ops.moe_ops.*
++moe_ops = _optional_import("moe_ops")
+ 
+-# MoE INT4 Batch kernels — registers torch.ops.moe_int4_ops.*
+-from custom_esimd_kernels_vllm import moe_int4_ops
++# MoE INT4 Batch kernels - registers torch.ops.moe_int4_ops.*
++moe_int4_ops = _optional_import("moe_int4_ops")
+ 
+ from custom_esimd_kernels_vllm.ops import (
+     # Core ESIMD ops
+@@ -70,10 +80,16 @@ from custom_esimd_kernels_vllm.ops import (
+     moe_forward_full_cutlass_nmajor_int4,
+     moe_forward_full_cutlass_nmajor_int4_with_router,
+     moe_forward_tiny_cutlass_nmajor_int4,
++    moe_forward_tiny_cutlass_nmajor_int4_u4,
++    moe_forward_tiny_cutlass_nmajor_int4_u4_logits,
++    moe_forward_tiny_cutlass_nmajor_int4_u4_logits_topk,
++    moe_forward_tiny_cutlass_nmajor_int4_u4_minimax,
++    moe_forward_tiny_cutlass_nmajor_int4_u4_ws,
+     moe_forward_tiny_cutlass_nmajor_int4_full_fp16_shared,
+     moe_forward_tiny_cutlass_nmajor_int4_full_fp16_shared_from_logits,
+     moe_tiny_cutlass_nmajor_int4_up,
+     moe_tiny_cutlass_nmajor_int4_down,
+     moe_tiny_fp16_shared_up,
+     moe_tiny_fp16_shared_finalize,
++    minimax_m2_candidate_repair_topk,
+ )
+diff --git a/vllm/custom-esimd-kernels-vllm/python/custom_esimd_kernels_vllm/ops.py b/vllm/custom-esimd-kernels-vllm/python/custom_esimd_kernels_vllm/ops.py
+index 328d283..d3af61f 100644
+--- a/vllm/custom-esimd-kernels-vllm/python/custom_esimd_kernels_vllm/ops.py
++++ b/vllm/custom-esimd-kernels-vllm/python/custom_esimd_kernels_vllm/ops.py
+@@ -836,6 +836,31 @@ def moe_forward_full(
+ _moe_int4 = torch.ops.moe_int4_ops
+ 
+ 
++def minimax_m2_candidate_repair_topk(
++    hidden_states: torch.Tensor,
++    candidate_ids: torch.Tensor,
++    gate_weight: torch.Tensor,
++    e_score_bias: torch.Tensor,
++    top_k: int,
++    norm: bool = True,
++) -> tuple[torch.Tensor, torch.Tensor]:
++    """Exact MiniMax-M2 candidate repair for small decode batches.
++
++    ``candidate_ids`` is produced by the fast FP16 proposal router. This op
++    recomputes exact FP32 router scores only for those candidate experts,
++    applies MiniMax's sigmoid-plus-bias selection rule, and returns normalized
++    top-k weights plus int32 expert ids.
++    """
++    return _moe_int4.minimax_m2_candidate_repair_topk(
++        hidden_states.contiguous(),
++        candidate_ids.contiguous(),
++        gate_weight.contiguous(),
++        e_score_bias.contiguous(),
++        top_k,
++        norm,
++    )
++
++
+ def moe_router_forward_int4(
+     x: torch.Tensor,
+     weight: torch.Tensor,
+@@ -1062,7 +1087,11 @@ def moe_route_gather_int4(
+             pass
+     output = torch.zeros(n_tokens, route_output.shape[1], dtype=route_output.dtype,
+                          device=route_output.device)
+-    output.index_add_(0, sorted_rows, route_output * sorted_weights.unsqueeze(-1))
++    output.index_add_(
++        0,
++        sorted_rows,
++        route_output * sorted_weights.to(route_output.dtype).unsqueeze(-1),
++    )
+     return output
+ 
+ 
+@@ -1271,6 +1300,121 @@ def moe_forward_tiny_cutlass_nmajor_int4(
+         topk_weights.contiguous(), topk_ids.contiguous())
+ 
+ 
++def moe_forward_tiny_cutlass_nmajor_int4_u4(
++    hidden_states: torch.Tensor,
++    w13_qweight_u4: torch.Tensor,
++    w13_scales: torch.Tensor,
++    w2_qweight_u4: torch.Tensor,
++    w2_scales: torch.Tensor,
++    topk_weights: torch.Tensor,
++    topk_ids: torch.Tensor,
++) -> torch.Tensor:
++    """Tiny routed MoE using unsigned uint4 N-major weights.
++
++    vLLM stores symmetric W4A16 expert weights as uint4 values with an
++    implicit zero point of 8. This variant subtracts that zero point inside the
++    kernel instead of requiring a signed compact-int4 copy. The route weights
++    may be FP32, BF16, or FP16; accepting FP32 avoids a per-layer cast in vLLM
++    decode. Hidden states may be FP16 or BF16 and the output keeps the hidden
++    state dtype.
++    """
++    if hidden_states.device.type != "xpu":
++        raise RuntimeError("tiny CUTLASS N-major INT4 path requires XPU")
++    return _moe_int4.moe_forward_tiny_cutlass_nmajor_int4_u4(
++        hidden_states.contiguous(),
++        w13_qweight_u4.contiguous(), w13_scales.contiguous(),
++        w2_qweight_u4.contiguous(), w2_scales.contiguous(),
++        topk_weights.contiguous(), topk_ids.contiguous())
++
++
++def moe_forward_tiny_cutlass_nmajor_int4_u4_logits(
++    hidden_states: torch.Tensor,
++    w13_qweight_u4: torch.Tensor,
++    w13_scales: torch.Tensor,
++    w2_qweight_u4: torch.Tensor,
++    w2_scales: torch.Tensor,
++    router_logits: torch.Tensor,
++) -> torch.Tensor:
++    """Tiny unsigned-u4 routed MoE with top-2 routing inside the extension.
++
++    Experimental decode-only helper for MiniMax-like top-2, renormalized
++    softmax routing. This avoids a separate vLLM topk/select call for tiny
++    decode batches.
++    """
++    if hidden_states.device.type != "xpu":
++        raise RuntimeError("tiny CUTLASS N-major INT4 path requires XPU")
++    return _moe_int4.moe_forward_tiny_cutlass_nmajor_int4_u4_logits(
++        hidden_states.contiguous(),
++        w13_qweight_u4.contiguous(), w13_scales.contiguous(),
++        w2_qweight_u4.contiguous(), w2_scales.contiguous(),
++        router_logits.contiguous())
++
++
++def moe_forward_tiny_cutlass_nmajor_int4_u4_logits_topk(
++    hidden_states: torch.Tensor,
++    w13_qweight_u4: torch.Tensor,
++    w13_scales: torch.Tensor,
++    w2_qweight_u4: torch.Tensor,
++    w2_scales: torch.Tensor,
++    router_logits: torch.Tensor,
++    top_k: int,
++) -> torch.Tensor:
++    """Tiny unsigned-u4 routed MoE with top-k routing inside the extension."""
++    if hidden_states.device.type != "xpu":
++        raise RuntimeError("tiny CUTLASS N-major INT4 path requires XPU")
++    return _moe_int4.moe_forward_tiny_cutlass_nmajor_int4_u4_logits_topk(
++        hidden_states.contiguous(),
++        w13_qweight_u4.contiguous(), w13_scales.contiguous(),
++        w2_qweight_u4.contiguous(), w2_scales.contiguous(),
++        router_logits.contiguous(), int(top_k))
++
++
++def moe_forward_tiny_cutlass_nmajor_int4_u4_minimax(
++    hidden_states: torch.Tensor,
++    w13_qweight_u4: torch.Tensor,
++    w13_scales: torch.Tensor,
++    w2_qweight_u4: torch.Tensor,
++    w2_scales: torch.Tensor,
++    router_logits: torch.Tensor,
++    e_score_bias: torch.Tensor,
++    top_k: int,
++    norm: bool = True,
++) -> torch.Tensor:
++    """Tiny unsigned-u4 MiniMax M2 routed MoE from router logits.
++
++    This keeps MiniMax's routing rule intact: selection uses
++    sigmoid(router_logits) + e_score_bias, while routed weights use
++    sigmoid(router_logits) optionally normalized across the selected top-k.
++    """
++    if hidden_states.device.type != "xpu":
++        raise RuntimeError("tiny CUTLASS N-major INT4 path requires XPU")
++    return _moe_int4.moe_forward_tiny_cutlass_nmajor_int4_u4_minimax(
++        hidden_states.contiguous(),
++        w13_qweight_u4.contiguous(), w13_scales.contiguous(),
++        w2_qweight_u4.contiguous(), w2_scales.contiguous(),
++        router_logits.contiguous(), e_score_bias.contiguous(),
++        int(top_k), bool(norm))
++
++
++def moe_forward_tiny_cutlass_nmajor_int4_u4_ws(
++    hidden_states: torch.Tensor,
++    w13_qweight_u4: torch.Tensor,
++    w13_scales: torch.Tensor,
++    w2_qweight_u4: torch.Tensor,
++    w2_scales: torch.Tensor,
++    topk_weights: torch.Tensor,
++    topk_ids: torch.Tensor,
++) -> torch.Tensor:
++    """Unsigned uint4 tiny MoE using the ESIMD work-sharing up/down kernels."""
++    if hidden_states.device.type != "xpu":
++        raise RuntimeError("tiny CUTLASS N-major INT4 path requires XPU")
++    return _moe_int4.moe_forward_tiny_cutlass_nmajor_int4_u4_ws(
++        hidden_states.contiguous(),
++        w13_qweight_u4.contiguous(), w13_scales.contiguous(),
++        w2_qweight_u4.contiguous(), w2_scales.contiguous(),
++        topk_weights.contiguous(), topk_ids.contiguous())
++
++
+ def moe_tiny_cutlass_nmajor_int4_up(
+     hidden_states: torch.Tensor,
+     w13_qweight_s4: torch.Tensor,
