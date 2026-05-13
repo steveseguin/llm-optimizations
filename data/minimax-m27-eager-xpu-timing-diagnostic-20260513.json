@@ -1,0 +1,136 @@
+{
+  "model": {
+    "hf_id": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+    "local_path": "/mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround",
+    "quantization": "INT4 AutoRound W4A16",
+    "dtype": "float16"
+  },
+  "hardware": {
+    "gpu": "Intel Arc Pro B70 32GB",
+    "gpu_count": 4,
+    "vram_gb_per_gpu": 32,
+    "cpu": "AMD EPYC 9015 8-Core Processor",
+    "ram_gb": 16,
+    "os": "Ubuntu 24.04.4 LTS, kernel 6.17.0-23-generic"
+  },
+  "diagnostic": {
+    "name": "eager_xpu_decode_timing",
+    "purpose": "Get region attribution for MiniMax M2.7 XPU decode. This is not an optimized throughput benchmark.",
+    "command_delta": [
+      "--enforce-eager",
+      "--no-enable-prefix-caching",
+      "VLLM_XPU_DECODE_TIMING=1",
+      "VLLM_XPU_DECODE_TIMING_SYNC=1"
+    ],
+    "prompt_tokens": 512,
+    "output_tokens": 16,
+    "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n16-20260513T181411Z.log",
+    "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n16-20260513T181411Z.json",
+    "elapsed_s": 3.706641303986544,
+    "tok_s_total": 142.4470178520184,
+    "tok_s_out": 4.316573268242982,
+    "caveats": [
+      "Uses eager execution, not the optimized AOT/XPU graph path.",
+      "Uses synchronized timing, so throughput is intentionally distorted.",
+      "Counts include the 512-token prefill plus 16 decode tokens."
+    ]
+  },
+  "rank0_summary": [
+    {
+      "label": "minimax.moe.experts_total",
+      "count": 1116,
+      "total_ms": 2098.495131,
+      "avg_ms": 1.880372,
+      "max_ms": 1192.945219
+    },
+    {
+      "label": "minimax.attn.qk_norm",
+      "count": 1116,
+      "total_ms": 874.900703,
+      "avg_ms": 0.783961,
+      "max_ms": 343.05102
+    },
+    {
+      "label": "all_reduce:(512, 3072):torch.float16",
+      "count": 250,
+      "total_ms": 528.522262,
+      "avg_ms": 2.114089,
+      "max_ms": 449.970614
+    },
+    {
+      "label": "minimax.attn.kv_attention",
+      "count": 1116,
+      "total_ms": 487.816856,
+      "avg_ms": 0.437112,
+      "max_ms": 310.650617
+    },
+    {
+      "label": "all_reduce:(1, 3072):torch.float16",
+      "count": 2000,
+      "total_ms": 340.579788,
+      "avg_ms": 0.17029,
+      "max_ms": 13.270931
+    },
+    {
+      "label": "minimax.attn.delayed_residual_allreduce",
+      "count": 1116,
+      "total_ms": 288.030971,
+      "avg_ms": 0.258092,
+      "max_ms": 8.186417
+    },
+    {
+      "label": "minimax.moe.router_linear",
+      "count": 1116,
+      "total_ms": 226.198896,
+      "avg_ms": 0.202687,
+      "max_ms": 63.2596
+    },
+    {
+      "label": "minimax.attn.qkv",
+      "count": 1116,
+      "total_ms": 186.282548,
+      "avg_ms": 0.16692,
+      "max_ms": 80.603273
+    },
+    {
+      "label": "all_reduce:minimax_qk_var:(1, 2):torch.float32",
+      "count": 992,
+      "total_ms": 158.073944,
+      "avg_ms": 0.159349,
+      "max_ms": 3.394282
+    },
+    {
+      "label": "minimax.attn.o_proj",
+      "count": 1116,
+      "total_ms": 117.464552,
+      "avg_ms": 0.105255,
+      "max_ms": 29.939134
+    },
+    {
+      "label": "minimax.attn.rope",
+      "count": 1116,
+      "total_ms": 63.893985,
+      "avg_ms": 0.057253,
+      "max_ms": 1.726461
+    },
+    {
+      "label": "all_reduce:minimax_qk_var:(512, 2):torch.float32",
+      "count": 124,
+      "total_ms": 23.316459,
+      "avg_ms": 0.188036,
+      "max_ms": 4.592594
+    }
+  ],
+  "findings": [
+    "The eager synchronized diagnostic confirms MoE expert execution is the largest timed region, but max values include prefill and eager overhead.",
+    "Decode has many small allreduces. Rank 0 saw 2000 hidden-state all_reduce calls shaped (1,3072) averaging 0.170 ms each, plus 992 Q/K variance allreduces shaped (1,2) averaging 0.159 ms each.",
+    "The tiny Q/K variance allreduce has roughly the same per-call latency as the much larger decode hidden allreduce, so reducing collective count or fusing tiny collectives remains a high-value target.",
+    "AOT graph replay bypasses this Python timing helper, so optimized-path timing needs lower-level instrumentation or backend profiler traces."
+  ],
+  "next_targets": [
+    "Investigate fusing MiniMax Q/K RMS variance allreduce with adjacent operations or combining Q and K variance communication into a larger existing collective.",
+    "Investigate allreduce plus residual/RMS epilogue fusion in XPU-supported form instead of Python custom-op dispatch.",
+    "Inspect llm-scaler INT4 MoE decode kernels and routing overhead for x.shape<=4; MoE remains the dominant compute region.",
+    "Instrument optimized graph path below Python, or add backend/communicator counters that survive graph replay."
+  ]
+}
