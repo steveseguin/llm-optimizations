@@ -75,3 +75,20 @@ Logs:
 Decision: do not promote. Disabling chunked prefill forces a larger batching
 envelope for this 2048 context, reduces measured KV headroom, and regresses
 decode.
+
+## MBT480 Prefix-Off Follow-Up
+
+The prior MBT480 near miss was repeated with prefix caching disabled:
+
+| Run | Prompt/output | Total tok/s | Output tok/s |
+| --- | ---: | ---: | ---: |
+| block-size 256, MBT480, prefix cache off | 512/1536 | `97.623570` | `73.217677` |
+
+Logs:
+
+- warmup: `/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n128-20260513T174334Z.log`
+- measured: `/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T174902Z.log`
+- AOT: `9a1ca30e3741b266dc2f4fe430d00426ced0847ccaf31093fce9b0d7635f6349`
+
+Decision: do not promote. Prefix-cache-off also helps MBT480, but the result is
+still slightly below MBT512 prefix-off.

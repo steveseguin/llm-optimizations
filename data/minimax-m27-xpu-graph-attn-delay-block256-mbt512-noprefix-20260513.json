@@ -120,6 +120,33 @@
         "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T173917Z.json"
       },
       "decision": "Do not promote. Disabling chunked prefill requires MBT2048 for this context, lowers KV headroom, and regresses decode throughput."
+    },
+    {
+      "name": "block256_max_num_batched_tokens_480_no_prefix",
+      "result": "negative_near_miss",
+      "cache_root": "/mnt/fast-ai/vllm-cache-exp/minimax-xpugraph-attndelay-block256-mbt480-noprefix-20260513T174334Z",
+      "aot_hash": "9a1ca30e3741b266dc2f4fe430d00426ced0847ccaf31093fce9b0d7635f6349",
+      "settings_delta": {
+        "max_num_batched_tokens": 480,
+        "prefix_caching": false,
+        "chunked_prefill": true
+      },
+      "warmup": {
+        "tok_s_total": 78.01398304517988,
+        "elapsed_s": 8.203657537000254,
+        "kv_cache_tokens": 9472,
+        "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n128-20260513T174334Z.log",
+        "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n128-20260513T174334Z.json"
+      },
+      "measure": {
+        "tok_s_out": 73.21767726213886,
+        "tok_s_total": 97.62356968285182,
+        "elapsed_s": 20.978540394018637,
+        "kv_cache_tokens": 17920,
+        "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T174902Z.log",
+        "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T174902Z.json"
+      },
+      "decision": "Do not promote. MBT480 with prefix caching disabled is a near miss, but remains slightly below MBT512 with prefix caching disabled."
     }
   ],
   "localmaxxing": {
