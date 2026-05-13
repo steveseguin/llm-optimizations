@@ -8,6 +8,7 @@ MiniMax M2.7 AutoRound W4A16 reached a new four-B70 TP4 single-session high:
 | --- | ---: | ---: | ---: |
 | attention delay + block-size 128 | 512/1536 | `95.279855` | `71.459891` |
 | attention delay + block-size 256 | 512/1536 | `96.492073` | `72.369055` |
+| attention delay + block-size 512 | 512/1536 | `93.436845` | `70.077633` |
 
 This keeps the same quality policy as the previous run. The only promoted delta
 is:
@@ -50,3 +51,14 @@ measured pass had long worker broadcast waits after direct AOT load, then
 generated successfully. Treat block-size 256 as current best but not yet the
 end of the block-size sweep; block-size 512 or a repeat run should be tested
 before assuming the curve peaks here.
+
+Block-size 512 was tested next and regressed. It remained above 70 output tok/s
+but was materially slower than block-size 256:
+
+- warmup: `/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n128-20260513T145357Z.log`
+- measured: `/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T145923Z.log`
+- AOT: `ca103e551c598f64689aabc5412febc685eecd21b5d7eb175a6156d73b5a0591`
+- KV tokens: 16,896
+
+Current decision: promote block-size 256, do not submit block-size 512 to
+LocalMaxxing.

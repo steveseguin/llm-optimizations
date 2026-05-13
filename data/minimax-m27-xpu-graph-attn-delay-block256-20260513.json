@@ -78,6 +78,33 @@
     "relative_gain_percent_out": 1.272,
     "interpretation": "New quality-conservative MiniMax AutoRound TP4 high. Block-size 256 improves decode speed over block-size 128 while keeping the same model, dtype, routing, KV dtype, sampler, and power policy."
   },
+  "followups": [
+    {
+      "name": "attention_delay_block_size_512",
+      "result": "negative",
+      "cache_root": "/mnt/fast-ai/vllm-cache-exp/minimax-xpugraph-attndelay-block512-20260513T145357Z",
+      "aot_hash": "ca103e551c598f64689aabc5412febc685eecd21b5d7eb175a6156d73b5a0591",
+      "settings_delta": {
+        "block_size": 512
+      },
+      "warmup": {
+        "tok_s_total": 85.93382968853064,
+        "elapsed_s": 7.44759080701624,
+        "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n128-20260513T145357Z.log",
+        "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n128-20260513T145357Z.json"
+      },
+      "measure": {
+        "tok_s_out": 70.07763349604608,
+        "tok_s_total": 93.43684466139476,
+        "elapsed_s": 21.918548378016567,
+        "kv_cache_tokens": 16896,
+        "available_kv_cache_gib": 1.03,
+        "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T145923Z.log",
+        "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T145923Z.json"
+      },
+      "decision": "Do not promote. Block-size 512 remains above 70 tok/s but is slower than block-size 256."
+    }
+  ],
   "localmaxxing": {
     "id": "cmp46iv7v007lpc010l9f7lkf",
     "status": "APPROVED",
