@@ -126,8 +126,19 @@ bug to re-test after future Intel compiler/runtime updates.
 - Repeat the accepted p512/n1536 run after any driver/runtime update.
 - Preserve warm AOT/direct-load behavior in future benchmark scripts; cold
   compile and steady-state decode should be measured separately.
+- Near-neighbor launch screens did not beat the `69.064767` result:
+  `--cudagraph-capture-sizes 1` warmed to `68.359313` output tok/s,
+  `CCL_TOPO_FABRIC_VERTEX_CONNECTION_CHECK=0` reached `67.080608`, and
+  `CCL_ZE_IPC_EXCHANGE=pidfd` reached `68.019733`. Keep the promoted recipe on
+  default capture sizes, default topology recognition, and default IPC exchange.
 - Run a longer chat-generation sanity pass once we have a better non-graph
   correctness oracle for MiniMax on XPU.
 - Continue source-level work on quality-safe collective fusion, but the current
   priority is preserving this graph-capture path because it is the first
   >60 tok/s MiniMax result on the 4x B70 machine.
+
+Detailed follow-up data:
+
+```text
+data/minimax-m27-xpu-graph-followups-20260513.json
+```

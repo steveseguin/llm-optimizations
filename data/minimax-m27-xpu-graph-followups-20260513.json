@@ -1,0 +1,86 @@
+{
+  "model": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+  "hardware": "4x Intel Arc Pro B70 32GB",
+  "baseline": {
+    "name": "tp4_xpu_graph_p512_n1536_warm_aot_best",
+    "output_tok_s": 69.06476723150084,
+    "total_tok_s": 92.08635630866777,
+    "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T111235Z.json",
+    "localmaxxing_id": "cmp3yscom003epc014ogcjkui"
+  },
+  "common_settings": {
+    "dtype": "float16",
+    "tensor_parallel": 4,
+    "prompt_tokens": 512,
+    "output_tokens": 1536,
+    "max_model_len": 2048,
+    "max_num_batched_tokens": 1024,
+    "max_num_seqs": 1,
+    "llm_scaler_moe": true,
+    "xpu_graph": true,
+    "xpu_graph_noop_communicator_capture": true,
+    "compilation_config": {
+      "use_inductor_graph_partition": true,
+      "compile_sizes": [1],
+      "cudagraph_mode": "PIECEWISE"
+    }
+  },
+  "screens": [
+    {
+      "name": "cudagraph_capture_sizes_1_cold_compile",
+      "result": "negative_cold_artifact",
+      "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T111917Z.log",
+      "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T111917Z.json",
+      "elapsed_s": 27.40600246399117,
+      "output_tok_s": 56.04611624837132,
+      "total_tok_s": 74.72815499782843,
+      "kv_cache_tokens": 9408,
+      "notes": "Changing capture sizes changed the AOT hash and caused an in-process cold compile. This is not a steady-state speed result."
+    },
+    {
+      "name": "cudagraph_capture_sizes_1_warm_aot",
+      "result": "negative",
+      "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T112524Z.log",
+      "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T112524Z.json",
+      "elapsed_s": 22.469506078996346,
+      "output_tok_s": 68.35931304408135,
+      "total_tok_s": 91.14575072544179,
+      "kv_cache_tokens": 16832,
+      "notes": "Warm AOT recovered speed but did not beat the default capture sizes [1,2]."
+    },
+    {
+      "name": "ccl_topo_fabric_vertex_connection_check_0",
+      "result": "negative",
+      "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T112814Z.log",
+      "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T112814Z.json",
+      "elapsed_s": 22.897824783998658,
+      "output_tok_s": 67.08060763367268,
+      "total_tok_s": 89.44081017823025,
+      "kv_cache_tokens": 16832,
+      "notes": "Default oneCCL topology recognition remains better for this MiniMax graph path."
+    },
+    {
+      "name": "ccl_ze_ipc_exchange_pidfd",
+      "result": "negative",
+      "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T113102Z.log",
+      "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T113102Z.json",
+      "elapsed_s": 22.581682197007467,
+      "output_tok_s": 68.01973327760105,
+      "total_tok_s": 90.69297770346807,
+      "kv_cache_tokens": 16832,
+      "notes": "pidfd IPC exchange did not beat the default IPC exchange path."
+    },
+    {
+      "name": "baseline_warm_aot_repeat_after_screens",
+      "result": "reference_repeat",
+      "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T113358Z.log",
+      "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T113358Z.json",
+      "elapsed_s": 22.453421811005683,
+      "output_tok_s": 68.40828150509871,
+      "total_tok_s": 91.21104200679828,
+      "kv_cache_tokens": 16832,
+      "notes": "Shows normal warm-AOT run-to-run variance below the 69.064767 best."
+    }
+  ],
+  "decision": "Keep the promoted recipe unchanged: default capture sizes [1,2], default oneCCL topology recognition, default CCL_ZE_IPC_EXCHANGE, warm/direct-loaded AOT cache."
+}
