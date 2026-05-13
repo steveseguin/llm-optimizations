@@ -24,6 +24,9 @@ W4A16 on four Arc Pro B70 GPUs. The baseline to beat remains:
 | forced XPU graph with no-op communicator guard | 64/32 | 9,472 | 4.94 | 14.82 | Runs but unusably slow |
 | compile `[1]`, gmem 0.95, configured 32k context | 512/1536 | n/a | n/a | n/a | Failed KV check after graph memory overhead |
 | compile `[1]`, gmem 0.95, configured 24k context | 512/512 | 25,600 | 33.81 | 67.61 | Works as context-capacity proof, LocalMaxxing `cmp2p5jhb009wrm01cmkurcfa` |
+| Q/K helper fusion plus compile `[1]` | 64/32 | n/a | 6.39 | 19.17 | Negative smoke, bad compile shape |
+| MiniMax logits MoE plus compile `[1]` | 512/512 | 9,408 | 35.06 | 70.12 | Negative, forced extra `(1,1024)` graph |
+| attention delayed-allreduce plus compile `[1]` | 64/32 | 9,472 | 6.61 | 19.84 | Negative smoke, bad compile shape |
 
 ## Interpretation
 
@@ -46,6 +49,19 @@ The XPU graph path remains closed for throughput. The existing local
 `VLLM_XPU_GRAPH_NOOP_COMM_CAPTURE=1` patch gets past the CUDA-only communicator
 assert, but PIECEWISE graph capture still falls into the low-KV artifact and
 only reaches `4.94` output tok/s on a small p64/n32 smoke.
+
+Retesting earlier source-level helpers on top of the new static decode graph did
+not change their decisions. The XPU MiniMax Q/K helper pass stayed enabled, but
+it regressed to `6.39` output tok/s on p64/n32. The exact MiniMax logits MoE
+path activated and preserved routing semantics, but p512/n512 reached only
+`35.06` output tok/s and forced an extra `(1,1024)` compile graph with just
+`9,408` KV tokens. Attention delayed-allreduce also compiled, but the p64/n32
+smoke reached only `6.61` output tok/s. Keep all three flags unset for the
+current best recipe.
+
+The local benchmark wrapper now defaults `HF_HOME` and `TRANSFORMERS_CACHE` to
+`/mnt/fast-ai/llm-cache/hf`, avoiding the stale `/mnt/corsair-external` cache
+path that can become inaccessible after reboots or storage reshuffles.
 
 ## Compiler Bug Notes
 
@@ -75,3 +91,6 @@ prefill without combo kernels can compile, but memory and throughput are bad.
 - XPU graph no-op communicator: `/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-inductor-partition-compile1-xpugraph-noopcomm-p64n32-20260512T133404Z`
 - configured 32k context KV failure: `/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-inductor-partition-compile1-gmem095-ctx32768-p512n1536-20260512T134125Z`
 - configured 24k context proof: `/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-inductor-partition-compile1-gmem095-ctx24576-p512n512-20260512T134732Z`
+- Q/K helper plus static compile smoke: `/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-qk-helper-staticcompile-smoke-p64n32-20260513T000334Z`
+- MiniMax logits MoE plus static compile: `/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-minimax-logits-staticcompile-p512n512-20260513T001511Z`
+- attention delayed-allreduce plus static compile smoke: `/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-attndelay-staticcompile-smoke-p64n32-20260513T002140Z`

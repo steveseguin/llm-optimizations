@@ -304,6 +304,16 @@ capacity datapoint as `cmp2p5jhb009wrm01cmkurcfa`. Forced XPU PIECEWISE graph mo
 remains closed for speed, even with the local no-op communicator graph-capture
 guard: a p64/n32 smoke reached only `4.94` output tok/s.
 
+Additional static-compile retests closed three older source-level helper
+branches under the new best recipe. XPU MiniMax Q/K helper fusion plus
+`compile_sizes=[1]` reached only `6.39` output tok/s on p64/n32. The exact
+MiniMax logits MoE path activated, but p512/n512 reached only `35.06` output
+tok/s and forced an extra `(1,1024)` compile graph with `9,408` KV tokens.
+Attention delayed-allreduce plus static compile completed a p64/n32 smoke at
+only `6.61` output tok/s. Keep all three flags unset and focus remaining
+60 tok/s work on a real XPU collective/epilogue fusion or a verified
+speculative path.
+
 ## DP4+EP Status
 
 DP4+expert-parallel is now partially unblocked. A local XPU worker patch that

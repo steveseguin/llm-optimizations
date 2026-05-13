@@ -43,7 +43,8 @@ fi
 export CCL_TOPO_P2P_ACCESS="$CCL_P2P"
 export VLLM_XPU_ENABLE_XPU_GRAPH="$XPU_GRAPH"
 export VLLM_XPU_USE_LLM_SCALER_MOE="$USE_LLM_SCALER_MOE"
-export HF_HOME="${HF_HOME:-/mnt/corsair-external/llm-cache/hf}"
+export HF_HOME="${HF_HOME:-/mnt/fast-ai/llm-cache/hf}"
+export TRANSFORMERS_CACHE="${TRANSFORMERS_CACHE:-$HF_HOME/transformers}"
 export PYTHONPATH="$LLM_SCALER_KERNELS:${PYTHONPATH:-}"
 export LD_LIBRARY_PATH="$VENV/lib:$VENV/lib/python3.12/site-packages/torch/lib:${LD_LIBRARY_PATH:-}"
 
