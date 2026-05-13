@@ -1,0 +1,61 @@
+{
+  "model": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+  "recipe": "TP4 FP16 XPU graph, llm-scaler INT4 MoE, attention delayed allreduce, block256, MBT512, prefix caching disabled",
+  "cache_root": "/mnt/fast-ai/vllm-cache-exp/minimax-xpugraph-attndelay-block256-mbt512-noprefix-20260513T171301Z",
+  "aot_hash": "d0fed86b5a7cf64dcdb3e82d0b24effed00520ebd7f6018c6244d82201e6a98c",
+  "inductor_cache": "/mnt/fast-ai/vllm-cache-exp/minimax-xpugraph-attndelay-block256-mbt512-noprefix-20260513T171301Z/torch_compile_cache/torch_aot_compile/d0fed86b5a7cf64dcdb3e82d0b24effed00520ebd7f6018c6244d82201e6a98c/inductor_cache",
+  "classifier": "scripts/classify-vllm-aot-collectives.py",
+  "classifier_update": "Refined unknown hidden collectives with producer/consumer context, so attention o_proj hidden reductions classify correctly even when Inductor buffer shape metadata is missing.",
+  "summary": {
+    "actual_allreduce_call_lines": 1496,
+    "actual_wait_tensor_call_lines": 1496,
+    "allreduce_wait_pairs_within_7_lines": 1496,
+    "wait_gap_lines": {
+      "2": 1496
+    },
+    "files_with_actual_calls": 8,
+    "actual_calls_per_generated_file": 187
+  },
+  "categories": {
+    "embedding_hidden": 8,
+    "qk_rms_variance": 496,
+    "attention_o_proj_hidden": 496,
+    "moe_hidden": 496
+  },
+  "per_generated_decode_graph": {
+    "embedding_hidden": 1,
+    "qk_rms_variance": 62,
+    "attention_o_proj_hidden": 62,
+    "moe_hidden": 62,
+    "total_collectives": 187
+  },
+  "boundary_examples": [
+    {
+      "category": "qk_rms_variance",
+      "producer": "rms_norm_default | int4_gemm_w4a16",
+      "consumer": "split/to/div/chunk/add/rsqrt/mul/cat QK normalization path",
+      "shape_when_known": "torch.float32(s72, 2) or torch.float32(1, 2)",
+      "wait_gap_lines": 2
+    },
+    {
+      "category": "attention_o_proj_hidden",
+      "producer": "unified_attention_with_output | int4_gemm_w4a16",
+      "consumer": "rms_norm_default",
+      "shape_when_known": "hidden fp16[tokens, 3072]; many generated buffers lack shape metadata",
+      "wait_gap_lines": 2
+    },
+    {
+      "category": "moe_hidden",
+      "producer": "moe_forward",
+      "consumer": "add/mean/rsqrt/mul | int4_gemm_w4a16 next-layer path",
+      "shape_when_known": "hidden fp16[tokens, 3072]; many generated buffers lack shape metadata",
+      "wait_gap_lines": 2
+    }
+  ],
+  "optimization_implication": [
+    "Every collective is immediately fenced two generated-code lines after launch, so there is no latent overlap in the current AOT graph.",
+    "There are 992 hidden-state collectives across the eight generated files: 496 attention output reductions and 496 MoE output reductions.",
+    "The highest-confidence quality-preserving target remains an XPU-supported hidden allreduce plus residual/RMSNorm or projection/MoE epilogue fusion.",
+    "Q/K variance reductions are preserved and should not be removed; only an exact fused Q/K variance plus RMS apply path is acceptable."
+  ]
+}

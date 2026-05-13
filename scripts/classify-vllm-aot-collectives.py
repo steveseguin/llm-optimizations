@@ -82,6 +82,29 @@ def classify_allreduce(source_context: str, shape: str) -> str:
     return "unknown"
 
 
+def refine_category(
+    category: str,
+    producer_source: str,
+    producer_aten: str,
+    consumer_source: str,
+    consumer_aten: str,
+) -> str:
+    """Use surrounding graph context when source numbering/shape is missing."""
+    if category not in {"unknown", "hidden_or_embedding"}:
+        return category
+    producer = f"{producer_source} :: {producer_aten}"
+    consumer = f"{consumer_source} :: {consumer_aten}"
+    if "unified_attention_with_output" in producer and "rms_norm" in consumer:
+        return "attention_o_proj_hidden"
+    if "moe_forward" in producer:
+        return "moe_hidden"
+    if "embedding" in producer:
+        return "embedding_hidden"
+    if "split" in consumer and "rsqrt" in consumer and "cat" in consumer:
+        return "qk_rms_variance"
+    return category
+
+
 def surrounding_source(
     lines: list[str],
     start: int,
@@ -155,41 +178,55 @@ def classify_cache(cache: Path) -> dict:
                 producer_source, producer_aten = surrounding_source(
                     lines, idx - 28, idx, reverse=True
                 )
+                wait_gap = None
+                wait_line = None
+                consumer_source = "unknown"
+                consumer_aten = "unknown"
+                for gap, next_line in enumerate(lines[idx + 1 : idx + 8], start=1):
+                    wait = WAIT_RE.search(next_line)
+                    if wait and wait.group(1).strip() == buf:
+                        wait_gap = gap
+                        wait_line = next_line
+                        consumer_source, consumer_aten = surrounding_source(
+                            lines, idx + gap + 1, idx + gap + 31
+                        )
+                        break
+                category = refine_category(
+                    category,
+                    producer_source,
+                    producer_aten,
+                    consumer_source,
+                    consumer_aten,
+                )
                 actual_source_contexts[source_context] += 1
                 actual_categories[category] += 1
                 producer_contexts[
                     f"{category}: {producer_source} :: {producer_aten}"
                 ] += 1
-                for gap, next_line in enumerate(lines[idx + 1 : idx + 8], start=1):
-                    wait = WAIT_RE.search(next_line)
-                    if wait and wait.group(1).strip() == buf:
-                        immediate_waits += 1
-                        wait_gaps[gap] += 1
-                        consumer_source, consumer_aten = surrounding_source(
-                            lines, idx + gap + 1, idx + gap + 31
+                if wait_gap is not None and wait_line is not None:
+                    immediate_waits += 1
+                    wait_gaps[wait_gap] += 1
+                    consumer_contexts[
+                        f"{category}: {consumer_source} :: {consumer_aten}"
+                    ] += 1
+                    if len(examples) < 12:
+                        examples.append(
+                            {
+                                "file": rel,
+                                "line": idx + 1,
+                                "buffer": buf,
+                                "category": category,
+                                "shape": buffer_shapes.get(buf, "unknown"),
+                                "source_context": source_context,
+                                "producer_source": producer_source,
+                                "producer_aten": producer_aten,
+                                "consumer_source": consumer_source,
+                                "consumer_aten": consumer_aten,
+                                "wait_gap_lines": wait_gap,
+                                "call": line.strip(),
+                                "wait": wait_line.strip(),
+                            }
                         )
-                        consumer_contexts[
-                            f"{category}: {consumer_source} :: {consumer_aten}"
-                        ] += 1
-                        if len(examples) < 12:
-                            examples.append(
-                                {
-                                    "file": rel,
-                                    "line": idx + 1,
-                                    "buffer": buf,
-                                    "category": category,
-                                    "shape": buffer_shapes.get(buf, "unknown"),
-                                    "source_context": source_context,
-                                    "producer_source": producer_source,
-                                    "producer_aten": producer_aten,
-                                    "consumer_source": consumer_source,
-                                    "consumer_aten": consumer_aten,
-                                    "wait_gap_lines": gap,
-                                    "call": line.strip(),
-                                    "wait": next_line.strip(),
-                                }
-                            )
-                        break
             if WAIT_RE.search(line):
                 actual_waits += 1
 
