@@ -1,0 +1,140 @@
+{
+  "model": {
+    "hf_id": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+    "submitted_hf_id": "MiniMaxAI/MiniMax-M2.7",
+    "local_path": "/mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround",
+    "quantization": "INT4 AutoRound W4A16",
+    "dtype": "float16"
+  },
+  "hardware": {
+    "gpu": "Intel Arc Pro B70 32GB",
+    "gpu_count": 4,
+    "vram_gb_per_gpu": 32,
+    "cpu": "AMD EPYC 9015 8-Core Processor",
+    "ram_gb": 16,
+    "os": "Ubuntu 24.04.4 LTS, kernel 6.17.0-23-generic"
+  },
+  "control_recipe": {
+    "name": "xpu_graph_attention_delayed_allreduce_block256_mbt512_no_prefix_cache",
+    "cache_root": "/mnt/fast-ai/vllm-cache-exp/minimax-xpugraph-attndelay-block256-mbt512-noprefix-20260513T171301Z",
+    "aot_hash": "d0fed86b5a7cf64dcdb3e82d0b24effed00520ebd7f6018c6244d82201e6a98c",
+    "prompt_tokens": 512,
+    "output_tokens": 1536,
+    "context_length": 2048,
+    "tensor_parallel": 4,
+    "max_num_batched_tokens": 512,
+    "max_num_seqs": 1,
+    "block_size": 256,
+    "prefix_caching": false,
+    "chunked_prefill": true,
+    "quality_policy": [
+      "No model weight, quantization, router precision, expert routing, KV dtype, sampler, speculative decoding, or power-limit change.",
+      "MiniMax Q/K RMS variance allreduces remain preserved.",
+      "All followups keep TP4, FP16 activations, llm-scaler INT4 MoE decode, XPU graph, and MiniMax attention delayed-allreduce unless explicitly listed as a setting delta."
+    ]
+  },
+  "results": [
+    {
+      "name": "stream_interval_16",
+      "result": "negative",
+      "settings_delta": {
+        "stream_interval": 16
+      },
+      "measure": {
+        "elapsed_s": 21.081516772013856,
+        "tok_s_out": 72.86003263479938,
+        "tok_s_total": 97.14671017973251,
+        "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T182322Z.log",
+        "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T182322Z.json"
+      },
+      "decision": "Do not promote. Reducing output flush frequency did not improve single-request decode."
+    },
+    {
+      "name": "attention_plus_moe_delayed_allreduce",
+      "result": "negative",
+      "settings_delta": {
+        "VLLM_MINIMAX_MOE_DELAY_ALLREDUCE": "1"
+      },
+      "cache_root": "/mnt/fast-ai/vllm-cache-exp/minimax-xpugraph-attn-moe-delay-block256-mbt512-noprefix-20260513T182719Z",
+      "aot_hash": "d0fed86b5a7cf64dcdb3e82d0b24effed00520ebd7f6018c6244d82201e6a98c",
+      "warmup": {
+        "elapsed_s": 6.761333553993609,
+        "tok_s_total": 94.65588332378329,
+        "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n128-20260513T182719Z.log",
+        "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n128-20260513T182719Z.json"
+      },
+      "measure": {
+        "elapsed_s": 21.259416423999937,
+        "tok_s_out": 72.25033695026532,
+        "tok_s_total": 96.33378260035376,
+        "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T183236Z.log",
+        "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T183236Z.json"
+      },
+      "decision": "Do not promote. The current XPU graph path does not benefit from additionally delaying the MoE allreduce."
+    },
+    {
+      "name": "performance_mode_interactivity",
+      "result": "negative",
+      "settings_delta": {
+        "performance_mode": "interactivity"
+      },
+      "measure": {
+        "elapsed_s": 21.16825215902645,
+        "tok_s_out": 72.56149390421103,
+        "tok_s_total": 96.74865853894805,
+        "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T183649Z.log",
+        "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T183649Z.json"
+      },
+      "decision": "Do not promote. Balanced mode remains better for this warmed TP4 single-session benchmark."
+    },
+    {
+      "name": "performance_mode_throughput",
+      "result": "negative",
+      "settings_delta": {
+        "performance_mode": "throughput"
+      },
+      "measure": {
+        "elapsed_s": 21.10174816197832,
+        "tok_s_out": 72.79017777150827,
+        "tok_s_total": 97.05357036201103,
+        "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T183932Z.log",
+        "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T183932Z.json"
+      },
+      "decision": "Do not promote. Throughput mode is below the balanced-mode control for batch=1."
+    },
+    {
+      "name": "balanced_control_repeat_existing_aot",
+      "result": "new_control_high",
+      "settings_delta": {
+        "warmup": "skipped_existing_aot"
+      },
+      "measure": {
+        "elapsed_s": 20.95317532098852,
+        "tok_s_out": 73.30631164343902,
+        "tok_s_total": 97.7417488579187,
+        "kv_cache_tokens": 17920,
+        "available_kv_cache_gib": 1.07,
+        "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T184221Z.log",
+        "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T184221Z.json"
+      },
+      "comparison": {
+        "previous_promoted_tok_s_out": 73.23241819680321,
+        "absolute_gain_tok_s_out": 0.07389344663581,
+        "relative_gain_percent_out": 0.1009
+      },
+      "decision": "Promote as the current measured high for the same quality-preserving recipe. Treat the delta as run-to-run variance confirmation, not a new optimization."
+    }
+  ],
+  "next_targets": [
+    "Continue source-level work on hidden-state allreduce plus residual/RMSNorm or projection/MoE epilogue fusion; flag-level scheduler knobs did not beat the balanced control.",
+    "Lower-level graph replay timing is still needed because Python timing hooks are bypassed by AOT graph replay.",
+    "Keep speculative decoding separate until target verification is demonstrated."
+  ],
+  "localmaxxing": {
+    "id": "cmp4f31dh000amz01uqa329e6",
+    "status": "APPROVED",
+    "submitted_at": "2026-05-13T18:52:49.205Z",
+    "payload": "data/localmaxxing-minimax-m27-autoround-xpugraph-attn-delay-block256-mbt512-noprefix-repeat-high-20260513.payload.json",
+    "response": "data/localmaxxing-responses/minimax-m27-autoround-xpugraph-attn-delay-block256-mbt512-noprefix-repeat-high-20260513.response.json"
+  }
+}
