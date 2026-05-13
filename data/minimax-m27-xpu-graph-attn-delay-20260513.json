@@ -44,6 +44,18 @@
         "kv_cache_tokens": 17344,
         "available_kv_cache_gib": 1.03,
         "direct_aot_load": true
+      },
+      "repeat": {
+        "prompt_tokens": 512,
+        "output_tokens": 1536,
+        "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T131251Z.log",
+        "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T131251Z.json",
+        "elapsed_s": 22.39728247799212,
+        "tok_s_out": 68.57974852571041,
+        "tok_s_total": 91.43966470094723,
+        "kv_cache_tokens": 17344,
+        "direct_aot_load": true,
+        "note": "Exact same recipe repeat. Lower than the promoted high, so no new LocalMaxxing submission."
       }
     }
   },
@@ -54,6 +66,85 @@
     "relative_gain_percent_out": 1.234,
     "interpretation": "Small but valid new MiniMax AutoRound TP4 high. The larger learning is that attention delayed-allreduce can coexist with the XPU graph recipe if cold compile and warm measurement are split across processes."
   },
+  "followups": [
+    {
+      "name": "attention_delay_exact_repeat",
+      "result": "below_best",
+      "tok_s_out": 68.57974852571041,
+      "tok_s_total": 91.43966470094723,
+      "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T131251Z.log",
+      "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T131251Z.json",
+      "decision": "Do not resubmit; current best remains 69.917741 output tok/s."
+    },
+    {
+      "name": "attention_delay_plus_moe_delay",
+      "result": "negative",
+      "env": {
+        "VLLM_MINIMAX_M2_ATTN_DELAY_ALLREDUCE": "1",
+        "VLLM_MINIMAX_MOE_DELAY_ALLREDUCE": "1"
+      },
+      "cache_root": "/mnt/fast-ai/vllm-cache-exp/minimax-xpugraph-attn-moe-delay-20260513T132436Z",
+      "warmup": {
+        "tok_s_total": 97.91441278772928,
+        "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n128-20260513T132436Z.log",
+        "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n128-20260513T132436Z.json"
+      },
+      "measure": {
+        "tok_s_out": 69.28799058343469,
+        "tok_s_total": 92.38398744457959,
+        "elapsed_s": 22.168343851022655,
+        "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T132952Z.log",
+        "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T132952Z.json"
+      },
+      "decision": "Do not combine MoE delayed-allreduce with the current attention-delay graph recipe for promoted runs."
+    },
+    {
+      "name": "attention_delay_max_num_batched_tokens_512",
+      "result": "negative",
+      "cache_root": "/mnt/fast-ai/vllm-cache-exp/minimax-xpugraph-attndelay-mbt512-20260513T134000Z",
+      "settings_delta": {
+        "max_num_batched_tokens": 512
+      },
+      "warmup": {
+        "tok_s_total": 89.11089292327426,
+        "aot_hash": "3e201a5c599b816fe2eccce49a942a86425901fc2e13e87b9dba04ac048aff06",
+        "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n128-20260513T134000Z.log",
+        "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n128-20260513T134000Z.json"
+      },
+      "measure": {
+        "tok_s_out": 69.28742878470156,
+        "tok_s_total": 92.38323854274874,
+        "elapsed_s": 22.16852355800802,
+        "kv_cache_tokens": 17984,
+        "available_kv_cache_gib": 1.07,
+        "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T134520Z.log",
+        "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T134520Z.json"
+      },
+      "decision": "Do not promote. Extra KV headroom at this context did not improve decode speed."
+    },
+    {
+      "name": "attention_delay_max_num_batched_tokens_2048",
+      "result": "negative",
+      "cache_root": "/mnt/fast-ai/vllm-cache-exp/minimax-xpugraph-attndelay-mbt2048-20260513T134836Z",
+      "settings_delta": {
+        "max_num_batched_tokens": 2048
+      },
+      "warmup": {
+        "tok_s_total": 91.21111372247981,
+        "aot_hash": "382d6e26e897c7b3d9a6a57791d236f909aed143878efce8567137b23c1020a4",
+        "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n128-20260513T134836Z.log",
+        "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n128-20260513T134836Z.json"
+      },
+      "measure": {
+        "tok_s_out": 69.42343508566964,
+        "tok_s_total": 92.56458011422617,
+        "elapsed_s": 22.125093610025942,
+        "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T135402Z.log",
+        "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T135402Z.json"
+      },
+      "decision": "Do not promote. The 512/1024/2048 sweep keeps 1024 as the best observed batching envelope."
+    }
+  ],
   "localmaxxing": {
     "id": "cmp42sm8x005wpc01esa5mi3n",
     "status": "APPROVED",
