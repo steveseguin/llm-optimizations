@@ -103,6 +103,32 @@
         "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T145923Z.json"
       },
       "decision": "Do not promote. Block-size 512 remains above 70 tok/s but is slower than block-size 256."
+    },
+    {
+      "name": "attention_delay_block_size_384",
+      "result": "negative",
+      "cache_root": "/mnt/fast-ai/vllm-cache-exp/minimax-xpugraph-attndelay-block384-20260513T150413Z",
+      "aot_hash": "29d37262ad244dd19cfe44ce9b41d48cc6b9ca897e9b7bd2a44e4c25126f8c84",
+      "settings_delta": {
+        "block_size": 384
+      },
+      "warmup": {
+        "tok_s_total": 83.78816854750879,
+        "elapsed_s": 7.638309931993717,
+        "kv_cache_tokens": 8192,
+        "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n128-20260513T150413Z.log",
+        "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n128-20260513T150413Z.json"
+      },
+      "measure": {
+        "tok_s_out": 70.56529120049258,
+        "tok_s_total": 94.0870549339901,
+        "elapsed_s": 21.767075198993552,
+        "kv_cache_tokens": 15360,
+        "available_kv_cache_gib": 1.03,
+        "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T151512Z.log",
+        "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T151512Z.json"
+      },
+      "decision": "Do not promote. Block-size 384 remains above 70 tok/s but is slower than block-size 256."
     }
   ],
   "localmaxxing": {

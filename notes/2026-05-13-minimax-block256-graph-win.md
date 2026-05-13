@@ -8,6 +8,7 @@ MiniMax M2.7 AutoRound W4A16 reached a new four-B70 TP4 single-session high:
 | --- | ---: | ---: | ---: |
 | attention delay + block-size 128 | 512/1536 | `95.279855` | `71.459891` |
 | attention delay + block-size 256 | 512/1536 | `96.492073` | `72.369055` |
+| attention delay + block-size 384 | 512/1536 | `94.087055` | `70.565291` |
 | attention delay + block-size 512 | 512/1536 | `93.436845` | `70.077633` |
 
 This keeps the same quality policy as the previous run. The only promoted delta
@@ -62,3 +63,14 @@ but was materially slower than block-size 256:
 
 Current decision: promote block-size 256, do not submit block-size 512 to
 LocalMaxxing.
+
+Block-size 384 was also tested and landed between 256 and 512, but still below
+the 256 high:
+
+- warmup: `/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n128-20260513T150413Z.log`
+- measured: `/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T151512Z.log`
+- AOT: `29d37262ad244dd19cfe44ce9b41d48cc6b9ca897e9b7bd2a44e4c25126f8c84`
+- measured KV tokens: 15,360
+
+Current block-size decision: `256` is the best observed page size for this
+quality-preserving p512/n1536 recipe.
