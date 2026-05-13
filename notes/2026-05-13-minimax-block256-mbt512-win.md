@@ -118,3 +118,22 @@ Logs:
 
 Decision: do not promote or submit MBT576. The local sweep now shows MBT512 as
 the strongest point tested, with MBT448 close and MBT576/640 slower.
+
+## MBT480 Follow-Up
+
+`MAX_BATCHED_TOKENS=480` was tested as the lower-near point between MBT448 and
+MBT512. The measured pass direct-loaded AOT and reached the same 17,920-token
+KV cache size as MBT512:
+
+| Run | Prompt/output | Total tok/s | Output tok/s |
+| --- | ---: | ---: | ---: |
+| block-size 256, MBT480 | 512/1536 | `97.114925` | `72.836194` |
+
+Logs:
+
+- warmup: `/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n128-20260513T164404Z.log`
+- measured: `/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T164933Z.log`
+- AOT: `9a1ca30e3741b266dc2f4fe430d00426ced0847ccaf31093fce9b0d7635f6349`
+
+Decision: do not promote or submit MBT480. It is the closest near miss so far,
+but MBT512 remains ahead.
