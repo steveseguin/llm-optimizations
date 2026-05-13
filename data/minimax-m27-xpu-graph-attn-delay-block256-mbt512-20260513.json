@@ -81,6 +81,34 @@
     "relative_gain_percent_out": 1.021,
     "interpretation": "New quality-conservative MiniMax AutoRound TP4 high. Lowering max_num_batched_tokens to 512 with block-size 256 improves decode speed and increases KV headroom for this p512/n1536 single-session benchmark."
   },
+  "followups": [
+    {
+      "name": "block256_max_num_batched_tokens_256",
+      "result": "negative",
+      "cache_root": "/mnt/fast-ai/vllm-cache-exp/minimax-xpugraph-attndelay-block256-mbt256-20260513T154117Z",
+      "aot_hash": "9c9be15f0ef17e0b0afa671964895f2e4958296a445630b5a673fabf1e54a412",
+      "settings_delta": {
+        "max_num_batched_tokens": 256
+      },
+      "warmup": {
+        "tok_s_total": 86.5346485844994,
+        "elapsed_s": 7.395881424017716,
+        "kv_cache_tokens": 9472,
+        "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n128-20260513T154117Z.log",
+        "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n128-20260513T154117Z.json"
+      },
+      "measure": {
+        "tok_s_out": 69.50461775364853,
+        "tok_s_total": 92.67282367153136,
+        "elapsed_s": 22.09925109500182,
+        "kv_cache_tokens": 18176,
+        "available_kv_cache_gib": 1.08,
+        "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T154645Z.log",
+        "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T154645Z.json"
+      },
+      "decision": "Do not promote. MBT256 increases KV headroom but is slower than MBT512 and below 70 output tok/s."
+    }
+  ],
   "localmaxxing": {
     "id": "cmp487evm008gpc01vai6ol6m",
     "status": "APPROVED",

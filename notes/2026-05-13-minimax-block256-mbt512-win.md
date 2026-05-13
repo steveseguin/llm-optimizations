@@ -41,3 +41,22 @@ Logs:
 Measured KV cache size increased to 17,920 tokens versus 17,152 for MBT1024.
 The measured pass had repeated worker broadcast waits before generation, but
 completed successfully and produced the current best observed score.
+
+## MBT256 Follow-Up
+
+`MAX_BATCHED_TOKENS=256` was tested next with the same block-size 256 recipe.
+It further increased measured KV cache size to 18,176 tokens but slowed the
+run:
+
+| Run | Prompt/output | Total tok/s | Output tok/s |
+| --- | ---: | ---: | ---: |
+| block-size 256, MBT256 | 512/1536 | `92.672824` | `69.504618` |
+
+Logs:
+
+- warmup: `/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n128-20260513T154117Z.log`
+- measured: `/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T154645Z.log`
+- AOT: `9c9be15f0ef17e0b0afa671964895f2e4958296a445630b5a673fabf1e54a412`
+
+Decision: do not promote or submit MBT256. MBT512 remains the best observed
+batching envelope for this single-session benchmark.
