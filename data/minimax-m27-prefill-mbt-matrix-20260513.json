@@ -1,0 +1,150 @@
+{
+  "aborted": {
+    "4096": "Interrupted before a measured JSON was produced. MBT=1024 and 2048 were already consistently below the 512 baseline, so this was stopped to avoid another expensive compile cycle."
+  },
+  "baseline_mbt512": {
+    "source": "data/minimax-m27-prefill-baseline-p4096n512-20260513.json",
+    "warm_summary": {
+      "runs": 2,
+      "tok_s_out_max": 58.89255827641443,
+      "tok_s_out_mean": 58.55039785429774,
+      "tok_s_out_min": 58.20823743218105,
+      "tok_s_total_max": 530.0330244877298,
+      "tok_s_total_mean": 526.9535806886796,
+      "tok_s_total_min": 523.8741368896294
+    }
+  },
+  "created_utc": "2026-05-13T23:45:00Z",
+  "decision": "Keep MAX_BATCHED_TOKENS=512 for this p4096/n512 long-context baseline. Larger chunks reduced warmed total throughput and caused long initialization stalls after AOT load.",
+  "fixed_recipe": {
+    "attention_delayed_allreduce": true,
+    "block_size": 256,
+    "dtype": "float16",
+    "engine": "vLLM 0.20.1-local XPU",
+    "graph_partition": true,
+    "llm_scaler_int4_moe": true,
+    "max_num_seqs": 1,
+    "model": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+    "prefix_caching": false,
+    "tensor_parallel": 4,
+    "xpu_graph": true
+  },
+  "localmaxxing_decision": "No submission: negative matrix screen, no promoted result.",
+  "purpose": "MiniMax M2.7 AutoRound p4096/n512 prefill MAX_BATCHED_TOKENS screen after establishing repeatability and quality gates.",
+  "screened": {
+    "1024": {
+      "cold_runs": [
+        {
+          "cache_root": "/mnt/fast-ai/vllm-cache-exp/minimax-prefill-mbt1024-p4096n512-20260513T224920Z",
+          "elapsed_s": 13.678344918997027,
+          "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p4096n512-20260513T224920Z.json",
+          "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p4096n512-20260513T224920Z.log",
+          "max_batched_tokens": 1024,
+          "phase": "cold",
+          "run_index": 1,
+          "success": true,
+          "tok_s_out": 37.43142924323499,
+          "tok_s_total_reported": 336.88286318911486,
+          "total_num_tokens_reported": 4608
+        }
+      ],
+      "warm_runs": [
+        {
+          "cache_root": "/mnt/fast-ai/vllm-cache-exp/minimax-prefill-mbt1024-p4096n512-20260513T224920Z",
+          "elapsed_s": 9.123201563983457,
+          "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p4096n512-20260513T225818Z.json",
+          "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p4096n512-20260513T225818Z.log",
+          "max_batched_tokens": 1024,
+          "phase": "warm",
+          "run_index": 1,
+          "success": true,
+          "tok_s_out": 56.120649797026495,
+          "tok_s_total_reported": 505.08584817323845,
+          "total_num_tokens_reported": 4608
+        },
+        {
+          "cache_root": "/mnt/fast-ai/vllm-cache-exp/minimax-prefill-mbt1024-p4096n512-20260513T224920Z",
+          "elapsed_s": 9.110866878996603,
+          "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p4096n512-20260513T230628Z.json",
+          "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p4096n512-20260513T230628Z.log",
+          "max_batched_tokens": 1024,
+          "phase": "warm",
+          "run_index": 2,
+          "success": true,
+          "tok_s_out": 56.1966283560042,
+          "tok_s_total_reported": 505.7696552040378,
+          "total_num_tokens_reported": 4608
+        }
+      ],
+      "warm_summary": {
+        "runs": 2,
+        "tok_s_out_max": 56.1966283560042,
+        "tok_s_out_mean": 56.15863907651534,
+        "tok_s_out_min": 56.120649797026495,
+        "tok_s_total_max": 505.7696552040378,
+        "tok_s_total_mean": 505.4277516886381,
+        "tok_s_total_min": 505.08584817323845
+      }
+    },
+    "2048": {
+      "cold_runs": [
+        {
+          "cache_root": "/mnt/fast-ai/vllm-cache-exp/minimax-prefill-mbt2048-p4096n512-20260513T224920Z",
+          "elapsed_s": 13.918194083002163,
+          "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p4096n512-20260513T231431Z.json",
+          "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p4096n512-20260513T231431Z.log",
+          "max_batched_tokens": 2048,
+          "phase": "cold",
+          "run_index": 1,
+          "success": true,
+          "tok_s_out": 36.786381691953046,
+          "tok_s_total_reported": 331.07743522757744,
+          "total_num_tokens_reported": 4608
+        }
+      ],
+      "warm_runs": [
+        {
+          "cache_root": "/mnt/fast-ai/vllm-cache-exp/minimax-prefill-mbt2048-p4096n512-20260513T224920Z",
+          "elapsed_s": 9.147973968996666,
+          "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p4096n512-20260513T232156Z.json",
+          "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p4096n512-20260513T232156Z.log",
+          "max_batched_tokens": 2048,
+          "phase": "warm",
+          "run_index": 1,
+          "success": true,
+          "tok_s_out": 55.968676969918754,
+          "tok_s_total_reported": 503.7180927292688,
+          "total_num_tokens_reported": 4608
+        },
+        {
+          "cache_root": "/mnt/fast-ai/vllm-cache-exp/minimax-prefill-mbt2048-p4096n512-20260513T224920Z",
+          "elapsed_s": 9.185905047983397,
+          "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p4096n512-20260513T233004Z.json",
+          "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p4096n512-20260513T233004Z.log",
+          "max_batched_tokens": 2048,
+          "phase": "warm",
+          "run_index": 2,
+          "success": true,
+          "tok_s_out": 55.737567210364375,
+          "tok_s_total_reported": 501.63810489327943,
+          "total_num_tokens_reported": 4608
+        }
+      ],
+      "warm_summary": {
+        "runs": 2,
+        "tok_s_out_max": 55.968676969918754,
+        "tok_s_out_mean": 55.85312209014157,
+        "tok_s_out_min": 55.737567210364375,
+        "tok_s_total_max": 503.7180927292688,
+        "tok_s_total_mean": 502.67809881127414,
+        "tok_s_total_min": 501.63810489327943
+      }
+    }
+  },
+  "shape": {
+    "input_len": 4096,
+    "max_model_len": 8192,
+    "num_prompts": 1,
+    "output_len": 512
+  }
+}
