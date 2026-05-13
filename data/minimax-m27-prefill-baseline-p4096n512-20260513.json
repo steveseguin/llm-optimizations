@@ -1,0 +1,60 @@
+{
+  "created_utc": "2026-05-13T22:07:00Z",
+  "decision": "Record as a useful prefill/long-context baseline. Do not promote as a decode optimization or LocalMaxxing update without a longer repeat gate and unchanged p512/n1536 decode confirmation.",
+  "model": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+  "purpose": "MiniMax M2.7 AutoRound long-context prefill/decode baseline using the same quality-preserving decode recipe, p4096/n512.",
+  "recipe": {
+    "attention_delayed_allreduce": true,
+    "block_size": 256,
+    "cache_root": "/mnt/fast-ai/vllm-cache-exp/minimax-xpugraph-attndelay-block256-mbt512-noprefix-20260513T171301Z",
+    "chunked_prefill": true,
+    "dtype": "float16",
+    "engine": "vLLM 0.20.1-local XPU",
+    "graph_partition": true,
+    "input_len": 4096,
+    "llm_scaler_int4_moe": true,
+    "max_model_len": 8192,
+    "max_num_batched_tokens": 512,
+    "max_num_seqs": 1,
+    "num_prompts": 1,
+    "output_len": 512,
+    "prefix_caching": false,
+    "tensor_parallel": 4,
+    "xpu_graph": true
+  },
+  "runs": [
+    {
+      "classification": "cold_long_context_graph",
+      "elapsed_s": 13.331930317013757,
+      "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p4096n512-20260513T215513Z.json",
+      "tok_s_out": 38.40404111223136,
+      "tok_s_total_reported": 345.63637001008226,
+      "total_num_tokens_reported": 4608
+    },
+    {
+      "classification": "warm_long_context_graph",
+      "elapsed_s": 8.796005902026081,
+      "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p4096n512-20260513T220053Z.json",
+      "tok_s_out": 58.20823743218105,
+      "tok_s_total_reported": 523.8741368896294,
+      "total_num_tokens_reported": 4608
+    },
+    {
+      "classification": "warm_long_context_graph",
+      "elapsed_s": 8.693797909014393,
+      "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p4096n512-20260513T220317Z.json",
+      "tok_s_out": 58.89255827641443,
+      "tok_s_total_reported": 530.0330244877298,
+      "total_num_tokens_reported": 4608
+    }
+  ],
+  "warm_summary": {
+    "runs": 2,
+    "tok_s_out_max": 58.89255827641443,
+    "tok_s_out_mean": 58.55039785429774,
+    "tok_s_out_min": 58.20823743218105,
+    "tok_s_total_max": 530.0330244877298,
+    "tok_s_total_mean": 526.9535806886796,
+    "tok_s_total_min": 523.8741368896294
+  }
+}
