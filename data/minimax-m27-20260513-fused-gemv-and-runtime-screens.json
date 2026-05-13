@@ -1,0 +1,98 @@
+{
+  "date_utc": "2026-05-13",
+  "model": {
+    "hf_id": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+    "local_path": "/mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround",
+    "quantization": "AutoRound INT4 W4A16"
+  },
+  "hardware": {
+    "gpu_name": "Intel Arc Pro B70",
+    "gpu_count": 4,
+    "vram_gb_each": 32
+  },
+  "quality_guardrails": {
+    "speculative_decode": false,
+    "expert_dropping": false,
+    "router_precision_reduced": false,
+    "power_limits_changed": false
+  },
+  "runtime_screens": [
+    {
+      "name": "async_static_compile_gmem095",
+      "prompt_tokens": 512,
+      "output_tokens": 1536,
+      "elapsed_s": 31.725310907990206,
+      "tok_s_total": 64.55413489688446,
+      "tok_s_output": 48.41606735600335,
+      "gpu_kv_cache_tokens": 32256,
+      "aot_hash": "3e2cefa134c3aecc743c56d36960e4cb0a8ac7d2adc73c3f2a078cc8b6164846",
+      "outcome": "tiny high but not repeated; do not submit",
+      "log_dir": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-async-staticcompile-gmem095-p512n1536-20260513T011847Z"
+    },
+    {
+      "name": "async_static_compile_gmem095_repeat",
+      "prompt_tokens": 512,
+      "output_tokens": 1536,
+      "elapsed_s": 33.240230417999555,
+      "tok_s_total": 61.61208795023905,
+      "tok_s_output": 46.209068151764285,
+      "gpu_kv_cache_tokens": 33024,
+      "aot_hash": "3e2cefa134c3aecc743c56d36960e4cb0a8ac7d2adc73c3f2a078cc8b6164846",
+      "outcome": "negative versus accepted 48.092807 tok/s anchor",
+      "log_dir": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-async-staticcompile-gmem095-repeat-p512n1536-20260513T012136Z"
+    },
+    {
+      "name": "mode3_partition_compile1",
+      "prompt_tokens": 512,
+      "output_tokens": 512,
+      "elapsed_s": 15.404274229993462,
+      "tok_s_total": 66.47505651426167,
+      "tok_s_output": 33.237528257130835,
+      "gpu_kv_cache_tokens": 9408,
+      "aot_hash": "3e2cefa134c3aecc743c56d36960e4cb0a8ac7d2adc73c3f2a078cc8b6164846",
+      "compile_seconds": 178.9,
+      "outcome": "negative cold-cache artifact; same AOT hash as current best",
+      "log_dir": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-mode3-partition-compile1-p512n512-20260513T012448Z"
+    }
+  ],
+  "fused_gemv_probe": {
+    "script": "benchmarks/b70_resadd_norm_gemv_int4_race_probe.py",
+    "diagnosis": "esimd_resadd_norm_gemv_int4_pert mutates residual/normed_out from output-row workgroup 0 while peer output-row workgroups may still read residual, causing shape-dependent correctness errors.",
+    "source_restored_after_diagnostic": true,
+    "core_shared_object_restored_after_diagnostic": true,
+    "results": [
+      {
+        "n": 2048,
+        "k": 3072,
+        "shape": "MiniMax TP4 qkv_proj",
+        "vllm_rel": 0.00017808404961285314,
+        "fused_rel": 0.0004842670827675509,
+        "fused_vs_vllm_max_abs": 0.125
+      },
+      {
+        "n": 3072,
+        "k": 1536,
+        "shape": "MiniMax TP4 o_proj",
+        "vllm_rel": 0.00017409821068216087,
+        "fused_rel": 0.10329153205685042,
+        "fused_vs_vllm_max_abs": 36.1015625
+      },
+      {
+        "n": 256,
+        "k": 3072,
+        "shape": "small-N diagnostic",
+        "vllm_rel": 0.00016628789686318822,
+        "fused_rel": 0.0019468651886240915,
+        "fused_vs_vllm_max_abs": 14.875
+      }
+    ],
+    "no_store_diagnostic": {
+      "n": 3072,
+      "k": 1536,
+      "fused_rel_after_disabling_residual_normed_stores": 0.00048,
+      "oneDNN_int4_only_us": 53.30,
+      "fused_no_store_us": 64.75,
+      "conclusion": "race confirmed, but corrected standalone fused kernel is not a speed path for actual MiniMax o_proj"
+    }
+  }
+}

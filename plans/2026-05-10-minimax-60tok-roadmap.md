@@ -273,6 +273,20 @@ The u4 MoE bridge is no longer the only ceiling. Existing timing notes put MiniM
    variance allreduce visible, and repeated at `39.881` then `40.210` output
    tok/s for p512/n1536. Keep it as the preferred long-run benchmark flag while
    we analyze why p512/n512 remains below the older short-run reference.
+11. The llm-scaler core `esimd_resadd_norm_gemv_int4_pert` helper is closed as
+   a MiniMax projection-fusion lead. A synthetic TP4 probe found a
+   cross-workgroup residual mutation race: the actual `o_proj` shape
+   (`N=3072,K=1536`) had about `10.3%` fused relative error against a dequant
+   reference. A temporary no-store diagnostic confirmed the race but was slower
+   than oneDNN INT4-only on that shape, so this helper should not be wired into
+   vLLM as-is. Repro script:
+   `benchmarks/b70_resadd_norm_gemv_int4_race_probe.py`.
+12. `gpu_memory_utilization=0.95` with the current best async/static graph is a
+   capacity setting, not a repeatable speed win. It produced one p512/n1536
+   run at `48.42` output tok/s but repeated at only `46.21`. `mode=3` combined
+   with graph partition and `compile_sizes=[1]` produced the same AOT hash as
+   the current best but hit the `9,408` KV-token cold-cache artifact and only
+   reached `33.24` output tok/s at p512/n512.
 
 Current code-direction preference after the latest negative screens:
 
