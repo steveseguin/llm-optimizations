@@ -100,3 +100,21 @@ Logs:
 
 Decision: do not promote or submit MBT448. It is a near miss and helps narrow
 the optimum, but MBT512 remains the best observed scheduler envelope.
+
+## MBT576 Follow-Up
+
+`MAX_BATCHED_TOKENS=576` was tested to bracket the upper side of MBT512. It
+regressed clearly:
+
+| Run | Prompt/output | Total tok/s | Output tok/s |
+| --- | ---: | ---: | ---: |
+| block-size 256, MBT576 | 512/1536 | `92.417506` | `69.313130` |
+
+Logs:
+
+- warmup: `/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n128-20260513T162701Z.log`
+- measured: `/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T163415Z.log`
+- AOT: `321c82797a47ee1efafb6dbf7a2aed75de729d0ac392ada909b2386b3de9f589`
+
+Decision: do not promote or submit MBT576. The local sweep now shows MBT512 as
+the strongest point tested, with MBT448 close and MBT576/640 slower.

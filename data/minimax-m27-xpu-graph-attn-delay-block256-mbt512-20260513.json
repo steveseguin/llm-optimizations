@@ -157,6 +157,31 @@
         "startup_note": "Direct AOT load, followed by five shared-memory broadcast waits before KV setup and graph capture."
       },
       "decision": "Do not promote. MBT448 is close to MBT1024 but remains below the MBT512 best."
+    },
+    {
+      "name": "block256_max_num_batched_tokens_576",
+      "result": "negative",
+      "cache_root": "/mnt/fast-ai/vllm-cache-exp/minimax-xpugraph-attndelay-block256-mbt576-20260513T162701Z",
+      "aot_hash": "321c82797a47ee1efafb6dbf7a2aed75de729d0ac392ada909b2386b3de9f589",
+      "settings_delta": {
+        "max_num_batched_tokens": 576
+      },
+      "warmup": {
+        "tok_s_total": 81.85943087382223,
+        "elapsed_s": 7.81828059599502,
+        "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n128-20260513T162701Z.log",
+        "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n128-20260513T162701Z.json"
+      },
+      "measure": {
+        "tok_s_out": 69.31312983565097,
+        "tok_s_total": 92.41750644753462,
+        "elapsed_s": 22.160303590993863,
+        "kv_cache_tokens": 17664,
+        "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T163415Z.log",
+        "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T163415Z.json",
+        "startup_note": "Direct AOT load, followed by five shared-memory broadcast waits before KV setup and graph capture."
+      },
+      "decision": "Do not promote. MBT576 regresses versus MBT512 and MBT448."
     }
   ],
   "localmaxxing": {
