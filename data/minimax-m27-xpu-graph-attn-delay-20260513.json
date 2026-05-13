@@ -1,0 +1,81 @@
+{
+  "model": {
+    "hf_id": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+    "submitted_hf_id": "MiniMaxAI/MiniMax-M2.7",
+    "local_path": "/mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround",
+    "quantization": "INT4 AutoRound W4A16",
+    "dtype": "float16"
+  },
+  "hardware": {
+    "gpu": "Intel Arc Pro B70 32GB",
+    "gpu_count": 4,
+    "vram_gb_per_gpu": 32,
+    "cpu": "AMD EPYC 9015 8-Core Processor",
+    "ram_gb": 16,
+    "os": "Ubuntu 24.04.4 LTS, kernel 6.17.0-23-generic"
+  },
+  "experiment": {
+    "name": "xpu_graph_attention_delayed_allreduce",
+    "cache_root": "/mnt/fast-ai/vllm-cache-exp/minimax-xpugraph-attndelay-20260513T125052Z",
+    "aot_hash": "6af0d6cc0529d897d0f22a7c9af495be0b409a751d381ad783170934c3d20c83",
+    "quality_policy": [
+      "No model weight, quantization, router precision, expert routing, KV dtype, sampler, speculative decoding, or power-limit change.",
+      "MiniMax Q/K RMS variance allreduces remain in the generated graph.",
+      "The default-off attention delayed-allreduce path changes residual/add scheduling and floating-point accumulation order, so it is quality-conservative but not bitwise-identical."
+    ],
+    "warm_aot_method": {
+      "script": "scripts/bench-vllm-minimax-autoround-xpu-warm-aot.sh",
+      "warmup": {
+        "prompt_tokens": 512,
+        "output_tokens": 128,
+        "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n128-20260513T125052Z.log",
+        "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n128-20260513T125052Z.json",
+        "tok_s_total": 87.67328212574805,
+        "note": "Cold AOT compile/profiling process; not used as the promoted throughput number."
+      },
+      "measure": {
+        "prompt_tokens": 512,
+        "output_tokens": 1536,
+        "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T125755Z.log",
+        "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T125755Z.json",
+        "elapsed_s": 21.96867306099739,
+        "tok_s_out": 69.91774130987339,
+        "tok_s_total": 93.22365507983119,
+        "kv_cache_tokens": 17344,
+        "available_kv_cache_gib": 1.03,
+        "direct_aot_load": true
+      }
+    }
+  },
+  "comparison": {
+    "previous_best_tok_s_out": 69.06476723150084,
+    "previous_best_tok_s_total": 92.08635630866777,
+    "absolute_gain_tok_s_out": 0.85297407837255,
+    "relative_gain_percent_out": 1.234,
+    "interpretation": "Small but valid new MiniMax AutoRound TP4 high. The larger learning is that attention delayed-allreduce can coexist with the XPU graph recipe if cold compile and warm measurement are split across processes."
+  },
+  "localmaxxing": {
+    "id": "cmp42sm8x005wpc01esa5mi3n",
+    "status": "APPROVED",
+    "submitted_at": "2026-05-13T13:08:47.649Z",
+    "payload": "data/localmaxxing-minimax-m27-autoround-xpugraph-attn-delay-p512n1536-20260513.payload.json",
+    "response": "data/localmaxxing-responses/minimax-m27-autoround-xpugraph-attn-delay-p512n1536-20260513.response.json"
+  },
+  "aot_collectives": {
+    "actual_allreduce_call_lines": 1496,
+    "actual_wait_tensor_call_lines": 1496,
+    "actual_allreduce_wait_pairs_within_7_lines": 1496,
+    "wait_gap_lines": {
+      "2": 1496
+    },
+    "categories": {
+      "qk_rms_variance": 496,
+      "moe_hidden": 496,
+      "attention_o_proj_hidden": 372,
+      "embedding_hidden": 8,
+      "unknown": 124
+    },
+    "classifier": "scripts/classify-vllm-aot-collectives.py"
+  },
+  "decision": "Promote as the current best MiniMax M2.7 AutoRound 4x B70 single-session score, while continuing to target larger gains from graph/allreduce/RMS/MoE epilogue fusion."
+}

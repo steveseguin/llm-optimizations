@@ -22,6 +22,7 @@ FORCE_WARMUP="${FORCE_WARMUP:-0}"
 WARMUP_INPUT_LEN="${WARMUP_INPUT_LEN:-$INPUT_LEN}"
 WARMUP_OUTPUT_LEN="${WARMUP_OUTPUT_LEN:-$OUTPUT_LEN}"
 WARMUP_NUM_PROMPTS="${WARMUP_NUM_PROMPTS:-$NUM_PROMPTS}"
+REQUIRE_WARMUP_SUCCESS="${REQUIRE_WARMUP_SUCCESS:-0}"
 RUN_TIMEOUT="${RUN_TIMEOUT:-20m}"
 
 export MODEL VLLM_CACHE_ROOT OUTDIR TP DTYPE MAX_MODEL_LEN MAX_BATCHED_TOKENS
@@ -48,12 +49,18 @@ fi
 if [ "$FORCE_WARMUP" = "1" ] || { [ "$WARMUP_IF_MISSING" = "1" ] && [ "$have_aot" = "0" ]; }; then
   echo "warmup=needed"
   echo "warmup_cache_root=$VLLM_CACHE_ROOT"
+  warmup_status=0
   (
     export INPUT_LEN="$WARMUP_INPUT_LEN"
     export OUTPUT_LEN="$WARMUP_OUTPUT_LEN"
     export NUM_PROMPTS="$WARMUP_NUM_PROMPTS"
-    "$BENCH_SCRIPT" || true
-  )
+    "$BENCH_SCRIPT"
+  ) || warmup_status=$?
+  if [ "$warmup_status" != "0" ] && [ "$REQUIRE_WARMUP_SUCCESS" = "1" ]; then
+    echo "warmup_status=$warmup_status"
+    echo "measure=skipped"
+    exit "$warmup_status"
+  fi
 else
   echo "warmup=skipped"
   echo "warmup_cache_root=$VLLM_CACHE_ROOT"
