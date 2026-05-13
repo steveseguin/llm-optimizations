@@ -129,8 +129,11 @@ bug to re-test after future Intel compiler/runtime updates.
 - Near-neighbor launch screens did not beat the `69.064767` result:
   `--cudagraph-capture-sizes 1` warmed to `68.359313` output tok/s,
   `CCL_TOPO_FABRIC_VERTEX_CONNECTION_CHECK=0` reached `67.080608`, and
-  `CCL_ZE_IPC_EXCHANGE=pidfd` reached `68.019733`. Keep the promoted recipe on
-  default capture sizes, default topology recognition, and default IPC exchange.
+  `CCL_ZE_IPC_EXCHANGE=pidfd` reached `68.019733`. `--gpu-memory-utilization
+  0.95` failed on the first decode step with Level Zero
+  `UR_RESULT_ERROR_OUT_OF_RESOURCES`. Keep the promoted recipe on default
+  capture sizes, default topology recognition, default IPC exchange, and
+  default GPU memory utilization.
 - Run a longer chat-generation sanity pass once we have a better non-graph
   correctness oracle for MiniMax on XPU.
 - Continue source-level work on quality-safe collective fusion, but the current

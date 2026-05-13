@@ -80,7 +80,16 @@
       "total_tok_s": 91.21104200679828,
       "kv_cache_tokens": 16832,
       "notes": "Shows normal warm-AOT run-to-run variance below the 69.064767 best."
+    },
+    {
+      "name": "gpu_memory_utilization_0_95",
+      "result": "failed",
+      "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T113856Z.log",
+      "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T113856Z.json",
+      "output_tok_s": null,
+      "total_tok_s": null,
+      "notes": "Graph path failed on the first decode step with Level Zero UR_RESULT_ERROR_OUT_OF_RESOURCES in gpu_model_runner.py. Keep default gpu_memory_utilization for the speed recipe."
     }
   ],
-  "decision": "Keep the promoted recipe unchanged: default capture sizes [1,2], default oneCCL topology recognition, default CCL_ZE_IPC_EXCHANGE, warm/direct-loaded AOT cache."
+  "decision": "Keep the promoted recipe unchanged: default capture sizes [1,2], default oneCCL topology recognition, default CCL_ZE_IPC_EXCHANGE, default gpu_memory_utilization, warm/direct-loaded AOT cache."
 }
