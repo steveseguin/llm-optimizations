@@ -137,3 +137,21 @@ Logs:
 
 Decision: do not promote or submit MBT480. It is the closest near miss so far,
 but MBT512 remains ahead.
+
+## MBT544 Follow-Up
+
+`MAX_BATCHED_TOKENS=544` was tested as the upper-near point between MBT512 and
+MBT576. It regressed:
+
+| Run | Prompt/output | Total tok/s | Output tok/s |
+| --- | ---: | ---: | ---: |
+| block-size 256, MBT544 | 512/1536 | `92.960627` | `69.720470` |
+
+Logs:
+
+- warmup: `/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n128-20260513T165333Z.log`
+- measured: `/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T165853Z.log`
+- AOT: `74aec0458ad767dc1f0dd78a5eeb2a44ad608f8ad240194181d6c81a308f6d62`
+
+Decision: do not promote or submit MBT544. With MBT448, 480, 512, 544, 576,
+640, and 1024 tested, MBT512 remains the best observed scheduler envelope.
