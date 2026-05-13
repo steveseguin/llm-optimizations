@@ -132,6 +132,31 @@
         "startup_note": "Direct AOT load, followed by roughly five minutes of shared-memory broadcast waits before capture and generation."
       },
       "decision": "Do not promote. MBT640 is slower than MBT512 and MBT1024 on the same block-size 256 recipe."
+    },
+    {
+      "name": "block256_max_num_batched_tokens_448",
+      "result": "negative_near_miss",
+      "cache_root": "/mnt/fast-ai/vllm-cache-exp/minimax-xpugraph-attndelay-block256-mbt448-20260513T161219Z",
+      "aot_hash": "1934eac0e0882b3f155c31fc1e15c993165106c51efc20c4c077cd0af1a23464",
+      "settings_delta": {
+        "max_num_batched_tokens": 448
+      },
+      "warmup": {
+        "tok_s_total": 83.12053981592918,
+        "elapsed_s": 7.699661256017862,
+        "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n128-20260513T161219Z.log",
+        "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n128-20260513T161219Z.json"
+      },
+      "measure": {
+        "tok_s_out": 72.1339009182567,
+        "tok_s_total": 96.17853455767559,
+        "elapsed_s": 21.29373263398884,
+        "kv_cache_tokens": 17920,
+        "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T161742Z.log",
+        "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T161742Z.json",
+        "startup_note": "Direct AOT load, followed by five shared-memory broadcast waits before KV setup and graph capture."
+      },
+      "decision": "Do not promote. MBT448 is close to MBT1024 but remains below the MBT512 best."
     }
   ],
   "localmaxxing": {

@@ -81,3 +81,22 @@ Logs:
 Decision: do not promote or submit MBT640. The useful narrowing from this sweep
 is that the block-size 256 optimum is currently at MBT512, with MBT256 and
 MBT640 both slower.
+
+## MBT448 Follow-Up
+
+`MAX_BATCHED_TOKENS=448` was tested to bracket the lower side of MBT512. It
+used the same block-size 256 recipe and reached the same measured KV cache size
+as MBT512, but decode stayed below the current best:
+
+| Run | Prompt/output | Total tok/s | Output tok/s |
+| --- | ---: | ---: | ---: |
+| block-size 256, MBT448 | 512/1536 | `96.178535` | `72.133901` |
+
+Logs:
+
+- warmup: `/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n128-20260513T161219Z.log`
+- measured: `/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T161742Z.log`
+- AOT: `1934eac0e0882b3f155c31fc1e15c993165106c51efc20c4c077cd0af1a23464`
+
+Decision: do not promote or submit MBT448. It is a near miss and helps narrow
+the optimum, but MBT512 remains the best observed scheduler envelope.
