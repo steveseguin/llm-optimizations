@@ -74,3 +74,14 @@ the 256 high:
 
 Current block-size decision: `256` is the best observed page size for this
 quality-preserving p512/n1536 recipe.
+
+A same-cache block-size 256 repeat was then run to test variance. It direct
+loaded the promoted AOT but landed at only `70.118093` output tok/s:
+
+- measured: `/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T152050Z.log`
+- KV tokens: 17,152
+- init: 19.51 s, direct AOT load, graph capture 11 s
+
+Interpretation: `72.369055` is the best valid observed score, but the recipe is
+not repeat-stable at that level yet. Further work should target startup/runtime
+variance and collective scheduling, not just page size.
