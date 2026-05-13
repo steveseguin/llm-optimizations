@@ -1,0 +1,128 @@
+{
+  "aot_collectives": {
+    "actual_allreduce_call_lines": 1496,
+    "actual_allreduce_categories": {
+      "attention_o_proj_hidden": 496,
+      "embedding_hidden": 8,
+      "moe_hidden": 496,
+      "qk_rms_variance": 496
+    },
+    "actual_allreduce_wait_pairs_within_7_lines": 1496,
+    "actual_wait_tensor_call_lines": 1496,
+    "failures": [],
+    "full_record": "/home/steve/bench-results/minimax-m2.7-integrity-gate/current-best-gate-20260513T214452Z/aot-collectives.json",
+    "passed": true,
+    "wait_gap_lines": {
+      "2": 1496
+    }
+  },
+  "created_utc": "2026-05-13T21:55:00Z",
+  "hardware": {
+    "cpu": "AMD EPYC 9015 8-Core Processor",
+    "gpu": "Intel Arc Pro B70 32GB",
+    "gpu_count": 4,
+    "os": "Ubuntu 24.04.4 LTS, kernel 6.17.0-23-generic",
+    "vram_gb_per_gpu": 32
+  },
+  "limitations": [
+    "The quality check is a deterministic greedy smoke test, not a full MMLU/coding/agentic evaluation.",
+    "AOT collective validation verifies the expected Q/K RMS, attention, MoE, and embedding collectives remain present; it does not prove numerical equivalence by itself.",
+    "Load time is not part of decode throughput; low system RAM currently slows model load and prefetch behavior."
+  ],
+  "localmaxxing_decision": "No new submission: best repeat was a tiny run-to-run high, while the 3-run mean supports the existing submitted 73.306 tok/s result rather than establishing a material new optimization.",
+  "model": {
+    "dtype": "float16",
+    "hf_id": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+    "local_path": "/mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround",
+    "quantization": "INT4 AutoRound W4A16",
+    "submitted_hf_id": "MiniMaxAI/MiniMax-M2.7"
+  },
+  "next_steps": [
+    "Use this gate before promoting future >73 tok/s MiniMax changes.",
+    "Run a separate prefill screen with long prompts only if the decode recipe remains unchanged or the decode gate is rerun afterwards.",
+    "Continue source-level work on hidden-state allreduce plus residual/RMSNorm or projection/MoE epilogue fusion."
+  ],
+  "purpose": "Promotion guardrails for MiniMax M2.7 AutoRound current-best 4x B70 recipe: AOT collective integrity, deterministic greedy quality smoke, and repeated p512/n1536 throughput.",
+  "quality_gate_dir": "/home/steve/bench-results/minimax-m2.7-integrity-gate/current-best-gate-20260513T214224Z",
+  "quality_smoke": {
+    "combined_text_sha256": "ac7df251c86427aefbf8843973a3e1ed553ff41f140ba2d86f504af91e7a0d48",
+    "combined_token_sha256": "08fadfadc952da331e999d14684ac797d0dd4382eb9644722c2b08573604dccf",
+    "deterministic_across_runs": true,
+    "n_prompts": 3,
+    "runs": 2
+  },
+  "recipe": {
+    "aot_hash": "d0fed86b5a7cf64dcdb3e82d0b24effed00520ebd7f6018c6244d82201e6a98c",
+    "attention_delayed_allreduce": true,
+    "block_size": 256,
+    "cache_root": "/mnt/fast-ai/vllm-cache-exp/minimax-xpugraph-attndelay-block256-mbt512-noprefix-20260513T171301Z",
+    "chunked_prefill": true,
+    "engine": "vLLM 0.20.1-local XPU",
+    "graph_partition": true,
+    "llm_scaler_int4_moe": true,
+    "max_num_batched_tokens": 512,
+    "max_num_seqs": 1,
+    "prefix_caching": false,
+    "tensor_parallel": 4,
+    "xpu_graph": true
+  },
+  "repeatability": {
+    "failures": [],
+    "label": "minimax-m2.7-current-best",
+    "passed": true,
+    "runs": [
+      {
+        "elapsed_s": 21.004289674019674,
+        "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T214452Z.json",
+        "num_requests": 1,
+        "tok_s_out": 73.12791928878639,
+        "tok_s_total_from_lengths": 97.50389238504852,
+        "tok_s_total_reported": 97.50389238504852,
+        "total_num_tokens_reported": 2048
+      },
+      {
+        "elapsed_s": 20.935197807004442,
+        "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T214729Z.json",
+        "num_requests": 1,
+        "tok_s_out": 73.36926138266958,
+        "tok_s_total_from_lengths": 97.82568184355945,
+        "tok_s_total_reported": 97.82568184355945,
+        "total_num_tokens_reported": 2048
+      },
+      {
+        "elapsed_s": 20.973496445978526,
+        "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T215007Z.json",
+        "num_requests": 1,
+        "tok_s_out": 73.23528549263486,
+        "tok_s_total_from_lengths": 97.64704732351315,
+        "tok_s_total_reported": 97.64704732351315,
+        "total_num_tokens_reported": 2048
+      }
+    ],
+    "shape": {
+      "input_len": 512,
+      "num_prompts": 1,
+      "output_len": 1536
+    },
+    "summary": {
+      "runs": 3,
+      "tok_s_out_cv_pct": 0.16508524320664197,
+      "tok_s_out_max": 73.36926138266958,
+      "tok_s_out_mean": 73.24415538803028,
+      "tok_s_out_median": 73.23528549263486,
+      "tok_s_out_min": 73.12791928878639,
+      "tok_s_out_stddev": 0.12091529205698054,
+      "tok_s_total_reported_max": 97.82568184355945,
+      "tok_s_total_reported_mean": 97.65887385070704,
+      "tok_s_total_reported_median": 97.64704732351315,
+      "tok_s_total_reported_min": 97.50389238504852
+    },
+    "thresholds": {
+      "max_cv_pct": 1.0,
+      "min_ratio": 0.985,
+      "min_required_output_tok_s": 72.20671696878743,
+      "target_output_tok_s": 73.30631164343902
+    }
+  },
+  "repeatability_gate_dir": "/home/steve/bench-results/minimax-m2.7-integrity-gate/current-best-gate-20260513T214452Z"
+}
