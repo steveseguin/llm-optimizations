@@ -19,6 +19,8 @@ USE_LLM_SCALER_MOE="${USE_LLM_SCALER_MOE:-0}"
 LLM_SCALER_KERNELS="${LLM_SCALER_KERNELS:-/home/steve/src/llm-scaler/vllm/custom-esimd-kernels-vllm/python}"
 GPU_MEMORY_UTILIZATION="${GPU_MEMORY_UTILIZATION:-}"
 EXTRA_ARGS="${EXTRA_ARGS:-}"
+RUN_TIMEOUT="${RUN_TIMEOUT:-}"
+RUN_TIMEOUT_KILL_AFTER="${RUN_TIMEOUT_KILL_AFTER:-30s}"
 
 if [ -n "$GPU_MEMORY_UTILIZATION" ]; then
   EXTRA_ARGS="$EXTRA_ARGS --gpu-memory-utilization $GPU_MEMORY_UTILIZATION"
@@ -48,14 +50,20 @@ export TRANSFORMERS_CACHE="${TRANSFORMERS_CACHE:-$HF_HOME/transformers}"
 export PYTHONPATH="$LLM_SCALER_KERNELS:${PYTHONPATH:-}"
 export LD_LIBRARY_PATH="$VENV/lib:$VENV/lib/python3.12/site-packages/torch/lib:${LD_LIBRARY_PATH:-}"
 
+runner=(/usr/bin/time -v)
+if [ -n "$RUN_TIMEOUT" ]; then
+  runner=(timeout --foreground --signal=TERM --kill-after="$RUN_TIMEOUT_KILL_AFTER" "$RUN_TIMEOUT" /usr/bin/time -v)
+fi
+
 {
   echo "log=$log"
   echo "json=$json"
   echo "model=$MODEL"
   echo "vllm_cache_root=${VLLM_CACHE_ROOT:-}"
   echo "extra_args=$EXTRA_ARGS"
+  echo "run_timeout=$RUN_TIMEOUT"
   echo "start=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-  /usr/bin/time -v vllm bench throughput \
+  "${runner[@]}" vllm bench throughput \
     --backend vllm \
     --model "$MODEL" \
     --tokenizer "$MODEL" \

@@ -1,0 +1,28 @@
+{
+  "model": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+  "hardware": "4x Intel Arc Pro B70 32GB",
+  "purpose": "Make MiniMax vLLM/XPU graph benchmarks distinguish cold AOT compile artifacts from steady-state warm AOT decode.",
+  "scripts": {
+    "base": "scripts/bench-vllm-minimax-autoround-xpu.sh",
+    "warm_aot_wrapper": "scripts/bench-vllm-minimax-autoround-xpu-warm-aot.sh"
+  },
+  "changes": [
+    "Added RUN_TIMEOUT/RUN_TIMEOUT_KILL_AFTER support to the base vLLM MiniMax benchmark wrapper so CCL or graph-load stalls are bounded.",
+    "Added a warm-AOT wrapper that reuses one VLLM_CACHE_ROOT for an optional warmup process and a separate measured process.",
+    "Default warm-AOT recipe remains the current quality-preserving graph path: TP4, float16 activations, llm-scaler INT4 MoE, XPU graph enabled, graph partition, compile_sizes=[1], cudagraph_mode=PIECEWISE."
+  ],
+  "first_smoke": {
+    "name": "reused_cache_wrapper_attempt",
+    "cache_root": "/mnt/fast-ai/vllm-cache-exp/minimax-xpugraph-repeat-20260513T110319Z",
+    "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T123205Z.log",
+    "result": "stalled_before_decode",
+    "notes": "The wrapper skipped warmup because an AOT model file was present, then the measured process stopped advancing after XCCL rank initialization. No JSON was produced, so this is not a benchmark result. The process was terminated and RUN_TIMEOUT was added before further experiments."
+  },
+  "current_valid_reference": {
+    "output_tok_s": 69.06476723150084,
+    "total_tok_s": 92.08635630866777,
+    "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T111235Z.json",
+    "localmaxxing_id": "cmp3yscom003epc014ogcjkui"
+  },
+  "next_use": "Use a fresh isolated VLLM_CACHE_ROOT plus FORCE_WARMUP=1 for source-level variants, then compare only the measured warm-AOT process against the 69.064767 tok/s reference."
+}
