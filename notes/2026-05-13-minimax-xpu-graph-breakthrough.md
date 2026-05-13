@@ -6,7 +6,7 @@ Re-enabling XPU graph capture for the MiniMax TP4 AutoRound path is the first
 run to clear the 60 output tok/s target without changing model quality knobs.
 The best screen so far is:
 
-- `67.953543` output tok/s, `90.604724` total tok/s
+- `69.064767` output tok/s, `92.086356` total tok/s
 - prompt/output: `512/1536`
 - context length: `2048`
 - batch: `1`
@@ -19,6 +19,12 @@ This is not a lower-quality path: no expert dropping, no reduced router
 precision, no Q/K RMS variance shortcut, no speculative decode, no KV dtype
 change, and no weight/quantization change. The win is graph scheduling/capture
 around the same compiled TP4 model.
+
+Important measurement detail: the steady-state result requires a warm/direct-
+loaded AOT cache. A fresh cache that compiles inside the benchmark process ran
+successfully but measured lower because compiler/graph memory reduced available
+KV cache headroom in-process. The same generated AOT cache returned to >60 tok/s
+when loaded from disk on the next process.
 
 ## Launch
 
@@ -52,22 +58,29 @@ patches/vllm-xpu-graph-noop-communicator-capture-20260509.patch
 | --- | ---: | ---: | ---: | ---: | ---: |
 | XPU graph p512/n512 | 512 | 512 | `8.352200750` | `61.301209` | `122.602417` |
 | XPU graph p512/n1536 | 512 | 1536 | `22.603678052` | `67.953543` | `90.604724` |
+| XPU graph p512/n1536 warm AOT repeat | 512 | 1536 | `22.722263928` | `67.598898` | `90.131864` |
+| XPU graph p512/n1536 warm AOT best | 512 | 1536 | `22.239993872` | `69.064767` | `92.086356` |
+| XPU graph p512/n1536 cold compile same process | 512 | 1536 | `27.119832831` | `56.637517` | `75.516690` |
 
 Raw result files:
 
 ```text
 /home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n512-20260513T103115Z.json
 /home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T103400Z.json
+/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T110945Z.json
+/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T111235Z.json
+/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T110319Z.json
 ```
 
 LocalMaxxing:
 
 ```text
-cmp3y7d720034pc01t8cvx7j3
+cmp3yscom003epc014ogcjkui
 ```
 
+The earlier `67.953543` run is recorded as `cmp3y7d720034pc01t8cvx7j3`.
 The first submit attempt used `backend: xpu`, but the API backend enum rejected
-that value. The accepted submission omits the backend field and records
+that value. The accepted submissions omit the backend field and record
 `XPU/Level Zero` in notes and `engineFlags.extraFlags`.
 
 ## Quality Check
@@ -111,6 +124,8 @@ bug to re-test after future Intel compiler/runtime updates.
 ## Next
 
 - Repeat the accepted p512/n1536 run after any driver/runtime update.
+- Preserve warm AOT/direct-load behavior in future benchmark scripts; cold
+  compile and steady-state decode should be measured separately.
 - Run a longer chat-generation sanity pass once we have a better non-graph
   correctness oracle for MiniMax on XPU.
 - Continue source-level work on quality-safe collective fusion, but the current

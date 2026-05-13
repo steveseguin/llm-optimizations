@@ -31,7 +31,7 @@
       "compile_sizes": [1],
       "cudagraph_mode": "PIECEWISE"
     },
-    "cache_root": "/mnt/fast-ai/vllm-cache-exp/minimax-xpugraph-force-p512n256-20260513T101820Z",
+    "cache_root": "/mnt/fast-ai/vllm-cache-exp/minimax-xpugraph-repeat-20260513T110319Z",
     "aot_hash": "6af0d6cc0529d897d0f22a7c9af495be0b409a751d381ad783170934c3d20c83"
   },
   "benchmarks": [
@@ -58,6 +58,44 @@
       "elapsed_s": 22.603678052008036,
       "tok_s_out": 67.95354262549085,
       "tok_s_total": 90.60472350065446
+    },
+    {
+      "name": "tp4_xpu_graph_p512_n1536_cold_compile_same_process",
+      "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T110319Z.log",
+      "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T110319Z.json",
+      "prompt_tokens": 512,
+      "output_tokens": 1536,
+      "context_length": 2048,
+      "batch_size": 1,
+      "elapsed_s": 27.119832830998348,
+      "tok_s_out": 56.63751725800944,
+      "tok_s_total": 75.51668967734592,
+      "finding": "Cold compile in the benchmark process left only 0.56 GiB available KV memory and measured low. Do not use this as the steady-state speed result."
+    },
+    {
+      "name": "tp4_xpu_graph_p512_n1536_original_warm_aot_repeat",
+      "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T110945Z.log",
+      "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T110945Z.json",
+      "prompt_tokens": 512,
+      "output_tokens": 1536,
+      "context_length": 2048,
+      "batch_size": 1,
+      "elapsed_s": 22.722263928008033,
+      "tok_s_out": 67.59889792965075,
+      "tok_s_total": 90.13186390620099
+    },
+    {
+      "name": "tp4_xpu_graph_p512_n1536_warm_aot_best",
+      "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T111235Z.log",
+      "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T111235Z.json",
+      "prompt_tokens": 512,
+      "output_tokens": 1536,
+      "context_length": 2048,
+      "batch_size": 1,
+      "elapsed_s": 22.23999387200456,
+      "tok_s_out": 69.06476723150084,
+      "tok_s_total": 92.08635630866777,
+      "finding": "Best current quality-preserving MiniMax M2.7 AutoRound result. The run loaded AOT from disk and restored 16,832 KV tokens / 1.0 GiB available KV cache memory."
     }
   ],
   "quality_sanity": {
@@ -74,10 +112,11 @@
     "The run depends on the local VLLM_XPU_GRAPH_NOOP_COMM_CAPTURE=1 guard from patches/vllm-xpu-graph-noop-communicator-capture-20260509.patch."
   ],
   "localmaxxing": {
-    "best_run_id": "cmp3y7d720034pc01t8cvx7j3",
-    "submitted_at": "2026-05-13T11:00:17.678Z",
-    "submitted_run": "tp4_xpu_graph_p512_n1536",
+    "best_run_id": "cmp3yscom003epc014ogcjkui",
+    "submitted_at": "2026-05-13T11:16:36.790Z",
+    "submitted_run": "tp4_xpu_graph_p512_n1536_warm_aot_best",
     "status": "APPROVED",
+    "previous_run_id": "cmp3y7d720034pc01t8cvx7j3",
     "backend_field": null,
     "backend_note": "The API backend enum rejected xpu, so backend was omitted and XPU/Level Zero details were recorded in notes and engineFlags.extraFlags."
   }
