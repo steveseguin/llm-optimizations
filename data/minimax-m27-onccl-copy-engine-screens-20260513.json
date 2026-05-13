@@ -1,0 +1,81 @@
+{
+  "date": "2026-05-13",
+  "source": {
+    "name": "Intel oneCCL Developer Guide, Environment Variables",
+    "url": "https://www.intel.com/content/www/us/en/docs/oneccl/developer-guide-reference/2021-15/environment-variables.html",
+    "notes": "Intel documents copy-engine vs compute-kernel choices for GPU-buffer topo allreduce reduce-scatter and allgather phases."
+  },
+  "model": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+  "hardware": "4x Intel Arc Pro B70 32GB",
+  "engine": "vLLM 0.20.1-local XPU",
+  "baseline": {
+    "description": "Current best: TP4 FP16, llm-scaler INT4 MoE, XPU graph, MiniMax attention delayed allreduce, block-size 256, max batched tokens 512, prefix caching disabled",
+    "aot_hash": "d0fed86b5a7cf64dcdb3e82d0b24effed00520ebd7f6018c6244d82201e6a98c",
+    "prompt_tokens": 512,
+    "output_tokens": 1536,
+    "output_tok_s": 73.30631164343902,
+    "total_tok_s": 97.7417488579187
+  },
+  "quality_guardrail": "These screens changed only oneCCL runtime transport-phase toggles. Model weights, quantization, dtype, KV dtype, sampler, routing, tensor parallelism, graph recipe, and power settings were unchanged.",
+  "runs": [
+    {
+      "name": "both_copy_engine_first",
+      "env": {
+        "CCL_REDUCE_SCATTER_MONOLITHIC_PIPELINE_KERNEL": "0",
+        "CCL_ALLGATHERV_MONOLITHIC_PIPELINE_KERNEL": "0"
+      },
+      "elapsed_s": 20.90198492500349,
+      "total_tok_s": 97.98112511076066,
+      "output_tok_s": 73.48584383307049,
+      "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T200259Z.log",
+      "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T200259Z.json"
+    },
+    {
+      "name": "both_copy_engine_repeat_1",
+      "env": {
+        "CCL_REDUCE_SCATTER_MONOLITHIC_PIPELINE_KERNEL": "0",
+        "CCL_ALLGATHERV_MONOLITHIC_PIPELINE_KERNEL": "0"
+      },
+      "elapsed_s": 21.048602599999867,
+      "total_tok_s": 97.29862066947916,
+      "output_tok_s": 72.97396550210938,
+      "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T201117Z.log",
+      "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T201117Z.json"
+    },
+    {
+      "name": "both_copy_engine_repeat_2",
+      "env": {
+        "CCL_REDUCE_SCATTER_MONOLITHIC_PIPELINE_KERNEL": "0",
+        "CCL_ALLGATHERV_MONOLITHIC_PIPELINE_KERNEL": "0"
+      },
+      "elapsed_s": 21.14967557397904,
+      "total_tok_s": 96.8336366596424,
+      "output_tok_s": 72.6252274947318,
+      "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T201404Z.log",
+      "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T201404Z.json"
+    },
+    {
+      "name": "reduce_scatter_copy_engine_only",
+      "env": {
+        "CCL_REDUCE_SCATTER_MONOLITHIC_PIPELINE_KERNEL": "0"
+      },
+      "elapsed_s": 21.405550957017113,
+      "total_tok_s": 95.6761171021683,
+      "output_tok_s": 71.75708782662623,
+      "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T201717Z.log",
+      "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T201717Z.json"
+    },
+    {
+      "name": "allgather_copy_engine_only",
+      "env": {
+        "CCL_ALLGATHERV_MONOLITHIC_PIPELINE_KERNEL": "0"
+      },
+      "elapsed_s": 21.100774033984635,
+      "total_tok_s": 97.05805088957958,
+      "output_tok_s": 72.79353816718468,
+      "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T201959Z.log",
+      "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T201959Z.json"
+    }
+  ],
+  "decision": "Do not promote copy-engine allreduce phases. The first combined run beat the current best by 0.180 tok/s, but repeats regressed and split-phase screens were negative. Keep oneCCL defaults for this MiniMax single-session recipe."
+}
