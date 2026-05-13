@@ -37,6 +37,7 @@ Current promoted recipe:
 | both copy-engine phases repeat 2 | `72.625227` | `96.833637` | negative |
 | reduce-scatter copy-engine only | `71.757088` | `95.676117` | negative |
 | allgather copy-engine only | `72.793538` | `97.058051` | negative |
+| `CCL_SYCL_OUTPUT_EVENT=0` | `72.942286` | `97.256381` | negative |
 
 The first combined run was `+0.179532` output tok/s over the current best, but
 the next two combined runs fell below it. The split-phase screens were also
@@ -45,8 +46,9 @@ below current best, especially reduce-scatter-only.
 ## Decision
 
 Keep oneCCL defaults for the current MiniMax single-session path. The copy-engine
-settings are quality-neutral and worth knowing about, but they do not provide a
-repeatable sustained decode win on this B70 stack.
+settings and `CCL_SYCL_OUTPUT_EVENT=0` are quality-neutral and worth knowing
+about, but they do not provide a repeatable sustained decode win on this B70
+stack.
 
 No LocalMaxxing submission: the only above-best number was not repeatable.
 
@@ -60,3 +62,5 @@ No LocalMaxxing submission: the only above-best number was not repeatable.
   `/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T201717Z.log`
 - Allgather-only log:
   `/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T201959Z.log`
+- `CCL_SYCL_OUTPUT_EVENT=0` log:
+  `/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T202414Z.log`

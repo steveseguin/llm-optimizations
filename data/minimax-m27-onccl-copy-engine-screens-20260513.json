@@ -75,7 +75,18 @@
       "output_tok_s": 72.79353816718468,
       "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T201959Z.log",
       "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T201959Z.json"
+    },
+    {
+      "name": "disable_sycl_output_event",
+      "env": {
+        "CCL_SYCL_OUTPUT_EVENT": "0"
+      },
+      "elapsed_s": 21.05774432499311,
+      "total_tok_s": 97.25638075913291,
+      "output_tok_s": 72.94228556934968,
+      "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T202414Z.log",
+      "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T202414Z.json"
     }
   ],
-  "decision": "Do not promote copy-engine allreduce phases. The first combined run beat the current best by 0.180 tok/s, but repeats regressed and split-phase screens were negative. Keep oneCCL defaults for this MiniMax single-session recipe."
+  "decision": "Do not promote copy-engine allreduce phases or CCL_SYCL_OUTPUT_EVENT=0. The first combined copy-engine run beat the current best by 0.180 tok/s, but repeats regressed, split-phase screens were negative, and disabling SYCL output events was negative. Keep oneCCL defaults for this MiniMax single-session recipe."
 }
