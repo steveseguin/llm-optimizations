@@ -108,3 +108,30 @@ Logs:
 
 Decision: do not promote. The repeat used a fast init path with no repeated
 broadcast waits, but decode was below the promoted 73.232 tok/s run.
+
+## Graph Mode And Async Scheduling
+
+Full graph mode is not a clean next comparison on this XPU build. The XPU
+platform hook in:
+
+```text
+/home/steve/.venvs/vllm-xpu/lib/python3.12/site-packages/vllm/platforms/xpu.py
+```
+
+forces `cudagraph_mode` back to `PIECEWISE` when FlashAttention is active. A
+real FULL graph test would require disabling FlashAttention or patching the
+platform guard, so it is not currently a useful fast-path experiment.
+
+`--async-scheduling` was tested on the promoted prefix-off MBT512 cache:
+
+| Run | Prompt/output | Total tok/s | Output tok/s |
+| --- | ---: | ---: | ---: |
+| block-size 256, MBT512, prefix cache off, async scheduling | 512/1536 | `97.528481` | `73.146361` |
+
+Logs:
+
+- measured: `/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T175848Z.log`
+- AOT: `d0fed86b5a7cf64dcdb3e82d0b24effed00520ebd7f6018c6244d82201e6a98c`
+
+Decision: do not promote. Async scheduling is close but below the simpler
+prefix-cache-off best.

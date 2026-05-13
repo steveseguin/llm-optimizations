@@ -167,6 +167,33 @@
         "startup_note": "Existing AOT direct-load repeat. Fast init path with no repeated shared-memory broadcast waits; still below promoted best."
       },
       "decision": "Do not promote. Clean repeat was slower than the 73.232 tok/s promoted prefix-cache-off run."
+    },
+    {
+      "name": "full_graph_mode_review",
+      "result": "not_tested_platform_fallback",
+      "source": "/home/steve/.venvs/vllm-xpu/lib/python3.12/site-packages/vllm/platforms/xpu.py",
+      "finding": "XPU platform forces cudagraph_mode back to PIECEWISE when FlashAttention is active. A FULL graph test would require disabling FlashAttention or changing platform code, so it is not a clean quality-preserving fast-path comparison."
+    },
+    {
+      "name": "block256_mbt512_no_prefix_async_scheduling",
+      "result": "negative",
+      "cache_root": "/mnt/fast-ai/vllm-cache-exp/minimax-xpugraph-attndelay-block256-mbt512-noprefix-20260513T171301Z",
+      "aot_hash": "d0fed86b5a7cf64dcdb3e82d0b24effed00520ebd7f6018c6244d82201e6a98c",
+      "settings_delta": {
+        "warmup": "skipped_existing_aot",
+        "async_scheduling": true,
+        "prefix_caching": false
+      },
+      "measure": {
+        "tok_s_out": 73.14636064107123,
+        "tok_s_total": 97.52848085476163,
+        "elapsed_s": 20.998994160996517,
+        "kv_cache_tokens": 17920,
+        "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T175848Z.log",
+        "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T175848Z.json",
+        "startup_note": "Existing AOT direct-load with fast init and no repeated shared-memory broadcast waits."
+      },
+      "decision": "Do not promote. Async scheduling is close but remains below the simpler prefix-cache-off best."
     }
   ],
   "localmaxxing": {
