@@ -60,3 +60,24 @@ Logs:
 
 Decision: do not promote or submit MBT256. MBT512 remains the best observed
 batching envelope for this single-session benchmark.
+
+## MBT640 Follow-Up
+
+`MAX_BATCHED_TOKENS=640` was also tested with the same block-size 256 recipe.
+It direct-loaded the AOT cache, then spent roughly five minutes in shared-memory
+broadcast waits before capture and generation. Decode throughput was worse than
+the promoted MBT512 result:
+
+| Run | Prompt/output | Total tok/s | Output tok/s |
+| --- | ---: | ---: | ---: |
+| block-size 256, MBT640 | 512/1536 | `89.338458` | `67.003843` |
+
+Logs:
+
+- warmup: `/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n128-20260513T155635Z.log`
+- measured: `/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T160201Z.log`
+- AOT: `2eea7af3ee5588dfdc5abb686c781b26e15d78e85eee8be751e2cf4b775a20af`
+
+Decision: do not promote or submit MBT640. The useful narrowing from this sweep
+is that the block-size 256 optimum is currently at MBT512, with MBT256 and
+MBT640 both slower.

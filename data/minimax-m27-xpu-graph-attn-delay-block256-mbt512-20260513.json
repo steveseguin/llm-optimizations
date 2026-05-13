@@ -107,6 +107,31 @@
         "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T154645Z.json"
       },
       "decision": "Do not promote. MBT256 increases KV headroom but is slower than MBT512 and below 70 output tok/s."
+    },
+    {
+      "name": "block256_max_num_batched_tokens_640",
+      "result": "negative",
+      "cache_root": "/mnt/fast-ai/vllm-cache-exp/minimax-xpugraph-attndelay-block256-mbt640-20260513T155634Z",
+      "aot_hash": "2eea7af3ee5588dfdc5abb686c781b26e15d78e85eee8be751e2cf4b775a20af",
+      "settings_delta": {
+        "max_num_batched_tokens": 640
+      },
+      "warmup": {
+        "tok_s_total": 82.4250321248409,
+        "elapsed_s": 7.764631489990279,
+        "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n128-20260513T155635Z.log",
+        "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n128-20260513T155635Z.json"
+      },
+      "measure": {
+        "tok_s_out": 67.00384317949617,
+        "tok_s_total": 89.33845757266157,
+        "elapsed_s": 22.924058189993957,
+        "kv_cache_tokens": 17664,
+        "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T160201Z.log",
+        "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T160201Z.json",
+        "startup_note": "Direct AOT load, followed by roughly five minutes of shared-memory broadcast waits before capture and generation."
+      },
+      "decision": "Do not promote. MBT640 is slower than MBT512 and MBT1024 on the same block-size 256 recipe."
     }
   ],
   "localmaxxing": {
