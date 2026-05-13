@@ -18,12 +18,16 @@ Current accepted reference points:
   `c3f2b10098683775b74b9bb91c9a44570f4df792c7a1b0061b5df73b6ef18f20`, and
   the Q/K variance allreduce preserved. LocalMaxxing:
   `cmp2kd5ux006frm013il4qu13`.
-- Current best quality-cleared long-run result: `47.586110` output tok/s and
-  `63.448146` total tok/s at p512/n1536 with
+- Current best quality-cleared long-run result: `48.092807` output tok/s and
+  `64.123742` total tok/s at p512/n1536 with the same static decode graph plus
+  the vLLM benchmark async engine. It uses
   `--compilation-config '{"use_inductor_graph_partition":true,"compile_sizes":[1]}'`,
   AOT `3e2cefa134c3aecc743c56d36960e4cb0a8ac7d2adc73c3f2a078cc8b6164846`,
-  and the Q/K variance allreduce preserved. LocalMaxxing:
-  `cmp2mf1zw007wrm01op7aimhk`.
+  `--async-engine`, and the Q/K variance allreduce preserved. LocalMaxxing:
+  `cmp3cgooj0019s401d7p1ks3e`.
+- Previous non-async static decode long-run result: `47.586110` output tok/s
+  and `63.448146` total tok/s at p512/n1536 with the same AOT graph and Q/K
+  variance allreduce preserved. LocalMaxxing: `cmp2mf1zw007wrm01op7aimhk`.
 - Accepted short/mid speed points: `39.610585` output tok/s at p512/n512 and `40.303730` output tok/s at p512/n1024 using the fast-NVMe FP16 u4 decode recipe.
 - The earlier `41.130667` p512/n1536 result remains useful as a scheduling clue, but it is not the quality-cleared target because the cached AOT graph did not visibly include the per-layer Q/K RMS variance allreduce.
 
@@ -258,7 +262,13 @@ The u4 MoE bridge is no longer the only ceiling. Existing timing notes put MiniM
    vLLM refuses the old binary with `Source code has changed since the last
    compilation` and recompiles current `3b096...`. Treat the old `41.130667`
    p512/n1536 number only as a scheduling clue.
-9. `use_inductor_graph_partition=true` is the first post-CCL quality-preserving
+9. The vLLM benchmark `--async-engine` is a small positive on the current
+   static decode graph. It reached `45.648` output tok/s at p512/n512, then
+   repeated at `47.743` and `48.093` output tok/s on p512/n1536. This is now
+   the accepted best, but it is only a roughly one-percent runtime-side gain,
+   so the path to `60 tok/s` still requires source-level execution work.
+   `--stream-interval 32` and `--max-num-seqs 2` are closed as negative.
+10. `use_inductor_graph_partition=true` is the first post-CCL quality-preserving
    software win. It changes the compiled graph to AOT `c3f2...`, keeps Q/K
    variance allreduce visible, and repeated at `39.881` then `40.210` output
    tok/s for p512/n1536. Keep it as the preferred long-run benchmark flag while

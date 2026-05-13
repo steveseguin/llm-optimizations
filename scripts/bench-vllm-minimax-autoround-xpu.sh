@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-MODEL="${MODEL:-/mnt/corsair-external/llm-models/minimax-m2.7-int4-autoround}"
+MODEL="${MODEL:-/mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround}"
 VENV="${VENV:-/home/steve/.venvs/vllm-xpu}"
 OUTDIR="${OUTDIR:-/home/steve/bench-results/minimax-m2.7-autoround-vllm}"
 TP="${TP:-4}"
@@ -52,6 +52,8 @@ export LD_LIBRARY_PATH="$VENV/lib:$VENV/lib/python3.12/site-packages/torch/lib:$
   echo "log=$log"
   echo "json=$json"
   echo "model=$MODEL"
+  echo "vllm_cache_root=${VLLM_CACHE_ROOT:-}"
+  echo "extra_args=$EXTRA_ARGS"
   echo "start=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
   /usr/bin/time -v vllm bench throughput \
     --backend vllm \

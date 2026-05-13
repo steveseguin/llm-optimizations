@@ -1,0 +1,40 @@
+{
+  "hfId": "MiniMaxAI/MiniMax-M2.7",
+  "modelRevision": "main",
+  "hardware": {
+    "hwClass": "DISCRETE_GPU",
+    "gpuName": "Intel Arc Pro B70 32GB",
+    "gpuCount": 4,
+    "vramGb": 32,
+    "cpu": "AMD EPYC 9015 8-Core Processor",
+    "ramGb": 16,
+    "os": "Ubuntu 24.04.4 LTS, kernel 6.17.0-23-generic"
+  },
+  "engineName": "vllm",
+  "engineVersion": "0.20.1-local",
+  "quantization": "INT4 AutoRound W4A16",
+  "promptTokens": 512,
+  "outputTokens": 1536,
+  "contextLength": 2048,
+  "batchSize": 1,
+  "tokSOut": 48.092806751180824,
+  "tokSTotal": 64.12374233490776,
+  "peakVramGb": 28.11,
+  "notes": "MiniMax M2.7 AutoRound W4A16 on 4x Intel Arc Pro B70 via vLLM/XPU TP4. Local weights are Lasimeri/MiniMax-M2.7-int4-AutoRound submitted under base MiniMaxAI/MiniMax-M2.7. Small repeatable improvement over the prior static decode graph result by using vLLM throughput async engine with the same quality-preserving target model path. p512/n1536 async repeats: 47.743 and 48.093 output tok/s; submitted the better repeat. No speculative decode, no expert dropping, no reduced router precision, no power-limit changes. Same AOT static decode graph 3e2cefa134c3aecc743c56d36960e4cb0a8ac7d2adc73c3f2a078cc8b6164846 was loaded directly on all ranks; Q/K RMS variance allreduce remains preserved. GPU KV cache size reported 16064 tokens.",
+  "engineFlags": {
+    "commandSnippet": "VLLM_XPU_USE_LLM_SCALER_MOE=1 CCL_TOPO_P2P_ACCESS=1 VLLM_XPU_ENABLE_XPU_GRAPH=0 VLLM_CACHE_ROOT=/mnt/fast-ai/vllm-cache-exp/minimax-inductor-partition-compile1-p512n512-20260512T122329Z vllm bench throughput --backend vllm --async-engine --model /mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround --tokenizer /mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround --trust-remote-code --dtype float16 --tensor-parallel-size 4 --distributed-executor-backend mp --max-model-len 2048 --max-num-batched-tokens 1024 --max-num-seqs 1 --dataset-name random --random-input-len 512 --random-output-len 1536 --random-range-ratio 0 --num-prompts 1 --disable-log-stats --compilation-config '{\"use_inductor_graph_partition\":true,\"compile_sizes\":[1]}'",
+    "tensorParallel": 4,
+    "pipelineParallel": 1,
+    "kvCacheDtype": "auto",
+    "flashAttn": true,
+    "attentionBackend": "flash_attn",
+    "contextLength": 2048,
+    "prefillChunkSize": 1024,
+    "maxRunningSeqs": 1,
+    "concurrency": 1,
+    "specDecoding": false,
+    "mtpEnabled": false,
+    "engineQuant": "inc",
+    "extraFlags": "XPU/Level Zero; B70 tuned MoE config E=256,N=384,dtype=int4_w4a16; llm-scaler u4 MoE decode path for x.shape<=4; CCL_ATL_TRANSPORT=ofi; CCL_TOPO_P2P_ACCESS=1; oneCCL ATL inferred local rank; use_inductor_graph_partition=true; compile_sizes=[1]; --async-engine; AOT 3e2cefa134c3aecc743c56d36960e4cb0a8ac7d2adc73c3f2a078cc8b6164846; Q/K RMS variance tensor_model_parallel_all_reduce preserved; XPU graph disabled; no power-limit change"
+  }
+}
