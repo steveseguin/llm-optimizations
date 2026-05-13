@@ -82,3 +82,26 @@ wall-clock bottleneck. The next viable path still needs a real fused collective
 epilogue, not just a cleaner functional allreduce trace.
 
 No LocalMaxxing submission: this is a negative internal optimization screen.
+
+## 2026-05-13 Retest With Attention-Delay Graph
+
+Retested the same guarded compile-time functional collective path on top of the
+current best MiniMax recipe:
+
+- `VLLM_MINIMAX_M2_ATTN_DELAY_ALLREDUCE=1`
+- `VLLM_XPU_ENABLE_XPU_GRAPH=1`
+- `VLLM_XPU_FORCE_GRAPH_WITH_COMM=1`
+- `VLLM_XPU_GRAPH_NOOP_COMM_CAPTURE=1`
+- `VLLM_XPU_COMPILE_OUT_OF_PLACE_ALLREDUCE=1`
+- `compile_sizes=[1]`, graph partition, cudagraph piecewise
+
+Result, p512/n1536 after warm AOT:
+
+| Run | Total tok/s | Output tok/s | Log |
+| --- | ---: | ---: | --- |
+| attention delay + functional collective | `93.176374` | `69.882280` | `/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T141043Z.log` |
+
+The result is close to the current high but still below `69.917741` output
+tok/s. The measured process also spent several minutes past direct AOT load with
+repeated shared-memory broadcast waits before completing. Keep this as a
+confirmed below-best path, not a promoted recipe.

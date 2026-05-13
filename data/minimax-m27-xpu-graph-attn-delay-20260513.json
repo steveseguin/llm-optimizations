@@ -143,6 +143,30 @@
         "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T135402Z.json"
       },
       "decision": "Do not promote. The 512/1024/2048 sweep keeps 1024 as the best observed batching envelope."
+    },
+    {
+      "name": "attention_delay_functional_collective_allreduce",
+      "result": "below_best",
+      "env": {
+        "VLLM_MINIMAX_M2_ATTN_DELAY_ALLREDUCE": "1",
+        "VLLM_XPU_COMPILE_OUT_OF_PLACE_ALLREDUCE": "1"
+      },
+      "cache_root": "/mnt/fast-ai/vllm-cache-exp/minimax-xpugraph-attndelay-funcol-20260513T140525Z",
+      "warmup": {
+        "tok_s_total": 84.79555537612538,
+        "elapsed_s": 7.547565401997417,
+        "aot_hash": "6af0d6cc0529d897d0f22a7c9af495be0b409a751d381ad783170934c3d20c83",
+        "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n128-20260513T140525Z.log",
+        "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n128-20260513T140525Z.json"
+      },
+      "measure": {
+        "tok_s_out": 69.88228029157433,
+        "tok_s_total": 93.1763737220991,
+        "elapsed_s": 21.979820829990786,
+        "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T141043Z.log",
+        "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T141043Z.json"
+      },
+      "decision": "Do not promote. The compile-time functional collective allreduce path remains math-preserving but did not beat the 69.917741 tok/s attention-delay high, and startup showed repeated shared-memory broadcast waits."
     }
   ],
   "localmaxxing": {
