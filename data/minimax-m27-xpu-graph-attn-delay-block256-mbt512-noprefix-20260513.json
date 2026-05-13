@@ -82,6 +82,46 @@
     "relative_gain_percent_out": 0.1699,
     "interpretation": "Small new quality-preserving MiniMax AutoRound TP4 high. Disabling prefix caching improved p512/n1536 measured decode slightly for this single random request, while preserving the same AOT graph hash as the prior MBT512 run."
   },
+  "followups": [
+    {
+      "name": "no_prefix_no_chunked_prefill_mbt512",
+      "result": "invalid_config",
+      "settings_delta": {
+        "max_num_batched_tokens": 512,
+        "prefix_caching": false,
+        "chunked_prefill": false
+      },
+      "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n128-20260513T173311Z.log",
+      "decision": "Do not retry as-is. vLLM rejects no-chunked-prefill when max_num_batched_tokens is smaller than max_model_len=2048."
+    },
+    {
+      "name": "no_prefix_no_chunked_prefill_mbt2048",
+      "result": "negative",
+      "cache_root": "/mnt/fast-ai/vllm-cache-exp/minimax-xpugraph-attndelay-block256-mbt2048-noprefix-nochunk-20260513T173355Z",
+      "aot_hash": "4be0701399d5053b6e9b2f084fabf3fe9e039f542c8255eda66de3458cafe295",
+      "settings_delta": {
+        "max_num_batched_tokens": 2048,
+        "prefix_caching": false,
+        "chunked_prefill": false
+      },
+      "warmup": {
+        "tok_s_total": 83.35569299877496,
+        "elapsed_s": 7.6779398859944195,
+        "kv_cache_tokens": 9216,
+        "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n128-20260513T173355Z.log",
+        "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n128-20260513T173355Z.json"
+      },
+      "measure": {
+        "tok_s_out": 69.22475741844633,
+        "tok_s_total": 92.29967655792844,
+        "elapsed_s": 22.18859346397221,
+        "kv_cache_tokens": 16128,
+        "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T173917Z.log",
+        "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T173917Z.json"
+      },
+      "decision": "Do not promote. Disabling chunked prefill requires MBT2048 for this context, lowers KV headroom, and regresses decode throughput."
+    }
+  ],
   "localmaxxing": {
     "id": "cmp4c7pan00bepc01d0ikr12e",
     "status": "APPROVED",

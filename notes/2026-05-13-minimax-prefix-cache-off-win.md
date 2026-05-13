@@ -47,3 +47,31 @@ coordination issue.
 
 Decision: promote and submit. The gain is small, but it is the best
 quality-preserving MiniMax 4x B70 number observed so far.
+
+## No Chunked Prefill Follow-Up
+
+Disabling chunked prefill was tested next because this benchmark uses a single
+512-token prompt. The first attempt failed validation:
+
+```text
+--no-enable-prefix-caching --no-enable-chunked-prefill --max-num-batched-tokens 512
+```
+
+vLLM rejects that combination because `max_num_batched_tokens` must be at least
+`max_model_len` when chunked prefill is disabled. The valid equivalent was then
+tested with MBT2048:
+
+| Run | Prompt/output | Total tok/s | Output tok/s | KV tokens |
+| --- | ---: | ---: | ---: | ---: |
+| no prefix, no chunked prefill, MBT2048 | 512/1536 | `92.299677` | `69.224757` | `16128` |
+
+Logs:
+
+- invalid MBT512 warmup: `/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n128-20260513T173311Z.log`
+- MBT2048 warmup: `/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n128-20260513T173355Z.log`
+- MBT2048 measured: `/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T173917Z.log`
+- AOT: `4be0701399d5053b6e9b2f084fabf3fe9e039f542c8255eda66de3458cafe295`
+
+Decision: do not promote. Disabling chunked prefill forces a larger batching
+envelope for this 2048 context, reduces measured KV headroom, and regresses
+decode.
