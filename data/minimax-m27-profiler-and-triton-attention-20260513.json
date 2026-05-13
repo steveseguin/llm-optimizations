@@ -1,0 +1,116 @@
+{
+  "date": "2026-05-13",
+  "model": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+  "hardware": "4x Intel Arc Pro B70 32GB",
+  "engine": "vLLM 0.20.1-local XPU",
+  "quality_guardrail": "No model, quantization, router precision, KV dtype, sampler, speculative decoding, or power changes.",
+  "current_best": {
+    "description": "TP4 FP16, llm-scaler INT4 MoE, XPU graph, MiniMax attention delayed allreduce, block-size 256, max batched tokens 512, prefix caching disabled",
+    "aot_hash": "d0fed86b5a7cf64dcdb3e82d0b24effed00520ebd7f6018c6244d82201e6a98c",
+    "prompt_tokens": 512,
+    "output_tokens": 1536,
+    "output_tok_s": 73.30631164343902,
+    "total_tok_s": 97.7417488579187,
+    "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T184221Z.json",
+    "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T184221Z.log"
+  },
+  "profiler_diagnostic": {
+    "shape": "p512/n32 diagnostic; profiler overhead makes tok/s non-comparable",
+    "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n32-20260513T185810Z.json",
+    "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n32-20260513T185810Z.log",
+    "profiler_dir": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/profiler-current-best-20260513T185810Z",
+    "rank0_highlights": {
+      "_vllm_fa2_C::varlen_fwd": {
+        "calls": 496,
+        "self_xpu_ms": 7.410,
+        "cpu_total_ms": 89.188
+      },
+      "gemm_kernel": {
+        "calls": 15,
+        "self_xpu_ms": 5.055
+      },
+      "fused_moe_kernel_gptq_awq": {
+        "calls": 5,
+        "self_xpu_ms": 2.315
+      },
+      "oneccl_allreduce_pcie_half": {
+        "calls": 5,
+        "self_xpu_us": 644.060
+      },
+      "oneccl_allgatherv_pcie_half": {
+        "calls": 9,
+        "self_xpu_us": 428.642
+      },
+      "zeEventHostSynchronize": {
+        "calls": 464,
+        "self_cpu_ms": 54.342
+      },
+      "urEnqueueKernelLaunch": {
+        "calls": 664,
+        "self_cpu_ms": 14.942
+      },
+      "compiled_fx_graph": {
+        "calls": 8,
+        "cpu_total_ms": 152.526,
+        "xpu_total_ms": 7.410
+      },
+      "vllm_unified_attention_with_output": {
+        "calls": 496,
+        "cpu_total_ms": 104.316,
+        "xpu_total_ms": 7.410
+      }
+    },
+    "interpretation": "FlashAttention remains a major PIECEWISE graph boundary with visible host synchronization and launch overhead in the profiler path."
+  },
+  "triton_full_graph_screen": {
+    "description": "Switched attention backend to TRITON_ATTN and cudagraph_mode FULL while keeping the same model, quantization, dtype, sampler, block size, prefix-cache-off, and p512/n1536 measurement shape.",
+    "cache_root": "/mnt/fast-ai/vllm-cache-exp/minimax-triton-attn-fullgraph-block256-mbt512-noprefix-20260513T190706Z",
+    "aot_hash": "20ce3b498033eac955acbe2a8e473a337b2159fa71664dde2b53c12ea60724b2",
+    "warmup_p512_n16": {
+      "elapsed_s": 4.635333837999497,
+      "total_tok_s": 113.9076533542345,
+      "output_tok_s": 3.451746917
+    },
+    "short_p512_n128": {
+      "elapsed_s": 2.2869525399873964,
+      "total_tok_s": 279.8483959809359,
+      "output_tok_s": 55.96967919618717,
+      "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n128-20260513T191359Z.json",
+      "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n128-20260513T191359Z.log"
+    },
+    "sustained_p512_n1536": {
+      "elapsed_s": 21.425592682993738,
+      "total_tok_s": 95.58662065043228,
+      "output_tok_s": 71.68996548782421,
+      "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T192211Z.json",
+      "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T192211Z.log"
+    },
+    "current_best_control_p512_n128": {
+      "elapsed_s": 2.7472671260184143,
+      "total_tok_s": 232.95878072386262,
+      "output_tok_s": 46.591756144772525,
+      "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n128-20260513T193330Z.json",
+      "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n128-20260513T193330Z.log"
+    },
+    "aot_collectives": {
+      "actual_allreduce_call_lines": 1496,
+      "actual_wait_tensor_call_lines": 1496,
+      "actual_allreduce_categories": {
+        "embedding_hidden": 8,
+        "qk_rms_variance": 496,
+        "attention_o_proj_hidden": 496,
+        "moe_hidden": 496
+      },
+      "wait_gap_lines": {
+        "2": 1496
+      }
+    },
+    "decision": "Negative for sustained decode. Triton FULL graph was 9.378 tok/s faster than the current best at p512/n128, but did not change the collective count and was 1.616 tok/s slower than the current best on p512/n1536."
+  },
+  "next_steps": [
+    "Keep FlashAttention/PIECEWISE as the current production recipe.",
+    "Use profiler evidence to target host synchronization around attention and compiled graph boundaries.",
+    "Prioritize source-level collective fusion or delayed wait experiments over more scheduler flag sweeps.",
+    "Run a p512/n128 current-best control to interpret whether Triton only improves short-output or startup-heavy measurements."
+  ]
+}
