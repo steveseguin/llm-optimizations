@@ -155,3 +155,22 @@ Logs:
 
 Decision: do not promote or submit MBT544. With MBT448, 480, 512, 544, 576,
 640, and 1024 tested, MBT512 remains the best observed scheduler envelope.
+
+## MBT512 Existing-AOT Repeat
+
+The promoted MBT512 cache was repeated with warmup skipped to separate compile
+effects from decode variance:
+
+| Run | Prompt/output | Total tok/s | Output tok/s |
+| --- | ---: | ---: | ---: |
+| block-size 256, MBT512 repeat | 512/1536 | `96.548965` | `72.411724` |
+
+Logs:
+
+- measured: `/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T170835Z.log`
+- AOT: `d0fed86b5a7cf64dcdb3e82d0b24effed00520ebd7f6018c6244d82201e6a98c`
+
+Decision: do not promote or submit the repeat. It direct-loaded the existing AOT
+cache and used a faster init path with no repeated broadcast waits, but decode
+was still below the promoted 73.108 tok/s run. This confirms meaningful
+run-to-run variance but does not change the best result.

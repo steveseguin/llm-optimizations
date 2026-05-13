@@ -234,6 +234,25 @@
         "startup_note": "Direct AOT load, followed by five shared-memory broadcast waits before KV setup and graph capture."
       },
       "decision": "Do not promote. MBT544 regresses versus MBT512 and MBT480."
+    },
+    {
+      "name": "block256_max_num_batched_tokens_512_repeat_existing_aot",
+      "result": "negative_repeat",
+      "cache_root": "/mnt/fast-ai/vllm-cache-exp/minimax-xpugraph-attndelay-block256-mbt512-20260513T152439Z",
+      "aot_hash": "d0fed86b5a7cf64dcdb3e82d0b24effed00520ebd7f6018c6244d82201e6a98c",
+      "settings_delta": {
+        "warmup": "skipped_existing_aot"
+      },
+      "measure": {
+        "tok_s_out": 72.4117235800363,
+        "tok_s_total": 96.54896477338173,
+        "elapsed_s": 21.21203479298856,
+        "kv_cache_tokens": 17920,
+        "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T170835Z.log",
+        "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T170835Z.json",
+        "startup_note": "Existing AOT direct-load repeat. Fast init path with no repeated shared-memory broadcast waits; still below promoted best."
+      },
+      "decision": "Do not promote. The repeat was clean but slower than the 73.108 tok/s promoted run, confirming run-to-run variance."
     }
   ],
   "localmaxxing": {
