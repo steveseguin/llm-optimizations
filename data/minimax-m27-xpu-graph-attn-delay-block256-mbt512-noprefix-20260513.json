@@ -1,0 +1,93 @@
+{
+  "model": {
+    "hf_id": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+    "submitted_hf_id": "MiniMaxAI/MiniMax-M2.7",
+    "local_path": "/mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround",
+    "quantization": "INT4 AutoRound W4A16",
+    "dtype": "float16"
+  },
+  "hardware": {
+    "gpu": "Intel Arc Pro B70 32GB",
+    "gpu_count": 4,
+    "vram_gb_per_gpu": 32,
+    "cpu": "AMD EPYC 9015 8-Core Processor",
+    "ram_gb": 16,
+    "os": "Ubuntu 24.04.4 LTS, kernel 6.17.0-23-generic"
+  },
+  "experiment": {
+    "name": "xpu_graph_attention_delayed_allreduce_block256_mbt512_no_prefix_cache",
+    "cache_root": "/mnt/fast-ai/vllm-cache-exp/minimax-xpugraph-attndelay-block256-mbt512-noprefix-20260513T171301Z",
+    "aot_hash": "d0fed86b5a7cf64dcdb3e82d0b24effed00520ebd7f6018c6244d82201e6a98c",
+    "quality_policy": [
+      "No model weight, quantization, router precision, expert routing, KV dtype, sampler, speculative decoding, or power-limit change.",
+      "Prefix caching disabled only affects scheduler/cache behavior for this single random prompt benchmark.",
+      "Chunked prefill, block-size 256, MAX_BATCHED_TOKENS=512, TP4, FP16 activations, AutoRound W4A16, and MiniMax attention delayed-allreduce scheduling stayed fixed.",
+      "MiniMax Q/K RMS variance allreduces remain in the generated graph."
+    ],
+    "settings": {
+      "tensor_parallel": 4,
+      "max_model_len": 2048,
+      "max_num_batched_tokens": 512,
+      "max_num_seqs": 1,
+      "block_size": 256,
+      "prefix_caching": false,
+      "chunked_prefill": true,
+      "compilation_config": {
+        "use_inductor_graph_partition": true,
+        "compile_sizes": [
+          1
+        ],
+        "cudagraph_mode": "PIECEWISE"
+      },
+      "env": {
+        "VLLM_MINIMAX_M2_ATTN_DELAY_ALLREDUCE": "1",
+        "VLLM_XPU_ENABLE_XPU_GRAPH": "1",
+        "VLLM_XPU_FORCE_GRAPH_WITH_COMM": "1",
+        "VLLM_XPU_GRAPH_NOOP_COMM_CAPTURE": "1",
+        "VLLM_XPU_USE_LLM_SCALER_MOE": "1",
+        "CCL_TOPO_P2P_ACCESS": "1"
+      }
+    },
+    "warm_aot_method": {
+      "script": "scripts/bench-vllm-minimax-autoround-xpu-warm-aot.sh",
+      "warmup": {
+        "prompt_tokens": 512,
+        "output_tokens": 128,
+        "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n128-20260513T171301Z.log",
+        "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n128-20260513T171301Z.json",
+        "elapsed_s": 7.415471284999512,
+        "tok_s_total": 86.30604521315223,
+        "kv_cache_tokens": 9472,
+        "note": "Cold AOT compile/profiling process; not used as the promoted throughput number."
+      },
+      "measure": {
+        "prompt_tokens": 512,
+        "output_tokens": 1536,
+        "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T172151Z.log",
+        "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T172151Z.json",
+        "elapsed_s": 20.97431762900669,
+        "tok_s_out": 73.23241819680321,
+        "tok_s_total": 97.64322426240429,
+        "kv_cache_tokens": 17920,
+        "available_kv_cache_gib": 1.07,
+        "direct_aot_load": true,
+        "startup_note": "Measured process direct-loaded AOT, then had five shared-memory broadcast waits before KV setup and graph capture."
+      }
+    }
+  },
+  "comparison": {
+    "previous_best_tok_s_out": 73.10821124850621,
+    "previous_best_tok_s_total": 97.47761499800826,
+    "absolute_gain_tok_s_out": 0.124206948297,
+    "relative_gain_percent_out": 0.1699,
+    "interpretation": "Small new quality-preserving MiniMax AutoRound TP4 high. Disabling prefix caching improved p512/n1536 measured decode slightly for this single random request, while preserving the same AOT graph hash as the prior MBT512 run."
+  },
+  "localmaxxing": {
+    "id": "cmp4c7pan00bepc01d0ikr12e",
+    "status": "APPROVED",
+    "submitted_at": "2026-05-13T17:32:27.983Z",
+    "payload": "data/localmaxxing-minimax-m27-autoround-xpugraph-attn-delay-block256-mbt512-noprefix-p512n1536-20260513.payload.json",
+    "response": "data/localmaxxing-responses/minimax-m27-autoround-xpugraph-attn-delay-block256-mbt512-noprefix-p512n1536-20260513.response.json"
+  },
+  "decision": "Promote as the current best MiniMax M2.7 AutoRound 4x B70 single-session score."
+}
