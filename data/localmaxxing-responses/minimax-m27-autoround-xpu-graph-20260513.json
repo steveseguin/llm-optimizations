@@ -1,0 +1,22 @@
+{
+  "submitted_at": "2026-05-13T11:00:17.678Z",
+  "status": "APPROVED",
+  "id": "cmp3y7d720034pc01t8cvx7j3",
+  "hfId": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+  "engineName": "vllm",
+  "engineVersion": "0.20.1-local",
+  "quantization": "INT4 AutoRound W4A16",
+  "hardware": {
+    "hwClass": "DISCRETE_GPU",
+    "gpuName": "Intel Arc Pro B70 32GB",
+    "gpuCount": 4,
+    "vramGb": 32
+  },
+  "promptTokens": 512,
+  "outputTokens": 1536,
+  "contextLength": 2048,
+  "batchSize": 1,
+  "tokSOut": 67.95354262549085,
+  "tokSTotal": 90.60472350065446,
+  "notes": "Accepted after omitting backend because the API backend enum rejected xpu. XPU/Level Zero details are preserved in the submitted notes and engineFlags.extraFlags."
+}

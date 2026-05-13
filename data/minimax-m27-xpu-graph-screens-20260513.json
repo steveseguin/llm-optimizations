@@ -1,0 +1,84 @@
+{
+  "model": {
+    "hf_id": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+    "local_path": "/mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround",
+    "quantization": "INT4 AutoRound W4A16",
+    "dtype": "float16"
+  },
+  "hardware": {
+    "gpu": "Intel Arc Pro B70 32GB",
+    "gpu_count": 4,
+    "vram_gb_per_gpu": 32,
+    "cpu": "AMD EPYC 9015 8-Core Processor",
+    "ram_gb": 15,
+    "os": "Ubuntu 24.04.4 LTS"
+  },
+  "runtime": {
+    "engine": "vllm",
+    "engine_version": "0.20.1",
+    "backend": "xpu",
+    "tensor_parallel": 4,
+    "expert_parallel": false,
+    "llm_scaler_moe": true,
+    "xpu_graph": true,
+    "xpu_graph_noop_communicator_capture": true,
+    "custom_all_reduce_disabled": true,
+    "flash_attention": true,
+    "ccl_atl_transport": "ofi",
+    "ccl_topo_p2p_access": 1,
+    "compilation_config": {
+      "use_inductor_graph_partition": true,
+      "compile_sizes": [1],
+      "cudagraph_mode": "PIECEWISE"
+    },
+    "cache_root": "/mnt/fast-ai/vllm-cache-exp/minimax-xpugraph-force-p512n256-20260513T101820Z",
+    "aot_hash": "6af0d6cc0529d897d0f22a7c9af495be0b409a751d381ad783170934c3d20c83"
+  },
+  "benchmarks": [
+    {
+      "name": "tp4_xpu_graph_p512_n512",
+      "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n512-20260513T103115Z.log",
+      "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n512-20260513T103115Z.json",
+      "prompt_tokens": 512,
+      "output_tokens": 512,
+      "context_length": 2048,
+      "batch_size": 1,
+      "elapsed_s": 8.35220074999961,
+      "tok_s_out": 61.30120854674426,
+      "tok_s_total": 122.60241709348853
+    },
+    {
+      "name": "tp4_xpu_graph_p512_n1536",
+      "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T103400Z.log",
+      "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T103400Z.json",
+      "prompt_tokens": 512,
+      "output_tokens": 1536,
+      "context_length": 2048,
+      "batch_size": 1,
+      "elapsed_s": 22.603678052008036,
+      "tok_s_out": 67.95354262549085,
+      "tok_s_total": 90.60472350065446
+    }
+  ],
+  "quality_sanity": {
+    "script": "/home/steve/llm-optimizations-publish/scripts/run-vllm-minimax-quality-check.py",
+    "chat_template": "/mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround/chat_template.jinja",
+    "eager_chat_json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/minimax-quality-chat-eager-20260513T1050.json",
+    "graph_chat_json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/minimax-quality-chat-graph-20260513T1054.json",
+    "eager_chat_token_sha256": "b78527aaa0abb671875af7e0ca34e614818f1b9428a8e094925614b807ca3a6e",
+    "graph_chat_token_sha256": "40bab1f1d427fbac1d01684284b6b37c7ae3210655408e8200cc976a812f7854",
+    "finding": "The graph/chat run produced coherent MiniMax reasoning text. A strict graph-vs-eager token match is inconclusive because the offline eager/chat run repeated token 0/NUL after the first token on this stack. The graph optimization does not change weights, quantization, router precision, expert routing, sampling, or KV dtype."
+  },
+  "known_warnings": [
+    "During graph capture, rank 3 repeatedly logs an Intel IGC/ocloc internal compiler error for triton_red_fused__to_copy_mm_t_9, then recovers and completes graph capture.",
+    "The run depends on the local VLLM_XPU_GRAPH_NOOP_COMM_CAPTURE=1 guard from patches/vllm-xpu-graph-noop-communicator-capture-20260509.patch."
+  ],
+  "localmaxxing": {
+    "best_run_id": "cmp3y7d720034pc01t8cvx7j3",
+    "submitted_at": "2026-05-13T11:00:17.678Z",
+    "submitted_run": "tp4_xpu_graph_p512_n1536",
+    "status": "APPROVED",
+    "backend_field": null,
+    "backend_note": "The API backend enum rejected xpu, so backend was omitted and XPU/Level Zero details were recorded in notes and engineFlags.extraFlags."
+  }
+}
