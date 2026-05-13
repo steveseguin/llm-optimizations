@@ -1,0 +1,89 @@
+{
+  "model": {
+    "hf_id": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+    "submitted_hf_id": "MiniMaxAI/MiniMax-M2.7",
+    "local_path": "/mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround",
+    "quantization": "INT4 AutoRound W4A16",
+    "dtype": "float16"
+  },
+  "hardware": {
+    "gpu": "Intel Arc Pro B70 32GB",
+    "gpu_count": 4,
+    "vram_gb_per_gpu": 32,
+    "cpu": "AMD EPYC 9015 8-Core Processor",
+    "ram_gb": 16,
+    "os": "Ubuntu 24.04.4 LTS, kernel 6.17.0-23-generic"
+  },
+  "experiment": {
+    "name": "xpu_graph_attention_delayed_allreduce_block128",
+    "cache_root": "/mnt/fast-ai/vllm-cache-exp/minimax-xpugraph-attndelay-block128-20260513T142239Z",
+    "aot_hash": "a9b852501268c6a31c53d0f693e89aacaf63891669e825d75b8d59e6249635bb",
+    "quality_policy": [
+      "No model weight, quantization, router precision, expert routing, KV dtype, sampler, speculative decoding, or power-limit change.",
+      "Explicit --block-size 128 changes KV cache paging only; it does not change generated-token math or model quality policy.",
+      "MiniMax Q/K RMS variance allreduces remain in the generated graph.",
+      "The default-off attention delayed-allreduce path changes residual/add scheduling and floating-point accumulation order, so it is quality-conservative but not bitwise-identical."
+    ],
+    "settings": {
+      "tensor_parallel": 4,
+      "max_model_len": 2048,
+      "max_num_batched_tokens": 1024,
+      "max_num_seqs": 1,
+      "block_size": 128,
+      "compilation_config": {
+        "use_inductor_graph_partition": true,
+        "compile_sizes": [
+          1
+        ],
+        "cudagraph_mode": "PIECEWISE"
+      },
+      "env": {
+        "VLLM_MINIMAX_M2_ATTN_DELAY_ALLREDUCE": "1",
+        "VLLM_XPU_ENABLE_XPU_GRAPH": "1",
+        "VLLM_XPU_FORCE_GRAPH_WITH_COMM": "1",
+        "VLLM_XPU_GRAPH_NOOP_COMM_CAPTURE": "1",
+        "VLLM_XPU_USE_LLM_SCALER_MOE": "1",
+        "CCL_TOPO_P2P_ACCESS": "1"
+      }
+    },
+    "warm_aot_method": {
+      "script": "scripts/bench-vllm-minimax-autoround-xpu-warm-aot.sh",
+      "warmup": {
+        "prompt_tokens": 512,
+        "output_tokens": 128,
+        "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n128-20260513T142239Z.log",
+        "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n128-20260513T142239Z.json",
+        "elapsed_s": 7.298792154993862,
+        "tok_s_total": 87.68574120337288,
+        "note": "Cold AOT compile/profiling process; not used as the promoted throughput number."
+      },
+      "measure": {
+        "prompt_tokens": 512,
+        "output_tokens": 1536,
+        "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T142806Z.log",
+        "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T142806Z.json",
+        "elapsed_s": 21.494575221993728,
+        "tok_s_out": 71.45989088578641,
+        "tok_s_total": 95.27985451438188,
+        "kv_cache_tokens": 17280,
+        "available_kv_cache_gib": 1.03,
+        "direct_aot_load": true
+      }
+    }
+  },
+  "comparison": {
+    "previous_best_tok_s_out": 69.91774130987339,
+    "previous_best_tok_s_total": 93.22365507983119,
+    "absolute_gain_tok_s_out": 1.54214957591302,
+    "relative_gain_percent_out": 2.206,
+    "interpretation": "New quality-conservative MiniMax AutoRound TP4 high. Explicit block-size 128 improves decode speed versus the previous block-size 64 attention-delay graph while keeping the same model, dtype, routing, KV dtype, sampler, and power policy."
+  },
+  "localmaxxing": {
+    "id": "cmp45ssw1007apc01fwhysnwp",
+    "status": "APPROVED",
+    "submitted_at": "2026-05-13T14:32:55.105Z",
+    "payload": "data/localmaxxing-minimax-m27-autoround-xpugraph-attn-delay-block128-p512n1536-20260513.payload.json",
+    "response": "data/localmaxxing-responses/minimax-m27-autoround-xpugraph-attn-delay-block128-p512n1536-20260513.response.json"
+  },
+  "decision": "Promote as the current best MiniMax M2.7 AutoRound 4x B70 single-session score, while continuing to target larger gains from graph/allreduce/RMS/MoE epilogue fusion."
+}

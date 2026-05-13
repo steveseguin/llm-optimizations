@@ -32,7 +32,9 @@ export VLLM_XPU_USE_LLM_SCALER_MOE="${VLLM_XPU_USE_LLM_SCALER_MOE:-1}"
 export XPU_GRAPH="${XPU_GRAPH:-1}"
 export VLLM_XPU_FORCE_GRAPH_WITH_COMM="${VLLM_XPU_FORCE_GRAPH_WITH_COMM:-1}"
 export VLLM_XPU_GRAPH_NOOP_COMM_CAPTURE="${VLLM_XPU_GRAPH_NOOP_COMM_CAPTURE:-1}"
-export EXTRA_ARGS="${EXTRA_ARGS:---async-engine --compilation-config {\"use_inductor_graph_partition\":true,\"compile_sizes\":[1],\"cudagraph_mode\":\"PIECEWISE\"}}"
+if [ "${EXTRA_ARGS+x}" = "" ]; then
+  export EXTRA_ARGS='--async-engine --compilation-config {"use_inductor_graph_partition":true,"compile_sizes":[1],"cudagraph_mode":"PIECEWISE"}'
+fi
 
 if [ "${CCL_ZE_IPC_EXCHANGE+x}" = "" ]; then
   export CCL_IPC="${CCL_IPC:-default}"
