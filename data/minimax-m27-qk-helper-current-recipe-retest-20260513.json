@@ -1,0 +1,64 @@
+{
+  "date": "2026-05-13",
+  "model": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+  "hardware": "4x Intel Arc Pro B70 32GB",
+  "engine": "vLLM 0.20.1-local XPU",
+  "quality_guardrail": "The retest kept the same model, quantization, dtype, KV dtype, sampler, tensor parallelism, block size, prefix-cache-off setting, and allreduce semantics.",
+  "baseline": {
+    "description": "Current best: TP4 FP16, llm-scaler INT4 MoE, XPU graph, MiniMax attention delayed allreduce, block-size 256, max batched tokens 512, prefix caching disabled",
+    "aot_hash": "d0fed86b5a7cf64dcdb3e82d0b24effed00520ebd7f6018c6244d82201e6a98c",
+    "prompt_tokens": 512,
+    "output_tokens": 1536,
+    "output_tok_s": 73.30631164343902,
+    "total_tok_s": 97.7417488579187
+  },
+  "qk_helper_retest": {
+    "description": "Current best recipe plus VLLM_MINIMAX_QK_NORM_XPU_HELPER_FUSION=1 and pass_config.fuse_minimax_qk_norm=true",
+    "cache_root": "/mnt/fast-ai/vllm-cache-exp/minimax-xpugraph-attndelay-qkhelper-block256-mbt512-noprefix-20260513T194500Z",
+    "aot_hash": "7da4e01598f805f5c4a9841c387d77f9956b1771eb9e78838a768d330a4c19dc",
+    "extra_args": "--async-engine --block-size 256 --no-enable-prefix-caching --compilation-config {\"use_inductor_graph_partition\":true,\"compile_sizes\":[1],\"cudagraph_mode\":\"PIECEWISE\",\"pass_config\":{\"fuse_minimax_qk_norm\":true}}",
+    "environment": {
+      "VLLM_MINIMAX_M2_ATTN_DELAY_ALLREDUCE": "1",
+      "VLLM_MINIMAX_QK_NORM_XPU_HELPER_FUSION": "1",
+      "MAX_MODEL_LEN": 2048,
+      "MAX_BATCHED_TOKENS": 512,
+      "MAX_NUM_SEQS": 1,
+      "DTYPE": "float16"
+    },
+    "warmup_p512_n128": {
+      "elapsed_s": 7.7359576459857635,
+      "total_tok_s": 82.73054601482986,
+      "output_tok_s": 16.54610920296597,
+      "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n128-20260513T193806Z.log",
+      "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n128-20260513T193806Z.json"
+    },
+    "sustained_p512_n1536_first": {
+      "elapsed_s": 21.00480101199355,
+      "total_tok_s": 97.50151876376313,
+      "output_tok_s": 73.12613907282235,
+      "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T194704Z.log",
+      "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T194704Z.json"
+    },
+    "sustained_p512_n1536_repeat": {
+      "elapsed_s": 21.24995148400194,
+      "total_tok_s": 96.37669062641578,
+      "output_tok_s": 72.28251796981183,
+      "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T195543Z.log",
+      "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T195543Z.json"
+    },
+    "aot_collectives": {
+      "actual_allreduce_call_lines": 1496,
+      "actual_wait_tensor_call_lines": 1496,
+      "actual_allreduce_categories": {
+        "embedding_hidden": 8,
+        "qk_rms_variance": 496,
+        "attention_o_proj_hidden": 496,
+        "moe_hidden": 496
+      },
+      "wait_gap_lines": {
+        "2": 1496
+      }
+    },
+    "decision": "Closed as negative/near-neutral. The branch preserves semantics but does not reduce collective count and does not beat the current best sustained decode result."
+  }
+}
