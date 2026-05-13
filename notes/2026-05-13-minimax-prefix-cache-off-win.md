@@ -92,3 +92,19 @@ Logs:
 
 Decision: do not promote. Prefix-cache-off also helps MBT480, but the result is
 still slightly below MBT512 prefix-off.
+
+## MBT512 Prefix-Off Repeat
+
+The promoted prefix-off cache was repeated with warmup skipped:
+
+| Run | Prompt/output | Total tok/s | Output tok/s |
+| --- | ---: | ---: | ---: |
+| block-size 256, MBT512, prefix cache off repeat | 512/1536 | `97.033748` | `72.775311` |
+
+Logs:
+
+- measured: `/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T175300Z.log`
+- AOT: `d0fed86b5a7cf64dcdb3e82d0b24effed00520ebd7f6018c6244d82201e6a98c`
+
+Decision: do not promote. The repeat used a fast init path with no repeated
+broadcast waits, but decode was below the promoted 73.232 tok/s run.
