@@ -53,6 +53,30 @@
       "compile_seconds": 178.9,
       "outcome": "negative cold-cache artifact; same AOT hash as current best",
       "log_dir": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-mode3-partition-compile1-p512n512-20260513T012448Z"
+    },
+    {
+      "name": "async_static_compile_no_prefix",
+      "prompt_tokens": 512,
+      "output_tokens": 512,
+      "elapsed_s": 11.084251649997896,
+      "tok_s_total": 92.38332296436037,
+      "tok_s_output": 46.19166148218019,
+      "gpu_kv_cache_tokens": 16832,
+      "aot_hash": "3e2cefa134c3aecc743c56d36960e4cb0a8ac7d2adc73c3f2a078cc8b6164846",
+      "outcome": "short-run positive only; long repeat is below accepted best",
+      "log_dir": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-noprefix-staticcompile-p512n512-20260513T014259Z"
+    },
+    {
+      "name": "async_static_compile_no_prefix_long_repeat",
+      "prompt_tokens": 512,
+      "output_tokens": 1536,
+      "elapsed_s": 32.646058810991235,
+      "tok_s_total": 62.73345312085519,
+      "tok_s_output": 47.05008984064139,
+      "gpu_kv_cache_tokens": 16832,
+      "aot_hash": "3e2cefa134c3aecc743c56d36960e4cb0a8ac7d2adc73c3f2a078cc8b6164846",
+      "outcome": "negative versus accepted 48.092807 tok/s async-engine anchor; do not submit",
+      "log_dir": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-noprefix-staticcompile-p512n1536-20260513T014535Z"
     }
   ],
   "fused_gemv_probe": {

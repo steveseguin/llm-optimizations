@@ -23,9 +23,9 @@ count_rg "Topologically Sorted Source Nodes: \\[.*all_reduce"
 printf 'all_reduce_placeholder_lines='
 count_rg "PlaceHolder\\[target=all_reduce"
 printf 'all_reduce_call_lines='
-count_rg "^[[:space:]]*[A-Za-z_][A-Za-z0-9_]*: .* = torch\\.ops\\._c10d_functional\\.all_reduce"
+count_rg "torch\\.ops\\._c10d_functional\\.all_reduce_?\\.default"
 printf 'wait_tensor_call_lines='
-count_rg "^[[:space:]]*[A-Za-z_][A-Za-z0-9_]*: .* = torch\\.ops\\._c10d_functional\\.wait_tensor"
+count_rg "torch\\.ops\\._c10d_functional\\.wait_tensor\\.default"
 printf 'vllm_all_reduce_call_lines='
 count_rg "torch\\.ops\\.vllm\\.all_reduce"
 printf 'rms_int4_lines='
@@ -41,8 +41,8 @@ count_rg "def triton_red_fused__to_copy_add_mean_moe_forward_mul_pow_rsqrt"
 
 echo
 echo "files_with_collectives:"
-rg -l "_c10d_functional\\.all_reduce|torch\\.ops\\.vllm\\.all_reduce|PlaceHolder\\[target=all_reduce" "$cache" -g '*.py' 2>/dev/null | sort || true
+rg -l "_c10d_functional\\.all_reduce|_c10d_functional\\.wait_tensor|torch\\.ops\\.vllm\\.all_reduce|PlaceHolder\\[target=all_reduce" "$cache" -g '*.py' 2>/dev/null | sort || true
 
 echo
 echo "sample_collective_context:"
-rg -n "Topologically Sorted Source Nodes: \\[all_reduce|PlaceHolder\\[target=all_reduce|^[[:space:]]*[A-Za-z_][A-Za-z0-9_]*: .* = torch\\.ops\\._c10d_functional\\.all_reduce|^[[:space:]]*[A-Za-z_][A-Za-z0-9_]*: .* = torch\\.ops\\._c10d_functional\\.wait_tensor|torch\\.ops\\.vllm\\.all_reduce|rms_norm_default, int4_gemm_w4a16|Original ATen: \\[aten\\._to_copy, aten\\.add, aten\\.pow, aten\\.mean, aten\\.rsqrt, aten\\.mul, vllm\\.moe_forward\\]" "$cache" -g '*.py' 2>/dev/null | head -160 || true
+rg -n "Topologically Sorted Source Nodes: \\[all_reduce|PlaceHolder\\[target=all_reduce|torch\\.ops\\._c10d_functional\\.all_reduce_?\\.default|torch\\.ops\\._c10d_functional\\.wait_tensor\\.default|torch\\.ops\\.vllm\\.all_reduce|rms_norm_default, int4_gemm_w4a16|Original ATen: \\[aten\\._to_copy, aten\\.add, aten\\.pow, aten\\.mean, aten\\.rsqrt, aten\\.mul, vllm\\.moe_forward\\]" "$cache" -g '*.py' 2>/dev/null | head -160 || true

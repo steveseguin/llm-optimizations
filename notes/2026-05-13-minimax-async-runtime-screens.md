@@ -15,12 +15,21 @@ changing model quality.
 | `--async-engine` | 512/512 | 45.648 | 91.295 | small positive |
 | `--async-engine` | 512/1536 | 47.743 | 63.658 | repeat candidate |
 | `--async-engine` repeat | 512/1536 | 48.093 | 64.124 | new accepted best |
+| `--async-engine --no-enable-prefix-caching` | 512/512 | 46.192 | 92.383 | short-run positive |
+| same long repeat | 512/1536 | 47.050 | 62.733 | negative versus accepted best |
 
 `--no-enable-prefix-caching --no-enable-chunked-prefill` did not load under the
 normal `max_model_len=2048` / `max_num_batched_tokens=1024` recipe. vLLM warned
 that MiniMax does not officially support disabling chunked prefill, then failed
 validation because no-chunk mode requires `max_num_batched_tokens >=
 max_model_len`. This is not worth pursuing for the quality-preserving speed path.
+
+Disabling prefix caching alone is valid with chunked prefill left enabled, and
+it reused the same static decode graph with `16,832` GPU KV-cache tokens. It is
+not a promoted speed path: the short p512/n512 run edged above the async-engine
+screen, but the p512/n1536 repeat landed below the accepted `48.092807` output
+tok/s anchor. Keep prefix caching enabled unless a later source patch changes
+the scheduling tradeoff.
 
 ## Current Best
 
@@ -48,3 +57,5 @@ attention/KV scheduling, and MoE bridge/kernel overhead.
 - async p512/n512: `/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-asyncengine-staticcompile-p512n512-20260513T004155Z`
 - async p512/n1536: `/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-asyncengine-staticcompile-p512n1536-20260513T004424Z`
 - async p512/n1536 repeat: `/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-asyncengine-staticcompile-repeat-p512n1536-20260513T004725Z`
+- no-prefix p512/n512: `/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-noprefix-staticcompile-p512n512-20260513T014259Z`
+- no-prefix p512/n1536: `/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-noprefix-staticcompile-p512n1536-20260513T014535Z`

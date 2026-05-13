@@ -148,6 +148,14 @@ The u4 MoE bridge is no longer the only ceiling. Existing timing notes put MiniM
    - EP round-robin does not rescue expert parallelism for batch-1 speed.
      The warm p64/n32 screen reached only `22.338` output-equivalent tok/s,
      consistent with earlier slower EP4 long-run behavior.
+   - UR/Level Zero launch knobs are not the current speed path. On the current
+     async/static AOT graph, `UR_L0_USE_IMMEDIATE_COMMANDLISTS=1` regressed
+     slightly to `45.49` output tok/s at p512/n512, while
+     `UR_L0_USE_IMMEDIATE_COMMANDLISTS=2` and `UR_L0_DEVICE_SCOPE_EVENTS=2`
+     stalled or hung. Keep default UR event behavior for promoted runs.
+   - oneCCL's default `mpi` ATL transport is also not usable in the current
+     vLLM harness; forcing `CCL_ATL_TRANSPORT=mpi` stalled during init. Keep
+     the wrapper's `CCL_ATL_TRANSPORT=ofi` setting.
 
 6. Speculative decode and MTP
    - Current MiniMax n-gram, ngram_gpu, and DFlash screens are negative or unstable.
@@ -160,6 +168,11 @@ The u4 MoE bridge is no longer the only ceiling. Existing timing notes put MiniM
    - A fast-NVMe DFlash retest loaded and compiled both target and drafter, but
      still stalled before generating a p64/n32 sample. Storage was not the
      blocker.
+   - A newer `MirecX/MiniMax-M2.7-L3H5-DFlash` drafter was downloaded and
+     screened. The original config resolved the draft to
+     `max_model_len=196608`; a local max-512 smoke copy fixed that startup
+     shape, but both variants still stalled before generation. Keep DFlash as
+     an XPU/vLLM integration debug track, not a current speed route.
    - Revisit speculation only with a draft that has target-model verification and a measured acceptance rate high enough to beat the extra scheduler and KV pressure.
    - vLLM's native suffix speculative path is now technically runnable on this
      XPU stack via a minimal Arctic `suffix_decoding` subset. A p64/n16 random

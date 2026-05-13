@@ -1,0 +1,78 @@
+{
+  "date_utc": "2026-05-13",
+  "model": {
+    "hf_id": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+    "local_path": "/mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround",
+    "quantization": "AutoRound INT4 W4A16"
+  },
+  "hardware": {
+    "gpu_name": "Intel Arc Pro B70",
+    "gpu_count": 4,
+    "vram_gb_each": 32
+  },
+  "quality_guardrails": {
+    "expert_dropping": false,
+    "router_precision_reduced": false,
+    "power_limits_changed": false,
+    "target_model_changed": false
+  },
+  "runtime_screens": [
+    {
+      "name": "ur_l0_immediate_command_lists_1",
+      "prompt_tokens": 512,
+      "output_tokens": 512,
+      "elapsed_s": 11.255910109000979,
+      "tok_s_total": 90.97442944050708,
+      "tok_s_output": 45.48721472025354,
+      "gpu_kv_cache_tokens": 16064,
+      "aot_hash": "3e2cefa134c3aecc743c56d36960e4cb0a8ac7d2adc73c3f2a078cc8b6164846",
+      "outcome": "negative versus async/static p512/n512 baseline",
+      "log_dir": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-ur-immediate1-staticcompile-p512n512-20260513T015504Z"
+    },
+    {
+      "name": "ur_l0_immediate_command_lists_2",
+      "prompt_tokens": 512,
+      "output_tokens": 512,
+      "outcome": "hung after AOT load; repeated ocloc/IGC internal compiler errors and shared-memory broadcast timeout",
+      "gpu_kv_cache_tokens": 16832,
+      "aot_hash": "3e2cefa134c3aecc743c56d36960e4cb0a8ac7d2adc73c3f2a078cc8b6164846",
+      "log_dir": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-ur-immediate2-staticcompile-p512n512-20260513T015725Z"
+    },
+    {
+      "name": "ur_l0_device_scope_events_2",
+      "prompt_tokens": 512,
+      "output_tokens": 512,
+      "outcome": "hung during distributed/model init; no benchmark JSON",
+      "log_dir": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-ur-devscope2-staticcompile-p512n512-20260513T020124Z"
+    },
+    {
+      "name": "ccl_atl_transport_mpi",
+      "prompt_tokens": 512,
+      "output_tokens": 512,
+      "outcome": "hung during distributed/model init; keep wrapper CCL_ATL_TRANSPORT=ofi",
+      "log_dir": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-ccl-mpi-staticcompile-p512n512-20260513T020627Z"
+    }
+  ],
+  "speculative_decode_screens": [
+    {
+      "name": "dflash_l3h5_original_config",
+      "draft_hf_id": "MirecX/MiniMax-M2.7-L3H5-DFlash",
+      "draft_local_path": "/mnt/fast-ai/llm-models/minimax-m2.7-l3h5-dflash",
+      "prompt_tokens": 64,
+      "output_tokens": 32,
+      "num_speculative_tokens": 4,
+      "outcome": "stalled before generation; draft resolved max_model_len=196608",
+      "log_dir": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-dflash-l3h5-smoke-p64n32-20260513T021112Z"
+    },
+    {
+      "name": "dflash_l3h5_local_max512_config",
+      "draft_hf_id": "MirecX/MiniMax-M2.7-L3H5-DFlash",
+      "draft_local_path": "/mnt/fast-ai/llm-models/minimax-m2.7-l3h5-dflash-max512",
+      "prompt_tokens": 64,
+      "output_tokens": 32,
+      "num_speculative_tokens": 4,
+      "outcome": "still stalled before generation after reducing draft max_position_embeddings to 512",
+      "log_dir": "/mnt/fast-ai/bench-results/minimax-m2.7-autoround-vllm-dflash-l3h5-max512-smoke-p64n32-20260513T021532Z"
+    }
+  ]
+}
