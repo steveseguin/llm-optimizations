@@ -1,0 +1,8 @@
+]~!b[]~b]system
+You are a helpful assistant. Your name is MiniMax-M2.7 and is built by MiniMax.[e~[
+]~b]user
+Answer exactly with the single uppercase word: PASS[e~[
+]~b]ai
+<think>
+</think>
+

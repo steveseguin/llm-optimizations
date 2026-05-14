@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Run deterministic MiniMax M2.7 generation smoke checks.
+"""Run MiniMax M2.7 generation smoke checks.
 
-This is intentionally a smoke check, not a full evaluation suite.  It verifies
-that a candidate runtime is deterministic for fixed greedy prompts and records
-token hashes that can be compared across graph/backend changes.
+This is intentionally a smoke check, not a full evaluation suite. It records
+token hashes for repeatability diagnostics while separating those diagnostics
+from hard corruption and semantic-canary checks.
 """
 
 from __future__ import annotations
@@ -13,6 +13,7 @@ import hashlib
 import json
 import math
 import os
+import re
 import sys
 import time
 from pathlib import Path
@@ -178,6 +179,54 @@ def parse_args() -> argparse.Namespace:
         help="Record but do not fail if repeated greedy runs produce different token hashes.",
     )
     parser.add_argument(
+        "--min-distinct-generated-tokens",
+        type=int,
+        default=2,
+        help="Fail if generated token diversity is below this threshold.",
+    )
+    parser.add_argument(
+        "--min-printable-nonspace-chars",
+        type=int,
+        default=1,
+        help="Fail if generated printable non-space text chars are below this threshold.",
+    )
+    parser.add_argument(
+        "--max-control-nonspace-chars",
+        type=int,
+        default=0,
+        help="Fail if generated non-space control chars exceed this threshold.",
+    )
+    parser.add_argument(
+        "--max-nul-token-count",
+        type=int,
+        default=0,
+        help="Fail if generated token id 0 count exceeds this threshold.",
+    )
+    parser.add_argument(
+        "--require-substring",
+        action="append",
+        default=None,
+        help=(
+            "Substring that must appear in the combined generated text. May be "
+            "repeated. Use with canary prompts."
+        ),
+    )
+    parser.add_argument(
+        "--require-regex",
+        action="append",
+        default=None,
+        help=(
+            "Python regex that must match the combined generated text. May be "
+            "repeated. Use with canary prompts."
+        ),
+    )
+    parser.add_argument(
+        "--async-scheduling",
+        choices=("default", "on", "off"),
+        default="default",
+        help="Override vLLM async scheduling for determinism/isolation tests.",
+    )
+    parser.add_argument(
         "--enable-prefix-caching",
         dest="enable_prefix_caching",
         action="store_true",
@@ -234,6 +283,73 @@ def serialize_logprobs(logprobs):
         entries.sort(key=lambda entry: entry.get("rank") or 10**9)
         serialized.append(entries)
     return serialized
+
+
+def text_quality_stats(token_ids: list[int], text: str) -> dict:
+    distinct_tokens = sorted(set(token_ids))
+    printable_chars = sum(
+        1 for char in text if char.isprintable() and not char.isspace()
+    )
+    control_nonspace_chars = sum(
+        1 for char in text if not char.isprintable() and not char.isspace()
+    )
+    nul_token_count = sum(1 for token in token_ids if token == 0)
+    return {
+        "n_tokens": len(token_ids),
+        "distinct_generated_token_count": len(distinct_tokens),
+        "first_distinct_generated_tokens": distinct_tokens[:16],
+        "printable_nonspace_text_chars": printable_chars,
+        "control_nonspace_text_chars": control_nonspace_chars,
+        "nul_token_count": nul_token_count,
+        "nontrivial_tokens": len(distinct_tokens) > 1,
+        "nontrivial_text": printable_chars > 0,
+        "control_char_output": control_nonspace_chars > 0 or nul_token_count > 0,
+    }
+
+
+def semantic_requirement_results(
+    generated_text: str,
+    required_substrings: list[str] | None,
+    required_regexes: list[str] | None,
+) -> dict:
+    substring_results = [
+        {"substring": substring, "matched": substring in generated_text}
+        for substring in (required_substrings or [])
+    ]
+    regex_results = []
+    for pattern in required_regexes or []:
+        try:
+            matched = re.search(pattern, generated_text, flags=re.MULTILINE) is not None
+            regex_results.append({"regex": pattern, "matched": matched})
+        except re.error as exc:
+            regex_results.append(
+                {"regex": pattern, "matched": False, "error": str(exc)}
+            )
+    return {
+        "required_substrings": substring_results,
+        "required_regexes": regex_results,
+        "all_required_substrings_matched": all(
+            item["matched"] for item in substring_results
+        ),
+        "all_required_regexes_matched": all(item["matched"] for item in regex_results),
+    }
+
+
+def prompt_output_record(prompt_index: int, output) -> dict:
+    token_ids = list(output.outputs[0].token_ids)
+    text = output.outputs[0].text
+    return {
+        "prompt_index": prompt_index,
+        "n_tokens": len(token_ids),
+        "token_ids": token_ids,
+        "token_sha256": hashlib.sha256(
+            ",".join(map(str, token_ids)).encode()
+        ).hexdigest(),
+        "text": text,
+        "text_sha256": hashlib.sha256(text.encode()).hexdigest(),
+        "logprobs": serialize_logprobs(output.outputs[0].logprobs),
+        "quality": text_quality_stats(token_ids, text),
+    }
 
 
 def configure_env(args: argparse.Namespace) -> None:
@@ -316,6 +432,8 @@ def main() -> None:
         }
     if args.gpu_memory_utilization is not None:
         llm_kwargs["gpu_memory_utilization"] = args.gpu_memory_utilization
+    if args.async_scheduling != "default":
+        llm_kwargs["async_scheduling"] = args.async_scheduling == "on"
 
     llm = LLM(
         model=args.model,
@@ -360,22 +478,7 @@ def main() -> None:
             prompt_records = []
             for i, prompt in enumerate(prompts):
                 outputs = llm.generate([prompt], params)
-                output = outputs[0]
-                prompt_records.append(
-                    {
-                        "prompt_index": i,
-                        "n_tokens": len(output.outputs[0].token_ids),
-                        "token_ids": list(output.outputs[0].token_ids),
-                        "token_sha256": hashlib.sha256(
-                            ",".join(map(str, output.outputs[0].token_ids)).encode()
-                        ).hexdigest(),
-                        "text": output.outputs[0].text,
-                        "text_sha256": hashlib.sha256(
-                            output.outputs[0].text.encode()
-                        ).hexdigest(),
-                        "logprobs": serialize_logprobs(output.outputs[0].logprobs),
-                    }
-                )
+                prompt_records.append(prompt_output_record(i, outputs[0]))
             run_records.append(
                 {
                     "run": run_idx,
@@ -393,22 +496,7 @@ def main() -> None:
                     params,
                     chat_template=rendered_prompt,
                 )
-                output = outputs[0]
-                prompt_records.append(
-                    {
-                        "prompt_index": i,
-                        "n_tokens": len(output.outputs[0].token_ids),
-                        "token_ids": list(output.outputs[0].token_ids),
-                        "token_sha256": hashlib.sha256(
-                            ",".join(map(str, output.outputs[0].token_ids)).encode()
-                        ).hexdigest(),
-                        "text": output.outputs[0].text,
-                        "text_sha256": hashlib.sha256(
-                            output.outputs[0].text.encode()
-                        ).hexdigest(),
-                        "logprobs": serialize_logprobs(output.outputs[0].logprobs),
-                    }
-                )
+                prompt_records.append(prompt_output_record(i, outputs[0]))
             run_records.append(
                 {
                     "run": run_idx,
@@ -439,19 +527,25 @@ def main() -> None:
         for run in run_records
         for prompt_record in run["prompts"]
     )
-    distinct_generated_tokens = sorted(set(generated_tokens))
-    printable_chars = sum(
-        1 for char in generated_text if char.isprintable() and not char.isspace()
+    quality_stats = text_quality_stats(generated_tokens, generated_text)
+    semantic_checks = semantic_requirement_results(
+        generated_text,
+        args.require_substring,
+        args.require_regex,
     )
-    control_nonspace_chars = sum(
-        1
-        for char in generated_text
-        if not char.isprintable() and not char.isspace()
+    nontrivial_tokens = (
+        quality_stats["distinct_generated_token_count"]
+        >= args.min_distinct_generated_tokens
     )
-    nul_token_count = sum(1 for token in generated_tokens if token == 0)
-    nontrivial_tokens = len(distinct_generated_tokens) > 1
-    nontrivial_text = printable_chars > 0
-    control_char_output = control_nonspace_chars > 0 or nul_token_count > 0
+    nontrivial_text = (
+        quality_stats["printable_nonspace_text_chars"]
+        >= args.min_printable_nonspace_chars
+    )
+    control_char_output = (
+        quality_stats["control_nonspace_text_chars"]
+        > args.max_control_nonspace_chars
+        or quality_stats["nul_token_count"] > args.max_nul_token_count
+    )
     degenerate_output = (
         not nontrivial_tokens or not nontrivial_text or control_char_output
     )
@@ -465,6 +559,17 @@ def main() -> None:
         if args.expected_token_sha256 is None
         else combined_token_hash == args.expected_token_sha256
     )
+    failure_reasons = []
+    if not deterministic and not args.allow_nondeterministic_output:
+        failure_reasons.append("nondeterministic token hashes")
+    if expected_match is False:
+        failure_reasons.append("combined token hash mismatch")
+    if degenerate_output and not args.allow_degenerate_output:
+        failure_reasons.append("degenerate or corrupt generated output")
+    if not semantic_checks["all_required_substrings_matched"]:
+        failure_reasons.append("required substring missing")
+    if not semantic_checks["all_required_regexes_matched"]:
+        failure_reasons.append("required regex missing or invalid")
     record = {
         "mode": args.mode,
         "elapsed_s": elapsed,
@@ -477,20 +582,23 @@ def main() -> None:
         "expected_token_sha256": args.expected_token_sha256,
         "expected_token_sha256_match": expected_match,
         "deterministic_across_runs": deterministic,
+        "passed": not failure_reasons,
+        "failure_reasons": failure_reasons,
         "quality_checks": {
-            "distinct_generated_token_count": len(distinct_generated_tokens),
-            "first_distinct_generated_tokens": distinct_generated_tokens[:16],
-            "printable_nonspace_text_chars": printable_chars,
-            "control_nonspace_text_chars": control_nonspace_chars,
-            "nul_token_count": nul_token_count,
+            **quality_stats,
             "nontrivial_tokens": nontrivial_tokens,
             "nontrivial_text": nontrivial_text,
             "control_char_output": control_char_output,
             "degenerate_output": degenerate_output,
+            "min_distinct_generated_tokens": args.min_distinct_generated_tokens,
+            "min_printable_nonspace_chars": args.min_printable_nonspace_chars,
+            "max_control_nonspace_chars": args.max_control_nonspace_chars,
+            "max_nul_token_count": args.max_nul_token_count,
             "allow_degenerate_output": args.allow_degenerate_output,
             "allow_nondeterministic_output": args.allow_nondeterministic_output,
             "disable_custom_all_reduce": args.disable_custom_all_reduce,
             "llm_scaler_moe": not args.disable_llm_scaler_moe,
+            "semantic_checks": semantic_checks,
         },
         "run_records": run_records,
         "prompts": prompts,
@@ -517,6 +625,7 @@ def main() -> None:
             "compilation_mode": args.compilation_mode,
             "cudagraph_mode": args.cudagraph_mode,
             "attention_backend": args.attention_backend,
+            "async_scheduling": args.async_scheduling,
             "cudagraph_num_warmups": args.cudagraph_num_warmups,
             "compile_ranges_endpoints": args.compile_ranges_endpoints,
         },
@@ -537,6 +646,8 @@ def main() -> None:
                 "deterministic_across_runs": record[
                     "deterministic_across_runs"
                 ],
+                "passed": record["passed"],
+                "failure_reasons": record["failure_reasons"],
                 "quality_checks": record["quality_checks"],
                 "expected_token_sha256_match": record[
                     "expected_token_sha256_match"
@@ -545,12 +656,10 @@ def main() -> None:
             indent=2,
         )
     )
-    if not deterministic and not args.allow_nondeterministic_output:
-        raise SystemExit("quality smoke failed: nondeterministic token hashes")
-    if expected_match is False:
-        raise SystemExit("quality smoke failed: combined token hash mismatch")
-    if degenerate_output and not args.allow_degenerate_output:
-        raise SystemExit("quality smoke failed: degenerate generated output")
+    if failure_reasons:
+        raise SystemExit(
+            "quality smoke failed: " + "; ".join(failure_reasons)
+        )
 
 
 if __name__ == "__main__":

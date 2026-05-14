@@ -19,8 +19,16 @@ GPU_MEMORY_UTILIZATION="${GPU_MEMORY_UTILIZATION:-}"
 QUALITY_TOKENS="${QUALITY_TOKENS:-160}"
 QUALITY_RUNS="${QUALITY_RUNS:-1}"
 QUALITY_PROMPT_FILE="${QUALITY_PROMPT_FILE:-/home/steve/llm-optimizations-publish/prompts/minimax-long-context-quality-smoke.txt}"
+QUALITY_RAW_PROMPT="${QUALITY_RAW_PROMPT:-0}"
 QUALITY_EXPECTED_TOKEN_SHA256="${QUALITY_EXPECTED_TOKEN_SHA256:-}"
 QUALITY_REQUIRE_DETERMINISTIC="${QUALITY_REQUIRE_DETERMINISTIC:-0}"
+QUALITY_ASYNC_SCHEDULING="${QUALITY_ASYNC_SCHEDULING:-default}"
+QUALITY_MIN_DISTINCT_GENERATED_TOKENS="${QUALITY_MIN_DISTINCT_GENERATED_TOKENS:-2}"
+QUALITY_MIN_PRINTABLE_NONSPACE_CHARS="${QUALITY_MIN_PRINTABLE_NONSPACE_CHARS:-1}"
+QUALITY_MAX_CONTROL_NONSPACE_CHARS="${QUALITY_MAX_CONTROL_NONSPACE_CHARS:-0}"
+QUALITY_MAX_NUL_TOKEN_COUNT="${QUALITY_MAX_NUL_TOKEN_COUNT:-0}"
+QUALITY_REQUIRE_SUBSTRING="${QUALITY_REQUIRE_SUBSTRING:-}"
+QUALITY_REQUIRE_REGEX="${QUALITY_REQUIRE_REGEX:-}"
 BENCH_REPEATS="${BENCH_REPEATS:-2}"
 RUN_TIMEOUT="${RUN_TIMEOUT:-25m}"
 VENV="${VENV:-/home/steve/.venvs/vllm-xpu}"
@@ -58,13 +66,27 @@ quality_cmd=(
   --cudagraph-mode full_decode_only
   --cudagraph-num-warmups 0
   --attention-backend TRITON_ATTN
+  --async-scheduling "$QUALITY_ASYNC_SCHEDULING"
+  --min-distinct-generated-tokens "$QUALITY_MIN_DISTINCT_GENERATED_TOKENS"
+  --min-printable-nonspace-chars "$QUALITY_MIN_PRINTABLE_NONSPACE_CHARS"
+  --max-control-nonspace-chars "$QUALITY_MAX_CONTROL_NONSPACE_CHARS"
+  --max-nul-token-count "$QUALITY_MAX_NUL_TOKEN_COUNT"
 )
 
 if [ -n "$GPU_MEMORY_UTILIZATION" ]; then
   quality_cmd+=(--gpu-memory-utilization "$GPU_MEMORY_UTILIZATION")
 fi
+if [ "$QUALITY_RAW_PROMPT" = "1" ]; then
+  quality_cmd+=(--raw-prompt)
+fi
 if [ -n "$QUALITY_EXPECTED_TOKEN_SHA256" ]; then
   quality_cmd+=(--expected-token-sha256 "$QUALITY_EXPECTED_TOKEN_SHA256")
+fi
+if [ -n "$QUALITY_REQUIRE_SUBSTRING" ]; then
+  quality_cmd+=(--require-substring "$QUALITY_REQUIRE_SUBSTRING")
+fi
+if [ -n "$QUALITY_REQUIRE_REGEX" ]; then
+  quality_cmd+=(--require-regex "$QUALITY_REQUIRE_REGEX")
 fi
 if [ "$QUALITY_REQUIRE_DETERMINISTIC" != "1" ]; then
   quality_cmd+=(--allow-nondeterministic-output)
@@ -124,8 +146,8 @@ tmp="$(mktemp)"
 for path in "${bench_jsons[@]}"; do
   jq --arg path "$path" --argjson output_tokens "$OUTPUT_LEN" \
     '. + {path: $path, output_tokens_per_second: ($output_tokens / .elapsed_time)}' "$path"
-done | jq -s --argfile summary "$summary_json" '
-  $summary + {
+done | jq -s --slurpfile summary "$summary_json" '
+  $summary[0] + {
     benchmarks: .,
     output_toks_per_second: [.[].output_tokens_per_second],
     total_toks_per_second: [.[].tokens_per_second],
