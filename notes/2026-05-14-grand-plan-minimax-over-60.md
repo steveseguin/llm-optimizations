@@ -154,6 +154,11 @@ Rules:
   TP4 graph recipe, repair EP communication with focused repros, and only use
   the compiled path for cheap one-token diagnostics until it stops producing
   NUL output.
+- Raising `max_num_batched_tokens` to `1024` is now a rejected stability
+  candidate for the current TP4 graph recipe. It passed the semantic quality
+  screen but stalled before throughput and left the XPU runtime unhealthy,
+  requiring reboot-level recovery. Keep the promoted recipe at
+  `max_num_batched_tokens=512` unless a separate graph/shared-memory fix lands.
 
 See `notes/2026-05-14-minimax-compiled-path-repair.md` for the active repair
 matrix and exact JSON/log paths.

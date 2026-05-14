@@ -187,3 +187,28 @@ current promoted recipe still clears the semantic canary after the EP crash.
   model load. Long-context graph quality and throughput runs still complete.
 - Add optional finite-logprob/top-logprob capture to canaries when the runtime
   can return it without destabilizing XPU graph execution.
+
+## MBT 1024 Stall
+
+Tried raising `max_num_batched_tokens` from `512` to `1024` while keeping the
+otherwise promoted TP4 full-decode graph recipe unchanged:
+
+- Label: `full-decode-graph-triton-mbt1024`
+- Quality JSON:
+  `/home/steve/bench-results/minimax-m2.7-quality-gated/minimax-full-decode-graph-triton-mbt1024-tp4-ctx2048-mbt1024-bs256-p512n1536-20260514T155639Z-quality.json`
+- Quality gate: `passed=true`, `nul_token_count=0`,
+  `control_nonspace_text_chars=0`, `degenerate_output=false`
+- Throughput log:
+  `/home/steve/bench-results/minimax-m2.7-quality-gated/vllm-minimax-m27-autoround-tp4-p512n1536-20260514T155845Z.log`
+
+Outcome: not promotable. The quality screen passed, but the throughput run
+loaded the model, selected the llm-scaler INT4 MoE config, then repeated
+`No available shared memory broadcast block found in 60 seconds` for more than
+10 minutes before manual termination. The follow-up minimal torch XPU health
+check then timed out, and `xpu-smi config -d 2 --reset` hung. `dmesg` showed Xe
+PF/TLB invalidation errors during reset, so the system needs a full reboot
+before more trustworthy benchmarks.
+
+No LocalMaxxing submission was made. This records `max_num_batched_tokens=1024`
+as a runtime-stability regression under the current graph recipe, despite a
+clean semantic quality screen.
