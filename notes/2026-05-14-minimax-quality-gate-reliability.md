@@ -462,3 +462,41 @@ Interpretation: the model, prompt, and 4096-token runtime shape can execute on
 XPU in eager mode. The invalid 4096-context result above is therefore more
 likely tied to the full-decode XPU graph/shared-memory scheduling path than to
 the checkpoint or long-context allocation itself.
+
+### 4096-Context Graph Short-Prompt Isolation
+
+Ran the full-decode graph path at `max_model_len=4096` with a short prompt and
+`32` generated tokens:
+
+```bash
+python scripts/run-vllm-minimax-quality-check.py \
+  --mode graph \
+  --max-model-len 4096 \
+  --max-tokens 32 \
+  --prompt 'In one concise sentence, name two software mitigations for PCIe multi-GPU LLM bottlenecks.' \
+  --compilation-mode none \
+  --cudagraph-mode full_decode_only \
+  --attention-backend TRITON_ATTN
+```
+
+Artifacts:
+
+- JSON:
+  `/home/steve/bench-results/minimax-m2.7-quality-gated/minimax-ctx4096-graph-shortprompt-20260514T173740Z.json`
+- Log:
+  `/home/steve/bench-results/minimax-m2.7-quality-gated/minimax-ctx4096-graph-shortprompt-20260514T173740Z.log`
+
+Result:
+
+- Result: `passed=true`
+- Generated tokens: `32`
+- Distinct generated tokens: `30`
+- NUL tokens: `0`
+- Control non-space chars: `0`
+- Observed short-run output rate from the progress line: about `28.1` tok/s
+- Follow-up four-device torch XPU health check passed.
+
+Interpretation: `max_model_len=4096` plus full-decode graph can work for a
+short prompt. The invalid larger-context quality-gate failure is narrowed to the
+long chat-template prompt / chunked-prefill path at `max_model_len=4096`, not
+to decode graph capture alone.
