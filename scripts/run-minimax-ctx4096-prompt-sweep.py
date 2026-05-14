@@ -212,7 +212,15 @@ def main() -> None:
     prompt_dir = outdir / "prompts"
     outdir.mkdir(parents=True, exist_ok=True)
     prompt_dir.mkdir(parents=True, exist_ok=True)
-    tokenizer = AutoTokenizer.from_pretrained(args.model, trust_remote_code=True)
+    print(
+        json.dumps({"event": "load_tokenizer", "model": args.model}),
+        flush=True,
+    )
+    tokenizer = AutoTokenizer.from_pretrained(
+        args.model,
+        trust_remote_code=True,
+        local_files_only=True,
+    )
     targets = [int(x) for x in args.targets.replace(" ", "").split(",") if x]
     run_id = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
     summary_path = outdir / f"summary-{run_id}.json"
