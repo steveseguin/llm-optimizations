@@ -31,6 +31,7 @@ QUALITY_REQUIRE_SUBSTRING="${QUALITY_REQUIRE_SUBSTRING:-}"
 QUALITY_REQUIRE_REGEX="${QUALITY_REQUIRE_REGEX:-}"
 BENCH_REPEATS="${BENCH_REPEATS:-2}"
 RUN_TIMEOUT="${RUN_TIMEOUT:-25m}"
+SHM_STALL_MAX_WARNINGS="${SHM_STALL_MAX_WARNINGS:-0}"
 VENV="${VENV:-/home/steve/.venvs/vllm-xpu}"
 LABEL="${LABEL:-full-decode-graph-triton}"
 
@@ -110,6 +111,7 @@ for i in $(seq 1 "$BENCH_REPEATS"); do
     DTYPE="$DTYPE" \
     GPU_MEMORY_UTILIZATION="$GPU_MEMORY_UTILIZATION" \
     RUN_TIMEOUT="$RUN_TIMEOUT" \
+    SHM_STALL_MAX_WARNINGS="$SHM_STALL_MAX_WARNINGS" \
     EXTRA_ARGS="--async-engine --block-size $BLOCK_SIZE --no-enable-prefix-caching --attention-backend TRITON_ATTN --compilation-config {\"mode\":0,\"cudagraph_mode\":\"FULL_DECODE_ONLY\",\"cudagraph_num_of_warmups\":0,\"compile_sizes\":[1]}" \
     /home/steve/llm-optimizations-publish/scripts/run-minimax-full-decode-graph-triton.sh
   )"

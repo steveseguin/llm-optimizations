@@ -159,6 +159,11 @@ Rules:
   screen but stalled before throughput and left the XPU runtime unhealthy,
   requiring reboot-level recovery. Keep the promoted recipe at
   `max_num_batched_tokens=512` unless a separate graph/shared-memory fix lands.
+- A post-reboot repeat of the promoted recipe reproduced `61.0167` output
+  tok/s mean with the quality gate passing.
+- The older faster piecewise graph/AOT recipe still fails the expanded raw
+  semantic canary with all generated tokens equal to `0`; it remains invalid
+  even if its throughput is higher.
 
 See `notes/2026-05-14-minimax-compiled-path-repair.md` for the active repair
 matrix and exact JSON/log paths.

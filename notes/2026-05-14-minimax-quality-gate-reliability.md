@@ -212,3 +212,44 @@ before more trustworthy benchmarks.
 No LocalMaxxing submission was made. This records `max_num_batched_tokens=1024`
 as a runtime-stability regression under the current graph recipe, despite a
 clean semantic quality screen.
+
+## Post-reboot Promoted Recipe Repeat
+
+After rebooting from the `max_num_batched_tokens=1024` stall, the promoted
+full-decode graph recipe was rerun with a shared-memory stall guard enabled:
+
+- Summary:
+  `/home/steve/bench-results/minimax-m2.7-quality-gated/minimax-postreboot-promoted-full-decode-graph-triton-tp4-ctx2048-mbt512-bs256-p512n1536-20260514T163325Z-summary.json`
+- Quality JSON:
+  `/home/steve/bench-results/minimax-m2.7-quality-gated/minimax-postreboot-promoted-full-decode-graph-triton-tp4-ctx2048-mbt512-bs256-p512n1536-20260514T163325Z-quality.json`
+- Quality gate: `passed=true`, `nul_token_count=0`,
+  `control_nonspace_text_chars=0`, `degenerate_output=false`
+- Output throughput repeats: `61.1757`, `60.8576` tok/s
+- Mean output throughput: `61.0167` tok/s
+- Mean total throughput: `81.3555` tok/s
+- Follow-up minimal torch XPU tensor check passed on all four devices.
+
+This is not a new LocalMaxxing submission because it reproduces the already
+submitted promoted result rather than improving it. It does strengthen the
+repeatability claim for the current quality-preserving recipe.
+
+## Fast Piecewise Graph Recheck
+
+The older faster piecewise graph/AOT recipe was rerun through the expanded raw
+semantic canary suite before any throughput retest:
+
+- JSON:
+  `/home/steve/bench-results/minimax-m2.7-quality-gated/minimax-fast-piecewise-graph-semantic-canary-20260514T164229Z.json`
+- Runtime delta: `PIECEWISE` graph partition, `max_num_batched_tokens=1024`,
+  old XPU graph cache root
+  `/mnt/fast-ai/vllm-cache-exp/minimax-xpugraph-force-p512n256-20260513T101820Z`
+- Result: `passed=false`
+- Failure reasons: degenerate/corrupt output, required substring missing,
+  required regex missing
+- Corruption: `192` generated token IDs, all token id `0`/NUL,
+  `distinct_generated_token_count=1`,
+  `control_nonspace_text_chars=192`
+
+This confirms the faster `~69` to `~73` tok/s piecewise/compiled/AOT lineage
+remains invalid for quality. Do not use it as a headline benchmark until the
+raw semantic canary suite passes.

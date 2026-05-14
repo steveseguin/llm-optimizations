@@ -21,6 +21,7 @@ GPU_MEMORY_UTILIZATION="${GPU_MEMORY_UTILIZATION:-}"
 EXTRA_ARGS="${EXTRA_ARGS:-}"
 RUN_TIMEOUT="${RUN_TIMEOUT:-}"
 RUN_TIMEOUT_KILL_AFTER="${RUN_TIMEOUT_KILL_AFTER:-30s}"
+SHM_STALL_MAX_WARNINGS="${SHM_STALL_MAX_WARNINGS:-0}"
 
 if [ -n "$GPU_MEMORY_UTILIZATION" ]; then
   EXTRA_ARGS="$EXTRA_ARGS --gpu-memory-utilization $GPU_MEMORY_UTILIZATION"
@@ -62,7 +63,28 @@ fi
   echo "vllm_cache_root=${VLLM_CACHE_ROOT:-}"
   echo "extra_args=$EXTRA_ARGS"
   echo "run_timeout=$RUN_TIMEOUT"
+  echo "shm_stall_max_warnings=$SHM_STALL_MAX_WARNINGS"
   echo "start=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  if [ "$SHM_STALL_MAX_WARNINGS" -gt 0 ]; then
+    (
+      while [ ! -f "$log" ]; do
+        sleep 1
+      done
+      while true; do
+        count="$(grep -c 'No available shared memory broadcast block found' "$log" 2>/dev/null || true)"
+        if [ "$count" -ge "$SHM_STALL_MAX_WARNINGS" ]; then
+          echo "shm_stall_guard=triggered warnings=$count limit=$SHM_STALL_MAX_WARNINGS at=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$log"
+          pkill -TERM -P "$$" 2>/dev/null || true
+          sleep 10
+          pkill -KILL -P "$$" 2>/dev/null || true
+          exit 0
+        fi
+        sleep 15
+      done
+    ) &
+    stall_guard_pid="$!"
+    trap 'kill "$stall_guard_pid" 2>/dev/null || true' EXIT
+  fi
   "${runner[@]}" vllm bench throughput \
     --backend vllm \
     --model "$MODEL" \
@@ -82,6 +104,9 @@ fi
     --disable-log-stats \
     --output-json "$json" \
     $EXTRA_ARGS
+  if [ -n "${stall_guard_pid:-}" ]; then
+    kill "$stall_guard_pid" 2>/dev/null || true
+  fi
   echo "end=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 } > "$log" 2>&1
 
