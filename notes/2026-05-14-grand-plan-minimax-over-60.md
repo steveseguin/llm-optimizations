@@ -178,6 +178,10 @@ Rules:
   both runs remained printable, nondegenerate, and NUL-free. Current wording
   should stay precise: semantic quality/corruption gates pass, but token-exact
   deterministic greedy decoding is not yet proven.
+- `max_model_len=4096` is currently rejected for the promoted TP4 graph recipe.
+  The quality stage reports `17,408` KV cache tokens and `4.25x` theoretical
+  concurrency, then stalls in `sample_tokens` with shared-memory broadcast waits
+  and no quality JSON.
 - A non-sync timing probe on the valid path only sees uncaptured regions, but
   the visible costs still point at MoE experts, Q/K RMS scheduling, and
   prefill-shaped TP allreduce as the next code-level optimization targets.

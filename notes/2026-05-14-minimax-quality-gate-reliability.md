@@ -391,3 +391,36 @@ graph recipe. Treat LocalMaxxing throughput numbers from this recipe as
 quality-preserving in the "no corruption / no changed quantization / no
 speculation / no expert drop" sense, but do not claim token-exact deterministic
 decoding until the reduction-order or sampler near-tie source is isolated.
+
+## 4096-Context Quality Gate Screen
+
+Tried the promoted TP4 full-decode graph recipe with `max_model_len=4096` and
+the same `p512/n1536`, `block-size=256`, `max_num_batched_tokens=512`, and
+TRITON attention settings:
+
+```bash
+LABEL=full-decode-graph-triton-ctx4096 \
+MAX_MODEL_LEN=4096 \
+BENCH_REPEATS=1 QUALITY_TIMEOUT=10m RUN_TIMEOUT=25m SHM_STALL_MAX_WARNINGS=4 \
+scripts/run-minimax-quality-gated-candidate.sh
+```
+
+Artifacts:
+
+- Quality log:
+  `/home/steve/bench-results/minimax-m2.7-quality-gated/minimax-full-decode-graph-triton-ctx4096-tp4-ctx4096-mbt512-bs256-p512n1536-20260514T172230Z-quality.log`
+- Quality JSON: not produced
+
+Observed before failure:
+
+- GPU KV cache size: `17,408` tokens
+- Maximum concurrency for `4096` tokens per request: `4.25x`
+- Failure mode: quality-stage generation stalled in `sample_tokens` after `4`
+  shared-memory broadcast wait warnings, then raised
+  `TimeoutError: RPC call to sample_tokens timed out`.
+- Follow-up four-device torch XPU health check passed after terminating the
+  leftover workers.
+
+Decision: `max_model_len=4096` is not currently a valid benchmark shape for the
+promoted TP4 graph recipe. This should be revisited through the graph/shared
+memory reliability workstream before any larger-context throughput submission.
