@@ -322,6 +322,40 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--qk-rms-xpu-helper",
+        action="store_true",
+        help="Use the standalone MiniMax Q/K RMS XPU helper custom ops.",
+    )
+    parser.add_argument(
+        "--qk-rms-xpu-helper-max-tokens",
+        type=int,
+        default=4,
+        help="Maximum token count eligible for --qk-rms-xpu-helper.",
+    )
+    parser.add_argument(
+        "--inductor-disable-combo-kernels",
+        action="store_true",
+        help="Set torch._inductor.config.combo_kernels=False through vLLM.",
+    )
+    parser.add_argument(
+        "--inductor-disable-epilogue-fusion",
+        action="store_true",
+        help="Set torch._inductor.config.epilogue_fusion=False through vLLM.",
+    )
+    parser.add_argument(
+        "--inductor-disable-shape-padding",
+        action="store_true",
+        help="Set torch._inductor.config.shape_padding=False through vLLM.",
+    )
+    parser.add_argument(
+        "--inductor-disable-persistent-reductions",
+        action="store_true",
+        help=(
+            "Set torch._inductor.config.triton.persistent_reductions=False "
+            "through vLLM."
+        ),
+    )
+    parser.add_argument(
         "--expected-token-sha256",
         default=None,
         help="Fail if the combined token hash differs from this value.",
@@ -476,6 +510,14 @@ def configure_env(args: argparse.Namespace) -> None:
         os.environ["VLLM_MINIMAX_QK_NORM_DECOMPOSED"] = "1"
     else:
         os.environ.pop("VLLM_MINIMAX_QK_NORM_DECOMPOSED", None)
+    if args.qk_rms_xpu_helper:
+        os.environ["VLLM_MINIMAX_QK_RMS_XPU_HELPER"] = "1"
+        os.environ["VLLM_MINIMAX_QK_RMS_XPU_HELPER_MAX_TOKENS"] = str(
+            args.qk_rms_xpu_helper_max_tokens
+        )
+    else:
+        os.environ.pop("VLLM_MINIMAX_QK_RMS_XPU_HELPER", None)
+        os.environ.pop("VLLM_MINIMAX_QK_RMS_XPU_HELPER_MAX_TOKENS", None)
     if args.disable_llm_scaler_moe:
         os.environ["VLLM_XPU_USE_LLM_SCALER_MOE"] = "0"
     else:
@@ -526,6 +568,18 @@ def main() -> None:
             if part
         ]
         compilation_config["compile_ranges_endpoints"] = endpoints
+    inductor_compile_config = {}
+    if args.inductor_disable_combo_kernels:
+        inductor_compile_config["combo_kernels"] = False
+        inductor_compile_config["benchmark_combo_kernel"] = False
+    if args.inductor_disable_epilogue_fusion:
+        inductor_compile_config["epilogue_fusion"] = False
+    if args.inductor_disable_shape_padding:
+        inductor_compile_config["shape_padding"] = False
+    if args.inductor_disable_persistent_reductions:
+        inductor_compile_config["triton.persistent_reductions"] = False
+    if inductor_compile_config:
+        compilation_config["inductor_compile_config"] = inductor_compile_config
 
     llm_kwargs = {}
     if args.rms_norm_priority:
@@ -729,6 +783,19 @@ def main() -> None:
                 args.eager_for_uncovered_compile_ranges
             ),
             "skip_compiled_prefill": args.skip_compiled_prefill,
+            "split_qk_var_allreduce": args.split_qk_var_allreduce,
+            "eager_qk_norm": args.eager_qk_norm,
+            "decomposed_qk_norm": args.decomposed_qk_norm,
+            "qk_rms_xpu_helper": args.qk_rms_xpu_helper,
+            "qk_rms_xpu_helper_max_tokens": args.qk_rms_xpu_helper_max_tokens,
+            "inductor_disable_combo_kernels": args.inductor_disable_combo_kernels,
+            "inductor_disable_epilogue_fusion": (
+                args.inductor_disable_epilogue_fusion
+            ),
+            "inductor_disable_shape_padding": args.inductor_disable_shape_padding,
+            "inductor_disable_persistent_reductions": (
+                args.inductor_disable_persistent_reductions
+            ),
             "vllm_cache_root": os.environ.get("VLLM_CACHE_ROOT"),
             "temperature": args.temperature,
             "top_p": args.top_p,

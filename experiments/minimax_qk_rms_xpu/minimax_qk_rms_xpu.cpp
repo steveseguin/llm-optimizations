@@ -131,6 +131,67 @@ class MinimaxQkRmsApplyKernel {
 };
 
 template <typename scalar_t>
+class MinimaxQkRmsApplyF32WeightKernel {
+ public:
+  MinimaxQkRmsApplyF32WeightKernel(const scalar_t* qkv,
+                                   const float* qk_var,
+                                   const float* q_weight,
+                                   const float* k_weight,
+                                   scalar_t* q_out,
+                                   scalar_t* k_out,
+                                   int q_size,
+                                   int kv_size,
+                                   int qkv_stride,
+                                   float eps)
+      : qkv_(qkv),
+        qk_var_(qk_var),
+        q_weight_(q_weight),
+        k_weight_(k_weight),
+        q_out_(q_out),
+        k_out_(k_out),
+        q_size_(q_size),
+        kv_size_(kv_size),
+        qkv_stride_(qkv_stride),
+        eps_(eps) {}
+
+  void operator() [[sycl::reqd_sub_group_size(32)]] (
+      const sycl::nd_item<1>& item) const {
+    const int group = item.get_group(0);
+    const int token_idx = group >> 1;
+    const int part = group & 1;
+    const int hidden = part == 0 ? q_size_ : kv_size_;
+    const int input_offset =
+        token_idx * qkv_stride_ + (part == 0 ? 0 : q_size_);
+    const int output_offset = token_idx * hidden;
+    const float scale = sycl::rsqrt(qk_var_[token_idx * 2 + part] + eps_);
+
+    for (int i = item.get_local_id(0); i < hidden;
+         i += item.get_local_range(0)) {
+      float x = static_cast<float>(qkv_[input_offset + i]);
+      float w = (part == 0 ? q_weight_ : k_weight_)[i];
+      scalar_t y = static_cast<scalar_t>(x * scale * w);
+      if (part == 0) {
+        q_out_[output_offset + i] = y;
+      } else {
+        k_out_[output_offset + i] = y;
+      }
+    }
+  }
+
+ private:
+  const scalar_t* __restrict__ qkv_;
+  const float* __restrict__ qk_var_;
+  const float* __restrict__ q_weight_;
+  const float* __restrict__ k_weight_;
+  scalar_t* __restrict__ q_out_;
+  scalar_t* __restrict__ k_out_;
+  const int q_size_;
+  const int kv_size_;
+  const int qkv_stride_;
+  const float eps_;
+};
+
+template <typename scalar_t>
 class MinimaxQkRmsApplyQkRopeKernel {
  public:
   MinimaxQkRmsApplyQkRopeKernel(const float* q,
@@ -293,6 +354,38 @@ void launch_apply(torch::Tensor& qkv,
 }
 
 template <typename scalar_t>
+void launch_apply_f32_weight(torch::Tensor& qkv,
+                             torch::Tensor& qk_var,
+                             torch::Tensor& q_weight,
+                             torch::Tensor& k_weight,
+                             torch::Tensor& q_out,
+                             torch::Tensor& k_out,
+                             int q_size,
+                             int kv_size,
+                             float eps) {
+  using sycl_t = typename SyclTypeTrait<scalar_t>::Type;
+  const int num_tokens = qkv.size(0);
+  const int qkv_stride = qkv.size(1);
+  constexpr int block_size = 256;
+  auto& queue = c10::xpu::getCurrentXPUStream(qkv.device().index()).queue();
+  queue.submit([&](sycl::handler& cgh) {
+    cgh.parallel_for(
+        sycl::nd_range<1>(num_tokens * 2 * block_size, block_size),
+        MinimaxQkRmsApplyF32WeightKernel<sycl_t>(
+            reinterpret_cast<const sycl_t*>(qkv.data_ptr<scalar_t>()),
+            qk_var.data_ptr<float>(),
+            q_weight.data_ptr<float>(),
+            k_weight.data_ptr<float>(),
+            reinterpret_cast<sycl_t*>(q_out.data_ptr<scalar_t>()),
+            reinterpret_cast<sycl_t*>(k_out.data_ptr<scalar_t>()),
+            q_size,
+            kv_size,
+            qkv_stride,
+            eps));
+      });
+}
+
+template <typename scalar_t>
 void launch_apply_qk_rope(torch::Tensor& q,
                           torch::Tensor& k,
                           torch::Tensor& qk_var,
@@ -359,6 +452,21 @@ void var(torch::Tensor qkv,
   });
 }
 
+torch::Tensor var_return(torch::Tensor qkv,
+                         torch::Tensor qk_var,
+                         int64_t q_size,
+                         int64_t kv_size) {
+  var(qkv, qk_var, q_size, kv_size);
+  return qk_var;
+}
+
+torch::Tensor var_alloc(torch::Tensor qkv, int64_t q_size, int64_t kv_size) {
+  auto qk_var =
+      torch::empty({qkv.size(0), 2}, qkv.options().dtype(torch::kFloat32));
+  var(qkv, qk_var, q_size, kv_size);
+  return qk_var;
+}
+
 void apply(torch::Tensor qkv,
            torch::Tensor qk_var,
            torch::Tensor q_weight,
@@ -411,6 +519,118 @@ void apply(torch::Tensor qkv,
                                static_cast<int>(kv_size),
                                static_cast<float>(eps));
       });
+}
+
+std::tuple<torch::Tensor, torch::Tensor> apply_return(torch::Tensor qkv,
+                                                      torch::Tensor qk_var,
+                                                      torch::Tensor q_weight,
+                                                      torch::Tensor k_weight,
+                                                      torch::Tensor q_out,
+                                                      torch::Tensor k_out,
+                                                      int64_t q_size,
+                                                      int64_t kv_size,
+                                                      double eps) {
+  apply(qkv, qk_var, q_weight, k_weight, q_out, k_out, q_size, kv_size, eps);
+  return std::make_tuple(q_out, k_out);
+}
+
+std::tuple<torch::Tensor, torch::Tensor> apply_alloc(torch::Tensor qkv,
+                                                     torch::Tensor qk_var,
+                                                     torch::Tensor q_weight,
+                                                     torch::Tensor k_weight,
+                                                     int64_t q_size,
+                                                     int64_t kv_size,
+                                                     double eps) {
+  auto q_out = torch::empty({qkv.size(0), q_size}, qkv.options());
+  auto k_out = torch::empty({qkv.size(0), kv_size}, qkv.options());
+  apply(qkv, qk_var, q_weight, k_weight, q_out, k_out, q_size, kv_size, eps);
+  return std::make_tuple(q_out, k_out);
+}
+
+void apply_f32_weight(torch::Tensor qkv,
+                      torch::Tensor qk_var,
+                      torch::Tensor q_weight,
+                      torch::Tensor k_weight,
+                      torch::Tensor q_out,
+                      torch::Tensor k_out,
+                      int64_t q_size,
+                      int64_t kv_size,
+                      double eps) {
+  const at::DeviceGuard device_guard(qkv.device());
+  CHECK_XPU(qkv);
+  CHECK_CONTIGUOUS(qkv);
+  CHECK_XPU(qk_var);
+  CHECK_CONTIGUOUS(qk_var);
+  CHECK_XPU(q_weight);
+  CHECK_CONTIGUOUS(q_weight);
+  CHECK_XPU(k_weight);
+  CHECK_CONTIGUOUS(k_weight);
+  CHECK_XPU(q_out);
+  CHECK_CONTIGUOUS(q_out);
+  CHECK_XPU(k_out);
+  CHECK_CONTIGUOUS(k_out);
+  TORCH_CHECK(qkv.dim() == 2, "qkv must be 2D");
+  TORCH_CHECK(qk_var.dim() == 2, "qk_var must be 2D");
+  TORCH_CHECK(qk_var.scalar_type() == torch::kFloat32, "qk_var must be float32");
+  TORCH_CHECK(q_weight.scalar_type() == torch::kFloat32,
+              "q_weight must be float32");
+  TORCH_CHECK(k_weight.scalar_type() == torch::kFloat32,
+              "k_weight must be float32");
+  TORCH_CHECK(qk_var.size(0) == qkv.size(0), "qk_var token dim must match qkv");
+  TORCH_CHECK(qk_var.size(1) == 2, "qk_var must have shape [num_tokens, 2]");
+  TORCH_CHECK(qkv.size(1) == q_size + 2 * kv_size, "qkv hidden dim mismatch");
+  TORCH_CHECK(q_weight.size(0) == q_size, "q_weight size mismatch");
+  TORCH_CHECK(k_weight.size(0) == kv_size, "k_weight size mismatch");
+  TORCH_CHECK(q_out.size(0) == qkv.size(0) && q_out.size(1) == q_size,
+              "q_out shape mismatch");
+  TORCH_CHECK(k_out.size(0) == qkv.size(0) && k_out.size(1) == kv_size,
+              "k_out shape mismatch");
+  TORCH_CHECK(qkv.scalar_type() == q_out.scalar_type() &&
+                  qkv.scalar_type() == k_out.scalar_type(),
+              "qkv and outputs must have the same dtype");
+
+  AT_DISPATCH_REDUCED_FLOATING_TYPES(
+      qkv.scalar_type(), "minimax_qk_rms_apply_f32_weight", [&] {
+        launch_apply_f32_weight<scalar_t>(qkv,
+                                          qk_var,
+                                          q_weight,
+                                          k_weight,
+                                          q_out,
+                                          k_out,
+                                          static_cast<int>(q_size),
+                                          static_cast<int>(kv_size),
+                                          static_cast<float>(eps));
+      });
+}
+
+std::tuple<torch::Tensor, torch::Tensor> apply_f32_weight_return(
+    torch::Tensor qkv,
+    torch::Tensor qk_var,
+    torch::Tensor q_weight,
+    torch::Tensor k_weight,
+    torch::Tensor q_out,
+    torch::Tensor k_out,
+    int64_t q_size,
+    int64_t kv_size,
+    double eps) {
+  apply_f32_weight(
+      qkv, qk_var, q_weight, k_weight, q_out, k_out, q_size, kv_size, eps);
+  return std::make_tuple(q_out, k_out);
+}
+
+std::tuple<torch::Tensor, torch::Tensor> apply_f32_weight_alloc(
+    torch::Tensor qkv,
+    torch::Tensor qk_var,
+    torch::Tensor q_weight,
+    torch::Tensor k_weight,
+    int64_t q_size,
+    int64_t kv_size,
+    double eps) {
+  auto q_out = torch::empty({qkv.size(0), q_size}, qkv.options());
+  auto k_out = torch::empty({qkv.size(0), kv_size}, qkv.options());
+  apply_f32_weight(
+      qkv, qk_var, q_weight, k_weight, q_out, k_out, q_size, kv_size, eps);
+  return std::make_tuple(q_out, k_out);
 }
 
 void apply_qk_rope(torch::Tensor q,
@@ -496,7 +716,28 @@ void apply_qk_rope(torch::Tensor q,
 
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
   m.def("var", &var, "MiniMax Q/K RMS variance helper");
+  m.def("var_return",
+        &var_return,
+        "MiniMax Q/K RMS variance helper returning qk_var");
+  m.def("var_alloc",
+        &var_alloc,
+        "MiniMax Q/K RMS variance helper allocating qk_var");
   m.def("apply", &apply, "MiniMax Q/K RMS apply helper");
+  m.def("apply_return",
+        &apply_return,
+        "MiniMax Q/K RMS apply helper returning q/k");
+  m.def("apply_alloc",
+        &apply_alloc,
+        "MiniMax Q/K RMS apply helper allocating q/k");
+  m.def("apply_f32_weight",
+        &apply_f32_weight,
+        "MiniMax Q/K RMS apply helper with FP32 norm weights");
+  m.def("apply_f32_weight_return",
+        &apply_f32_weight_return,
+        "MiniMax Q/K RMS apply helper with FP32 norm weights returning q/k");
+  m.def("apply_f32_weight_alloc",
+        &apply_f32_weight_alloc,
+        "MiniMax Q/K RMS apply helper with FP32 norm weights allocating q/k");
   m.def("apply_qk_rope",
         &apply_qk_rope,
         "MiniMax Q/K RMS apply plus RoPE helper");
@@ -505,8 +746,32 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
 TORCH_LIBRARY(minimax_qk_rms_xpu, m) {
   m.def("var(Tensor qkv, Tensor! qk_var, int q_size, int kv_size) -> ()");
   m.def(
+      "var_return(Tensor qkv, Tensor! qk_var, int q_size, int kv_size) "
+      "-> Tensor");
+  m.def("var_alloc(Tensor qkv, int q_size, int kv_size) -> Tensor");
+  m.def(
       "apply(Tensor qkv, Tensor qk_var, Tensor q_weight, Tensor k_weight, "
       "Tensor! q_out, Tensor! k_out, int q_size, int kv_size, float eps) -> ()");
+  m.def(
+      "apply_return(Tensor qkv, Tensor qk_var, Tensor q_weight, "
+      "Tensor k_weight, Tensor! q_out, Tensor! k_out, int q_size, "
+      "int kv_size, float eps) -> (Tensor, Tensor)");
+  m.def(
+      "apply_alloc(Tensor qkv, Tensor qk_var, Tensor q_weight, "
+      "Tensor k_weight, int q_size, int kv_size, float eps) "
+      "-> (Tensor, Tensor)");
+  m.def(
+      "apply_f32_weight(Tensor qkv, Tensor qk_var, Tensor q_weight, "
+      "Tensor k_weight, Tensor! q_out, Tensor! k_out, int q_size, "
+      "int kv_size, float eps) -> ()");
+  m.def(
+      "apply_f32_weight_return(Tensor qkv, Tensor qk_var, Tensor q_weight, "
+      "Tensor k_weight, Tensor! q_out, Tensor! k_out, int q_size, "
+      "int kv_size, float eps) -> (Tensor, Tensor)");
+  m.def(
+      "apply_f32_weight_alloc(Tensor qkv, Tensor qk_var, Tensor q_weight, "
+      "Tensor k_weight, int q_size, int kv_size, float eps) "
+      "-> (Tensor, Tensor)");
   m.def(
       "apply_qk_rope(Tensor q, Tensor k, Tensor qk_var, Tensor q_weight, "
       "Tensor k_weight, Tensor positions, Tensor cos_sin_cache, Tensor! q_out, "
@@ -516,6 +781,13 @@ TORCH_LIBRARY(minimax_qk_rms_xpu, m) {
 
 TORCH_LIBRARY_IMPL(minimax_qk_rms_xpu, XPU, m) {
   m.impl("var", &var);
+  m.impl("var_return", &var_return);
+  m.impl("var_alloc", &var_alloc);
   m.impl("apply", &apply);
+  m.impl("apply_return", &apply_return);
+  m.impl("apply_alloc", &apply_alloc);
+  m.impl("apply_f32_weight", &apply_f32_weight);
+  m.impl("apply_f32_weight_return", &apply_f32_weight_return);
+  m.impl("apply_f32_weight_alloc", &apply_f32_weight_alloc);
   m.impl("apply_qk_rope", &apply_qk_rope);
 }

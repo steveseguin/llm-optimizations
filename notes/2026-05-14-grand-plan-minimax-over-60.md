@@ -136,9 +136,10 @@ Rules:
   XPU-to-CPU transfer.
 - The stable promotable MiniMax number is still the full-decode graph TP4 path:
   about `61.08` output tok/s, quality-gated and submitted.
-- The compiled/AOT TP4 path is the highest-return target because it has already
-  demonstrated `~73` output tok/s without changing the model quantization, but
-  it currently corrupts output and must be fixed before it counts.
+- The compiled/AOT TP4 path is still useful as a diagnostic target because it
+  previously demonstrated `~73` output tok/s without changing model
+  quantization, but repeated repair attempts still corrupt output and it does
+  not count.
 - Compiled-path finite tracing shows the failure happens before logits:
   real-prompt hidden states become all-NaN before sampler selection, which then
   degenerates to token-id `0`.
@@ -146,10 +147,13 @@ Rules:
   16 attention, specifically Q RMSNorm. The qkv projection and K RMSNorm are
   still finite at that boundary.
 - Disabling MiniMax delayed attention allreduce, disabling llm-scaler INT4 MoE,
-  splitting the Q/K variance allreduce, and decomposing the Q/K norm expression
-  do not fix the compiled-path corruption. The next isolation target is
-  Inductor fusion/codegen control around Q RMSNorm or an opaque fullgraph-safe
-  Q RMSNorm custom op.
+  splitting the Q/K variance allreduce, decomposing the Q/K norm expression,
+  and replacing local Q/K RMS work with return-value or allocating SYCL helper
+  custom ops do not fix the compiled-path corruption.
+- Immediate priority shifts back to valid-quality paths: profile the stable
+  TP4 graph recipe, repair EP communication with focused repros, and only use
+  the compiled path for cheap one-token diagnostics until it stops producing
+  NUL output.
 
 See `notes/2026-05-14-minimax-compiled-path-repair.md` for the active repair
 matrix and exact JSON/log paths.

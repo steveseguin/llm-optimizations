@@ -204,22 +204,69 @@ A compiled-path result only counts if all of these pass:
 - Interpretation: simple expression decomposition and explicit contiguous
   boundaries are not enough to avoid the Q RMSNorm compile corruption.
 
+### Disabling Inductor Combo Kernels Did Not Produce A Candidate
+
+- Cache:
+  `/mnt/fast-ai/vllm-cache-exp/minimax-no-cudagraph-no-combo-20260514T144935Z`
+- Flag: `--inductor-disable-combo-kernels`
+- Outcome: the run compiled the `(1, 1)` and `(1, 512)` ranges, then hung in
+  the shared-memory wait path before writing a JSON result.
+- Interpretation: this is not a valid quality or performance result. It also
+  does not directly explain the token-id `0` corruption, because no generation
+  completed.
+
+### Opaque Q/K RMS Helper Did Not Repair Compile Quality
+
+- JSON:
+  `/home/steve/bench-results/minimax-m2.7-compile-quality/minimax-compiled-no-cudagraph-qk-helper-token1-20260514T145903Z.json`
+- JSON with FP32-weight apply support:
+  `/home/steve/bench-results/minimax-m2.7-compile-quality/minimax-compiled-no-cudagraph-qk-helper-f32w-token1-20260514T150948Z.json`
+- Trace:
+  `/home/steve/bench-results/minimax-m2.7-compile-quality/minimax-compiled-no-cudagraph-qk-helper-finite-trace-20260514T151507Z.jsonl`
+- Outcome: the one-token corruption-tolerant probes still generated token-id
+  `0`, and the finite trace still showed the first non-finite tensor at
+  `model.layers.16.self_attn.q_after_qk_norm`.
+- Interpretation: moving the local Q/K variance and apply kernels into a SYCL
+  custom op is not enough. The helper path was present in the compiled graph,
+  but the compiled model still corrupts Q RMSNorm output.
+
+### Return-Value And Allocating Helper Variants Also Failed
+
+- JSON, return-value variant:
+  `/home/steve/bench-results/minimax-m2.7-compile-quality/minimax-compiled-no-cudagraph-qk-helper-return-token1-20260514T152312Z.json`
+- JSON, allocating variant:
+  `/home/steve/bench-results/minimax-m2.7-compile-quality/minimax-compiled-no-cudagraph-qk-helper-alloc-token1-20260514T153103Z.json`
+- Result: both produced one generated token-id `0` and text `\\u0000`.
+- The return-value variant also triggered PyTorch custom-op alias warnings
+  because it returned preallocated output tensors. The allocating variant fixed
+  that API problem and passed a direct XPU numerical check, but the compiled
+  model output still collapsed to token-id `0`.
+- Interpretation: the root cause is broader than local output-buffer aliasing
+  in the helper. The compiled MiniMax attention/Q RMSNorm path remains
+  quarantined until a candidate passes real semantic canaries.
+
 ## Current Hypotheses
 
 - The bug is in the compiled XPU model-forward path before logits, not in the
   sampler.
 - The first real-prompt failure is layer 16 Q RMSNorm under `torch.compile`.
 - The bug is not solely caused by command graph capture, delayed attention
-  allreduce, inductor graph partition, llm-scaler MoE, or packed Q/K variance
-  allreduce.
-- The next best repair target is to prevent unsafe Inductor fusion/codegen for
-  the Q RMSNorm path while keeping the rest of the fast compiled decode path.
+  allreduce, inductor graph partition, llm-scaler MoE, packed Q/K variance
+  allreduce, simple Q/K RMS expression shape, or preallocated custom-op output
+  aliasing.
+- The highest-speed compiled/AOT path is still not promotable. The next
+  quality-preserving work should either find a narrower Inductor/XPU codegen
+  switch that repairs Q RMSNorm, or pivot to the stable TP4 graph path and EP
+  communication bottlenecks.
 
 ## Next Tests
 
-1. Try narrower Inductor controls around combo/fusion behavior for the compiled
-   Q RMSNorm path.
-2. If needed, replace Q RMSNorm with an opaque custom op that is safe in
-   fullgraph execution, instead of relying on `torch.compiler.disable`.
-3. Keep the quality-gated full-decode graph TP4 recipe as the only promoted
+1. Keep the quality-gated full-decode graph TP4 recipe as the only promoted
    baseline until a compiled candidate passes the semantic suite.
+2. Do not submit any compiled/AOT result to LocalMaxxing while it produces
+   token-id `0` or NUL text.
+3. If returning to this branch, test narrower Inductor controls one at a time
+   and stop immediately at the one-token gate if output remains NUL.
+4. Move main optimization time back to stable-path profiling and EP
+   communication repair, where quality can be tested without the known compiled
+   corruption.
