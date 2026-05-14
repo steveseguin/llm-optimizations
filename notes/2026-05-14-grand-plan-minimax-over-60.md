@@ -65,8 +65,8 @@ Next probes:
 
 - Inspect and, if practical, restore or implement a real non-AG/RS all-to-all
   control path for XPU EP.
-- Build a smaller synthetic XCCL/all-to-all repro before launching more full
-  MiniMax EP probes.
+- Use the synthetic XCCL/AG-RS repro to validate an XPU-safe padded equal-size
+  `all_gatherv` path before launching more full MiniMax EP probes.
 - If EP reaches generation, run the canary suite before throughput.
 - If EP reaches throughput, tune `E=64,N=1536` for decode `M=1`.
 
@@ -119,8 +119,9 @@ Rules:
 1. Keep the expanded raw semantic canary suite as the minimum pre-throughput
    quality screen.
 2. Record and push the EP controls from this pass.
-3. Inspect vLLM EP all-to-all backend registration and the XPU/XCCL path.
-4. If a real EP control path is practical, patch and test it on a synthetic
-   repro first.
+3. Patch/prototype the XPU uneven `all_gatherv` path to pad to equal chunk
+   sizes and validate it on the synthetic repro.
+4. If the synthetic repro passes, retry EP with a short MiniMax run and the
+   semantic canary before any throughput claim.
 5. In parallel with EP debugging, move to TP4 timing/profiling because the
    stable 61 tok/s path is still the only promotable path today.

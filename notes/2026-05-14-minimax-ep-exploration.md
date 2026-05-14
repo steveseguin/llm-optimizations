@@ -159,14 +159,155 @@ The current blockers are:
 Do not submit these EP attempts to LocalMaxxing; they are failure/diagnostic
 results only.
 
+## Source Inspection And Synthetic Ag/Rs Repro
+
+Source read:
+
+- `vllm/config/parallel.py` still accepts `naive` in the type list, but the
+  validator rewrites both `pplx` and `naive` to `allgather_reducescatter`.
+- `vllm/distributed/device_communicators/xpu_communicator.py` only wires XPU EP
+  all-to-all to `AgRsAll2AllManager`.
+- In practice, there is no real non-AG/RS XPU EP all-to-all backend in this
+  local vLLM tree.
+
+Added:
+
+- `benchmarks/b70_xccl_ag_rs_bench.py`
+
+Equal-size Ag/Rs microbench:
+
+- Log:
+  `/home/steve/bench-results/xccl-ag-rs/b70-xccl-ag-rs-vllm-compat-20260514T115640Z.log`
+- Runtime:
+  `torchrun --standalone --nproc_per_node=4 benchmarks/b70_xccl_ag_rs_bench.py`
+- Environment:
+  `CCL_ATL_TRANSPORT=ofi`, `CCL_TOPO_P2P_ACCESS=1`,
+  `ONEAPI_DEVICE_SELECTOR=level_zero:0,1,2,3`,
+  `ZE_AFFINITY_MASK=0,1,2,3`
+- The equal-size vLLM-compatible gather branch completed.
+- Decode-sized `tokens=1, hidden=6144` timings:
+  - `all_gather_into_tensor_equal`: `0.0215 ms`
+  - `all_gather_list_equal`: `0.0678 ms`
+  - `all_gather_vllm_xpu_equal`: `0.0250 ms`
+  - `reduce_scatter_tensor_equal`: `0.0179 ms`
+  - `reduce_scatter_list_equal`: `0.0426 ms`
+- Larger `tokens=512, hidden=6144` timings:
+  - `all_gather_into_tensor_equal`: `0.4601 ms`
+  - `all_gather_vllm_xpu_equal`: `0.5490 ms`
+  - `reduce_scatter_tensor_equal`: `0.4593 ms`
+  - `reduce_scatter_list_equal`: `0.5430 ms`
+
+Uneven-size Ag/Rs repro:
+
+- Log:
+  `/home/steve/bench-results/xccl-ag-rs/b70-xccl-ag-rs-uneven-timeout-20260514T115922Z.log`
+- Command added `B70_AGRS_INCLUDE_UNEVEN=1`.
+- Equal-size cases finished, then the first uneven `all_gather` did not return
+  before the 60-second timeout.
+- GPUs returned idle after timeout.
+
+Padded uneven-size Ag/Rs repro:
+
+- Log:
+  `/home/steve/bench-results/xccl-ag-rs/b70-xccl-ag-rs-padded-uneven-20260514T120324Z.log`
+- Added a padded uneven gather that pads all ranks to `max(sizes)`, gathers with
+  `all_gather_into_tensor`, then slices back to the requested per-rank sizes.
+- The padded uneven gather completed:
+  `all_gather_padded_uneven,1,6144,20,0.0602,0.1172`
+- The following raw uneven `all_gather(list, input)` still hung and was killed
+  by timeout.
+
+Interpretation:
+
+- Equal-size AG/RS collectives are not the root EP blocker by themselves.
+- The variable-size `dist.all_gather` path used by vLLM-style `all_gatherv`
+  appears unsafe on this XPU/XCCL stack.
+- A plausible next patch is to avoid uneven `all_gatherv` for XPU EP by padding
+  per-rank token chunks to an equal size before gather, then slicing after
+  dispatch/combine. This may trade a little bandwidth for correctness and
+  avoids another full-model blind launch.
+
+## EP Attempt 6: Padded XPU Allgatherv, Async Scheduling On
+
+Local source patch:
+
+- `vllm/distributed/device_communicators/xpu_communicator.py`
+- Patch snapshot:
+  `patches/vllm-xpu-padded-allgatherv-sync-output-20260514.patch`
+- Guard: `VLLM_XPU_PAD_UNEVEN_ALLGATHERV=1`
+- Behavior: for uneven `all_gatherv`, pad to equal-size chunks and use
+  `dist.all_gather_into_tensor`, then slice.
+
+Outcome:
+
+- Log:
+  `/home/steve/bench-results/minimax-m2.7-ep-exploration/vllm-minimax-m27-autoround-tp4-p512n64-20260514T120449Z.log`
+- EP reached model load, KV allocation, prompt processing, and decode/sampling.
+- It then hit the same async output-copy fault:
+  `RuntimeError: level_zero backend failed with error: 20 (UR_RESULT_ERROR_DEVICE_LOST)`.
+- Relevant stack:
+  `WorkerAsyncOutputCopy` / `gpu_model_runner.py` /
+  `gpu_input_batch.py:update_async_output_token_ids`.
+- No benchmark datapoint accepted.
+
+## EP Attempt 7: Padded XPU Allgatherv, Async Scheduling Off
+
+Outcome:
+
+- Log:
+  `/home/steve/bench-results/minimax-m2.7-ep-exploration/vllm-minimax-m27-autoround-tp4-p512n64-20260514T120748Z.log`
+- Command added `--no-async-scheduling`.
+- The run stalled in distributed initialization/worker setup at low VRAM before
+  model load.
+- No benchmark datapoint accepted.
+
+## EP Attempt 8: Padded XPU Allgatherv, Sync XPU Output Copy
+
+Local source patch:
+
+- `vllm/v1/worker/gpu_model_runner.py`
+- Patch snapshot:
+  `patches/vllm-xpu-padded-allgatherv-sync-output-20260514.patch`
+- Guard: `VLLM_XPU_SYNC_ASYNC_OUTPUT_COPY=1`
+- Behavior: keep async scheduling enabled, but for XPU copy sampled token ids to
+  CPU synchronously and use a completed no-op event instead of the async copy
+  stream/event.
+
+Outcome:
+
+- Log:
+  `/home/steve/bench-results/minimax-m2.7-ep-exploration/vllm-minimax-m27-autoround-tp4-p512n64-20260514T121053Z.log`
+- EP reached full model load.
+- It did not throw the async output-copy `DEVICE_LOST` error before being
+  stopped.
+- It then hung after model load and emitted:
+  `No available shared memory broadcast block found in 60 seconds`.
+- No benchmark datapoint accepted.
+
+Current read after Attempts 6-8:
+
+- The padded allgatherv patch fixes a real synthetic XCCL hang and gets the
+  full EP path past one prior hazard.
+- EP still is not stable enough to benchmark.
+- Async-on reaches decode but loses the device in output-copy/sampling.
+- Async-off avoids the output-copy path but can stall during initialization.
+- Sync XPU output copy avoids the observed output-copy exception but exposes a
+  later worker/shared-memory synchronization stall after model load.
+
 ## Next EP Work
 
 - Stop treating `naive` as available unless the current vLLM all-to-all registry
   is patched or an older backend is restored.
-- Inspect vLLM's EP all-to-all backend registration and XPU/xccl interaction
-  before launching more full MiniMax EP probes.
-- Add a smaller synthetic all-to-all/XCCL repro for the `E=64,N=1536` path so
-  the communication layer can be debugged without 400+ GiB of model load churn.
+- Keep the XPU-only padded equal-size `all_gatherv` patch as a candidate fix,
+  but do not promote it until the full EP path can complete a correctness run.
+- Check whether MiniMax EP decode normally produces uneven `dp_metadata` chunk
+  sizes; if yes, the current XPU AG/RS path can hang before any useful speed
+  measurement.
+- Add focused instrumentation around worker command progress after model load
+  and before KV/cache profiling; the next EP blocker is likely worker
+  synchronization rather than raw AG/RS collective latency.
+- Investigate XPU async sampled-token copy separately from EP. A synchronous
+  guarded path may be useful, but it is not sufficient by itself.
 - Add focused timing around MiniMax MoE dispatch/all-to-all when EP reaches
   generation.
 - If EP can reach generation, tune `E=64,N=1536` for decode `M=1` before any
