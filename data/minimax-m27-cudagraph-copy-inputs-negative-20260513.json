@@ -1,0 +1,90 @@
+{
+  "date": "2026-05-13",
+  "model": {
+    "hfId": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+    "localPath": "/mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround",
+    "quantization": "int4 AutoRound W4A16"
+  },
+  "hardware": {
+    "gpuName": "Intel Arc Pro B70",
+    "gpuCount": 4,
+    "vramGbPerGpu": 32,
+    "os": "Ubuntu 24.04.4 LTS"
+  },
+  "engine": {
+    "name": "vllm",
+    "version": "0.20.1-local",
+    "backend": "xpu-level-zero",
+    "tensorParallel": 4,
+    "dtype": "float16"
+  },
+  "baseRecipe": {
+    "xpuGraph": true,
+    "graphPartition": true,
+    "llmScalerInt4Moe": true,
+    "attentionDelayedAllreduce": true,
+    "blockSize": 256,
+    "maxBatchedTokens": 512,
+    "maxNumSeqs": 1,
+    "prefixCaching": false,
+    "speculativeDecode": false,
+    "expertDrop": false,
+    "powerChanges": false
+  },
+  "delta": {
+    "compilationConfig": {
+      "use_inductor_graph_partition": true,
+      "compile_sizes": [
+        1
+      ],
+      "cudagraph_mode": "PIECEWISE",
+      "cudagraph_copy_inputs": true
+    }
+  },
+  "cache": {
+    "root": "/mnt/fast-ai/vllm-cache-exp/minimax-xpugraph-attndelay-block256-mbt512-noprefix-copyinputs-20260514T004253Z",
+    "aotHash": "65cf16d3072bc078047ab6a81ab4ebcdaed377edd31d6d3c29bbd44935034ce2"
+  },
+  "runs": [
+    {
+      "name": "warmup_compile",
+      "promptTokens": 512,
+      "outputTokens": 128,
+      "elapsedTimeSec": 7.702365289995214,
+      "totalTokensPerSecond": 83.09135907009127,
+      "outputTokensPerSecond": null,
+      "resultJson": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n128-20260514T004253Z.json",
+      "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n128-20260514T004253Z.log",
+      "notes": "Cold compile/warmup only; not comparable to promoted p512/n1536 decode runs."
+    },
+    {
+      "name": "measurement",
+      "promptTokens": 512,
+      "outputTokens": 1536,
+      "elapsedTimeSec": null,
+      "totalTokensPerSecond": null,
+      "outputTokensPerSecond": null,
+      "resultJson": null,
+      "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260514T005004Z.log",
+      "failure": {
+        "workerErrors": [
+          "UR_RESULT_ERROR_OUT_OF_RESOURCES",
+          "UR_RESULT_ERROR_DEVICE_LOST"
+        ],
+        "kernelEvidence": [
+          "xe engine reset and coredump on 0000:e3:00.0",
+          "xe engine reset and coredump on 0000:83:00.0",
+          "xe engine reset and coredump on 0000:03:00.0",
+          "xe engine reset and coredump on 0000:a3:00.0",
+          "exec queue reset detected on all four GPUs"
+        ]
+      },
+      "notes": "AOT loaded successfully, but the run failed before producing a benchmark JSON."
+    }
+  ],
+  "decision": {
+    "promoted": false,
+    "submittedToLocalMaxxing": false,
+    "recommendation": "Keep cudagraph_copy_inputs at the default for the current-best MiniMax recipe."
+  }
+}
