@@ -87,6 +87,30 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max-num-seqs", type=int, default=1)
     parser.add_argument("--block-size", type=int, default=256)
     parser.add_argument(
+        "--enforce-eager",
+        action="store_true",
+        help="Disable vLLM torch.compile/cudagraph execution for correctness isolation.",
+    )
+    parser.add_argument(
+        "--disable-inductor-graph-partition",
+        action="store_true",
+        help="Keep torch.compile enabled but disable vLLM's inductor graph partition option.",
+    )
+    parser.add_argument(
+        "--rms-norm-priority",
+        default=None,
+        help=(
+            "Comma-separated vLLM IR RMSNorm provider priority, for example "
+            "'xpu_kernels,native'."
+        ),
+    )
+    parser.add_argument(
+        "--compilation-mode",
+        choices=("default", "none", "stock", "dynamo_once", "vllm"),
+        default="default",
+        help="Override vLLM compilation_config.mode for compiler-path isolation.",
+    )
+    parser.add_argument(
         "--disable-custom-all-reduce",
         action="store_true",
         help="Disable vLLM custom all-reduce. Default mirrors benchmark scripts.",
@@ -177,11 +201,30 @@ def main() -> None:
     from vllm import LLM, SamplingParams
 
     compilation_config = {
-        "use_inductor_graph_partition": True,
         "compile_sizes": [1],
     }
+    if args.compilation_mode != "default":
+        mode_map = {
+            "none": 0,
+            "stock": 1,
+            "dynamo_once": 2,
+            "vllm": 3,
+        }
+        compilation_config["mode"] = mode_map[args.compilation_mode]
+    if not args.disable_inductor_graph_partition:
+        compilation_config["use_inductor_graph_partition"] = True
     if args.mode == "graph":
         compilation_config["cudagraph_mode"] = "PIECEWISE"
+
+    llm_kwargs = {}
+    if args.rms_norm_priority:
+        llm_kwargs["ir_op_priority"] = {
+            "rms_norm": [
+                part
+                for part in args.rms_norm_priority.replace(" ", "").split(",")
+                if part
+            ]
+        }
 
     llm = LLM(
         model=args.model,
@@ -194,10 +237,12 @@ def main() -> None:
         max_num_batched_tokens=args.max_num_batched_tokens,
         max_num_seqs=args.max_num_seqs,
         block_size=args.block_size,
+        enforce_eager=args.enforce_eager,
         disable_custom_all_reduce=args.disable_custom_all_reduce,
         enable_chunked_prefill=True,
         enable_prefix_caching=args.enable_prefix_caching,
         compilation_config=compilation_config,
+        **llm_kwargs,
     )
     params = SamplingParams(
         temperature=args.temperature,
@@ -339,12 +384,16 @@ def main() -> None:
             "max_num_batched_tokens": args.max_num_batched_tokens,
             "max_num_seqs": args.max_num_seqs,
             "block_size": args.block_size,
+            "enforce_eager": args.enforce_eager,
+            "disable_inductor_graph_partition": args.disable_inductor_graph_partition,
             "enable_prefix_caching": args.enable_prefix_caching,
             "attention_delay_allreduce": args.attention_delay_allreduce,
             "vllm_cache_root": os.environ.get("VLLM_CACHE_ROOT"),
             "temperature": args.temperature,
             "top_p": args.top_p,
             "top_k": args.top_k,
+            "rms_norm_priority": args.rms_norm_priority,
+            "compilation_mode": args.compilation_mode,
         },
         "compilation_config": compilation_config,
     }

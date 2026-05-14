@@ -1,0 +1,66 @@
+{
+  "date_local": "2026-05-13",
+  "hardware": "4x Intel Arc Pro B70 32GB",
+  "model": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+  "model_path": "/mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround",
+  "conclusion": "AutoRound TP4 quality passes with enforce_eager=True and fails with vLLM compiled execution. Compiled throughput results remain speed-only diagnostics until this is fixed.",
+  "controls": [
+    {
+      "name": "GGUF RPC+SYCL greedy smoke",
+      "artifact": "/home/steve/bench-results/minimax-m2.7-ud-iq4_xs-gguf/correctness/gguf-rpc-y2-greedy-smoke-20260514T014907Z",
+      "passed": true,
+      "output_decode_tok_s": 17.29,
+      "notes": "Generated printable capital-city text through independent UD-IQ4_XS GGUF path."
+    },
+    {
+      "name": "compiled no llm-scaler no custom allreduce",
+      "artifact": "/home/steve/bench-results/minimax-m2.7-integrity-gate/eager-nollmscaler-quality-clean-20260514T015550Z.json",
+      "passed": false,
+      "first_distinct_generated_tokens": [0],
+      "degenerate_output": true
+    },
+    {
+      "name": "enforce eager no llm-scaler no custom allreduce",
+      "artifact": "/home/steve/bench-results/minimax-m2.7-integrity-gate/eager-enforced-nollmscaler-quality-20260514T020126Z.json",
+      "passed": true,
+      "token_sha256": "7001633e28e40f4e533151bad568e1181466b5a5180a323a9e99019430523407",
+      "observed_output_tok_s_short_smoke": 13.06
+    },
+    {
+      "name": "enforce eager optimized",
+      "artifact": "/home/steve/bench-results/minimax-m2.7-integrity-gate/eager-enforced-optimized-quality-20260514T020342Z.json",
+      "passed": true,
+      "token_sha256": "7001633e28e40f4e533151bad568e1181466b5a5180a323a9e99019430523407",
+      "observed_output_tok_s_short_smoke": 10.5
+    },
+    {
+      "name": "compiled without inductor graph partition",
+      "artifact": "/home/steve/bench-results/minimax-m2.7-integrity-gate/compiled-nopartition-quality-20260514T020619Z.json",
+      "passed": false,
+      "first_distinct_generated_tokens": [0],
+      "degenerate_output": true
+    },
+    {
+      "name": "compiled with xpu_kernels RMS priority",
+      "artifact": "/home/steve/bench-results/minimax-m2.7-integrity-gate/compiled-xpurms-quality-20260514T021054Z.json",
+      "passed": false,
+      "first_distinct_generated_tokens": [0],
+      "degenerate_output": true
+    },
+    {
+      "name": "stock torch compile",
+      "artifact": "/home/steve/bench-results/minimax-m2.7-integrity-gate/stockcompile-quality-20260514T021816Z.log",
+      "passed": false,
+      "notes": "No quality JSON produced; run hung in shared-memory broadcast/compile phase after model load and was killed."
+    }
+  ],
+  "localmaxxing": {
+    "submitted": false,
+    "reason": "No new promoted performance result; this is a correctness blocker/root-cause split."
+  },
+  "next_steps": [
+    "Compare eager and compiled pre-sampler logits on the same one-token prompt.",
+    "Bisect compiled-forward regions around final norm/lm_head, attention output, Q/K RMS, and MiniMax MoE.",
+    "Inspect AOT graph outputs for all-zero logits, aliasing, missing final gather, or masked logits before sampling."
+  ]
+}
