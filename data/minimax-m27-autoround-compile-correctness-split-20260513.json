@@ -52,6 +52,26 @@
       "artifact": "/home/steve/bench-results/minimax-m2.7-integrity-gate/stockcompile-quality-20260514T021816Z.log",
       "passed": false,
       "notes": "No quality JSON produced; run hung in shared-memory broadcast/compile phase after model load and was killed."
+    },
+    {
+      "name": "eager one-token logprobs",
+      "artifact": "/home/steve/bench-results/minimax-m2.7-integrity-gate/eager-enforced-logprobs-20260514T022845Z.json",
+      "passed": true,
+      "token_id": 8261,
+      "decoded_token": " Paris",
+      "rank": 1,
+      "logprob": -0.1312507539987564,
+      "notes": "Healthy first-token distribution."
+    },
+    {
+      "name": "compiled one-token logprobs",
+      "artifact": "/home/steve/bench-results/minimax-m2.7-integrity-gate/compiled-logprobs-20260514T023107Z.json",
+      "passed": false,
+      "token_id": 0,
+      "decoded_token": "\\u0000",
+      "rank": 1,
+      "logprob_nonfinite": "nan",
+      "notes": "Compiled path returns NaN logprobs and ranks token ids 0..9 first, explaining the all-NUL generation."
     }
   ],
   "localmaxxing": {
@@ -59,7 +79,7 @@
     "reason": "No new promoted performance result; this is a correctness blocker/root-cause split."
   },
   "next_steps": [
-    "Compare eager and compiled pre-sampler logits on the same one-token prompt.",
+    "Add lower-level eager/compiled probes to locate where non-finite logits first appear.",
     "Bisect compiled-forward regions around final norm/lm_head, attention output, Q/K RMS, and MiniMax MoE.",
     "Inspect AOT graph outputs for all-zero logits, aliasing, missing final gather, or masked logits before sampling."
   ]

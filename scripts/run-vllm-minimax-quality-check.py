@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import os
 import sys
 import time
@@ -60,6 +61,12 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--out", required=True, help="Output JSON path.")
     parser.add_argument("--max-tokens", type=int, default=128)
+    parser.add_argument(
+        "--logprobs",
+        type=int,
+        default=None,
+        help="Record generated-token top logprobs for diagnostics.",
+    )
     parser.add_argument("--temperature", type=float, default=0.0)
     parser.add_argument("--top-p", type=float, default=1.0)
     parser.add_argument("--top-k", type=int, default=-1)
@@ -158,6 +165,32 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def serialize_logprobs(logprobs):
+    if logprobs is None:
+        return None
+    serialized = []
+    for step in logprobs:
+        if step is None:
+            serialized.append(None)
+            continue
+        entries = []
+        for token_id, item in step.items():
+            record = {"token_id": int(token_id)}
+            for attr in ("logprob", "rank", "decoded_token"):
+                if hasattr(item, attr):
+                    value = getattr(item, attr)
+                    if attr == "logprob" and value is not None:
+                        value = float(value)
+                        if not math.isfinite(value):
+                            record["logprob_nonfinite"] = str(value)
+                            value = None
+                    record[attr] = value
+            entries.append(record)
+        entries.sort(key=lambda entry: entry.get("rank") or 10**9)
+        serialized.append(entries)
+    return serialized
+
+
 def configure_env(args: argparse.Namespace) -> None:
     os.environ.setdefault("ONEAPI_DEVICE_SELECTOR", "level_zero:0,1,2,3")
     os.environ.setdefault("ZE_AFFINITY_MASK", "0,1,2,3")
@@ -251,6 +284,7 @@ def main() -> None:
         max_tokens=args.max_tokens,
         seed=0,
         stop_token_ids=[200020],
+        logprobs=args.logprobs,
     )
     started = time.perf_counter()
     prompts = args.prompt or DEFAULT_PROMPTS
@@ -274,6 +308,9 @@ def main() -> None:
                             "text_sha256": hashlib.sha256(
                                 output.outputs[0].text.encode()
                             ).hexdigest(),
+                            "logprobs": serialize_logprobs(
+                                output.outputs[0].logprobs
+                            ),
                         }
                         for i, output in enumerate(outputs)
                     ],
@@ -304,6 +341,9 @@ def main() -> None:
                             "text_sha256": hashlib.sha256(
                                 output.outputs[0].text.encode()
                             ).hexdigest(),
+                            "logprobs": serialize_logprobs(
+                                output.outputs[0].logprobs
+                            ),
                         }
                         for i, output in enumerate(outputs)
                     ],
@@ -353,7 +393,8 @@ def main() -> None:
     record = {
         "mode": args.mode,
         "elapsed_s": elapsed,
-        "max_tokens": args.max_tokens,
+            "max_tokens": args.max_tokens,
+            "logprobs": args.logprobs,
         "runs": args.runs,
         "n_prompts": len(prompts),
         "combined_token_sha256": combined_token_hash,
