@@ -1,0 +1,81 @@
+{
+  "date": "2026-05-13",
+  "model": {
+    "hf_id": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+    "submitted_hf_id": "MiniMaxAI/MiniMax-M2.7",
+    "local_path": "/mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround",
+    "quantization": "INT4 AutoRound W4A16",
+    "dtype": "float16"
+  },
+  "hardware": {
+    "gpu": "Intel Arc Pro B70 32GB",
+    "gpu_count": 4,
+    "vram_gb_per_gpu": 32,
+    "cpu": "AMD EPYC 9015 8-Core Processor",
+    "ram_gb": 16,
+    "os": "Ubuntu 24.04.4 LTS, kernel 6.17.0-23-generic"
+  },
+  "experiment": {
+    "name": "minimax_logits_moe_current_recipe_retest",
+    "goal": "Retest the exact MiniMax logits MoE path under the current best XPU graph/block256/MBT512/no-prefix recipe.",
+    "quality_policy": [
+      "No model weight, quantization, router semantic, KV dtype, sampler, speculative decoding, or power-limit change.",
+      "The intended path moves exact MiniMax router/top-k work into the llm-scaler INT4 MoE decode call.",
+      "The log confirmed: Using llm-scaler XPU INT4 MiniMax logits decode path."
+    ],
+    "cache_root": "/mnt/fast-ai/vllm-cache-exp/minimax-xpugraph-attndelay-block256-mbt512-noprefix-minimaxlogits-20260513T235204Z",
+    "aot_hash": "d0fed86b5a7cf64dcdb3e82d0b24effed00520ebd7f6018c6244d82201e6a98c",
+    "settings": {
+      "tensor_parallel": 4,
+      "max_model_len": 2048,
+      "max_num_batched_tokens": 512,
+      "max_num_seqs": 1,
+      "block_size": 256,
+      "prefix_caching": false,
+      "chunked_prefill": true,
+      "compilation_config": {
+        "use_inductor_graph_partition": true,
+        "compile_sizes": [
+          1
+        ],
+        "cudagraph_mode": "PIECEWISE"
+      },
+      "env_delta": {
+        "VLLM_MINIMAX_M2_ATTN_DELAY_ALLREDUCE": "1",
+        "VLLM_XPU_USE_LLM_SCALER_MOE_MINIMAX_LOGITS": "1",
+        "VLLM_XPU_ENABLE_XPU_GRAPH": "1",
+        "VLLM_XPU_FORCE_GRAPH_WITH_COMM": "1",
+        "VLLM_XPU_GRAPH_NOOP_COMM_CAPTURE": "1"
+      }
+    }
+  },
+  "runs": [
+    {
+      "label": "warmup_aot",
+      "prompt_tokens": 512,
+      "output_tokens": 128,
+      "elapsed_s": 7.558861964003881,
+      "tok_s_total": 84.66883018207625,
+      "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n128-20260513T235204Z.log",
+      "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n128-20260513T235204Z.json"
+    },
+    {
+      "label": "measure",
+      "prompt_tokens": 512,
+      "output_tokens": 1536,
+      "elapsed_s": 20.979442104988266,
+      "tok_s_total": 97.61937375413089,
+      "tok_s_out": 73.21453031559817,
+      "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T235723Z.log",
+      "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T235723Z.json"
+    }
+  ],
+  "comparison": {
+    "current_best_submitted_tok_s_out": 73.30631164343902,
+    "current_best_repeat_mean_tok_s_out": 73.244155,
+    "delta_vs_submitted_tok_s_out": -0.09178132784085,
+    "interpretation": "Near-baseline but not an improvement; the logits MoE path should remain default-off for the current best recipe."
+  },
+  "localmaxxing_decision": "No submission: valid negative/near-baseline screen, not a new promoted result.",
+  "decision": "Keep VLLM_XPU_USE_LLM_SCALER_MOE_MINIMAX_LOGITS unset in the recommended recipe."
+}

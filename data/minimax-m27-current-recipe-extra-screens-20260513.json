@@ -1,0 +1,84 @@
+{
+  "date": "2026-05-13",
+  "model": {
+    "hf_id": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+    "submitted_hf_id": "MiniMaxAI/MiniMax-M2.7",
+    "local_path": "/mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround",
+    "quantization": "INT4 AutoRound W4A16",
+    "dtype": "float16"
+  },
+  "control_recipe": {
+    "cache_root": "/mnt/fast-ai/vllm-cache-exp/minimax-xpugraph-attndelay-block256-mbt512-noprefix-20260513T171301Z",
+    "aot_hash": "d0fed86b5a7cf64dcdb3e82d0b24effed00520ebd7f6018c6244d82201e6a98c",
+    "prompt_tokens": 512,
+    "output_tokens": 1536,
+    "tensor_parallel": 4,
+    "max_model_len": 2048,
+    "max_num_batched_tokens": 512,
+    "max_num_seqs": 1,
+    "block_size": 256,
+    "prefix_caching": false,
+    "chunked_prefill": true,
+    "current_best_submitted_tok_s_out": 73.30631164343902,
+    "current_best_repeat_mean_tok_s_out": 73.244155
+  },
+  "results": [
+    {
+      "name": "minimax_logits_moe_current_recipe",
+      "result": "negative_near_baseline",
+      "settings_delta": {
+        "VLLM_XPU_USE_LLM_SCALER_MOE_MINIMAX_LOGITS": "1"
+      },
+      "cache_root": "/mnt/fast-ai/vllm-cache-exp/minimax-xpugraph-attndelay-block256-mbt512-noprefix-minimaxlogits-20260513T235204Z",
+      "aot_hash": "d0fed86b5a7cf64dcdb3e82d0b24effed00520ebd7f6018c6244d82201e6a98c",
+      "measure": {
+        "elapsed_s": 20.979442104988266,
+        "tok_s_total": 97.61937375413089,
+        "tok_s_out": 73.21453031559817,
+        "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T235723Z.log",
+        "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260513T235723Z.json"
+      },
+      "decision": "Keep VLLM_XPU_USE_LLM_SCALER_MOE_MINIMAX_LOGITS unset."
+    },
+    {
+      "name": "stream_interval_16_retry",
+      "result": "stopped_redundant_negative",
+      "settings_delta": {
+        "stream_interval": 16
+      },
+      "measure": {
+        "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260514T000239Z.log",
+        "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260514T000239Z.json",
+        "status": "terminated after repeated shared-memory broadcast waits before graph capture"
+      },
+      "prior_result": {
+        "tok_s_out": 72.86003263479938,
+        "tok_s_total": 97.14671017973251,
+        "source": "data/minimax-m27-quality-preserving-followups-20260513-late.json"
+      },
+      "decision": "Do not retest until another scheduler change makes output-processing overhead relevant."
+    },
+    {
+      "name": "disable_hybrid_kv_cache_manager",
+      "result": "negative_no_op",
+      "settings_delta": {
+        "disable_hybrid_kv_cache_manager": true
+      },
+      "measure": {
+        "elapsed_s": 21.078757310984656,
+        "tok_s_total": 97.15942784410431,
+        "tok_s_out": 72.86957088307823,
+        "kv_cache_tokens": 17920,
+        "available_kv_cache_gib": 1.07,
+        "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260514T001131Z.log",
+        "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260514T001131Z.json"
+      },
+      "decision": "Do not promote. KV size was unchanged and output throughput regressed."
+    }
+  ],
+  "localmaxxing_decision": "No submissions: negative/no-op screens only.",
+  "next_targets": [
+    "Inspect generated AOT and runtime source around hidden-state collectives and adjacent residual/RMS/projection/MoE work.",
+    "Avoid more flag-only retests unless source inspection identifies a plausible quality-neutral mechanism."
+  ]
+}
