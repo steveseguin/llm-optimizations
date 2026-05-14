@@ -500,3 +500,47 @@ Interpretation: `max_model_len=4096` plus full-decode graph can work for a
 short prompt. The invalid larger-context quality-gate failure is narrowed to the
 long chat-template prompt / chunked-prefill path at `max_model_len=4096`, not
 to decode graph capture alone.
+
+### 4096-Context Graph Long Prompt With 256-Token Prefill Chunks
+
+Tried reducing the chunked-prefill scheduling unit from `512` to `256` while
+keeping `max_model_len=4096`, the long chat-template quality prompt, and the
+full-decode graph path:
+
+```bash
+python scripts/run-vllm-minimax-quality-check.py \
+  --mode graph \
+  --max-model-len 4096 \
+  --max-num-batched-tokens 256 \
+  --max-tokens 64 \
+  --prompt-file prompts/minimax-long-context-quality-smoke.txt \
+  --compilation-mode none \
+  --cudagraph-mode full_decode_only \
+  --attention-backend TRITON_ATTN
+```
+
+Artifacts:
+
+- JSON:
+  `/home/steve/bench-results/minimax-m2.7-quality-gated/minimax-ctx4096-graph-longprompt-mbt256-20260514T174057Z.json`
+- Log:
+  `/home/steve/bench-results/minimax-m2.7-quality-gated/minimax-ctx4096-graph-longprompt-mbt256-20260514T174057Z.log`
+
+Result:
+
+- Result: `passed=false`
+- Failure reason: `degenerate or corrupt generated output`
+- Generated tokens: `64`
+- Distinct generated tokens: `1`
+- NUL tokens: `64`
+- Control non-space chars: `64`
+- KV cache size increased slightly to `17,920` tokens with theoretical
+  `4.38x` concurrency at `4096`.
+- Init/profile took `344.85` seconds before graph capture completed.
+- Follow-up four-device torch XPU health check passed.
+
+Interpretation: lowering the prefill chunk to `256` avoids the hard
+`sample_tokens` timeout seen with `512`, but it corrupts generation under the
+4096-context graph path. This is not a valid workaround. The next useful 4096
+work should instrument the first long-prefill chunk and graph replay boundary
+rather than trying to promote smaller prefill chunks.

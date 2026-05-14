@@ -188,6 +188,9 @@ Rules:
 - A short-prompt 4096-context full-decode graph smoke also passes, narrowing
   the failing combination to long chat-template prompt / chunked-prefill at
   `max_model_len=4096`.
+- Reducing the 4096-context long-prompt graph prefill chunk from `512` to `256`
+  avoids the hard `sample_tokens` timeout, but corrupts generation into all
+  token-id-zero/NUL output. This is not a valid larger-context workaround.
 - A non-sync timing probe on the valid path only sees uncaptured regions, but
   the visible costs still point at MoE experts, Q/K RMS scheduling, and
   prefill-shaped TP allreduce as the next code-level optimization targets.
