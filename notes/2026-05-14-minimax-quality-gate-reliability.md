@@ -154,6 +154,29 @@ This does not prove broad benchmark quality, but it raises the bar above a
 single PASS token and gives speed experiments a cheap correctness screen before
 throughput numbers are promoted.
 
+## Post-reset Graph Semantic Canary
+
+After EP Attempt 13 forced xe devcoredumps and `xpu-smi` device resets, the
+promoted TP4 full-decode graph recipe was rechecked with the expanded raw
+semantic suite:
+
+- JSON:
+  `/home/steve/bench-results/minimax-m2.7-quality-gated/minimax-post-reset-full-decode-graph-semantic-canary-20260514T155344Z.json`
+- Runtime: TP4, TRITON_ATTN, `CompilationMode.NONE`,
+  `FULL_DECODE_ONLY` graph, `block-size=256`,
+  llm-scaler INT4 MoE decode enabled
+- `passed=true`
+- `nul_token_count=0`
+- `control_nonspace_text_chars=0`
+- `degenerate_output=false`
+- Required substrings matched: `PASS`, `42`, `def add_one`
+- Required regex matched: `return\s+x\s*\+\s*1`
+- Follow-up minimal torch XPU tensor check passed on devices `0`, `1`, `2`,
+  and `3`.
+
+This confirms the device reset recovered the non-EP TP4 graph path and that the
+current promoted recipe still clears the semantic canary after the EP crash.
+
 ## Next Debug Targets
 
 - Continue isolating whether free-form greedy token drift comes from XPU/oneCCL
