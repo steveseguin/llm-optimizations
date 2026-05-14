@@ -76,6 +76,12 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Prompt to run. May be repeated. Defaults to a small fixed suite.",
     )
+    parser.add_argument(
+        "--prompt-file",
+        action="append",
+        default=None,
+        help="UTF-8 prompt file to run. May be repeated.",
+    )
     parser.add_argument("--runs", type=int, default=1)
     parser.add_argument(
         "--raw-prompt",
@@ -93,6 +99,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max-num-batched-tokens", type=int, default=512)
     parser.add_argument("--max-num-seqs", type=int, default=1)
     parser.add_argument("--block-size", type=int, default=256)
+    parser.add_argument(
+        "--gpu-memory-utilization",
+        type=float,
+        default=None,
+        help="Optional vLLM GPU memory utilization fraction.",
+    )
     parser.add_argument(
         "--enforce-eager",
         action="store_true",
@@ -159,6 +171,11 @@ def parse_args() -> argparse.Namespace:
         "--allow-degenerate-output",
         action="store_true",
         help="Do not fail on all-identical tokens or control-character output.",
+    )
+    parser.add_argument(
+        "--allow-nondeterministic-output",
+        action="store_true",
+        help="Record but do not fail if repeated greedy runs produce different token hashes.",
     )
     parser.add_argument(
         "--enable-prefix-caching",
@@ -297,6 +314,8 @@ def main() -> None:
                 if part
             ]
         }
+    if args.gpu_memory_utilization is not None:
+        llm_kwargs["gpu_memory_utilization"] = args.gpu_memory_utilization
 
     llm = LLM(
         model=args.model,
@@ -327,66 +346,73 @@ def main() -> None:
         logprobs=args.logprobs,
     )
     started = time.perf_counter()
-    prompts = args.prompt or DEFAULT_PROMPTS
+    prompts = []
+    if args.prompt:
+        prompts.extend(args.prompt)
+    if args.prompt_file:
+        prompts.extend(Path(path).read_text().rstrip("\n") for path in args.prompt_file)
+    if not prompts:
+        prompts = list(DEFAULT_PROMPTS)
     run_records = []
     if args.raw_prompt:
         rendered_prompt = None
         for run_idx in range(args.runs):
-            outputs = llm.generate(prompts, params)
+            prompt_records = []
+            for i, prompt in enumerate(prompts):
+                outputs = llm.generate([prompt], params)
+                output = outputs[0]
+                prompt_records.append(
+                    {
+                        "prompt_index": i,
+                        "n_tokens": len(output.outputs[0].token_ids),
+                        "token_ids": list(output.outputs[0].token_ids),
+                        "token_sha256": hashlib.sha256(
+                            ",".join(map(str, output.outputs[0].token_ids)).encode()
+                        ).hexdigest(),
+                        "text": output.outputs[0].text,
+                        "text_sha256": hashlib.sha256(
+                            output.outputs[0].text.encode()
+                        ).hexdigest(),
+                        "logprobs": serialize_logprobs(output.outputs[0].logprobs),
+                    }
+                )
             run_records.append(
                 {
                     "run": run_idx,
-                    "prompts": [
-                        {
-                            "prompt_index": i,
-                            "n_tokens": len(output.outputs[0].token_ids),
-                            "token_ids": list(output.outputs[0].token_ids),
-                            "token_sha256": hashlib.sha256(
-                                ",".join(map(str, output.outputs[0].token_ids)).encode()
-                            ).hexdigest(),
-                            "text": output.outputs[0].text,
-                            "text_sha256": hashlib.sha256(
-                                output.outputs[0].text.encode()
-                            ).hexdigest(),
-                            "logprobs": serialize_logprobs(
-                                output.outputs[0].logprobs
-                            ),
-                        }
-                        for i, output in enumerate(outputs)
-                    ],
+                    "prompts": prompt_records,
                 }
             )
     else:
         template_path = Path(args.chat_template or Path(args.model) / "chat_template.jinja")
         rendered_prompt = template_path.read_text()
-        conversations = [[{"role": "user", "content": prompt}] for prompt in prompts]
         for run_idx in range(args.runs):
-            outputs = llm.chat(
-                conversations,
-                params,
-                chat_template=rendered_prompt,
-            )
+            prompt_records = []
+            for i, prompt in enumerate(prompts):
+                outputs = llm.chat(
+                    [[{"role": "user", "content": prompt}]],
+                    params,
+                    chat_template=rendered_prompt,
+                )
+                output = outputs[0]
+                prompt_records.append(
+                    {
+                        "prompt_index": i,
+                        "n_tokens": len(output.outputs[0].token_ids),
+                        "token_ids": list(output.outputs[0].token_ids),
+                        "token_sha256": hashlib.sha256(
+                            ",".join(map(str, output.outputs[0].token_ids)).encode()
+                        ).hexdigest(),
+                        "text": output.outputs[0].text,
+                        "text_sha256": hashlib.sha256(
+                            output.outputs[0].text.encode()
+                        ).hexdigest(),
+                        "logprobs": serialize_logprobs(output.outputs[0].logprobs),
+                    }
+                )
             run_records.append(
                 {
                     "run": run_idx,
-                    "prompts": [
-                        {
-                            "prompt_index": i,
-                            "n_tokens": len(output.outputs[0].token_ids),
-                            "token_ids": list(output.outputs[0].token_ids),
-                            "token_sha256": hashlib.sha256(
-                                ",".join(map(str, output.outputs[0].token_ids)).encode()
-                            ).hexdigest(),
-                            "text": output.outputs[0].text,
-                            "text_sha256": hashlib.sha256(
-                                output.outputs[0].text.encode()
-                            ).hexdigest(),
-                            "logprobs": serialize_logprobs(
-                                output.outputs[0].logprobs
-                            ),
-                        }
-                        for i, output in enumerate(outputs)
-                    ],
+                    "prompts": prompt_records,
                 }
             )
     elapsed = time.perf_counter() - started
@@ -462,6 +488,7 @@ def main() -> None:
             "control_char_output": control_char_output,
             "degenerate_output": degenerate_output,
             "allow_degenerate_output": args.allow_degenerate_output,
+            "allow_nondeterministic_output": args.allow_nondeterministic_output,
             "disable_custom_all_reduce": args.disable_custom_all_reduce,
             "llm_scaler_moe": not args.disable_llm_scaler_moe,
         },
@@ -477,6 +504,7 @@ def main() -> None:
             "max_num_batched_tokens": args.max_num_batched_tokens,
             "max_num_seqs": args.max_num_seqs,
             "block_size": args.block_size,
+            "gpu_memory_utilization": args.gpu_memory_utilization,
             "enforce_eager": args.enforce_eager,
             "disable_inductor_graph_partition": args.disable_inductor_graph_partition,
             "enable_prefix_caching": args.enable_prefix_caching,
@@ -517,7 +545,7 @@ def main() -> None:
             indent=2,
         )
     )
-    if not deterministic:
+    if not deterministic and not args.allow_nondeterministic_output:
         raise SystemExit("quality smoke failed: nondeterministic token hashes")
     if expected_match is False:
         raise SystemExit("quality smoke failed: combined token hash mismatch")

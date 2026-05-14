@@ -19,6 +19,10 @@ export VLLM_XPU_GRAPH_NOOP_COMM_CAPTURE="${VLLM_XPU_GRAPH_NOOP_COMM_CAPTURE:-1}"
 export VLLM_MINIMAX_M2_ATTN_DELAY_ALLREDUCE="${VLLM_MINIMAX_M2_ATTN_DELAY_ALLREDUCE:-1}"
 export RUN_TIMEOUT="${RUN_TIMEOUT:-25m}"
 
-export EXTRA_ARGS="${EXTRA_ARGS:---async-engine --block-size 256 --no-enable-prefix-caching --attention-backend TRITON_ATTN --compilation-config {\"mode\":0,\"cudagraph_mode\":\"FULL_DECODE_ONLY\",\"cudagraph_num_of_warmups\":0,\"compile_sizes\":[1]}}"
+if [ -z "${EXTRA_ARGS+x}" ]; then
+  export EXTRA_ARGS='--async-engine --block-size 256 --no-enable-prefix-caching --attention-backend TRITON_ATTN --compilation-config {"mode":0,"cudagraph_mode":"FULL_DECODE_ONLY","cudagraph_num_of_warmups":0,"compile_sizes":[1]}'
+else
+  export EXTRA_ARGS
+fi
 
 exec /home/steve/llm-optimizations-publish/scripts/bench-vllm-minimax-autoround-xpu.sh

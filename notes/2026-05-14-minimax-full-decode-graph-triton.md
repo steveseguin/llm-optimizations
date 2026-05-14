@@ -75,3 +75,7 @@ vllm bench throughput \
 - Try `max_num_batched_tokens=1024` and `block_size=128` only after quality smoke.
 - Add a stable helper script for this exact recipe so future runs do not omit
   `VLLM_MINIMAX_M2_ATTN_DELAY_ALLREDUCE`.
+- Follow-up reliability note:
+  `notes/2026-05-14-minimax-quality-gate-reliability.md`. The fast graph path
+  passes the long-context corruption smoke, but token-exact deterministic greedy
+  output is not yet proven and should not be claimed.
