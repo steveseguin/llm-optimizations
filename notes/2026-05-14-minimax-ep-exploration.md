@@ -424,3 +424,68 @@ EP remains a high-upside workstream, but it is not the next promotable path.
 The immediate quality-preserving performance path is to repair the faster TP4
 compiled/AOT recipe, which previously reached about `73` output tok/s but was
 invalidated by semantic quality corruption.
+
+## EP Attempt 13: Deferred XPU Async Output Copy
+
+Patch:
+
+- `vllm/v1/worker/gpu_model_runner.py`
+- Guard: `VLLM_XPU_DEFER_ASYNC_OUTPUT_COPY=1`
+- Behavior: for XPU async scheduling with no logprobs, allocate the CPU output
+  tensor but defer the sampled-token D2H copy until the async output event is
+  synchronized. This avoids launching the copy immediately on the async output
+  copy stream.
+
+Command shape:
+
+```bash
+VLLM_XPU_PAD_UNEVEN_ALLGATHERV=1 \
+VLLM_XPU_DEFER_ASYNC_OUTPUT_COPY=1 \
+VLLM_XPU_DEFERRED_COPY_SYNC_DEVICE=1 \
+CCL_TOPO_FABRIC_VERTEX_CONNECTION_CHECK=0 \
+VLLM_TUNED_CONFIG_FOLDER=/home/steve/llm-optimizations-publish/configs/moe \
+TP=4 XPU_GRAPH=0 USE_LLM_SCALER_MOE=1 OUTPUT_LEN=32 \
+EXTRA_ARGS='--enforce-eager --async-engine --block-size 256 \
+--no-enable-prefix-caching --attention-backend TRITON_ATTN \
+--enable-expert-parallel --all2all-backend allgather_reducescatter \
+--compilation-config {"mode":0,"cudagraph_mode":"NONE",\
+"cudagraph_num_of_warmups":0,"compile_sizes":[1]}' \
+  scripts/bench-vllm-minimax-autoround-xpu.sh
+```
+
+Outcome:
+
+- Log:
+  `/home/steve/bench-results/minimax-m2.7-ep-exploration/vllm-minimax-m27-autoround-tp4-p512n32-20260514T154209Z.log`
+- EP reached decode, then failed when the deferred event attempted to
+  synchronize the XPU before copying sampled token ids:
+  `RuntimeError: level_zero backend failed with error: 20 (UR_RESULT_ERROR_DEVICE_LOST)`.
+- The error appeared on multiple EP ranks at
+  `gpu_input_batch.py:update_async_output_token_ids` ->
+  `finish_deferred_xpu_output_copy()` -> `torch.xpu.synchronize()`.
+- After termination, a trivial XPU tensor health check failed with
+  `UR_RESULT_ERROR_OUT_OF_RESOURCES` on device 1. `dmesg` showed xe
+  devcoredumps on all four B70s and `VM worker error: -62`.
+- Recovery without full system reboot:
+
+  ```bash
+  sudo sh -c 'for d in /sys/class/drm/card*/device/devcoredump; do \
+    [ -e "$d/data" ] && echo 1 > "$d/data" || true; done'
+  for d in 0 1 2 3; do sudo xpu-smi config -d "$d" --reset; done
+  ```
+
+- After the `xpu-smi` resets, a minimal torch XPU tensor check passed on all
+  four devices again.
+
+Interpretation:
+
+- The sampled-token copy workaround is not sufficient. EP decode is leaving at
+  least some ranks/devices in a bad Level Zero state before the host token copy
+  can complete.
+- The next EP investigation should move earlier than output-copy mechanics:
+  instrument the EP MoE dispatch/combine and AG/RS collectives around the first
+  successful `sample_tokens` call, then identify which rank/device reports the
+  first xe reset or non-returning collective.
+- Because EP can currently force device resets, full EP probes should stay
+  short and should be followed by a minimal XPU health check before any baseline
+  or LocalMaxxing-worthy run.
