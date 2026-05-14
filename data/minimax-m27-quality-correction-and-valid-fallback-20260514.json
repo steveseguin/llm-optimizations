@@ -47,6 +47,12 @@
       "evidence": [
         "/home/steve/bench-results/minimax-m2.7-integrity-gate/compiled-clone-final-hidden-warmups0-quality-20260514T042415Z.json"
       ]
+    },
+    {
+      "finding": "Forcing compile_ranges_endpoints to an empty list did not isolate decode-only compile; vLLM/XPU still compiled the 512-token range and produced NUL output.",
+      "evidence": [
+        "/home/steve/bench-results/minimax-m2.7-integrity-gate/compiled-decode-only-warmups0-quality-20260514T045212Z.json"
+      ]
     }
   ],
   "quality_valid_fallback": {
@@ -89,7 +95,7 @@
   "next_steps": [
     "Treat >60 tok/s target as still open for quality-valid MiniMax.",
     "Focus on isolating the compiled NaN path inside vLLM/XPU/Inductor rather than promoting compiled throughput.",
-    "Try disabling compile ranges so prefill stays eager while decode experiments remain isolated.",
+    "Find where XPU platform setup regenerates compile_ranges_endpoints and add a stronger decode-only compile override.",
     "Instrument compile warmup state and determine why cudagraph_num_of_warmups=1 corrupts mode=NONE decode.",
     "Use the 20.74 tok/s quality-valid fallback as the baseline for future honest comparisons."
   ]

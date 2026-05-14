@@ -110,6 +110,14 @@ def parse_args() -> argparse.Namespace:
         help="Override vLLM compilation_config.cudagraph_num_of_warmups.",
     )
     parser.add_argument(
+        "--compile-ranges-endpoints",
+        default=None,
+        help=(
+            "Comma-separated compilation_config.compile_ranges_endpoints. "
+            "Use an empty string to force an empty list."
+        ),
+    )
+    parser.add_argument(
         "--rms-norm-priority",
         default=None,
         help=(
@@ -261,6 +269,13 @@ def main() -> None:
         compilation_config["cudagraph_mode"] = "PIECEWISE"
     if args.cudagraph_num_warmups is not None:
         compilation_config["cudagraph_num_of_warmups"] = args.cudagraph_num_warmups
+    if args.compile_ranges_endpoints is not None:
+        endpoints = [
+            int(part)
+            for part in args.compile_ranges_endpoints.replace(" ", "").split(",")
+            if part
+        ]
+        compilation_config["compile_ranges_endpoints"] = endpoints
 
     llm_kwargs = {}
     if args.rms_norm_priority:
@@ -463,6 +478,7 @@ def main() -> None:
             "compilation_mode": args.compilation_mode,
             "attention_backend": args.attention_backend,
             "cudagraph_num_warmups": args.cudagraph_num_warmups,
+            "compile_ranges_endpoints": args.compile_ranges_endpoints,
         },
         "compilation_config": compilation_config,
     }
