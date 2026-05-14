@@ -1,0 +1,12 @@
+{
+  "submitted_utc": "2026-05-14T04:50:17Z",
+  "payload": "data/localmaxxing-minimax-m27-autoround-quality-valid-none-warmups0-p512n1536-20260514.payload.json",
+  "response": {
+    "id": "cmp50fdu90007o301bhqk6r8v",
+    "status": "APPROVED",
+    "tokSOut": 20.74229496697839,
+    "tokSTotal": 27.65639328930451,
+    "createdAt": "2026-05-14T04:50:17.169Z"
+  },
+  "reason": "Quality-valid fallback/correction submission. Notes explain that earlier compiled MiniMax speed-only results are invalid for quality due NUL output."
+}

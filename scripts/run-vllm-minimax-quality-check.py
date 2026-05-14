@@ -104,6 +104,12 @@ def parse_args() -> argparse.Namespace:
         help="Keep torch.compile enabled but disable vLLM's inductor graph partition option.",
     )
     parser.add_argument(
+        "--cudagraph-num-warmups",
+        type=int,
+        default=None,
+        help="Override vLLM compilation_config.cudagraph_num_of_warmups.",
+    )
+    parser.add_argument(
         "--rms-norm-priority",
         default=None,
         help=(
@@ -116,6 +122,11 @@ def parse_args() -> argparse.Namespace:
         choices=("default", "none", "stock", "dynamo_once", "vllm"),
         default="default",
         help="Override vLLM compilation_config.mode for compiler-path isolation.",
+    )
+    parser.add_argument(
+        "--attention-backend",
+        default=None,
+        help="Override vLLM attention backend, for example TRITON_ATTN.",
     )
     parser.add_argument(
         "--disable-custom-all-reduce",
@@ -248,6 +259,8 @@ def main() -> None:
         compilation_config["use_inductor_graph_partition"] = True
     if args.mode == "graph":
         compilation_config["cudagraph_mode"] = "PIECEWISE"
+    if args.cudagraph_num_warmups is not None:
+        compilation_config["cudagraph_num_of_warmups"] = args.cudagraph_num_warmups
 
     llm_kwargs = {}
     if args.rms_norm_priority:
@@ -275,6 +288,7 @@ def main() -> None:
         enable_chunked_prefill=True,
         enable_prefix_caching=args.enable_prefix_caching,
         compilation_config=compilation_config,
+        attention_backend=args.attention_backend,
         **llm_kwargs,
     )
     params = SamplingParams(
@@ -447,6 +461,8 @@ def main() -> None:
             "top_k": args.top_k,
             "rms_norm_priority": args.rms_norm_priority,
             "compilation_mode": args.compilation_mode,
+            "attention_backend": args.attention_backend,
+            "cudagraph_num_warmups": args.cudagraph_num_warmups,
         },
         "compilation_config": compilation_config,
     }

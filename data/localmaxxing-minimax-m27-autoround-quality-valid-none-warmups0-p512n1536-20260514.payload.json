@@ -1,0 +1,35 @@
+{
+  "hfId": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+  "hardware": {
+    "hwClass": "DISCRETE_GPU",
+    "gpuName": "Intel Arc Pro B70 32GB",
+    "gpuCount": 4,
+    "vramGb": 32,
+    "cpu": "AMD EPYC 9015 8-Core Processor",
+    "ramGb": 15,
+    "os": "Ubuntu 24.04.4 LTS"
+  },
+  "engineName": "vllm",
+  "engineVersion": "0.20.1-local",
+  "quantization": "INT4 AutoRound W4A16",
+  "promptTokens": 512,
+  "outputTokens": 1536,
+  "contextLength": 2048,
+  "batchSize": 1,
+  "tokSOut": 20.74229496697839,
+  "tokSTotal": 27.656393289304514,
+  "notes": "Quality-valid correction run. Earlier compiled/AOT MiniMax speed-only runs around 73 out tok/s are now considered invalid for quality because the quality smoke produced token 0/NUL output. This fallback disables Inductor compile with compilation_config mode=0 and cudagraph_num_of_warmups=0; 3-run p512/n1536 CV 0.081%, quality smoke has no NUL/control output. Goal remains to fix compiled path and exceed 60 out tok/s without quality loss.",
+  "engineFlags": {
+    "commandSnippet": "VLLM_XPU_USE_LLM_SCALER_MOE=1 VLLM_MINIMAX_M2_ATTN_DELAY_ALLREDUCE=1 VLLM_XPU_ENABLE_XPU_GRAPH=0 vllm bench throughput --backend vllm --model /mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround --dtype float16 --tensor-parallel-size 4 --distributed-executor-backend mp --max-model-len 2048 --max-num-batched-tokens 512 --max-num-seqs 1 --dataset-name random --random-input-len 512 --random-output-len 1536 --random-range-ratio 0 --num-prompts 1 --async-engine --block-size 256 --no-enable-prefix-caching --compilation-config '{\"mode\":0,\"cudagraph_num_of_warmups\":0}'",
+    "tensorParallel": 4,
+    "gpuLayers": 0,
+    "splitMode": "tensor_parallel",
+    "contextLength": 2048,
+    "concurrency": 1,
+    "prefixCaching": false,
+    "chunkedPrefill": true,
+    "prefillChunkSize": 512,
+    "contBatching": true,
+    "extraFlags": "llm-scaler INT4 MoE enabled; MiniMax attention delayed allreduce enabled; Inductor compile disabled; cudagraph_num_of_warmups=0"
+  }
+}

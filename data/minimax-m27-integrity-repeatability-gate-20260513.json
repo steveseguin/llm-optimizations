@@ -17,6 +17,11 @@
     }
   },
   "created_utc": "2026-05-13T21:55:00Z",
+  "corrected_2026_05_14": {
+    "status": "invalidated_for_quality",
+    "reason": "The archived quality-smoke.json for this gate contains all token 0/NUL output. The summary did not preserve quality_checks, so this was previously interpreted too optimistically.",
+    "replacement_record": "data/minimax-m27-quality-correction-and-valid-fallback-20260514.json"
+  },
   "hardware": {
     "cpu": "AMD EPYC 9015 8-Core Processor",
     "gpu": "Intel Arc Pro B70 32GB",
@@ -29,7 +34,7 @@
     "AOT collective validation verifies the expected Q/K RMS, attention, MoE, and embedding collectives remain present; it does not prove numerical equivalence by itself.",
     "Load time is not part of decode throughput; low system RAM currently slows model load and prefetch behavior."
   ],
-  "localmaxxing_decision": "No new submission: best repeat was a tiny run-to-run high, while the 3-run mean supports the existing submitted 73.306 tok/s result rather than establishing a material new optimization.",
+  "localmaxxing_decision": "Corrected 2026-05-14: do not treat this as a quality-valid LocalMaxxing result. The compiled/AOT run is speed-only because the quality smoke produced NUL output.",
   "model": {
     "dtype": "float16",
     "hf_id": "Lasimeri/MiniMax-M2.7-int4-AutoRound",

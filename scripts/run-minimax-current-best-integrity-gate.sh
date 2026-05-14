@@ -158,10 +158,21 @@ record["aot_collectives"] = {
 quality = gate_dir / "quality-smoke.json"
 if quality.exists():
     q = json.loads(quality.read_text())
+    first_prompt = {}
+    if q.get("run_records"):
+        prompts = q["run_records"][0].get("prompts", [])
+        if prompts:
+            first = prompts[0]
+            first_prompt = {
+                "text_prefix": first.get("text", "")[:160],
+                "token_ids_prefix": first.get("token_ids", [])[:32],
+            }
     record["quality_smoke"] = {
         "deterministic_across_runs": q["deterministic_across_runs"],
         "combined_token_sha256": q["combined_token_sha256"],
         "combined_text_sha256": q["combined_text_sha256"],
+        "quality_checks": q.get("quality_checks"),
+        "first_prompt": first_prompt,
         "runs": q["runs"],
         "n_prompts": q["n_prompts"],
     }

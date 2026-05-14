@@ -1,0 +1,96 @@
+{
+  "created_utc": "2026-05-14T04:49:00Z",
+  "model": {
+    "hf_id": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+    "base_hf_id": "MiniMaxAI/MiniMax-M2.7",
+    "local_path": "/mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround",
+    "quantization": "INT4 AutoRound W4A16"
+  },
+  "hardware": {
+    "gpu": "Intel Arc Pro B70 32GB",
+    "gpu_count": 4,
+    "vram_gb_per_gpu": 32,
+    "cpu": "AMD EPYC 9015 8-Core Processor",
+    "ram_gb": 15,
+    "os": "Ubuntu 24.04.4 LTS"
+  },
+  "correction": {
+    "summary": "Earlier MiniMax compiled/AOT throughput runs around 73 output tok/s are now treated as speed-only diagnostics, not quality-valid benchmark results.",
+    "reason": "The archived current-best quality smoke contains token 0/NUL output even though the summary file did not preserve quality_checks and was previously interpreted as passing.",
+    "invalidated_artifacts": [
+      "/home/steve/bench-results/minimax-m2.7-integrity-gate/current-best-gate-20260513T214224Z/quality-smoke.json",
+      "/home/steve/bench-results/minimax-m2.7-integrity-gate/current-best-gate-20260513T214452Z/repeatability-summary.json",
+      "/home/steve/llm-optimizations-publish/data/minimax-m27-integrity-repeatability-gate-20260513.json"
+    ],
+    "localmaxxing": {
+      "compiled_73_tok_s_should_be_read_as_invalid_for_quality": true,
+      "new_compiled_speed_submissions": false
+    }
+  },
+  "root_cause_progress": [
+    {
+      "finding": "Default compiled and stock-compiled vLLM/XPU MiniMax paths produce NaN logits and token 0/NUL output.",
+      "evidence": [
+        "/home/steve/bench-results/minimax-m2.7-integrity-gate/compiled-warmups0-quality-20260514T041455Z.json",
+        "/home/steve/bench-results/minimax-m2.7-integrity-gate/compilemode-stock-warmups0-quality-20260514T041715Z.json"
+      ]
+    },
+    {
+      "finding": "The non-Inductor path is also corrupted unless cudagraph_num_of_warmups is forced to 0.",
+      "evidence": [
+        "/home/steve/bench-results/minimax-m2.7-integrity-gate/compilemode-none-quality-20260514T025653Z.json",
+        "/home/steve/bench-results/minimax-m2.7-integrity-gate/compilemode-none-warmups0-quality-20260514T041240Z.json"
+      ]
+    },
+    {
+      "finding": "Final hidden-state clone/materialization did not repair the compiled path.",
+      "evidence": [
+        "/home/steve/bench-results/minimax-m2.7-integrity-gate/compiled-clone-final-hidden-warmups0-quality-20260514T042415Z.json"
+      ]
+    }
+  ],
+  "quality_valid_fallback": {
+    "engine": "vLLM 0.20.1-local XPU",
+    "backend": "xpu",
+    "tensor_parallel": 4,
+    "llm_scaler_int4_moe": true,
+    "attention_delayed_allreduce": true,
+    "xpu_graph": false,
+    "inductor_compile": false,
+    "cudagraph_num_of_warmups": 0,
+    "command_shape": "vllm bench throughput random p512/n1536, batch=1",
+    "engine_flags": {
+      "commandSnippet": "vllm bench throughput --backend vllm --model /mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround --dtype float16 --tensor-parallel-size 4 --max-model-len 2048 --max-num-batched-tokens 512 --max-num-seqs 1 --dataset-name random --random-input-len 512 --random-output-len 1536 --num-prompts 1 --async-engine --block-size 256 --no-enable-prefix-caching --compilation-config '{\"mode\":0,\"cudagraph_num_of_warmups\":0}'",
+      "tensorParallel": 4,
+      "splitMode": "tensor_parallel",
+      "contextLength": 2048,
+      "concurrency": 1,
+      "extraFlags": "VLLM_XPU_USE_LLM_SCALER_MOE=1 VLLM_MINIMAX_M2_ATTN_DELAY_ALLREDUCE=1 VLLM_XPU_ENABLE_XPU_GRAPH=0"
+    },
+    "repeatability": {
+      "summary_json": "/home/steve/bench-results/minimax-m2.7-integrity-gate/valid-none-warmups0-p512n1536-repeatability-20260514.json",
+      "runs": [
+        "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260514T043758Z.json",
+        "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260514T044125Z.json",
+        "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260514T044441Z.json"
+      ],
+      "tok_s_out_mean": 20.74229496697839,
+      "tok_s_out_cv_pct": 0.0806701010204913,
+      "tok_s_total_mean": 27.656393289304514
+    },
+    "quality_smoke": {
+      "json": "/home/steve/bench-results/minimax-m2.7-integrity-gate/compilemode-none-warmups0-quality-20260514T041240Z.json",
+      "text_prefix": " Paris.\\n\\nThe capital of Germany is Berlin.",
+      "control_char_output": false,
+      "nul_token_count": 0,
+      "degenerate_output": false
+    }
+  },
+  "next_steps": [
+    "Treat >60 tok/s target as still open for quality-valid MiniMax.",
+    "Focus on isolating the compiled NaN path inside vLLM/XPU/Inductor rather than promoting compiled throughput.",
+    "Try disabling compile ranges so prefill stays eager while decode experiments remain isolated.",
+    "Instrument compile warmup state and determine why cudagraph_num_of_warmups=1 corrupts mode=NONE decode.",
+    "Use the 20.74 tok/s quality-valid fallback as the baseline for future honest comparisons."
+  ]
+}
