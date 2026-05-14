@@ -252,6 +252,76 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--vllm-cache-root", default=None)
     parser.add_argument(
+        "--finite-trace-file",
+        default=None,
+        help=(
+            "Enable local XPU finite tensor tracing and write JSONL records to "
+            "this path. Intended for tiny correctness probes only."
+        ),
+    )
+    parser.add_argument(
+        "--finite-trace-limit",
+        type=int,
+        default=8,
+        help="Maximum records per finite-trace tag when --finite-trace-file is set.",
+    )
+    parser.add_argument(
+        "--preserve-cudagraph-warmups",
+        action="store_true",
+        help=(
+            "Set local XPU patch env so vLLM does not rewrite an explicit "
+            "cudagraph_num_of_warmups value to 1."
+        ),
+    )
+    parser.add_argument(
+        "--disable-auto-compile-ranges",
+        action="store_true",
+        help=(
+            "Set local XPU patch env to skip auto-adding max_num_batched_tokens "
+            "to compilation_config.compile_ranges_endpoints."
+        ),
+    )
+    parser.add_argument(
+        "--eager-for-uncovered-compile-ranges",
+        action="store_true",
+        help=(
+            "Set local XPU patch env so piecewise compilation falls back to eager "
+            "for runtime shapes outside compile_sizes/compile_ranges."
+        ),
+    )
+    parser.add_argument(
+        "--skip-compiled-prefill",
+        action="store_true",
+        help=(
+            "Set local XPU patch env so vLLM bypasses the compiled model wrapper "
+            "for prefill/mixed steps with more than one token."
+        ),
+    )
+    parser.add_argument(
+        "--split-qk-var-allreduce",
+        action="store_true",
+        help=(
+            "Use separate Q and K variance all-reduces in MiniMax Q/K RMSNorm "
+            "instead of the default concatenated qk_var collective."
+        ),
+    )
+    parser.add_argument(
+        "--eager-qk-norm",
+        action="store_true",
+        help=(
+            "Force MiniMax Q/K RMSNorm through a torch.compiler.disable helper "
+            "for compiled-path correctness isolation."
+        ),
+    )
+    parser.add_argument(
+        "--decomposed-qk-norm",
+        action="store_true",
+        help=(
+            "Use a decomposed MiniMax Q/K RMSNorm expression with explicit "
+            "contiguous boundaries to avoid unsafe compile fusion."
+        ),
+    )
+    parser.add_argument(
         "--expected-token-sha256",
         default=None,
         help="Fail if the combined token hash differs from this value.",
@@ -370,6 +440,42 @@ def configure_env(args: argparse.Namespace) -> None:
     )
     if args.vllm_cache_root:
         os.environ["VLLM_CACHE_ROOT"] = args.vllm_cache_root
+    if args.finite_trace_file:
+        os.environ["VLLM_XPU_FINITE_TRACE"] = "1"
+        os.environ["VLLM_XPU_FINITE_TRACE_FILE"] = args.finite_trace_file
+        os.environ["VLLM_XPU_FINITE_TRACE_LIMIT"] = str(args.finite_trace_limit)
+    else:
+        os.environ.pop("VLLM_XPU_FINITE_TRACE", None)
+        os.environ.pop("VLLM_XPU_FINITE_TRACE_FILE", None)
+        os.environ.pop("VLLM_XPU_FINITE_TRACE_LIMIT", None)
+    if args.preserve_cudagraph_warmups:
+        os.environ["VLLM_XPU_PRESERVE_CUDAGRAPH_WARMUPS"] = "1"
+    else:
+        os.environ.pop("VLLM_XPU_PRESERVE_CUDAGRAPH_WARMUPS", None)
+    if args.disable_auto_compile_ranges:
+        os.environ["VLLM_XPU_DISABLE_AUTO_COMPILE_RANGES"] = "1"
+    else:
+        os.environ.pop("VLLM_XPU_DISABLE_AUTO_COMPILE_RANGES", None)
+    if args.eager_for_uncovered_compile_ranges:
+        os.environ["VLLM_XPU_EAGER_FOR_UNCOVERED_COMPILE_RANGES"] = "1"
+    else:
+        os.environ.pop("VLLM_XPU_EAGER_FOR_UNCOVERED_COMPILE_RANGES", None)
+    if args.skip_compiled_prefill:
+        os.environ["VLLM_XPU_SKIP_COMPILED_PREFILL"] = "1"
+    else:
+        os.environ.pop("VLLM_XPU_SKIP_COMPILED_PREFILL", None)
+    if args.split_qk_var_allreduce:
+        os.environ["VLLM_MINIMAX_QK_VAR_SPLIT_ALLREDUCE"] = "1"
+    else:
+        os.environ.pop("VLLM_MINIMAX_QK_VAR_SPLIT_ALLREDUCE", None)
+    if args.eager_qk_norm:
+        os.environ["VLLM_MINIMAX_QK_NORM_EAGER"] = "1"
+    else:
+        os.environ.pop("VLLM_MINIMAX_QK_NORM_EAGER", None)
+    if args.decomposed_qk_norm:
+        os.environ["VLLM_MINIMAX_QK_NORM_DECOMPOSED"] = "1"
+    else:
+        os.environ.pop("VLLM_MINIMAX_QK_NORM_DECOMPOSED", None)
     if args.disable_llm_scaler_moe:
         os.environ["VLLM_XPU_USE_LLM_SCALER_MOE"] = "0"
     else:
@@ -617,6 +723,12 @@ def main() -> None:
             "disable_inductor_graph_partition": args.disable_inductor_graph_partition,
             "enable_prefix_caching": args.enable_prefix_caching,
             "attention_delay_allreduce": args.attention_delay_allreduce,
+            "preserve_cudagraph_warmups": args.preserve_cudagraph_warmups,
+            "disable_auto_compile_ranges": args.disable_auto_compile_ranges,
+            "eager_for_uncovered_compile_ranges": (
+                args.eager_for_uncovered_compile_ranges
+            ),
+            "skip_compiled_prefill": args.skip_compiled_prefill,
             "vllm_cache_root": os.environ.get("VLLM_CACHE_ROOT"),
             "temperature": args.temperature,
             "top_p": args.top_p,

@@ -312,3 +312,115 @@ Current read after Attempts 6-8:
   generation.
 - If EP can reach generation, tune `E=64,N=1536` for decode `M=1` before any
   throughput comparison.
+
+## EP Attempt 9: Active Package Patch, Async Scheduling On
+
+Earlier patching had been done in `/home/steve/src/vllm`, but the benchmark
+venv imports vLLM from:
+
+`/home/steve/.venvs/vllm-xpu/lib/python3.12/site-packages/vllm`
+
+The active package was patched directly with:
+
+- `VLLM_XPU_PAD_UNEVEN_ALLGATHERV=1` padded XPU `all_gatherv`
+- `VLLM_XPU_SYNC_ASYNC_OUTPUT_COPY=1` diagnostic synchronous sampled-token copy
+- `VLLM_XPU_TRACE_WORKER_RPC=1` worker RPC progress logging
+
+Outcome:
+
+- Log:
+  `/home/steve/bench-results/minimax-m2.7-ep-exploration/vllm-minimax-m27-autoround-tp4-p512n32-20260514T122909Z.log`
+- Without the active sync-copy guard, EP again reached sampling and failed in
+  `WorkerAsyncOutputCopy` / `update_async_output_token_ids` with:
+  `UR_RESULT_ERROR_DEVICE_LOST`.
+- This confirmed the prior source-tree patch was not active for the benchmark
+  process.
+- No benchmark datapoint accepted.
+
+## EP Attempt 10: Active Package Patch, XCCL Group Diagnostics
+
+Added:
+
+- `benchmarks/b70_xccl_group_init_probe.py`
+
+Purpose: determine whether repeated XCCL and Gloo process-group creation is
+itself enough to reproduce the low-VRAM EP initialization stalls.
+
+Outcomes:
+
+- Logs:
+  - `/home/steve/bench-results/xccl-group-probes/b70-xccl-group-init-probe-ofi-p2p-20260514T124150Z.log`
+  - `/home/steve/bench-results/xccl-group-probes/b70-xccl-group-init-probe-ofi-p2p-fabriccheck0-20260514T124300Z.log`
+- Eight repeated XCCL groups plus Gloo groups completed with
+  `CCL_TOPO_P2P_ACCESS=1`.
+- Repeating with `CCL_TOPO_FABRIC_VERTEX_CONNECTION_CHECK=0` also completed.
+- Passing `device_id=torch.device("xpu:N")` to `init_process_group` suppresses
+  the XCCL rank/device warning, but it can break later Gloo `new_group` calls
+  with `No backend type associated with device type xpu`; do not apply that as
+  a broad vLLM patch yet.
+
+Interpretation:
+
+- Repeated process-group construction alone is not the EP blocker.
+- The low-VRAM EP stalls likely need the fuller vLLM mix of worker RPC,
+  group setup, shared-memory broadcast, and model initialization to reproduce.
+
+## EP Attempt 11: Active Package Patch, Fabric Vertex Check Disabled
+
+Command shape added:
+
+```bash
+CCL_TOPO_FABRIC_VERTEX_CONNECTION_CHECK=0 \
+VLLM_XPU_PAD_UNEVEN_ALLGATHERV=1 \
+VLLM_XPU_SYNC_ASYNC_OUTPUT_COPY=1 \
+VLLM_XPU_TRACE_WORKER_RPC=1
+```
+
+Outcome:
+
+- Log:
+  `/home/steve/bench-results/minimax-m2.7-ep-exploration/vllm-minimax-m27-autoround-tp4-p512n32-20260514T124411Z.log`
+- This was the furthest EP run: model load, profiling, KV init, warmup, prompt
+  rendering, and first decode `sample_tokens` completed.
+- It stalled in the next `sample_tokens`.
+- GDB showed rank 0 blocked inside the diagnostic synchronous XPU-to-CPU copy:
+  `urEnqueueUSMMemcpy` -> `at::native::xpu::_copy_xpu` -> Python `.to("cpu")`.
+- The sync-copy patch moves the async `DEVICE_LOST` failure into a Level Zero
+  memcpy wait; it is a diagnostic, not a usable fix.
+- No benchmark datapoint accepted.
+
+## EP Attempt 12: Active Package Patch, Async Scheduling Disabled
+
+Command shape used the same topology/patch environment as Attempt 11 and added:
+
+```bash
+--no-async-scheduling
+```
+
+Outcome:
+
+- Log:
+  `/home/steve/bench-results/minimax-m2.7-ep-exploration/vllm-minimax-m27-autoround-tp4-p512n32-20260514T124752Z.log`
+- The run stalled early at low VRAM after rank assignment, before normal model
+  load.
+- No benchmark datapoint accepted.
+
+## Updated EP Read
+
+The padded XPU allgatherv path still looks like a real correctness fix for a
+synthetic XCCL hang, and `CCL_TOPO_FABRIC_VERTEX_CONNECTION_CHECK=0` can help
+one EP path get further. The full MiniMax EP path is still blocked before a
+quality-valid result:
+
+- Async scheduling on reaches decode, but sampled-token CPU transfer can
+  `DEVICE_LOST` or hang in Level Zero.
+- Async scheduling off avoids that copy path but stalls before model load on
+  current runs.
+- Worker/group construction microbenchmarks pass, so the failure is likely an
+  interaction in vLLM's EP worker execution rather than a simple process-group
+  creation failure.
+
+EP remains a high-upside workstream, but it is not the next promotable path.
+The immediate quality-preserving performance path is to repair the faster TP4
+compiled/AOT recipe, which previously reached about `73` output tok/s but was
+invalidated by semantic quality corruption.

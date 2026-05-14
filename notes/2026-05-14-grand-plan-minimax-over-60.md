@@ -118,10 +118,38 @@ Rules:
 
 1. Keep the expanded raw semantic canary suite as the minimum pre-throughput
    quality screen.
-2. Record and push the EP controls from this pass.
-3. Patch/prototype the XPU uneven `all_gatherv` path to pad to equal chunk
-   sizes and validate it on the synthetic repro.
-4. If the synthetic repro passes, retry EP with a short MiniMax run and the
-   semantic canary before any throughput claim.
-5. In parallel with EP debugging, move to TP4 timing/profiling because the
-   stable 61 tok/s path is still the only promotable path today.
+2. Treat the EP path as blocked until async sampled-token transfer and worker
+   synchronization are understood; do not spend full-model benchmark time on
+   EP until a focused repro changes that.
+3. Keep the XPU uneven `all_gatherv` padded equal-size patch as a real candidate
+   fix because the synthetic repro proves raw uneven XCCL gather can hang.
+4. Move the main effort to repairing the faster TP4 compiled/AOT recipe. It
+   previously produced about `73` output tok/s, but is speed-only diagnostic
+   data until the raw semantic canary suite passes.
+5. Once a compiled candidate passes quality, run at least two throughput
+   repeats and submit only then.
+
+## Active Blockers As Of 2026-05-14
+
+- EP is not yet a valid route to a headline number. The furthest run reaches
+  decode only with diagnostic sync-copy enabled, then hangs in Level Zero
+  XPU-to-CPU transfer.
+- The stable promotable MiniMax number is still the full-decode graph TP4 path:
+  about `61.08` output tok/s, quality-gated and submitted.
+- The compiled/AOT TP4 path is the highest-return target because it has already
+  demonstrated `~73` output tok/s without changing the model quantization, but
+  it currently corrupts output and must be fixed before it counts.
+- Compiled-path finite tracing shows the failure happens before logits:
+  real-prompt hidden states become all-NaN before sampler selection, which then
+  degenerates to token-id `0`.
+- No-cudagraph compiled traces narrow the first real-prompt corruption to layer
+  16 attention, specifically Q RMSNorm. The qkv projection and K RMSNorm are
+  still finite at that boundary.
+- Disabling MiniMax delayed attention allreduce, disabling llm-scaler INT4 MoE,
+  splitting the Q/K variance allreduce, and decomposing the Q/K norm expression
+  do not fix the compiled-path corruption. The next isolation target is
+  Inductor fusion/codegen control around Q RMSNorm or an opaque fullgraph-safe
+  Q RMSNorm custom op.
+
+See `notes/2026-05-14-minimax-compiled-path-repair.md` for the active repair
+matrix and exact JSON/log paths.
