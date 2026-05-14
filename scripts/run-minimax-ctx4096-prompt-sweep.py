@@ -27,14 +27,8 @@ FINAL_QUESTION = (
 )
 
 
-def rendered_len(tokenizer, prompt: str) -> int:
-    return len(
-        tokenizer.apply_chat_template(
-            [{"role": "user", "content": prompt}],
-            tokenize=True,
-            add_generation_prompt=True,
-        )
-    )
+def prompt_len(tokenizer, prompt: str) -> int:
+    return len(tokenizer(prompt, add_special_tokens=False).input_ids)
 
 
 def make_prompt_for_target(tokenizer, target_tokens: int) -> tuple[str, int, int]:
@@ -43,19 +37,21 @@ def make_prompt_for_target(tokenizer, target_tokens: int) -> tuple[str, int, int
     hi = 1
     while True:
         prompt = prefix + (BASE_CONTEXT * hi) + " " + FINAL_QUESTION
-        if rendered_len(tokenizer, prompt) >= target_tokens:
+        if prompt_len(tokenizer, prompt) >= target_tokens:
             break
+        if hi > 4096:
+            raise RuntimeError(f"could not reach target prompt length {target_tokens}")
         hi *= 2
     while lo < hi:
         mid = (lo + hi) // 2
         prompt = prefix + (BASE_CONTEXT * mid) + " " + FINAL_QUESTION
-        if rendered_len(tokenizer, prompt) >= target_tokens:
+        if prompt_len(tokenizer, prompt) >= target_tokens:
             hi = mid
         else:
             lo = mid + 1
     repeats = lo
     prompt = prefix + (BASE_CONTEXT * repeats) + " " + FINAL_QUESTION
-    return prompt, rendered_len(tokenizer, prompt), repeats
+    return prompt, prompt_len(tokenizer, prompt), repeats
 
 
 def run_target(
@@ -238,7 +234,7 @@ def main() -> None:
                 {
                     "event": "start",
                     "target_tokens": target,
-                    "actual_chat_tokens": actual_tokens,
+                    "actual_prompt_tokens": actual_tokens,
                     "repeats": repeats,
                     "prompt": str(prompt_path),
                     "json": str(out_json),
@@ -252,7 +248,7 @@ def main() -> None:
         result.update(
             {
                 "target_tokens": target,
-                "actual_chat_tokens": actual_tokens,
+                "actual_prompt_tokens": actual_tokens,
                 "repeats": repeats,
                 "prompt": str(prompt_path),
                 "wall_s": wall_s,
