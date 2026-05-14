@@ -1,0 +1,133 @@
+diff --git a/vllm/compilation/piecewise_backend.py b/vllm/compilation/piecewise_backend.py
+index b647e0d85..52b18a840 100644
+--- a/vllm/compilation/piecewise_backend.py
++++ b/vllm/compilation/piecewise_backend.py
+@@ -4,6 +4,7 @@
+ import dataclasses
+ import io
+ import json
++import os
+ import pickle
+ from collections.abc import Callable
+ from pickle import Pickler
+@@ -195,17 +196,22 @@ class PiecewiseBackend:
+         self, compiled_graph: Callable[..., Any]
+     ) -> Callable[..., Any]:
+         def compiled_graph_wrapper(*args: Any) -> Any:
+-            graph_output = compiled_graph(*args)
+-            # unpack the tuple if needed
+-            # TODO(rzou): the implication is that we're not
+-            # reading the python bytecode correctly in vLLM?
+-            if self.returns_tuple or not isinstance(graph_output, (tuple, list)):
+-                return graph_output
+-            else:
+-                return graph_output[0]
++            return self._normalize_graph_output(compiled_graph(*args))
+ 
+         return compiled_graph_wrapper
+ 
++    def _normalize_graph_output(self, graph_output: Any) -> Any:
++        # unpack the tuple if needed
++        # TODO(rzou): the implication is that we're not
++        # reading the python bytecode correctly in vLLM?
++        if self.returns_tuple or not isinstance(graph_output, (tuple, list)):
++            return graph_output
++        return graph_output[0]
++
++    def _call_eager_graph(self, *args: Any) -> Any:
++        assert self.graph is not None
++        return self._normalize_graph_output(self.graph(*args))
++
+     def to_bytes(self) -> dict[str, bytes]:
+         class StandaloneCompiledArtifactsPickler(Pickler):
+             def reducer_override(self, obj: object) -> Any:
+@@ -359,6 +365,22 @@ class PiecewiseBackend:
+         if self.sym_shape_indices:
+             runtime_shape = args[self.sym_shape_indices[0]]
+             range_entry = self._find_range_for_shape(runtime_shape)
++            if (
++                range_entry is None
++                and self.graph is not None
++                and os.environ.get(
++                    "VLLM_XPU_EAGER_FOR_UNCOVERED_COMPILE_RANGES", "0"
++                )
++                == "1"
++            ):
++                logger.warning_once(
++                    "Shape %s is outside piecewise compile ranges %s; "
++                    "falling back to eager FX graph because "
++                    "VLLM_XPU_EAGER_FOR_UNCOVERED_COMPILE_RANGES=1.",
++                    str(runtime_shape),
++                    str(self.compile_ranges),
++                )
++                return self._call_eager_graph(*args)
+             assert range_entry is not None, (
+                 f"Shape: {runtime_shape} out of considered ranges: "
+                 f"{self.compile_ranges}"
+diff --git a/vllm/config/vllm.py b/vllm/config/vllm.py
+index 88e6660e2..b81ab10f1 100644
+--- a/vllm/config/vllm.py
++++ b/vllm/config/vllm.py
+@@ -1605,7 +1605,10 @@ class VllmConfig:
+ 
+         # The upper bound of the compile ranges is the max_num_batched_tokens.
+         compile_range_end = self.scheduler_config.max_num_batched_tokens
+-        if compile_range_end is not None:
++        if (
++            compile_range_end is not None
++            and os.environ.get("VLLM_XPU_DISABLE_AUTO_COMPILE_RANGES", "0") != "1"
++        ):
+             computed_compile_ranges_endpoints.append(compile_range_end)
+ 
+         # Add the compile ranges for flashinfer/aiter.
+diff --git a/vllm/platforms/xpu.py b/vllm/platforms/xpu.py
+index bd9006f3f..4f47b8e0b 100644
+--- a/vllm/platforms/xpu.py
++++ b/vllm/platforms/xpu.py
+@@ -195,12 +195,20 @@ class XPUPlatform(Platform):
+                 "XPU Graph is disabled by environment variable, "
+                 "please set VLLM_XPU_ENABLE_XPU_GRAPH=1 to enable it."
+             )
+-        elif parallel_config.world_size_across_dp > 1:
++        elif (
++            parallel_config.world_size_across_dp > 1
++            and os.getenv("VLLM_XPU_FORCE_GRAPH_WITH_COMM", "0") != "1"
++        ):
+             compilation_config.cudagraph_mode = CUDAGraphMode.NONE
+             logger.warning(
+                 "XPU Graph doesn't support capture communication ops, "
+                 "disabling cudagraph_mode."
+             )
++        elif parallel_config.world_size_across_dp > 1:
++            logger.warning(
++                "Forcing XPU Graph with communication ops because "
++                "VLLM_XPU_FORCE_GRAPH_WITH_COMM=1."
++            )
+         else:
+             if (
+                 attention_config.backend == AttentionBackendEnum.FLASH_ATTN
+@@ -225,6 +233,13 @@ class XPUPlatform(Platform):
+             "fuse_act_padding": "Activation + padding fusion",
+             "fuse_rope_kvcache": "RoPE + KV cache fusion",
+         }
++        if os.getenv("VLLM_XPU_EXPERIMENTAL_ENABLE_SP", "0") == "1":
++            fusion_passes_to_disable.pop("enable_sp", None)
++        if os.getenv("VLLM_XPU_EXPERIMENTAL_FUSE_GEMM_COMMS", "0") == "1":
++            fusion_passes_to_disable.pop("enable_sp", None)
++            fusion_passes_to_disable.pop("fuse_gemm_comms", None)
++        if os.getenv("VLLM_XPU_EXPERIMENTAL_FUSE_ALLREDUCE_RMS", "0") == "1":
++            fusion_passes_to_disable.pop("fuse_allreduce_rms", None)
+         for flag, feature_name in fusion_passes_to_disable.items():
+             if getattr(pass_config, flag):
+                 logger.warning(
+@@ -343,6 +358,10 @@ class XPUPlatform(Platform):
+             )
+         return "vllm.distributed.device_communicators.xpu_communicator.XpuCommunicator"  # noqa
+ 
++    @classmethod
++    def use_custom_op_collectives(cls) -> bool:
++        return os.environ.get("VLLM_XPU_USE_CUSTOM_OP_COLLECTIVES", "0") == "1"
++
+     @classmethod
+     def supports_fp8(cls) -> bool:
+         return True

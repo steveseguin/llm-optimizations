@@ -1,0 +1,38 @@
+{
+  "hfId": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+  "modelRevision": "main",
+  "hardware": {
+    "hwClass": "DISCRETE_GPU",
+    "gpuName": "Intel Arc Pro B70",
+    "gpuCount": 4,
+    "vramGb": 32,
+    "cpu": "AMD EPYC 9015 8-Core Processor",
+    "ramGb": 15,
+    "os": "Ubuntu 24.04.4 LTS"
+  },
+  "engineName": "vllm",
+  "engineVersion": "0.20.1-local",
+  "quantization": "AutoRound W4A16",
+  "promptTokens": 512,
+  "outputTokens": 1536,
+  "contextLength": 2048,
+  "batchSize": 1,
+  "tokSOut": 61.752847811155235,
+  "tokSTotal": 82.33713041487366,
+  "notes": "MiniMax M2.7 AutoRound W4A16 on 4x Intel Arc Pro B70 via vLLM/XPU TP4. Mean of two repeat p512/n1536 runs: 61.761 and 61.744 output tok/s, 82.349 and 82.326 total tok/s. Quality smoke passed separately under the same graph/Triton recipe; no speculative decoding, no expert dropping, no power-limit increase. Uses llm-scaler INT4 MoE decode path, MiniMax attention delayed allreduce, TRITON_ATTN, and FULL_DECODE_ONLY XPU graph with non-Inductor CompilationMode.NONE because Inductor compiled decode produced invalid all-NUL output.",
+  "engineFlags": {
+    "commandSnippet": "VLLM_XPU_USE_LLM_SCALER_MOE=1 VLLM_MINIMAX_M2_ATTN_DELAY_ALLREDUCE=1 VLLM_XPU_ENABLE_XPU_GRAPH=1 VLLM_XPU_FORCE_GRAPH_WITH_COMM=1 VLLM_XPU_GRAPH_NOOP_COMM_CAPTURE=1 vllm bench throughput --backend vllm --model /mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround --tokenizer /mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround --trust-remote-code --dtype float16 --tensor-parallel-size 4 --distributed-executor-backend mp --max-model-len 2048 --max-num-batched-tokens 512 --max-num-seqs 1 --dataset-name random --random-input-len 512 --random-output-len 1536 --random-range-ratio 0 --num-prompts 1 --disable-log-stats --async-engine --block-size 256 --no-enable-prefix-caching --attention-backend TRITON_ATTN --compilation-config '{\"mode\":0,\"cudagraph_mode\":\"FULL_DECODE_ONLY\",\"cudagraph_num_of_warmups\":0,\"compile_sizes\":[1]}'",
+    "tensorParallel": 4,
+    "gpuLayers": 0,
+    "contextLength": 2048,
+    "attentionBackend": "triton",
+    "flashAttn": false,
+    "chunkedPrefill": true,
+    "prefillChunkSize": 512,
+    "prefixCaching": false,
+    "contBatching": false,
+    "specDecoding": false,
+    "temperature": 0,
+    "extraFlags": "CompilationMode.NONE; cudagraph_mode=FULL_DECODE_ONLY; compile_sizes=[1]; XPU graph forced with no-op communicator capture; MiniMax attention delayed allreduce; llm-scaler INT4 MoE decode path."
+  }
+}

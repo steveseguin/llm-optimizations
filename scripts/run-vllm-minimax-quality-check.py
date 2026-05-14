@@ -132,6 +132,15 @@ def parse_args() -> argparse.Namespace:
         help="Override vLLM compilation_config.mode for compiler-path isolation.",
     )
     parser.add_argument(
+        "--cudagraph-mode",
+        choices=("none", "piecewise", "full", "full_decode_only", "full_and_piecewise"),
+        default=None,
+        help=(
+            "Override vLLM compilation_config.cudagraph_mode. By default, "
+            "--mode graph uses PIECEWISE."
+        ),
+    )
+    parser.add_argument(
         "--attention-backend",
         default=None,
         help="Override vLLM attention backend, for example TRITON_ATTN.",
@@ -265,7 +274,9 @@ def main() -> None:
         compilation_config["mode"] = mode_map[args.compilation_mode]
     if not args.disable_inductor_graph_partition:
         compilation_config["use_inductor_graph_partition"] = True
-    if args.mode == "graph":
+    if args.cudagraph_mode is not None:
+        compilation_config["cudagraph_mode"] = args.cudagraph_mode.upper()
+    elif args.mode == "graph":
         compilation_config["cudagraph_mode"] = "PIECEWISE"
     if args.cudagraph_num_warmups is not None:
         compilation_config["cudagraph_num_of_warmups"] = args.cudagraph_num_warmups
@@ -476,6 +487,7 @@ def main() -> None:
             "top_k": args.top_k,
             "rms_norm_priority": args.rms_norm_priority,
             "compilation_mode": args.compilation_mode,
+            "cudagraph_mode": args.cudagraph_mode,
             "attention_backend": args.attention_backend,
             "cudagraph_num_warmups": args.cudagraph_num_warmups,
             "compile_ranges_endpoints": args.compile_ranges_endpoints,

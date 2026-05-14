@@ -1,0 +1,87 @@
+{
+  "date": "2026-05-14",
+  "model": {
+    "hfId": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+    "base": "MiniMaxAI/MiniMax-M2.7",
+    "localPath": "/mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround",
+    "quantization": "AutoRound W4A16"
+  },
+  "hardware": {
+    "gpu": "Intel Arc Pro B70",
+    "gpuCount": 4,
+    "vramGbEach": 32,
+    "cpu": "AMD EPYC 9015 8-Core Processor",
+    "ramGb": 15,
+    "os": "Ubuntu 24.04.4 LTS"
+  },
+  "recipe": {
+    "engine": "vLLM 0.20.1-local XPU",
+    "tensorParallel": 4,
+    "dtype": "float16",
+    "attentionBackend": "TRITON_ATTN",
+    "compilationConfig": {
+      "mode": 0,
+      "cudagraph_mode": "FULL_DECODE_ONLY",
+      "cudagraph_num_of_warmups": 0,
+      "compile_sizes": [1]
+    },
+    "xpuGraph": true,
+    "llmScalerMoe": true,
+    "minimaxAttentionDelayAllreduce": true,
+    "forceGraphWithComm": true,
+    "graphNoopCommCapture": true,
+    "speculativeDecode": false,
+    "powerLimitRaised": false
+  },
+  "benchmark": {
+    "type": "vllm bench throughput",
+    "promptTokens": 512,
+    "outputTokens": 1536,
+    "contextLength": 2048,
+    "batchSize": 1,
+    "runs": [
+      {
+        "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260514T053345Z.log",
+        "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260514T053345Z.json",
+        "elapsedSec": 24.86988903899328,
+        "tokSTotal": 82.34857810539319,
+        "tokSOut": 61.76143357904489
+      },
+      {
+        "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260514T053641Z.log",
+        "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260514T053641Z.json",
+        "elapsedSec": 24.876805539010093,
+        "tokSTotal": 82.32568272435412,
+        "tokSOut": 61.744262043265586
+      }
+    ],
+    "mean": {
+      "tokSOut": 61.752847811155235,
+      "tokSTotal": 82.33713041487366
+    }
+  },
+  "localmaxxing": {
+    "id": "cmp52gqmb000vo3015qj4kl9t",
+    "status": "APPROVED",
+    "payload": "/home/steve/llm-optimizations-publish/data/localmaxxing-minimax-m27-autoround-full-decode-graph-triton-p512n1536-20260514.payload.json",
+    "response": "/home/steve/llm-optimizations-publish/data/localmaxxing-submission-minimax-m27-autoround-full-decode-graph-triton-p512n1536-20260514.json"
+  },
+  "quality": {
+    "status": "quality smoke passed",
+    "chatLongContext": {
+      "json": "/home/steve/bench-results/minimax-m2.7-integrity-gate/graph-full-decode-none-triton-chat-longctx-quality-20260514T054216Z.json",
+      "log": "/home/steve/bench-results/minimax-m2.7-integrity-gate/graph-full-decode-none-triton-chat-longctx-quality-20260514T054216Z.log",
+      "controlCharOutput": false,
+      "degenerateOutput": false,
+      "nulTokenCount": 0,
+      "distinctGeneratedTokenCount": 88,
+      "elapsedSec": 4.404080813983455
+    },
+    "notes": [
+      "Random-token throughput is not itself a semantic quality test, so it is paired with chat-template smoke checks under the same graph/Triton recipe.",
+      "Earlier Inductor VLLM_COMPILE and decode-only compile attempts generated all-NUL token 0 output and are not counted.",
+      "The first p512/n1536 graph run without VLLM_MINIMAX_M2_ATTN_DELAY_ALLREDUCE hung with idle GPUs; the successful recipe includes the delayed-allreduce MiniMax patch."
+    ]
+  },
+  "conclusion": "FULL_DECODE_ONLY XPU graph capture with TRITON_ATTN and CompilationMode.NONE crosses the 60 output tok/s target while preserving the current MiniMax AutoRound W4A16 model and avoiding Inductor's quality-breaking compiled decode path."
+}
