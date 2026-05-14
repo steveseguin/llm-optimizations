@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Sweep MiniMax 4096-context graph quality across prompt lengths."""
+"""Sweep MiniMax graph quality across prompt lengths."""
 
 from __future__ import annotations
 
@@ -112,7 +112,7 @@ def run_target(
         "--dtype",
         "float16",
         "--max-model-len",
-        "4096",
+        str(args.max_model_len),
         "--max-num-batched-tokens",
         str(args.max_num_batched_tokens),
         "--max-num-seqs",
@@ -198,6 +198,7 @@ def main() -> None:
         default="/home/steve/bench-results/minimax-m2.7-quality-gated/ctx4096-prompt-sweep",
     )
     parser.add_argument("--targets", default="128,256,512,768,1024,1280,1400")
+    parser.add_argument("--max-model-len", type=int, default=4096)
     parser.add_argument("--max-tokens", type=int, default=32)
     parser.add_argument("--max-num-batched-tokens", type=int, default=512)
     parser.add_argument("--timeout", default="12m")
@@ -224,7 +225,10 @@ def main() -> None:
 
     for target in targets:
         prompt, actual_tokens, repeats = make_prompt_for_target(tokenizer, target)
-        stem = f"ctx4096-mbt{args.max_num_batched_tokens}-target{target}-actual{actual_tokens}-{run_id}"
+        stem = (
+            f"ctx{args.max_model_len}-mbt{args.max_num_batched_tokens}"
+            f"-target{target}-actual{actual_tokens}-{run_id}"
+        )
         prompt_path = prompt_dir / f"{stem}.txt"
         out_json = outdir / f"{stem}.json"
         log_path = outdir / f"{stem}.log"
@@ -258,7 +262,7 @@ def main() -> None:
         summary = {
             "run_id": run_id,
             "model": args.model,
-            "max_model_len": 4096,
+            "max_model_len": args.max_model_len,
             "max_num_batched_tokens": args.max_num_batched_tokens,
             "max_tokens": args.max_tokens,
             "targets": targets,
