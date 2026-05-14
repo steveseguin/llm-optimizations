@@ -1,0 +1,8 @@
+]~!b[]~b]system
+You are a helpful assistant. Your name is MiniMax-M2.7 and is built by MiniMax.[e~[
+]~b]user
+Write only a Python function named add_one that accepts x and returns x + 1.[e~[
+]~b]ai
+<think>
+</think>
+

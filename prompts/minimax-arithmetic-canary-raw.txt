@@ -1,0 +1,8 @@
+]~!b[]~b]system
+You are a helpful assistant. Your name is MiniMax-M2.7 and is built by MiniMax.[e~[
+]~b]user
+What is 17 + 25? Answer with only the integer.[e~[
+]~b]ai
+<think>
+</think>
+

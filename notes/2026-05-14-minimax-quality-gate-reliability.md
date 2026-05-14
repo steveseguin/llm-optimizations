@@ -120,6 +120,40 @@ The wrapper summary step initially failed because this host's `jq` rejects the
 legacy `--argfile` option. The script now uses `--slurpfile`, and the summary
 above was reconstructed from the completed benchmark JSON files.
 
+## Expanded Raw Semantic Canary Suite
+
+Added:
+
+- `prompts/minimax-arithmetic-canary-raw.txt`
+- `prompts/minimax-code-canary-raw.txt`
+- `scripts/run-minimax-semantic-canary-suite.sh`
+
+The suite now checks three raw, pre-closed-`<think>` prompts:
+
+- final-answer compliance: must include `PASS`
+- arithmetic: must include `42`
+- short Python code: must include `def add_one` and match
+  `return\s+x\s*\+\s*1`
+
+Eager TP4 result:
+
+- JSON:
+  `/home/steve/bench-results/minimax-m2.7-quality-gated/minimax-semantic-canary-suite-eager-tp4-20260514T113538Z.json`
+- `passed=true`
+- `deterministic_across_runs=true`
+- `combined_token_sha256=adacbf144264486ea7d378ebb6a4c0ba23951b72c4cf86251a762b07ebef5805`
+- `nul_token_count=0`
+- `control_nonspace_text_chars=0`
+- `degenerate_output=false`
+- Run 1 and run 2 outputs matched exactly:
+  - `PASS`
+  - `42`
+  - `def add_one(x): return x + 1`
+
+This does not prove broad benchmark quality, but it raises the bar above a
+single PASS token and gives speed experiments a cheap correctness screen before
+throughput numbers are promoted.
+
 ## Next Debug Targets
 
 - Continue isolating whether free-form greedy token drift comes from XPU/oneCCL
@@ -128,7 +162,5 @@ above was reconstructed from the completed benchmark JSON files.
   INT4 MoE path as the sole cause.
 - Debug the graph-mode shared-memory broadcast stall seen by short prompts after
   model load. Long-context graph quality and throughput runs still complete.
-- Extend the raw semantic canary set beyond `PASS` with one arithmetic prompt
-  and one short code prompt, both using pre-closed `<think>` raw templates.
 - Add optional finite-logprob/top-logprob capture to canaries when the runtime
   can return it without destabilizing XPU graph execution.

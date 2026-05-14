@@ -71,12 +71,86 @@ Outcome:
   initialization/worker setup.
 - Run was killed. No benchmark datapoint accepted.
 
+## EP Attempt 3: Eager, No XPU Graph
+
+Command shape:
+
+```bash
+VLLM_TUNED_CONFIG_FOLDER=/home/steve/llm-optimizations-publish/configs/moe \
+VLLM_MINIMAX_M2_ATTN_DELAY_ALLREDUCE=1 \
+TP=4 \
+XPU_GRAPH=0 \
+USE_LLM_SCALER_MOE=1 \
+MAX_MODEL_LEN=2048 \
+MAX_BATCHED_TOKENS=512 \
+MAX_NUM_SEQS=1 \
+INPUT_LEN=512 \
+OUTPUT_LEN=128 \
+DTYPE=float16 \
+EXTRA_ARGS='--enforce-eager --block-size 256 --no-enable-prefix-caching --attention-backend TRITON_ATTN --enable-expert-parallel --all2all-backend allgather_reducescatter --compilation-config {"mode":0,"cudagraph_mode":"NONE","cudagraph_num_of_warmups":0,"compile_sizes":[1]}' \
+  scripts/bench-vllm-minimax-autoround-xpu.sh
+```
+
+Outcome:
+
+- Log:
+  `/home/steve/bench-results/minimax-m2.7-ep-exploration/vllm-minimax-m27-autoround-tp4-p512n128-20260514T113821Z.log`
+- EP reached full worker/model load with `TP0_EP0` through `TP3_EP3`.
+- It still stalled with repeated
+  `No available shared memory broadcast block found in 60 seconds`.
+- This means the first EP blocker is not only XPU graph capture.
+- Run was killed. No benchmark datapoint accepted.
+
+## EP Attempt 4: Requested Naive All-to-All
+
+Command shape was the same as Attempt 3 but with:
+
+```bash
+--all2all-backend naive
+```
+
+Outcome:
+
+- Log:
+  `/home/steve/bench-results/minimax-m2.7-ep-exploration/vllm-minimax-m27-autoround-tp4-p512n128-20260514T114208Z.log`
+- This run got further than Attempt 3: model load, local `E=64,N=1536`
+  config pickup, KV cache allocation, and prompt processing.
+- It then failed during decode/sampling in the async output path with:
+  `RuntimeError: level_zero backend failed with error: 20 (UR_RESULT_ERROR_DEVICE_LOST)`.
+- The relevant stack was in `WorkerAsyncOutputCopy` /
+  `gpu_model_runner.py` / `update_async_output_token_ids`.
+- Run was killed. No benchmark datapoint accepted.
+
+## EP Attempt 5: Requested Naive All-to-All, Async Scheduling Disabled
+
+Command shape was Attempt 4 plus:
+
+```bash
+--no-async-scheduling
+```
+
+Outcome:
+
+- Log:
+  `/home/steve/bench-results/minimax-m2.7-ep-exploration/vllm-minimax-m27-autoround-tp4-p512n128-20260514T114743Z.log`
+- vLLM reported:
+  `The 'naive' all2all backend has been removed. Falling back to 'allgather_reducescatter'.`
+- It confirmed `Asynchronous scheduling is disabled.`
+- The run stalled in distributed initialization/worker setup at low VRAM
+  instead of reaching model load or decode.
+- GPU memory stayed around 0.9 to 1.1 GiB per card before termination.
+- Run was killed. No benchmark datapoint accepted.
+
 ## Current EP Read
 
 EP is still worth pursuing, but it is not a drop-in speed win on this stack yet.
 The current blockers are:
 
 - EP/all-to-all initialization is unreliable on the current XPU+oneCCL path.
+- Disabling XPU graph does not clear the stall.
+- Disabling async scheduling does not clear the stall.
+- `--all2all-backend naive` is not a true control on this vLLM build because
+  vLLM falls back to `allgather_reducescatter`.
 - The EP-local MoE shape needs a real tuned XPU config and probably kernel
   validation, not just copied TP-only parameters.
 - The available all-to-all backend used here,
@@ -87,10 +161,12 @@ results only.
 
 ## Next EP Work
 
-- Try `--enforce-eager` with EP and no XPU graph to separate all-to-all setup
-  from graph capture.
-- Try `--all2all-backend naive` as a correctness/control path if vLLM accepts it
-  on XPU.
+- Stop treating `naive` as available unless the current vLLM all-to-all registry
+  is patched or an older backend is restored.
+- Inspect vLLM's EP all-to-all backend registration and XPU/xccl interaction
+  before launching more full MiniMax EP probes.
+- Add a smaller synthetic all-to-all/XCCL repro for the `E=64,N=1536` path so
+  the communication layer can be debugged without 400+ GiB of model load churn.
 - Add focused timing around MiniMax MoE dispatch/all-to-all when EP reaches
   generation.
 - If EP can reach generation, tune `E=64,N=1536` for decode `M=1` before any
