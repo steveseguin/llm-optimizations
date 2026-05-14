@@ -341,3 +341,53 @@ Throughput result:
 Decision: keep `VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS` at the default for
 the current promoted recipe. Disabling it does not corrupt model output, but it
 adds a long profiling pause and fails to produce a benchmark result.
+
+## Two-Run Token Determinism Check
+
+Reran the promoted TP4 full-decode graph recipe through the long-context quality
+smoke with two generations in one engine process and strict token-hash
+determinism enabled:
+
+```bash
+python scripts/run-vllm-minimax-quality-check.py \
+  --mode graph \
+  --model /mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround \
+  --max-tokens 160 \
+  --runs 2 \
+  --tensor-parallel-size 4 \
+  --dtype float16 \
+  --max-model-len 2048 \
+  --max-num-batched-tokens 512 \
+  --max-num-seqs 1 \
+  --block-size 256 \
+  --compilation-mode none \
+  --cudagraph-mode full_decode_only \
+  --attention-backend TRITON_ATTN
+```
+
+Artifacts:
+
+- JSON:
+  `/home/steve/bench-results/minimax-m2.7-quality-gated/minimax-promoted-two-run-determinism-20260514T171832Z.json`
+- Log:
+  `/home/steve/bench-results/minimax-m2.7-quality-gated/minimax-promoted-two-run-determinism-20260514T171832Z.log`
+
+Result:
+
+- Strict result: `passed=false`
+- Failure reason: `nondeterministic token hashes`
+- Runs: `2`
+- Generated tokens: `320` total
+- Distinct generated tokens: `103`
+- NUL tokens: `0`
+- Control non-space chars: `0`
+- First token difference between runs: generated token index `24`
+- Follow-up four-device torch XPU health check passed.
+
+Interpretation: this is not the compiled-path NUL corruption failure. Both runs
+produced coherent, printable answer text and passed the semantic corruption
+checks, but exact greedy token determinism is not proven for the promoted XPU
+graph recipe. Treat LocalMaxxing throughput numbers from this recipe as
+quality-preserving in the "no corruption / no changed quantization / no
+speculation / no expert drop" sense, but do not claim token-exact deterministic
+decoding until the reduction-order or sampler near-tie source is isolated.

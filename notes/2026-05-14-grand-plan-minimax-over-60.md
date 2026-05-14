@@ -173,6 +173,11 @@ Rules:
   `VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS=0` preserves quality on the canary
   but is rejected for the promoted recipe: the throughput stage stalls after
   model load with repeated shared-memory broadcast waits and produces no JSON.
+- A strict two-run token-hash determinism check on the promoted graph recipe
+  failed with the first token difference at generated token index `24`, while
+  both runs remained printable, nondegenerate, and NUL-free. Current wording
+  should stay precise: semantic quality/corruption gates pass, but token-exact
+  deterministic greedy decoding is not yet proven.
 - A non-sync timing probe on the valid path only sees uncaptured regions, but
   the visible costs still point at MoE experts, Q/K RMS scheduling, and
   prefill-shaped TP allreduce as the next code-level optimization targets.
