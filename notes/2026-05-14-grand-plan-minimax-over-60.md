@@ -182,6 +182,9 @@ Rules:
   The quality stage reports `17,408` KV cache tokens and `4.25x` theoretical
   concurrency, then stalls in `sample_tokens` with shared-memory broadcast waits
   and no quality JSON.
+- A short eager/no-cudagraph 4096-context smoke passes with no NUL/control
+  output, so the 4096-context blocker is likely in full-decode XPU graph or
+  shared-memory scheduling, not the model, prompt, or KV allocation alone.
 - A non-sync timing probe on the valid path only sees uncaptured regions, but
   the visible costs still point at MoE experts, Q/K RMS scheduling, and
   prefill-shaped TP allreduce as the next code-level optimization targets.

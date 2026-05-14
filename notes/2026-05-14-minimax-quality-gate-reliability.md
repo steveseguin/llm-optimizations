@@ -424,3 +424,41 @@ Observed before failure:
 Decision: `max_model_len=4096` is not currently a valid benchmark shape for the
 promoted TP4 graph recipe. This should be revisited through the graph/shared
 memory reliability workstream before any larger-context throughput submission.
+
+### 4096-Context Eager Isolation
+
+Ran a shorter eager/no-cudagraph isolation smoke with the same `max_model_len`
+and prompt, but only `32` generated tokens:
+
+```bash
+python scripts/run-vllm-minimax-quality-check.py \
+  --mode eager \
+  --enforce-eager \
+  --max-model-len 4096 \
+  --max-tokens 32 \
+  --compilation-mode none \
+  --cudagraph-mode none \
+  --attention-backend TRITON_ATTN
+```
+
+Artifacts:
+
+- JSON:
+  `/home/steve/bench-results/minimax-m2.7-quality-gated/minimax-ctx4096-eager-smoke-20260514T173431Z.json`
+- Log:
+  `/home/steve/bench-results/minimax-m2.7-quality-gated/minimax-ctx4096-eager-smoke-20260514T173431Z.log`
+
+Result:
+
+- Result: `passed=true`
+- Generated tokens: `32`
+- Distinct generated tokens: `29`
+- NUL tokens: `0`
+- Control non-space chars: `0`
+- Observed short-run output rate from the progress line: about `8.2` tok/s
+- Follow-up four-device torch XPU health check passed.
+
+Interpretation: the model, prompt, and 4096-token runtime shape can execute on
+XPU in eager mode. The invalid 4096-context result above is therefore more
+likely tied to the full-decode XPU graph/shared-memory scheduling path than to
+the checkpoint or long-context allocation itself.
