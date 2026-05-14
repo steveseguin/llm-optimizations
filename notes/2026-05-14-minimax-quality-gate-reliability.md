@@ -253,3 +253,55 @@ semantic canary suite before any throughput retest:
 This confirms the faster `~69` to `~73` tok/s piecewise/compiled/AOT lineage
 remains invalid for quality. Do not use it as a headline benchmark until the
 raw semantic canary suite passes.
+
+## Timing Probe On Valid Path
+
+Ran a short non-synchronized timing diagnostic on the promoted full-decode graph
+path:
+
+- Log:
+  `/home/steve/bench-results/minimax-m2.7-timing/vllm-minimax-m27-autoround-tp4-p512n256-20260514T164927Z.log`
+- JSON:
+  `/home/steve/bench-results/minimax-m2.7-timing/vllm-minimax-m27-autoround-tp4-p512n256-20260514T164927Z.json`
+- Shape: `512/256`, TP4, full-decode graph, `block-size=256`,
+  `max_num_batched_tokens=512`
+- Output throughput: `55.30` tok/s
+- Total throughput: `165.90` tok/s
+
+Caveat: this hook does not see most steady-state decode work once the valid
+path is inside an XPU graph. It mostly records prefill/profile and uncaptured
+Python-visible regions. The visible rank-0 hotspots were:
+
+- `minimax.moe.experts_total`: `658.7 ms` total over `310` calls
+- `minimax.attn.qk_norm`: `469.4 ms` total over `310` calls
+- prefill-shaped hidden allreduce `(512,3072)`: `448.3 ms` total over `250`
+  calls
+
+Interpretation: useful next optimizations still point at MoE expert execution,
+Q/K RMS scheduling, and TP communication, but a lower-level graph-captured trace
+is needed before attributing exact steady-state decode percentages.
+
+## Direct Q/K RMS Helper Screen
+
+Tried enabling the default-off direct MiniMax Q/K RMS XPU helper against the
+current valid full-decode graph path:
+
+```bash
+VLLM_MINIMAX_QK_RMS_XPU_HELPER=1
+VLLM_MINIMAX_QK_RMS_XPU_HELPER_MAX_TOKENS=2048
+```
+
+Outcome: not promotable and not a benchmark datapoint.
+
+- First attempt failed during worker startup with oneCCL/OFI
+  `atl_ofi.cpp:376 send` / `Cannot assign requested address`.
+- After cleanup and a successful four-device torch health check, the retry
+  reached model load, then stalled before the quality gate produced JSON with
+  repeated shared-memory broadcast warnings.
+- The workers were terminated manually and a follow-up four-device torch health
+  check passed.
+
+Decision: keep the direct Q/K helper off for the current recipe. This screen
+also showed that quality-stage hangs need the same guardrails as throughput
+runs, so `scripts/run-minimax-quality-gated-candidate.sh` now writes a quality
+log and wraps the quality stage in `QUALITY_TIMEOUT`.

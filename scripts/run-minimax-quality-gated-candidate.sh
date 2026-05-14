@@ -29,6 +29,7 @@ QUALITY_MAX_CONTROL_NONSPACE_CHARS="${QUALITY_MAX_CONTROL_NONSPACE_CHARS:-0}"
 QUALITY_MAX_NUL_TOKEN_COUNT="${QUALITY_MAX_NUL_TOKEN_COUNT:-0}"
 QUALITY_REQUIRE_SUBSTRING="${QUALITY_REQUIRE_SUBSTRING:-}"
 QUALITY_REQUIRE_REGEX="${QUALITY_REQUIRE_REGEX:-}"
+QUALITY_TIMEOUT="${QUALITY_TIMEOUT:-25m}"
 BENCH_REPEATS="${BENCH_REPEATS:-2}"
 RUN_TIMEOUT="${RUN_TIMEOUT:-25m}"
 SHM_STALL_MAX_WARNINGS="${SHM_STALL_MAX_WARNINGS:-0}"
@@ -45,6 +46,7 @@ mkdir -p "$OUTDIR"
 ts="$(date -u +%Y%m%dT%H%M%SZ)"
 stem="minimax-${LABEL}-tp${TP}-ctx${MAX_MODEL_LEN}-mbt${MAX_BATCHED_TOKENS}-bs${BLOCK_SIZE}-p${INPUT_LEN}n${OUTPUT_LEN}-${ts}"
 quality_json="$OUTDIR/${stem}-quality.json"
+quality_log="$OUTDIR/${stem}-quality.log"
 summary_json="$OUTDIR/${stem}-summary.json"
 
 source "$VENV/bin/activate"
@@ -94,7 +96,9 @@ if [ "$QUALITY_REQUIRE_DETERMINISTIC" != "1" ]; then
 fi
 
 printf 'quality_json=%s\n' "$quality_json"
-"${quality_cmd[@]}"
+printf 'quality_log=%s\n' "$quality_log"
+timeout --foreground --signal=TERM --kill-after=30s "$QUALITY_TIMEOUT" \
+  "${quality_cmd[@]}" 2>&1 | tee "$quality_log"
 
 bench_jsons=()
 bench_logs=()
@@ -123,6 +127,7 @@ done
 jq -n \
   --arg label "$LABEL" \
   --arg quality_json "$quality_json" \
+  --arg quality_log "$quality_log" \
   --argjson prompt_tokens "$INPUT_LEN" \
   --argjson output_tokens "$OUTPUT_LEN" \
   --argjson context_length "$MAX_MODEL_LEN" \
@@ -134,6 +139,7 @@ jq -n \
   '{
     label: $label,
     quality_json: $quality_json,
+    quality_log: $quality_log,
     prompt_tokens: $prompt_tokens,
     output_tokens: $output_tokens,
     context_length: $context_length,

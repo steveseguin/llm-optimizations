@@ -164,6 +164,14 @@ Rules:
 - The older faster piecewise graph/AOT recipe still fails the expanded raw
   semantic canary with all generated tokens equal to `0`; it remains invalid
   even if its throughput is higher.
+- The direct Q/K RMS XPU helper remains off. A valid-path screen first hit a
+  transient oneCCL/OFI startup failure, then a retry stalled before quality JSON
+  with shared-memory broadcast waits. The quality-gated runner now saves a
+  quality log and applies `QUALITY_TIMEOUT` so future quality-stage hangs are
+  bounded.
+- A non-sync timing probe on the valid path only sees uncaptured regions, but
+  the visible costs still point at MoE experts, Q/K RMS scheduling, and
+  prefill-shaped TP allreduce as the next code-level optimization targets.
 
 See `notes/2026-05-14-minimax-compiled-path-repair.md` for the active repair
 matrix and exact JSON/log paths.
