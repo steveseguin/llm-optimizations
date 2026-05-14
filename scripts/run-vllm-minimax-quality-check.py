@@ -60,6 +60,9 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--out", required=True, help="Output JSON path.")
     parser.add_argument("--max-tokens", type=int, default=128)
+    parser.add_argument("--temperature", type=float, default=0.0)
+    parser.add_argument("--top-p", type=float, default=1.0)
+    parser.add_argument("--top-k", type=int, default=-1)
     parser.add_argument(
         "--prompt",
         action="append",
@@ -83,6 +86,21 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max-num-batched-tokens", type=int, default=512)
     parser.add_argument("--max-num-seqs", type=int, default=1)
     parser.add_argument("--block-size", type=int, default=256)
+    parser.add_argument(
+        "--disable-custom-all-reduce",
+        action="store_true",
+        help="Disable vLLM custom all-reduce. Default mirrors benchmark scripts.",
+    )
+    parser.add_argument(
+        "--disable-llm-scaler-moe",
+        action="store_true",
+        help="Disable the llm-scaler MiniMax INT4 MoE path for control probes.",
+    )
+    parser.add_argument(
+        "--allow-degenerate-output",
+        action="store_true",
+        help="Do not fail on all-identical tokens or control-character output.",
+    )
     parser.add_argument(
         "--enable-prefix-caching",
         dest="enable_prefix_caching",
@@ -134,7 +152,10 @@ def configure_env(args: argparse.Namespace) -> None:
     )
     if args.vllm_cache_root:
         os.environ["VLLM_CACHE_ROOT"] = args.vllm_cache_root
-    os.environ["VLLM_XPU_USE_LLM_SCALER_MOE"] = "1"
+    if args.disable_llm_scaler_moe:
+        os.environ["VLLM_XPU_USE_LLM_SCALER_MOE"] = "0"
+    else:
+        os.environ["VLLM_XPU_USE_LLM_SCALER_MOE"] = "1"
     if args.attention_delay_allreduce:
         os.environ["VLLM_MINIMAX_M2_ATTN_DELAY_ALLREDUCE"] = "1"
     else:
@@ -173,14 +194,15 @@ def main() -> None:
         max_num_batched_tokens=args.max_num_batched_tokens,
         max_num_seqs=args.max_num_seqs,
         block_size=args.block_size,
-        disable_custom_all_reduce=True,
+        disable_custom_all_reduce=args.disable_custom_all_reduce,
         enable_chunked_prefill=True,
         enable_prefix_caching=args.enable_prefix_caching,
         compilation_config=compilation_config,
     )
     params = SamplingParams(
-        temperature=0.0,
-        top_p=1.0,
+        temperature=args.temperature,
+        top_p=args.top_p,
+        top_k=args.top_k,
         max_tokens=args.max_tokens,
         seed=0,
         stop_token_ids=[200020],
@@ -255,6 +277,24 @@ def main() -> None:
         ",".join(map(str, combined_tokens)).encode()
     ).hexdigest()
     combined_text_hash = hashlib.sha256("".join(combined_text_parts).encode()).hexdigest()
+    generated_tokens = [
+        token
+        for run in run_records
+        for prompt_record in run["prompts"]
+        for token in prompt_record["token_ids"]
+    ]
+    generated_text = "".join(
+        prompt_record["text"]
+        for run in run_records
+        for prompt_record in run["prompts"]
+    )
+    distinct_generated_tokens = sorted(set(generated_tokens))
+    printable_chars = sum(
+        1 for char in generated_text if char.isprintable() and not char.isspace()
+    )
+    nontrivial_tokens = len(distinct_generated_tokens) > 1
+    nontrivial_text = printable_chars > 0
+    degenerate_output = not nontrivial_tokens or not nontrivial_text
     first_run_hashes = [p["token_sha256"] for p in run_records[0]["prompts"]]
     deterministic = all(
         [p["token_sha256"] for p in run["prompts"]] == first_run_hashes
@@ -276,6 +316,17 @@ def main() -> None:
         "expected_token_sha256": args.expected_token_sha256,
         "expected_token_sha256_match": expected_match,
         "deterministic_across_runs": deterministic,
+        "quality_checks": {
+            "distinct_generated_token_count": len(distinct_generated_tokens),
+            "first_distinct_generated_tokens": distinct_generated_tokens[:16],
+            "printable_nonspace_text_chars": printable_chars,
+            "nontrivial_tokens": nontrivial_tokens,
+            "nontrivial_text": nontrivial_text,
+            "degenerate_output": degenerate_output,
+            "allow_degenerate_output": args.allow_degenerate_output,
+            "disable_custom_all_reduce": args.disable_custom_all_reduce,
+            "llm_scaler_moe": not args.disable_llm_scaler_moe,
+        },
         "run_records": run_records,
         "prompts": prompts,
         "raw_prompt": args.raw_prompt,
@@ -291,6 +342,9 @@ def main() -> None:
             "enable_prefix_caching": args.enable_prefix_caching,
             "attention_delay_allreduce": args.attention_delay_allreduce,
             "vllm_cache_root": os.environ.get("VLLM_CACHE_ROOT"),
+            "temperature": args.temperature,
+            "top_p": args.top_p,
+            "top_k": args.top_k,
         },
         "compilation_config": compilation_config,
     }
@@ -309,6 +363,7 @@ def main() -> None:
                 "deterministic_across_runs": record[
                     "deterministic_across_runs"
                 ],
+                "quality_checks": record["quality_checks"],
                 "expected_token_sha256_match": record[
                     "expected_token_sha256_match"
                 ],
@@ -320,6 +375,8 @@ def main() -> None:
         raise SystemExit("quality smoke failed: nondeterministic token hashes")
     if expected_match is False:
         raise SystemExit("quality smoke failed: combined token hash mismatch")
+    if degenerate_output and not args.allow_degenerate_output:
+        raise SystemExit("quality smoke failed: degenerate generated output")
 
 
 if __name__ == "__main__":

@@ -1,0 +1,103 @@
+{
+  "date": "2026-05-13",
+  "model": {
+    "hfId": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+    "localPath": "/mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround",
+    "quantization": "INT4 AutoRound W4A16"
+  },
+  "hardware": {
+    "gpuName": "Intel Arc Pro B70",
+    "gpuCount": 4,
+    "vramGbPerGpu": 32,
+    "os": "Ubuntu 24.04.4 LTS"
+  },
+  "engine": {
+    "name": "vllm",
+    "version": "0.20.1-local",
+    "backend": "xpu-level-zero",
+    "tensorParallel": 4,
+    "dtype": "float16"
+  },
+  "qualityToolChange": {
+    "script": "scripts/run-vllm-minimax-quality-check.py",
+    "newFailureConditions": [
+      "all generated tokens are the same id",
+      "decoded generated text has zero printable non-space characters"
+    ],
+    "newControls": [
+      "--temperature",
+      "--top-p",
+      "--top-k",
+      "--disable-custom-all-reduce",
+      "--disable-llm-scaler-moe",
+      "--allow-degenerate-output"
+    ]
+  },
+  "probes": [
+    {
+      "name": "graph_benchmark_mirrored",
+      "mode": "graph",
+      "llmScalerMoe": true,
+      "disableCustomAllReduce": false,
+      "temperature": 0.0,
+      "topP": 1.0,
+      "topK": -1,
+      "rawPrompt": true,
+      "prompt": "Write one short sentence about PCIe tensor parallel bottlenecks.",
+      "resultJson": "/home/steve/bench-results/minimax-m2.7-integrity-gate/raw-quality-smoke-benchmirror-20260514T0121.json",
+      "qualityChecks": {
+        "distinctGeneratedTokenCount": 1,
+        "firstDistinctGeneratedTokens": [
+          0
+        ],
+        "printableNonspaceTextChars": 0,
+        "nontrivialTokens": false,
+        "nontrivialText": false,
+        "degenerateOutput": true
+      },
+      "decision": "fail"
+    },
+    {
+      "name": "eager_no_llm_scaler",
+      "mode": "eager",
+      "llmScalerMoe": false,
+      "disableCustomAllReduce": false,
+      "temperature": 0.0,
+      "topP": 1.0,
+      "topK": -1,
+      "rawPrompt": true,
+      "prompt": "Write one short sentence about PCIe tensor parallel bottlenecks.",
+      "resultJson": "/home/steve/bench-results/minimax-m2.7-integrity-gate/raw-quality-smoke-eager-nollmscaler-20260514T0124.json",
+      "qualityChecks": {
+        "distinctGeneratedTokenCount": 1,
+        "firstDistinctGeneratedTokens": [
+          0
+        ],
+        "printableNonspaceTextChars": 0,
+        "nontrivialTokens": false,
+        "nontrivialText": false,
+        "degenerateOutput": true
+      },
+      "decision": "fail"
+    },
+    {
+      "name": "graph_sampling_recommended_params",
+      "mode": "graph",
+      "llmScalerMoe": true,
+      "temperature": 1.0,
+      "topP": 0.95,
+      "topK": 40,
+      "rawPrompt": true,
+      "prompt": "Write one short sentence about PCIe tensor parallel bottlenecks.",
+      "resultJson": null,
+      "failure": "hung after AOT load with repeated shared-memory broadcast waits; manually terminated",
+      "decision": "no_result"
+    }
+  ],
+  "decision": {
+    "promoted": false,
+    "submittedToLocalMaxxing": false,
+    "currentAutoRoundVllmPathQualityCleared": false,
+    "recommendation": "Treat MiniMax AutoRound vLLM/XPU throughput numbers as speed-only diagnostics until a non-degenerate text generation quality check passes."
+  }
+}
