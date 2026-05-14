@@ -1,0 +1,69 @@
+{
+  "model": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+  "local_model_path": "/mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround",
+  "hardware": "4x Intel Arc Pro B70 32GB",
+  "runtime": "vLLM 0.20.1-local XPU TP4",
+  "date_local": "2026-05-13",
+  "objective": "Validate correctness before promoting compiled MiniMax TP4 speed results.",
+  "artifacts": {
+    "compiled_finite_trace": "/home/steve/bench-results/minimax-m2.7-integrity-gate/compiled-finite-trace-20260514T023956Z",
+    "compiled_no_attention_delay_trace": "/home/steve/bench-results/minimax-m2.7-integrity-gate/compiled-noattndelay-finite-trace-20260514T024850Z",
+    "compiled_fresh_cache_trace": "/home/steve/bench-results/minimax-m2.7-integrity-gate/compiled-freshcache-finite-trace-20260514T025123Z",
+    "eager_enforced_quality": "/home/steve/bench-results/minimax-m2.7-integrity-gate/eager-enforced-quality-postgate-20260514T025943Z",
+    "compiled_quality_postgate": "/home/steve/bench-results/minimax-m2.7-integrity-gate/compiled-quality-postgate-20260514T030205Z",
+    "compilemode_none_quality": "/home/steve/bench-results/minimax-m2.7-integrity-gate/compilemode-none-quality-20260514T025653Z"
+  },
+  "results": [
+    {
+      "name": "compiled_default_trace",
+      "quality_valid": false,
+      "tokens": [0],
+      "trace_signal": "request sample_hidden_states all NaN before LM head; warmup tensors finite",
+      "sample_hidden_states": {
+        "shape": [1, 3072],
+        "finite": 0,
+        "nan": 3072
+      }
+    },
+    {
+      "name": "compiled_no_attention_delay",
+      "quality_valid": false,
+      "tokens": [0],
+      "trace_signal": "same all-NaN request hidden states with attention delayed allreduce disabled"
+    },
+    {
+      "name": "compiled_fresh_cache",
+      "quality_valid": false,
+      "tokens": [0],
+      "trace_signal": "fresh AOT cache rebuilt; same all-NaN request hidden states"
+    },
+    {
+      "name": "compilation_mode_none",
+      "quality_valid": false,
+      "tokens_prefix": [8261, 0, 0, 0, 0],
+      "text_prefix": " Paris\\u0000\\u0000\\u0000\\u0000",
+      "reason": "first token is correct, then NUL/control-character collapse"
+    },
+    {
+      "name": "enforce_eager",
+      "quality_valid": true,
+      "tokens_prefix": [8261, 634, 758, 5505, 300, 11980, 355, 20043],
+      "text_prefix": " Paris.\\n\\nThe capital of Germany is Berlin.",
+      "control_nonspace_text_chars": 0,
+      "nul_token_count": 0
+    }
+  ],
+  "quality_gate_update": {
+    "script": "scripts/run-vllm-minimax-quality-check.py",
+    "new_fields": [
+      "control_nonspace_text_chars",
+      "nul_token_count",
+      "control_char_output"
+    ],
+    "purpose": "Reject outputs that contain NUL/control-character collapse even if the token set is not single-valued."
+  },
+  "localmaxxing": {
+    "submitted": false,
+    "reason": "No new quality-valid performance result; compiled speed path is currently invalid."
+  }
+}

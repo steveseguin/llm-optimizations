@@ -377,9 +377,18 @@ def main() -> None:
     printable_chars = sum(
         1 for char in generated_text if char.isprintable() and not char.isspace()
     )
+    control_nonspace_chars = sum(
+        1
+        for char in generated_text
+        if not char.isprintable() and not char.isspace()
+    )
+    nul_token_count = sum(1 for token in generated_tokens if token == 0)
     nontrivial_tokens = len(distinct_generated_tokens) > 1
     nontrivial_text = printable_chars > 0
-    degenerate_output = not nontrivial_tokens or not nontrivial_text
+    control_char_output = control_nonspace_chars > 0 or nul_token_count > 0
+    degenerate_output = (
+        not nontrivial_tokens or not nontrivial_text or control_char_output
+    )
     first_run_hashes = [p["token_sha256"] for p in run_records[0]["prompts"]]
     deterministic = all(
         [p["token_sha256"] for p in run["prompts"]] == first_run_hashes
@@ -406,8 +415,11 @@ def main() -> None:
             "distinct_generated_token_count": len(distinct_generated_tokens),
             "first_distinct_generated_tokens": distinct_generated_tokens[:16],
             "printable_nonspace_text_chars": printable_chars,
+            "control_nonspace_text_chars": control_nonspace_chars,
+            "nul_token_count": nul_token_count,
             "nontrivial_tokens": nontrivial_tokens,
             "nontrivial_text": nontrivial_text,
+            "control_char_output": control_char_output,
             "degenerate_output": degenerate_output,
             "allow_degenerate_output": args.allow_degenerate_output,
             "disable_custom_all_reduce": args.disable_custom_all_reduce,
