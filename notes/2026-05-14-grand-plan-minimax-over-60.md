@@ -191,6 +191,10 @@ Rules:
 - Reducing the 4096-context long-prompt graph prefill chunk from `512` to `256`
   avoids the hard `sample_tokens` timeout, but corrupts generation into all
   token-id-zero/NUL output. This is not a valid larger-context workaround.
+- A controlled `max_model_len=4096` prompt-family sweep found a sharp early
+  boundary: raw prompt lengths `48`, `81`, and `114` tokens pass, while `147`
+  raw prompt tokens stalls during graph/profile work and then emits all NUL
+  tokens. See `notes/2026-05-14-minimax-ctx4096-prompt-sweep.md`.
 - A non-sync timing probe on the valid path only sees uncaptured regions, but
   the visible costs still point at MoE experts, Q/K RMS scheduling, and
   prefill-shaped TP allreduce as the next code-level optimization targets.
