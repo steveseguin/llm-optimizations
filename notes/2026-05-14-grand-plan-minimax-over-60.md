@@ -169,6 +169,10 @@ Rules:
   with shared-memory broadcast waits. The quality-gated runner now saves a
   quality log and applies `QUALITY_TIMEOUT` so future quality-stage hangs are
   bounded.
+- Disabling vLLM graph memory estimation with
+  `VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS=0` preserves quality on the canary
+  but is rejected for the promoted recipe: the throughput stage stalls after
+  model load with repeated shared-memory broadcast waits and produces no JSON.
 - A non-sync timing probe on the valid path only sees uncaptured regions, but
   the visible costs still point at MoE experts, Q/K RMS scheduling, and
   prefill-shaped TP allreduce as the next code-level optimization targets.

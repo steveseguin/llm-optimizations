@@ -305,3 +305,39 @@ Decision: keep the direct Q/K helper off for the current recipe. This screen
 also showed that quality-stage hangs need the same guardrails as throughput
 runs, so `scripts/run-minimax-quality-gated-candidate.sh` now writes a quality
 log and wraps the quality stage in `QUALITY_TIMEOUT`.
+
+## Graph Memory Estimate Disable Screen
+
+Tried disabling vLLM's graph memory estimate on the promoted TP4
+full-decode-graph recipe:
+
+```bash
+VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS=0 \
+LABEL=full-decode-graph-triton-nographmemest \
+BENCH_REPEATS=1 QUALITY_TIMEOUT=10m RUN_TIMEOUT=25m SHM_STALL_MAX_WARNINGS=4 \
+scripts/run-minimax-quality-gated-candidate.sh
+```
+
+Quality result:
+
+- JSON:
+  `/home/steve/bench-results/minimax-m2.7-quality-gated/minimax-full-decode-graph-triton-nographmemest-tp4-ctx2048-mbt512-bs256-p512n1536-20260514T170122Z-quality.json`
+- Result: `passed=true`
+- Generated tokens: `160`
+- Distinct generated tokens: `97`
+- NUL tokens: `0`
+- Control non-space chars: `0`
+
+Throughput result:
+
+- Log:
+  `/home/steve/bench-results/minimax-m2.7-quality-gated/vllm-minimax-m27-autoround-tp4-p512n1536-20260514T170907Z.log`
+- JSON: not produced
+- Failure mode: throughput-stage profiling stalled after model load with `4`
+  `No available shared memory broadcast block found` warnings and exited by the
+  stall/timeout guard.
+- Follow-up four-device torch XPU health check passed.
+
+Decision: keep `VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS` at the default for
+the current promoted recipe. Disabling it does not corrupt model output, but it
+adds a long profiling pause and fails to produce a benchmark result.
