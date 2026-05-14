@@ -1,0 +1,79 @@
+{
+  "date": "2026-05-13",
+  "model": {
+    "hf_id": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+    "submitted_hf_id": "MiniMaxAI/MiniMax-M2.7",
+    "local_path": "/mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround",
+    "quantization": "INT4 AutoRound W4A16",
+    "dtype": "float16"
+  },
+  "base_recipe": {
+    "tensor_parallel": 4,
+    "max_model_len": 2048,
+    "max_num_batched_tokens": 512,
+    "max_num_seqs": 1,
+    "block_size": 256,
+    "prefix_caching": false,
+    "xpu_graph": true,
+    "graph_partition": true,
+    "compile_sizes": [1],
+    "cudagraph_mode": "PIECEWISE",
+    "attention_delayed_allreduce": true,
+    "current_best_submitted_tok_s_out": 73.30631164343902,
+    "current_best_repeat_mean_tok_s_out": 73.244155
+  },
+  "experiment": {
+    "name": "distributed_residual_allreduce",
+    "status": "negative",
+    "quality_intent": "algebraically equivalent residual placement, assuming identical residual on TP ranks; not promoted because throughput regressed",
+    "env_delta": {
+      "VLLM_MINIMAX_M2_DIST_RESIDUAL_ALLREDUCE": "1"
+    },
+    "source_files_patched": [
+      "/home/steve/.venvs/vllm-xpu/lib/python3.12/site-packages/vllm/model_executor/models/minimax_m2.py",
+      "/home/steve/src/vllm/vllm/model_executor/models/minimax_m2.py"
+    ],
+    "repro_patch": "patches/vllm-minimax-dist-residual-allreduce-20260513.patch",
+    "cache_root": "/mnt/fast-ai/vllm-cache-exp/minimax-xpugraph-attndelay-distresid-block256-mbt512-noprefix-20260514T001936Z",
+    "aot_hash": "d2ff2c916a54632fb1b730da99bb20edf7c3983f0242653dfc2099e311597bc5",
+    "warmup": {
+      "prompt_tokens": 512,
+      "output_tokens": 128,
+      "elapsed_s": 7.554515881987754,
+      "tok_s_total": 84.71753981296844,
+      "tok_s_out": 16.94350828259372,
+      "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n128-20260514T001936Z.log",
+      "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n128-20260514T001936Z.json"
+    },
+    "measure": {
+      "prompt_tokens": 512,
+      "output_tokens": 1536,
+      "elapsed_s": 21.135738705983385,
+      "tok_s_total": 96.89748858506776,
+      "tok_s_out": 72.67311643880082,
+      "requests_per_second": 0.04731322684817762,
+      "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260514T002501Z.log",
+      "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260514T002501Z.json"
+    },
+    "aot_collectives": {
+      "actual_allreduce_call_lines": 1496,
+      "actual_wait_tensor_call_lines": 1496,
+      "actual_allreduce_wait_pairs_within_7_lines": 1496,
+      "wait_gap_lines": {
+        "2": 1496
+      },
+      "categories": {
+        "embedding_hidden": 8,
+        "qk_rms_variance": 496,
+        "attention_o_proj_hidden": 496,
+        "moe_hidden": 496
+      }
+    },
+    "decision": "Do not submit or promote. Leave VLLM_MINIMAX_M2_DIST_RESIDUAL_ALLREDUCE unset."
+  },
+  "localmaxxing_decision": "No submission: negative source-level screen below repeat mean.",
+  "next_targets": [
+    "Inspect XPU collective lowering and wait placement instead of changing Python residual placement.",
+    "Pursue a real backend fused collective-plus-adjacent-op path for RMS/residual/projection/MoE epilogues."
+  ]
+}

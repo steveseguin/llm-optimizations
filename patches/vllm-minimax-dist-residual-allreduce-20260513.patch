@@ -1,0 +1,23 @@
+diff --git a/vllm/model_executor/models/minimax_m2.py b/vllm/model_executor/models/minimax_m2.py
+index 000000000..000000000 100644
+--- a/vllm/model_executor/models/minimax_m2.py
++++ b/vllm/model_executor/models/minimax_m2.py
+@@ -96,6 +96,9 @@ _MINIMAX_M2_MOE_DELAY_ALLREDUCE = (
+     os.environ.get("VLLM_MINIMAX_MOE_DELAY_ALLREDUCE", "0") == "1"
+ )
++_MINIMAX_M2_DIST_RESIDUAL_ALLREDUCE = (
++    os.environ.get("VLLM_MINIMAX_M2_DIST_RESIDUAL_ALLREDUCE", "0") == "1"
++)
+ _MINIMAX_QK_RMS_XPU_HELPER = (
+     os.environ.get("VLLM_MINIMAX_QK_RMS_XPU_HELPER", "0") == "1"
+ )
+@@ -624,6 +627,9 @@ class MiniMaxM2DecoderLayer(nn.Module):
+     def _allreduce_with_rank0_residual(
+         self, hidden_states: torch.Tensor, residual: torch.Tensor
+     ) -> torch.Tensor:
++        if _MINIMAX_M2_DIST_RESIDUAL_ALLREDUCE:
++            hidden_states = hidden_states + residual * (1.0 / self.tp_size)
++            return tensor_model_parallel_all_reduce(hidden_states)
+         if self.tp_rank == 0:
+             hidden_states = hidden_states + residual
+         return tensor_model_parallel_all_reduce(hidden_states)
