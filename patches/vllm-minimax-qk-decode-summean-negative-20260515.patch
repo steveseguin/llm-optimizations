@@ -1,0 +1,42 @@
+diff --git a/vllm/model_executor/layers/mamba/linear_attn.py b/vllm/model_executor/layers/mamba/linear_attn.py
+--- a/vllm/model_executor/layers/mamba/linear_attn.py
++++ b/vllm/model_executor/layers/mamba/linear_attn.py
+@@
+ _MINIMAX_QK_NORM_COMPILE_USE_PARAM = (
+     os.environ.get("VLLM_MINIMAX_QK_NORM_COMPILE_USE_PARAM", "0") == "1"
+ )
++_MINIMAX_QK_NORM_DECODE_SUMMEAN = (
++    os.environ.get("VLLM_MINIMAX_QK_NORM_DECODE_SUMMEAN", "0") == "1"
++)
++_MINIMAX_QK_NORM_DECODE_SUMMEAN_MAX_TOKENS = int(
++    os.environ.get("VLLM_MINIMAX_QK_NORM_DECODE_SUMMEAN_MAX_TOKENS", "1") or "1"
++)
+@@
+         orig_dtype = q.dtype
+         q = q.to(torch.float32)
+         k = k.to(torch.float32)
+         trace_prefix = getattr(q_norm, "trace_name", "minimax.qk_norm")
+-        q_var = q.pow(2).mean(dim=-1, keepdim=True)
+-        k_var = k.pow(2).mean(dim=-1, keepdim=True)
++        decode_summean = (
++            os.environ.get(
++                "VLLM_MINIMAX_QK_NORM_DECODE_SUMMEAN",
++                "1" if _MINIMAX_QK_NORM_DECODE_SUMMEAN else "0",
++            )
++            == "1"
++        )
++        decode_summean_max_tokens = int(
++            os.environ.get(
++                "VLLM_MINIMAX_QK_NORM_DECODE_SUMMEAN_MAX_TOKENS",
++                str(_MINIMAX_QK_NORM_DECODE_SUMMEAN_MAX_TOKENS),
++            )
++            or "1"
++        )
++        if decode_summean and q.shape[0] <= decode_summean_max_tokens:
++            q_var = q.square().sum(dim=-1, keepdim=True) / q.shape[-1]
++            k_var = k.square().sum(dim=-1, keepdim=True) / k.shape[-1]
++        else:
++            q_var = q.pow(2).mean(dim=-1, keepdim=True)
++            k_var = k.pow(2).mean(dim=-1, keepdim=True)
+         trace_tensor_graph(f"{trace_prefix}.q_var_pre_allreduce", q_var)
+         trace_tensor_graph(f"{trace_prefix}.k_var_pre_allreduce", k_var)
