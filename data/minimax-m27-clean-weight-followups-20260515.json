@@ -1,0 +1,26 @@
+{
+  "date_utc": "2026-05-15",
+  "baseline_mean_output_toks_per_second": 65.75245827198079,
+  "experiments": [
+    {
+      "label": "clean-weight-min-tokens-100000",
+      "quality_json": "/home/steve/bench-results/minimax-m2.7-quality-gated/compiled-piecewise-raw145-clean-weight-min100000-ctx2048-n64-20260515T021400Z.json",
+      "throughput_json": "/home/steve/bench-results/minimax-m2.7-quality-gated/piecewise-throughput-min100000/vllm-minimax-m27-autoround-tp4-p512n1536-20260515T021930Z.json",
+      "passed_quality": true,
+      "output_toks_per_second": 64.81874591106778,
+      "total_toks_per_second": 86.42499454809037,
+      "result": "negative: quality passed, slower than promoted 65.75 tok/s mean",
+      "note": "Setting restore min tokens to 100000 avoids the live parameter sanity check for prompt-sized tensors, but did not improve p512/n1536 throughput. The quality log also exposed an ocloc/IGC internal compiler floating-point exception during capture that vLLM recovered from."
+    },
+    {
+      "label": "qk-rms-xpu-helper-clean-weight",
+      "quality_json": "/home/steve/bench-results/minimax-m2.7-quality-gated/compiled-piecewise-qkrms-helper-clean-weight-enabled-ctx2048-n64-20260515T022935Z.json",
+      "throughput_json": "/home/steve/bench-results/minimax-m2.7-quality-gated/piecewise-throughput-qkrms-helper/vllm-minimax-m27-autoround-tp4-p512n1536-20260515T023503Z.json",
+      "passed_quality": true,
+      "output_toks_per_second": 64.9877884598773,
+      "total_toks_per_second": 86.65038461316973,
+      "result": "negative for speed: quality passed, slower than promoted 65.75 tok/s mean",
+      "note": "Patched the optional Q/K RMS XPU helper to consume clean guarded Q/K norm weights. This makes the helper compatible with the clean-weight repair when enabled, but the first p512/n1536 throughput sample was not faster."
+    }
+  ]
+}

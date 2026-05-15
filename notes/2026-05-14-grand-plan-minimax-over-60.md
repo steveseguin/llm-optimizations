@@ -224,6 +224,12 @@ Rules:
   averaged `65.7525` output tok/s. This supersedes the prior stable `61` tok/s
   2048-context baseline, but does not resurrect the old `~73` tok/s diagnostic
   as a valid result.
+- Two immediate follow-ups did not improve speed:
+  `VLLM_MINIMAX_QK_NORM_RESTORE_WEIGHT_MIN_TOKENS=100000` reached `64.8187`
+  output tok/s after quality passed, and the clean-guarded optional Q/K RMS XPU
+  helper reached `64.9878` output tok/s after quality passed. Keep the helper
+  patch as a compatibility improvement, but leave it disabled for the headline
+  recipe.
 
 See `notes/2026-05-14-minimax-compiled-path-repair.md` for the active repair
 matrix and exact JSON/log paths.

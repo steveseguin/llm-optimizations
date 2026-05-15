@@ -129,6 +129,23 @@ speed-only diagnostic, but faster than the earlier quality-corrected
 full-decode graph baseline. The important distinction is that this result keeps
 the same model/quantization and passes the corruption gates.
 
+Follow-up controls:
+
+- Local record: `data/minimax-m27-clean-weight-followups-20260515.json`
+- `VLLM_MINIMAX_QK_NORM_RESTORE_WEIGHT_MIN_TOKENS=100000` passed the 64-token
+  raw quality gate but reached only `64.8187` output tok/s on one p512/n1536
+  sample, below the promoted `65.7525` mean. It is not a speed route.
+- The same min-token run exposed a driver/compiler issue during graph capture:
+  `ocloc`/IGC returned an internal compiler error with a floating-point
+  exception for a generated Triton reduction kernel, then vLLM recovered and
+  produced clean output. Keep this as a B70 driver/compiler stability clue.
+- Patched the optional MiniMax Q/K RMS XPU helper so it uses clean guarded
+  Q/K norm weights when `VLLM_MINIMAX_QK_RMS_XPU_HELPER=1`. The helper-enabled
+  raw quality gate passed, but one p512/n1536 sample reached only `64.9878`
+  output tok/s, so the helper remains off for the headline recipe.
+- Patch snapshot:
+  `patches/vllm-minimax-qk-rms-helper-clean-weight-guard-20260515.patch`
+
 ## Reproduction
 
 ```bash
