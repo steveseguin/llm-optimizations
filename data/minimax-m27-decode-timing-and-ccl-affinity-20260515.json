@@ -1,0 +1,76 @@
+{
+  "title": "MiniMax M2.7 AutoRound decode timing and oneCCL worker affinity screen",
+  "date": "2026-05-15",
+  "model": "/mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround",
+  "hardware": "4x Intel Arc Pro B70 32GB, AMD EPYC 9015 8C/16T",
+  "runtime": "vLLM 0.20.1-local XPU, TP4, FP16 activations, llm-scaler INT4 MoE decode path",
+  "timing_helper_patch": "patches/vllm-xpu-decode-timing-compileguard-skipfirst-20260515.patch",
+  "timing_runs": [
+    {
+      "name": "p512n32_enforce_eager_rank0",
+      "json": "/home/steve/bench-results/minimax-m2.7-decode-timing/eager-current-rank0-sync/vllm-minimax-m27-autoround-tp4-p512n32-20260515T182153Z.json",
+      "log": "/home/steve/bench-results/minimax-m2.7-decode-timing/eager-current-rank0-sync/vllm-minimax-m27-autoround-tp4-p512n32-20260515T182153Z.log",
+      "output_tok_s": 6.564244622023262,
+      "note": "Diagnostic only; includes profile and prefill calls."
+    },
+    {
+      "name": "p1n32_enforce_eager_rank0_skip_first_124",
+      "json": "/home/steve/bench-results/minimax-m2.7-decode-timing/eager-current-rank0-sync-skipwarmup/vllm-minimax-m27-autoround-tp4-p1n32-20260515T182739Z.json",
+      "log": "/home/steve/bench-results/minimax-m2.7-decode-timing/eager-current-rank0-sync-skipwarmup/vllm-minimax-m27-autoround-tp4-p1n32-20260515T182739Z.log",
+      "output_tok_s": 7.096875899530043,
+      "rank0_summary": [
+        {"label": "minimax.attn.qk_norm", "count": 1984, "total_ms": 1048.345627, "avg_ms": 0.528400},
+        {"label": "minimax.moe.experts_total", "count": 1984, "total_ms": 594.123620, "avg_ms": 0.299457},
+        {"label": "minimax.attn.kv_attention", "count": 1984, "total_ms": 565.328066, "avg_ms": 0.284944},
+        {"label": "all_reduce:(1, 3072):torch.float16", "count": 4001, "total_ms": 494.247821, "avg_ms": 0.123531},
+        {"label": "minimax.attn.delayed_residual_allreduce", "count": 1984, "total_ms": 447.472221, "avg_ms": 0.225540},
+        {"label": "all_reduce:minimax_qk_var:(1, 2):torch.float32", "count": 1922, "total_ms": 310.849855, "avg_ms": 0.161732}
+      ],
+      "interpretation": "Eager timing is not headline performance, but it points the next source work toward Q/K RMSNorm, MoE experts, attention/KV, and TP collective boundaries."
+    }
+  ],
+  "affinity_runs": [
+    {
+      "name": "baseline_after_timing_helper_patch",
+      "env": {"CCL_WORKER_AFFINITY": "unset"},
+      "json": "/home/steve/bench-results/minimax-m2.7-decode-candidates/current-best-after-timingpatch/vllm-minimax-m27-autoround-tp4-p512n1536-20260515T183715Z.json",
+      "log": "/home/steve/bench-results/minimax-m2.7-decode-candidates/current-best-after-timingpatch/vllm-minimax-m27-autoround-tp4-p512n1536-20260515T183715Z.log",
+      "tok_s_total": 88.48797087034602,
+      "tok_s_out_equiv": 66.36597815275951
+    },
+    {
+      "name": "ccl_worker_affinity_12_15_compile_seed",
+      "env": {"CCL_WORKER_AFFINITY": "12,13,14,15"},
+      "json": "/home/steve/bench-results/minimax-m2.7-decode-candidates/ccl-worker-affinity-12-15/vllm-minimax-m27-autoround-tp4-p512n1536-20260515T183158Z.json",
+      "log": "/home/steve/bench-results/minimax-m2.7-decode-candidates/ccl-worker-affinity-12-15/vllm-minimax-m27-autoround-tp4-p512n1536-20260515T183158Z.log",
+      "tok_s_total": 87.701386588203,
+      "tok_s_out_equiv": 65.77603994115225,
+      "note": "Fresh AOT compile after timing-helper source hash changed; not used for the warmed comparison."
+    },
+    {
+      "name": "ccl_worker_affinity_12_15_warmed_1",
+      "env": {"CCL_WORKER_AFFINITY": "12,13,14,15"},
+      "json": "/home/steve/bench-results/minimax-m2.7-decode-candidates/ccl-worker-affinity-12-15/vllm-minimax-m27-autoround-tp4-p512n1536-20260515T184020Z.json",
+      "log": "/home/steve/bench-results/minimax-m2.7-decode-candidates/ccl-worker-affinity-12-15/vllm-minimax-m27-autoround-tp4-p512n1536-20260515T184020Z.log",
+      "tok_s_total": 88.90963306531103,
+      "tok_s_out_equiv": 66.68222479898327
+    },
+    {
+      "name": "ccl_worker_affinity_12_15_warmed_2",
+      "env": {"CCL_WORKER_AFFINITY": "12,13,14,15"},
+      "json": "/home/steve/bench-results/minimax-m2.7-decode-candidates/ccl-worker-affinity-12-15/vllm-minimax-m27-autoround-tp4-p512n1536-20260515T184617Z.json",
+      "log": "/home/steve/bench-results/minimax-m2.7-decode-candidates/ccl-worker-affinity-12-15/vllm-minimax-m27-autoround-tp4-p512n1536-20260515T184617Z.log",
+      "tok_s_total": 88.53112386604211,
+      "tok_s_out_equiv": 66.39834289953158
+    },
+    {
+      "name": "ccl_worker_affinity_4_7",
+      "env": {"CCL_WORKER_AFFINITY": "4,5,6,7"},
+      "json": "/home/steve/bench-results/minimax-m2.7-decode-candidates/ccl-worker-affinity-4-7/vllm-minimax-m27-autoround-tp4-p512n1536-20260515T184317Z.json",
+      "log": "/home/steve/bench-results/minimax-m2.7-decode-candidates/ccl-worker-affinity-4-7/vllm-minimax-m27-autoround-tp4-p512n1536-20260515T184317Z.log",
+      "tok_s_total": 87.71529810238016,
+      "tok_s_out_equiv": 65.78647357678511
+    }
+  ],
+  "decision": "CCL_WORKER_AFFINITY=12,13,14,15 is a small local scheduling hint but not a promoted result. The two warmed repeats averaged 66.5403 output-equivalent tok/s, only about 0.27% above the same-source baseline and inside the noise band. Do not submit to LocalMaxxing."
+}
