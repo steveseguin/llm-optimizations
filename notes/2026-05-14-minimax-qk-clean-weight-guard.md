@@ -86,6 +86,24 @@ This converts the previously rejected 4096-context full-decode graph path into
 a valid result for this prompt/length screen. It still needs broader semantic
 canaries before treating 4096 as broadly production-safe.
 
+Server latency probe:
+
+- Result JSON:
+  `/home/steve/bench-results/minimax-m2.7-serve-metrics/vllm-minimax-m27-autoround-serve-tp4-p512n256-np3-20260515T014336Z.json`
+- Local record:
+  `data/minimax-m27-serve-latency-ctx4096-clean-weight-20260515.json`
+- Config: `max_model_len=4096`, `3` random prompts, `512` input tokens,
+  `256` output tokens, `temperature=0`, `MAX_NUM_SEQS=1`.
+- Output throughput: `60.7175` tok/s.
+- Total token throughput: `182.1524` tok/s for the serving benchmark window.
+- Mean TTFT: `4894.95` ms; median TTFT: `4901.29` ms.
+- Mean TPOT: `14.6272` ms; median TPOT: `14.6256` ms.
+- Mean ITL: `14.6272` ms; median ITL: `14.6157` ms.
+
+This is not a LocalMaxxing submission because it is a server-latency probe with
+multiple queued requests and shorter output length. Use it to track interactive
+latency and prefill/first-token behavior, not as the headline decode result.
+
 ## Reproduction
 
 ```bash
