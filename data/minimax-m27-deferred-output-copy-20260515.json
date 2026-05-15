@@ -1,0 +1,60 @@
+{
+  "title": "MiniMax M2.7 AutoRound deferred XPU output-copy screen",
+  "date": "2026-05-15",
+  "model": "/mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround",
+  "hardware": "4x Intel Arc Pro B70 32GB",
+  "runtime": "vLLM 0.20.1-local XPU, TP4, FP16 activations, llm-scaler INT4 MoE decode path",
+  "common_recipe": {
+    "input_tokens": 512,
+    "output_tokens": 1536,
+    "max_model_len": 2048,
+    "max_batched_tokens": 512,
+    "max_num_seqs": 1,
+    "block_size": 256,
+    "attention_backend": "TRITON_ATTN",
+    "xpu_graph": true,
+    "cudagraph_mode": "PIECEWISE",
+    "compile_sizes": [1],
+    "prefix_caching": false,
+    "qk_norm_restore_weight": true,
+    "qk_norm_restore_weight_min_tokens": 2,
+    "attention_delayed_allreduce": true,
+    "no_power_limit_change": true
+  },
+  "same_session_baseline_repeat": {
+    "env": {
+      "VLLM_XPU_DEFER_ASYNC_OUTPUT_COPY": "unset"
+    },
+    "json": "/home/steve/bench-results/minimax-m2.7-decode-candidates/current-best-repeat/vllm-minimax-m27-autoround-tp4-p512n1536-20260515T180802Z.json",
+    "log": "/home/steve/bench-results/minimax-m2.7-decode-candidates/current-best-repeat/vllm-minimax-m27-autoround-tp4-p512n1536-20260515T180802Z.log",
+    "elapsed_s": 23.231088197004283,
+    "tok_s_total": 88.15772996221915,
+    "tok_s_out_equiv": 66.11829747166436
+  },
+  "deferred_copy_with_device_sync": {
+    "env": {
+      "VLLM_XPU_DEFER_ASYNC_OUTPUT_COPY": "1",
+      "VLLM_XPU_DEFERRED_COPY_SYNC_DEVICE": "1"
+    },
+    "json": "/home/steve/bench-results/minimax-m2.7-decode-candidates/deferred-output-copy/vllm-minimax-m27-autoround-tp4-p512n1536-20260515T180127Z.json",
+    "log": "/home/steve/bench-results/minimax-m2.7-decode-candidates/deferred-output-copy/vllm-minimax-m27-autoround-tp4-p512n1536-20260515T180127Z.log",
+    "elapsed_s": 24.601002042007167,
+    "tok_s_total": 83.24864151886823,
+    "tok_s_out_equiv": 62.43648113915118,
+    "decision": "reject"
+  },
+  "deferred_copy_without_global_device_sync": {
+    "env": {
+      "VLLM_XPU_DEFER_ASYNC_OUTPUT_COPY": "1",
+      "VLLM_XPU_DEFERRED_COPY_SYNC_DEVICE": "0"
+    },
+    "json": "/home/steve/bench-results/minimax-m2.7-decode-candidates/deferred-output-copy-nosync/vllm-minimax-m27-autoround-tp4-p512n1536-20260515T180455Z.json",
+    "log": "/home/steve/bench-results/minimax-m2.7-decode-candidates/deferred-output-copy-nosync/vllm-minimax-m27-autoround-tp4-p512n1536-20260515T180455Z.log",
+    "elapsed_s": 24.765370550987427,
+    "tok_s_total": 82.69611778202703,
+    "tok_s_out_equiv": 62.02208833652028,
+    "decision": "reject"
+  },
+  "source_patch": "patches/vllm-xpu-deferred-output-copy-inference-mode-20260515.patch",
+  "interpretation": "The local deferred-copy path needed an inference-mode wrapper to avoid a background-thread RuntimeError, but both completed variants are slower than the same-session baseline. Keep VLLM_XPU_DEFER_ASYNC_OUTPUT_COPY unset for MiniMax TP4 decode benchmarks."
+}
