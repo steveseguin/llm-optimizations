@@ -16,6 +16,9 @@ Current best stable baseline:
 - Stronger raw-corruption-canary repeat with Q/K RMS clean-weight guard:
   `61.3490` output tok/s, `81.7987` total tok/s
   (`cmp68grii00kdo301g5kqwapp`)
+- 4096-context raw-corruption-canary repeat with the same guard:
+  `60.8976` output tok/s, `81.1968` total tok/s
+  (`cmp68w1mc00kso3016xc7jsgk`)
 - No power-limit increase.
 
 ## Promotion Rules
@@ -207,6 +210,10 @@ Rules:
   full-decode graph correctness on raw `121` and tokenizer-count `145` prompt
   canaries while preserving `>60` output tok/s. See
   `notes/2026-05-14-minimax-qk-clean-weight-guard.md`.
+- The same guard also repaired the previously rejected `max_model_len=4096`
+  prompt-boundary screen: two p512/n1536 repeats averaged `60.8976` output
+  tok/s after quality passed. This is a valid larger-context result, but not
+  proof yet that very long prompts are safe.
 
 See `notes/2026-05-14-minimax-compiled-path-repair.md` for the active repair
 matrix and exact JSON/log paths.

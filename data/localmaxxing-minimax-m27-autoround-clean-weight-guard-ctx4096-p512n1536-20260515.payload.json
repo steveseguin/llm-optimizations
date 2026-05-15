@@ -1,0 +1,38 @@
+{
+  "hfId": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+  "modelRevision": "main",
+  "hardware": {
+    "hwClass": "DISCRETE_GPU",
+    "gpuName": "Intel Arc Pro B70",
+    "gpuCount": 4,
+    "vramGb": 32,
+    "cpu": "AMD EPYC 9015 8-Core Processor",
+    "ramGb": 15,
+    "os": "Ubuntu 24.04.4 LTS"
+  },
+  "engineName": "vllm",
+  "engineVersion": "0.20.1-local",
+  "quantization": "AutoRound W4A16",
+  "promptTokens": 512,
+  "outputTokens": 1536,
+  "contextLength": 4096,
+  "batchSize": 1,
+  "tokSOut": 60.897635437582466,
+  "tokSTotal": 81.19684725010995,
+  "notes": "MiniMax M2.7 AutoRound W4A16 on 4x Intel Arc Pro B70 via vLLM/XPU TP4, max_model_len=4096. Mean of two p512/n1536 repeats: 60.873 and 60.923 output tok/s, 81.164 and 81.230 total tok/s. Quality gate used the raw 145-token MiniMax prompt that previously exposed the 4096 graph NUL/token-0 failure; passed with 0 NUL tokens, 0 control chars, 28 distinct generated token ids. Uses default-off MiniMax Q/K RMS clean-weight guard after finite tracing showed q_norm weight corruption during real prompt execution. No speculative decoding, no expert dropping, no power-limit increase. Separate prefill-only rate was not isolated; total tok/s includes prompt+decode.",
+  "engineFlags": {
+    "commandSnippet": "FI_TCP_IFACE=wlxe865d47e3a48 CCL_KVS_IFACE=wlxe865d47e3a48 VLLM_XPU_USE_LLM_SCALER_MOE=1 VLLM_MINIMAX_M2_ATTN_DELAY_ALLREDUCE=1 VLLM_XPU_ENABLE_XPU_GRAPH=1 VLLM_XPU_FORCE_GRAPH_WITH_COMM=1 VLLM_XPU_GRAPH_NOOP_COMM_CAPTURE=1 VLLM_MINIMAX_QK_NORM_RESTORE_WEIGHT=1 VLLM_MINIMAX_QK_NORM_RESTORE_WEIGHT_MIN_TOKENS=2 vllm bench throughput --backend vllm --model /mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround --tokenizer /mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround --trust-remote-code --dtype float16 --tensor-parallel-size 4 --distributed-executor-backend mp --max-model-len 4096 --max-num-batched-tokens 512 --max-num-seqs 1 --dataset-name random --random-input-len 512 --random-output-len 1536 --random-range-ratio 0 --num-prompts 1 --disable-log-stats --async-engine --block-size 256 --no-enable-prefix-caching --attention-backend TRITON_ATTN --compilation-config '{\"mode\":0,\"cudagraph_mode\":\"FULL_DECODE_ONLY\",\"cudagraph_num_of_warmups\":0,\"compile_sizes\":[1]}'",
+    "tensorParallel": 4,
+    "gpuLayers": 0,
+    "contextLength": 4096,
+    "attentionBackend": "triton",
+    "flashAttn": false,
+    "chunkedPrefill": true,
+    "prefillChunkSize": 512,
+    "prefixCaching": false,
+    "contBatching": false,
+    "specDecoding": false,
+    "temperature": 0,
+    "extraFlags": "CompilationMode.NONE; cudagraph_mode=FULL_DECODE_ONLY; compile_sizes=[1]; XPU graph forced with no-op communicator capture; MiniMax attention delayed allreduce; llm-scaler INT4 MoE decode path; MiniMax Q/K RMS clean-weight guard enabled with min_tokens=2; Wi-Fi interface pinned for oneCCL/OFI startup."
+  }
+}

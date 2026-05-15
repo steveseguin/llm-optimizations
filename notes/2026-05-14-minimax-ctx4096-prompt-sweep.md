@@ -86,3 +86,16 @@ prompt boundary for `max_model_len=2048` while keeping full-decode graph mode:
 
 The original `max_model_len=4096` path still needs retest with the guard before
 it can be promoted.
+
+Retest completed:
+
+- Quality-only graph retest passed:
+  `/home/steve/bench-results/minimax-m2.7-quality-gated/ctx4096-prompt-sweep/graph-raw145-clean-weight-ctx4096-n64-20260515T012423Z.json`
+- Full quality-gated throughput repeat passed:
+  `/home/steve/bench-results/minimax-m2.7-quality-gated/minimax-clean-weight-full-decode-graph-triton-ctx4096-raw145-repeat-tp4-ctx4096-mbt512-bs256-p512n1536-20260515T012656Z-summary.json`
+- Mean throughput: `60.8976` output tok/s, `81.1968` total tok/s.
+- LocalMaxxing: `cmp68w1mc00kso3016xc7jsgk`
+
+The guard fixes the specific NUL-output prompt boundary at 4096 context. Broader
+4096 validation remains open, especially longer prompts and shutdown hygiene
+around oneCCL teardown warnings.

@@ -59,6 +59,21 @@ This is slightly below the earlier fastest submitted `61.7528` tok/s run, but
 it is the strongest quality-preserving graph result so far because it exercises
 the raw prompt corruption boundary and keeps the fast graph path enabled.
 
+4096-context follow-up:
+
+- Quality JSON: `/home/steve/bench-results/minimax-m2.7-quality-gated/minimax-clean-weight-full-decode-graph-triton-ctx4096-raw145-repeat-tp4-ctx4096-mbt512-bs256-p512n1536-20260515T012656Z-quality.json`
+- Summary JSON: `/home/steve/bench-results/minimax-m2.7-quality-gated/minimax-clean-weight-full-decode-graph-triton-ctx4096-raw145-repeat-tp4-ctx4096-mbt512-bs256-p512n1536-20260515T012656Z-summary.json`
+- Quality gate: passed with the same tokenizer-count `145` raw prompt; `0` NUL
+  tokens, `0` non-space control chars, `28` distinct generated token ids.
+- Throughput repeats: `60.8727` and `60.9225` output tok/s.
+- Mean: `60.8976` output tok/s, `81.1968` total tok/s at
+  `max_model_len=4096`.
+- LocalMaxxing submission: `cmp68w1mc00kso3016xc7jsgk`
+
+This converts the previously rejected 4096-context full-decode graph path into
+a valid result for this prompt/length screen. It still needs broader semantic
+canaries before treating 4096 as broadly production-safe.
+
 ## Reproduction
 
 ```bash
@@ -87,5 +102,7 @@ INPUT_LEN=512 OUTPUT_LEN=1536 DTYPE=float16 BLOCK_SIZE=256 \
   load time instead of first sane forward.
 - Expand quality gates from corruption checks to a small semantic canary suite
   before claiming any new speed work.
+- Retest 4096 with longer prompts and actual long-context prompts; the current
+  repair is proven for the earlier raw-prompt boundary, not for 128k-style use.
 - Continue profiling the valid graph path. The likely remaining speed limit is
   still TP communication plus MiniMax MoE dispatch, not model quality.
