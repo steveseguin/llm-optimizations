@@ -1,0 +1,121 @@
+{
+  "date": "2026-05-15",
+  "model": "/mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround",
+  "hardware": "4x Intel Arc Pro B70 32GB",
+  "engine": "vLLM 0.20.1-local XPU",
+  "goal": "Preserve MiniMax M2.7 quality at longer context/prefill sizes while keeping the accepted 2k-context decode path intact.",
+  "patch": {
+    "file": "patches/vllm-xpu-skip-compiled-prefill-profile-run-20260515.patch",
+    "source_paths_patched": [
+      "/home/steve/src/vllm/vllm/v1/worker/gpu/model_runner.py",
+      "/home/steve/src/vllm/vllm/v1/worker/gpu_model_runner.py"
+    ],
+    "active_venv_paths_patched": [
+      "/home/steve/.venvs/vllm-xpu/lib/python3.12/site-packages/vllm/v1/worker/gpu/model_runner.py",
+      "/home/steve/.venvs/vllm-xpu/lib/python3.12/site-packages/vllm/v1/worker/gpu_model_runner.py"
+    ],
+    "behavior": "When VLLM_XPU_SKIP_COMPILED_PREFILL=1 and token count is greater than 1, pass skip_compiled=True through set_forward_context for live requests and profile/dummy runs.",
+    "why": "The previous skip-compiled-prefill control did not cover profile/dummy prefill. With VLLM_XPU_DISABLE_AUTO_COMPILE_RANGES=1, startup still sent a 1024-token dummy/profile shape into the compiled MiniMax backbone and failed with Shape: 1024 out of considered ranges: []."
+  },
+  "accepted_baseline_before_patch": {
+    "localmaxxing_id": "cmp6a5c1o00mpo3011hg8ncyp",
+    "context_length": 2048,
+    "prompt_tokens": 512,
+    "output_tokens": 1536,
+    "mean_output_tok_s": 65.75245827198079,
+    "mean_total_tok_s": 87.66994436264105,
+    "quality_status": "passed"
+  },
+  "results": [
+    {
+      "name": "skip_compiled_prefill_disable_auto_ranges_before_dummy_patch",
+      "mode": "graph",
+      "cudagraph_mode": "none",
+      "max_model_len": 8192,
+      "max_num_batched_tokens": 1024,
+      "quality_log": "/home/steve/bench-results/minimax-m2.7-quality-gated/prefill-longctx-8192-skipcompiled-disableautorange-nograph-patched-20260515T144301Z.log",
+      "outcome": "failed_engine_startup",
+      "failure": "Shape: 1024 out of considered ranges: [] during determine_available_memory/profile_run dummy prefill.",
+      "decision": "root_cause_for_patch"
+    },
+    {
+      "name": "skip_compiled_prefill_disable_auto_ranges_after_dummy_patch_no_graph",
+      "mode": "graph",
+      "cudagraph_mode": "none",
+      "max_model_len": 8192,
+      "max_num_batched_tokens": 1024,
+      "quality_json": "/home/steve/bench-results/minimax-m2.7-quality-gated/prefill-longctx-8192-skipcompiled-disableautorange-nograph-patched2-20260515T144810Z.json",
+      "quality_log": "/home/steve/bench-results/minimax-m2.7-quality-gated/prefill-longctx-8192-skipcompiled-disableautorange-nograph-patched2-20260515T144810Z.log",
+      "quality": {
+        "passed": true,
+        "combined_token_sha256": "6383551ba6e75e54d53f529c351faf2615f18fb4f783173a4ab36245fc513482",
+        "generated_tokens": 48,
+        "distinct_generated_token_count": 34,
+        "nul_token_count": 0,
+        "control_nonspace_text_chars": 0
+      },
+      "observed_speed": {
+        "prompt_processing_output_estimate_tok_s": [
+          1.81,
+          30.10,
+          30.59
+        ],
+        "note": "Quality canary only; not a headline decode benchmark."
+      },
+      "decision": "quality_correct_long_context_workaround"
+    },
+    {
+      "name": "skip_compiled_prefill_disable_auto_ranges_after_dummy_patch_piecewise",
+      "mode": "graph",
+      "cudagraph_mode": "piecewise",
+      "max_model_len": 8192,
+      "max_num_batched_tokens": 1024,
+      "quality_log": "/home/steve/bench-results/minimax-m2.7-quality-gated/prefill-longctx-8192-skipcompiled-disableautorange-piecewise-patched2-20260515T145239Z.log",
+      "outcome": "hung_startup",
+      "failure": "Repeated shared-memory broadcast waits after model load; workers stayed CPU-bound. Stopped manually and recovered B70 runtime.",
+      "decision": "rejected_until_piecewise_capture_hang_is_fixed"
+    },
+    {
+      "name": "current_best_non_regression_throughput",
+      "mode": "vllm bench throughput",
+      "context_length": 2048,
+      "prompt_tokens": 512,
+      "output_tokens": 1536,
+      "result_json": "/home/steve/bench-results/minimax-m2.7-quality-gated/current-best-after-skip-prefill-patch/vllm-minimax-m27-autoround-tp4-p512n1536-20260515T150232Z.json",
+      "result_log": "/home/steve/bench-results/minimax-m2.7-quality-gated/current-best-after-skip-prefill-patch/vllm-minimax-m27-autoround-tp4-p512n1536-20260515T150232Z.log",
+      "metrics": {
+        "elapsed_s": 23.239055072990595,
+        "output_tok_s": 66.09563061732246,
+        "total_tok_s": 88.12750748976327
+      },
+      "decision": "non_regressing_vs_accepted_baseline"
+    },
+    {
+      "name": "current_best_non_regression_quality",
+      "mode": "graph",
+      "context_length": 2048,
+      "max_num_batched_tokens": 512,
+      "quality_json": "/home/steve/bench-results/minimax-m2.7-quality-gated/current-best-after-skip-prefill-patch/compiled-piecewise-raw145-clean-weight-after-skip-prefill-patch-20260515T150552Z.json",
+      "quality_log": "/home/steve/bench-results/minimax-m2.7-quality-gated/current-best-after-skip-prefill-patch/compiled-piecewise-raw145-clean-weight-after-skip-prefill-patch-20260515T150552Z.log",
+      "quality": {
+        "passed": true,
+        "expected_token_sha256_match": true,
+        "combined_token_sha256": "267cbf30208d84929ee79284ac695467f7e80597bf8694130e1e1f8b180eb5bd",
+        "generated_tokens": 64,
+        "distinct_generated_token_count": 28,
+        "nul_token_count": 0,
+        "control_nonspace_text_chars": 0
+      },
+      "decision": "quality_regression_cleared"
+    }
+  ],
+  "localmaxxing": {
+    "submitted": false,
+    "reason": "No new public speed win over the accepted cmp6a5c1o00mpo3011hg8ncyp result. The useful outcome is a correctness/workaround patch and a non-regression check."
+  },
+  "next_steps": [
+    "Find a narrower way to keep decode graph capture while bypassing only unsafe long-prefill compiled shapes; current piecewise capture hangs at 8k/1024 after the dummy-run patch.",
+    "Investigate why compiled long-prefill returns all-NaN hidden states while eager remains finite; the failure is upstream of logits/sampling.",
+    "Continue decode-speed work separately against the accepted 65.75 output tok/s baseline, with quality hash checks required before publication."
+  ]
+}

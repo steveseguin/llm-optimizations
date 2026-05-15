@@ -1,0 +1,66 @@
+diff --git a/vllm/v1/worker/gpu/model_runner.py b/vllm/v1/worker/gpu/model_runner.py
+--- a/vllm/v1/worker/gpu/model_runner.py
++++ b/vllm/v1/worker/gpu/model_runner.py
+@@
+-import gc
++import gc
++import os
+@@
+         if has_encoder_input:
+             # Encoder-decoder models can only compile the pure decode steps
+             # where no encoder inputs are present. Use eager for the first pass
+             # when encoder inputs are scheduled, because this step updates
+             # cross-attention cache with dynamic encoder outputs.
+             skip_compiled = True
++        if (
++            os.environ.get("VLLM_XPU_SKIP_COMPILED_PREFILL", "0") == "1"
++            and num_toks > 1
++        ):
++            skip_compiled = True
+ 
+         batch_desc, num_tokens_across_dp = dispatch_cg_and_sync_dp(
+             self.cudagraph_manager,
+diff --git a/vllm/v1/worker/gpu_model_runner.py b/vllm/v1/worker/gpu_model_runner.py
+--- a/vllm/v1/worker/gpu_model_runner.py
++++ b/vllm/v1/worker/gpu_model_runner.py
+@@
+-import itertools
++import itertools
++import os
+@@
+-        skip_compiled = has_encoder_input
++        skip_compiled = has_encoder_input or (
++            os.environ.get("VLLM_XPU_SKIP_COMPILED_PREFILL", "0") == "1"
++            and num_tokens_padded > 1
++        )
+@@
+                 set_forward_context(
+                     attn_metadata,
+                     self.vllm_config,
+                     num_tokens=num_tokens_padded,
+                     num_tokens_across_dp=num_tokens_across_dp,
+                     cudagraph_runtime_mode=cudagraph_mode,
+                     batch_descriptor=batch_desc,
+                     ubatch_slices=ubatch_slices_padded,
+                     slot_mapping=slot_mappings,
+-                    skip_compiled=has_encoder_input,
++                    skip_compiled=skip_compiled,
+                 ),
+@@
+                 set_forward_context(
+                     attn_metadata,
+                     self.vllm_config,
+                     num_tokens=num_tokens_padded,
+                     num_tokens_across_dp=num_tokens_across_dp,
+                     cudagraph_runtime_mode=cudagraph_runtime_mode,
+                     batch_descriptor=batch_desc,
+                     ubatch_slices=ubatch_slices_padded,
+                     slot_mapping=slot_mappings,
++                    skip_compiled=(
++                        os.environ.get("VLLM_XPU_SKIP_COMPILED_PREFILL", "0")
++                        == "1"
++                        and num_tokens_padded > 1
++                    ),
+                 ),
+             ):
+                 outputs = self.model(

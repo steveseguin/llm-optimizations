@@ -332,6 +332,45 @@ the same accepted cache still completed, treat this as harness/runtime
 instability after repeated graph experiments, not as a quality failure of the
 published baseline.
 
+## Skip-Compiled Prefill Profile Patch
+
+Record:
+`data/minimax-m27-skip-compiled-prefill-profile-run-20260515.json`
+
+Patch:
+`patches/vllm-xpu-skip-compiled-prefill-profile-run-20260515.patch`
+
+Root cause found in the first patched attempt:
+
+- `VLLM_XPU_SKIP_COMPILED_PREFILL=1` covered live prefill in one runner path,
+  but profile/dummy prefill still entered the compiled MiniMax backbone.
+- With `VLLM_XPU_DISABLE_AUTO_COMPILE_RANGES=1`, startup failed during
+  memory profiling with `Shape: 1024 out of considered ranges: []`.
+- The fix passes `skip_compiled=True` through `set_forward_context` for
+  profile/dummy runs when the token count is greater than one. I also patched
+  the sync runner path so the env control is consistent.
+
+Validated controls:
+
+- Long-context, `max_model_len=8192`, `MBT=1024`,
+  `--disable-auto-compile-ranges`, `--skip-compiled-prefill`,
+  `--cudagraph-mode none`: passed. It generated `48` tokens across the fixed
+  canary prompts, `34` distinct token ids, `0` NUL tokens, and `0` non-space
+  control characters.
+- Same long-context settings with piecewise graph capture: rejected. It hung
+  after model load with repeated shared-memory broadcast waits while the
+  workers remained CPU-bound.
+- Current accepted p512/n1536 piecewise recipe after the patch: non-regressing.
+  One repeat produced `66.0956` output tok/s and `88.1275` total tok/s.
+- Current accepted raw 145-token quality canary after the patch: passed and
+  matched the expected token hash
+  `267cbf30208d84929ee79284ac695467f7e80597bf8694130e1e1f8b180eb5bd`.
+
+Decision: keep this as a correctness/workaround patch, not a new public speed
+result. It gives us a quality-correct long-context control when graph capture
+is disabled, and it does not disturb the accepted 2k-context decode baseline.
+Do not submit to LocalMaxxing because there is no new speed win.
+
 ## Next Work
 
 1. Continue to treat `65.7525` output tok/s as the published quality-valid
@@ -350,3 +389,6 @@ published baseline.
    prefill path currently corrupts into token id `0` or hangs; debug it with
    finite tracing and source-level shape guards before spending more benchmark
    time on long-context speed.
+8. For long-context speed, next try to isolate decode graph capture from
+   prefill graph capture more narrowly. The no-graph prefill workaround is
+   correct but slow; full piecewise capture still hangs at `8192`/`MBT1024`.
