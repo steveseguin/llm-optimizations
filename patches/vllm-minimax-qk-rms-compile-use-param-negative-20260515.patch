@@ -1,0 +1,39 @@
+diff --git a/vllm/model_executor/layers/mamba/linear_attn.py b/vllm/model_executor/layers/mamba/linear_attn.py
+index 5cab2b4ea..e69afce43 100644
+--- a/vllm/model_executor/layers/mamba/linear_attn.py
++++ b/vllm/model_executor/layers/mamba/linear_attn.py
+@@ -47,6 +47,9 @@ _MINIMAX_QK_NORM_RESTORE_WEIGHT = (
+ _MINIMAX_QK_NORM_RESTORE_WEIGHT_MIN_TOKENS = int(
+     os.environ.get("VLLM_MINIMAX_QK_NORM_RESTORE_WEIGHT_MIN_TOKENS", "2") or "2"
+ )
++_MINIMAX_QK_NORM_COMPILE_USE_PARAM = (
++    os.environ.get("VLLM_MINIMAX_QK_NORM_COMPILE_USE_PARAM", "0") == "1"
++)
+ 
+ 
+ @CustomOp.register("minimax_text01_rmsnorm_tp")
+@@ -123,8 +126,30 @@ class MiniMaxText01RMSNormTP(CustomOp):
+             getattr(norm.weight, "_minimax_clean_weight_xpu", None),
+         )
+         if torch.compiler.is_compiling():
++            if (
++                os.environ.get(
++                    "VLLM_MINIMAX_QK_NORM_COMPILE_USE_PARAM",
++                    "1" if _MINIMAX_QK_NORM_COMPILE_USE_PARAM else "0",
++                )
++                == "1"
++            ):
++                return norm.weight
+             return clean_weight_xpu if clean_weight_xpu is not None else norm.weight
+         if norm.weight.is_xpu and torch.xpu.is_current_stream_capturing():
++            if (
++                os.environ.get(
++                    "VLLM_MINIMAX_QK_NORM_COMPILE_USE_PARAM",
++                    "1" if _MINIMAX_QK_NORM_COMPILE_USE_PARAM else "0",
++                )
++                == "1"
++            ):
++                return norm.weight
+             return clean_weight_xpu if clean_weight_xpu is not None else norm.weight
+         min_tokens = int(
+             os.environ.get(

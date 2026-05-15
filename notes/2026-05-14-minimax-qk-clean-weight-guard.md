@@ -150,6 +150,23 @@ Follow-up controls:
 - Patch snapshot:
   `patches/vllm-minimax-qk-rms-helper-clean-weight-guard-20260515.patch`
 
+Additional 2026-05-15 control:
+
+- Local record:
+  `data/minimax-m27-aot-latency-and-compile-use-param-20260515.json`
+- The accepted piecewise/AOT recipe was profiled through the OpenAI-compatible
+  server path. A deterministic p512/n256, three-request probe reached
+  `65.0856` output tok/s with mean TTFT `4603.8070` ms and mean ITL
+  `13.5665` ms. This means steady decode is materially faster than the short
+  serving throughput suggests; prompt/first-token work is a separate target.
+- A default-off `VLLM_MINIMAX_QK_NORM_COMPILE_USE_PARAM=1` control passed the
+  64-token raw canary but reached only `64.4976` output tok/s and reused the
+  same AOT hash as the accepted clean-weight run. It is rejected as a speed
+  route, but kept as evidence that simply returning the live parameter during
+  compile/capture does not recover the old invalid graph shape.
+- Patch snapshot:
+  `patches/vllm-minimax-qk-rms-compile-use-param-negative-20260515.patch`
+
 ## Reproduction
 
 ```bash

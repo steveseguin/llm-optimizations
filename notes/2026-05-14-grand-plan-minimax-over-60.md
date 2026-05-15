@@ -218,6 +218,19 @@ Rules:
   prompt-boundary screen: two p512/n1536 repeats averaged `60.8976` output
   tok/s after quality passed. This is a valid larger-context result, but not
   proof yet that very long prompts are safe.
+- A 2026-05-15 server-side latency probe of the accepted piecewise/AOT recipe
+  shows `65.0856` output tok/s on p512/n256 serving, mean TTFT `4603.8070` ms,
+  and mean ITL `13.5665` ms. Long-output decode is still the headline metric,
+  but prefill/TTFT now has a clear measured cost to target.
+- AOT comparison between the accepted clean-weight graph and the old invalid
+  fast graph found identical collective counts (`1496` allreduce calls and
+  `1496` waits each). The valid graph introduces Aten RMS/MoE boundary kernels
+  where the invalid graph stayed in the faster `vllm_ir.rms_norm` shape, so the
+  next TP4 target is graph-shape repair rather than adding or removing
+  collectives.
+- `VLLM_MINIMAX_QK_NORM_COMPILE_USE_PARAM=1` is rejected as a speed route. It
+  passed the raw canary but reached only `64.4976` output tok/s and produced the
+  same valid AOT hash.
 - The faster TP4 piecewise/AOT path is now partially recovered as a valid
   2048-context result. After adding a Dynamo-safe clean-weight branch, raw
   canaries at 64 and 256 generated tokens passed, and three p512/n1536 repeats

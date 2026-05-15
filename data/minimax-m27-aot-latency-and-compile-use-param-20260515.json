@@ -1,0 +1,88 @@
+{
+  "date_utc": "2026-05-15",
+  "model": "/mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround",
+  "hardware": "4x Intel Arc Pro B70 32GB",
+  "engine": "vLLM 0.20.1-local XPU",
+  "accepted_baseline": {
+    "description": "Quality-valid MiniMax AutoRound W4A16 TP4 piecewise/AOT recipe with Q/K RMS clean-weight guard.",
+    "localmaxxing_id": "cmp6a5c1o00mpo3011hg8ncyp",
+    "summary_json": "/home/steve/bench-results/minimax-m2.7-quality-gated/piecewise-throughput/minimax-clean-weight-piecewise-tp4-ctx2048-mbt512-bs256-p512n1536-3run-20260515T020502Z-summary.json",
+    "quality_canaries": [
+      "/home/steve/bench-results/minimax-m2.7-quality-gated/compiled-piecewise-raw145-clean-weight-dynamo-safe-ctx2048-n64-20260515T015044Z.json",
+      "/home/steve/bench-results/minimax-m2.7-quality-gated/compiled-piecewise-raw145-clean-weight-dynamo-safe-ctx2048-n256-20260515T020231Z.json"
+    ],
+    "output_tok_s_repeats": [
+      64.622349,
+      66.658854,
+      65.976172
+    ],
+    "mean_output_tok_s": 65.752458,
+    "mean_total_tok_s": 87.669944,
+    "quality_status": "passed raw-prompt NUL/control/degeneracy canaries"
+  },
+  "server_latency_probe": {
+    "description": "OpenAI-compatible serving benchmark on the accepted AOT recipe, deterministic sampling, 3 requests, p512/n256.",
+    "json": "/home/steve/bench-results/minimax-m2.7-serve-metrics-aot/vllm-minimax-m27-autoround-serve-tp4-p512n256-np3-20260515T113800Z.json",
+    "server_log": "/home/steve/bench-results/minimax-m2.7-serve-metrics-aot/vllm-minimax-m27-autoround-serve-server-tp4-p512n256-np3-20260515T113800Z.log",
+    "bench_log": "/home/steve/bench-results/minimax-m2.7-serve-metrics-aot/vllm-minimax-m27-autoround-serve-bench-tp4-p512n256-np3-20260515T113800Z.log",
+    "completed": 3,
+    "input_tokens": 1536,
+    "output_tokens": 768,
+    "request_throughput_s": 0.2542406928,
+    "output_tok_s": 65.085617353,
+    "total_tok_s": 195.256852059,
+    "mean_ttft_ms": 4603.80702133,
+    "median_ttft_ms": 4604.704825993,
+    "mean_tpot_ms": 13.5664700993,
+    "median_tpot_ms": 13.5606585726,
+    "mean_itl_ms": 13.5664714588,
+    "median_itl_ms": 13.5664050031,
+    "interpretation": "Steady decode interval is about 13.57 ms/token, while p512/n256 service output remains near 65 tok/s because prompt/TTFT is about 4.6 s."
+  },
+  "aot_graph_comparison": {
+    "valid_clean_weight_aot": {
+      "cache": "/mnt/fast-ai/vllm-cache-exp/minimax-cleanweight-piecewise-quality-dynsafe-20260515T015044Z/torch_compile_cache/torch_aot_compile/13b321b34e7fd5459622f6904ca57e7598c7831539ca3104d19c1bcbbdee374d/inductor_cache",
+      "aot_hash": "13b321b34e7fd5459622f6904ca57e7598c7831539ca3104d19c1bcbbdee374d",
+      "all_reduce_call_lines": 1496,
+      "wait_tensor_call_lines": 1496,
+      "rms_int4_lines": 32,
+      "compiled_int4_rms_kernels": 24,
+      "allreduce_rms_moe_boundary_lines": 16,
+      "compiled_ar_rms_moe_kernels": 12
+    },
+    "old_invalid_fast_aot": {
+      "cache": "/mnt/fast-ai/vllm-cache-exp/minimax-xpugraph-attndelay-block256-mbt512-20260513T152439Z/torch_compile_cache/torch_aot_compile/d0fed86b5a7cf64dcdb3e82d0b24effed00520ebd7f6018c6244d82201e6a98c/inductor_cache",
+      "aot_hash": "d0fed86b5a7cf64dcdb3e82d0b24effed00520ebd7f6018c6244d82201e6a98c",
+      "all_reduce_call_lines": 1496,
+      "wait_tensor_call_lines": 1496,
+      "rms_int4_lines": 32,
+      "compiled_int4_rms_kernels": 24,
+      "allreduce_rms_moe_boundary_lines": 0,
+      "compiled_ar_rms_moe_kernels": 0
+    },
+    "interpretation": "The valid and old invalid AOT families have the same number of collective calls, so the remaining gap is unlikely to be an extra allreduce count. The valid graph introduces Aten-style RMS/MoE boundary kernels in places where the invalid graph stayed in the faster vLLM IR RMSNorm shape."
+  },
+  "negative_control_compile_use_param": {
+    "description": "Default-off experiment returning the live parameter during compile/capture while keeping the clean-weight guard available outside the compiled region.",
+    "env": "VLLM_MINIMAX_QK_NORM_COMPILE_USE_PARAM=1",
+    "quality_json": "/home/steve/bench-results/minimax-m2.7-quality-gated/compile-use-param/compiled-piecewise-raw145-compile-use-param-ctx2048-n64-20260515T114454Z.json",
+    "throughput_json": "/home/steve/bench-results/minimax-m2.7-quality-gated/compile-use-param-throughput/vllm-minimax-m27-autoround-tp4-p512n1536-20260515T115030Z.json",
+    "quality_passed": true,
+    "generated_tokens": 64,
+    "distinct_generated_token_ids": 28,
+    "nul_token_count": 0,
+    "nonspace_control_count": 0,
+    "elapsed_s": 23.814853021,
+    "input_tokens": 512,
+    "output_tokens": 1536,
+    "output_tok_s": 64.4975637114,
+    "total_tok_s": 85.9967516152,
+    "aot_hash": "13b321b34e7fd5459622f6904ca57e7598c7831539ca3104d19c1bcbbdee374d",
+    "result": "rejected as a speed route; quality passed but speed and AOT hash did not improve versus the accepted clean-weight recipe"
+  },
+  "next_targets": [
+    "Restore the faster vLLM IR RMSNorm graph shape while preserving the clean Q/K weight guard.",
+    "Use server TTFT/prefill measurements as a separate optimization track, because current p512/n256 service output is TTFT dominated.",
+    "Keep quality canaries before every speed run and do not promote old 73 tok/s diagnostics until the raw-prompt corruption gates pass."
+  ]
+}
