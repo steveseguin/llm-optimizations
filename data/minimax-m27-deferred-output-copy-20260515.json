@@ -55,6 +55,17 @@
     "tok_s_out_equiv": 62.02208833652028,
     "decision": "reject"
   },
+  "synchronous_output_copy": {
+    "env": {
+      "VLLM_XPU_SYNC_ASYNC_OUTPUT_COPY": "1"
+    },
+    "json": "/home/steve/bench-results/minimax-m2.7-decode-candidates/sync-output-copy/vllm-minimax-m27-autoround-tp4-p512n1536-20260515T181635Z.json",
+    "log": "/home/steve/bench-results/minimax-m2.7-decode-candidates/sync-output-copy/vllm-minimax-m27-autoround-tp4-p512n1536-20260515T181635Z.log",
+    "elapsed_s": 24.591379381992738,
+    "tok_s_total": 83.28121689260207,
+    "tok_s_out_equiv": 62.46091266945156,
+    "decision": "reject"
+  },
   "source_patch": "patches/vllm-xpu-deferred-output-copy-inference-mode-20260515.patch",
-  "interpretation": "The local deferred-copy path needed an inference-mode wrapper to avoid a background-thread RuntimeError, but both completed variants are slower than the same-session baseline. Keep VLLM_XPU_DEFER_ASYNC_OUTPUT_COPY unset for MiniMax TP4 decode benchmarks."
+  "interpretation": "The local deferred-copy path needed an inference-mode wrapper to avoid a background-thread RuntimeError, but all alternate output-copy variants were slower than the same-session baseline. Keep VLLM_XPU_DEFER_ASYNC_OUTPUT_COPY and VLLM_XPU_SYNC_ASYNC_OUTPUT_COPY unset for MiniMax TP4 decode benchmarks."
 }
