@@ -37,6 +37,22 @@
     },
     "observed_text": " Answer in English. Answer in English. Answer in English. Answer in English. Answer in English. Answer in English. Answer in English. Answer in English. Answer in English. Answer in English. Answer in English. Answer in English. Answer in English. Answer in English. Answer in English. Answer in English."
   },
+  "cold_cache_control_without_candidate": {
+    "json": "/home/steve/bench-results/minimax-m2.7-decode-candidates/cold-cache-control/compiled-piecewise-raw145-cold-cache-control-ctx2048-n64-20260515T233904Z.json",
+    "log": "/home/steve/bench-results/minimax-m2.7-decode-candidates/cold-cache-control/compiled-piecewise-raw145-cold-cache-control-ctx2048-n64-20260515T233904Z.log",
+    "cache_root": "/mnt/fast-ai/vllm-cache-exp/minimax-cold-cache-control-20260515T233904Z",
+    "passed": true,
+    "expected_token_sha256_match": true,
+    "combined_token_sha256": "267cbf30208d84929ee79284ac695467f7e80597bf8694130e1e1f8b180eb5bd",
+    "quality_checks": {
+      "n_tokens": 64,
+      "distinct_generated_token_count": 28,
+      "printable_nonspace_text_chars": 240,
+      "control_nonspace_text_chars": 0,
+      "nul_token_count": 0
+    },
+    "interpretation": "A fresh cache with the candidate flag absent passed the same raw canary, so the failed summean run is attributable to the candidate rather than generic cold compile instability."
+  },
   "runtime": {
     "tensor_parallel_size": 4,
     "dtype": "float16",
@@ -65,5 +81,5 @@
       "VLLM_MINIMAX_QK_NORM_RESTORE_WEIGHT_MIN_TOKENS": "2"
     }
   },
-  "decision": "Do not benchmark or submit to LocalMaxxing. This algebraic rewrite changed greedy output and collapsed the raw canary into a repeated phrase, so it is not quality-preserving."
+  "decision": "Do not benchmark or submit to LocalMaxxing. This algebraic rewrite changed greedy output and collapsed the raw canary into a repeated phrase, while a no-candidate fresh-cache control passed; it is not quality-preserving."
 }
