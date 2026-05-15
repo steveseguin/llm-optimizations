@@ -35,12 +35,21 @@ RUN_TIMEOUT="${RUN_TIMEOUT:-25m}"
 SHM_STALL_MAX_WARNINGS="${SHM_STALL_MAX_WARNINGS:-0}"
 VENV="${VENV:-/home/steve/.venvs/vllm-xpu}"
 LABEL="${LABEL:-full-decode-graph-triton}"
+QK_NORM_RESTORE_WEIGHT="${QK_NORM_RESTORE_WEIGHT:-0}"
+QK_NORM_RESTORE_WEIGHT_MIN_TOKENS="${QK_NORM_RESTORE_WEIGHT_MIN_TOKENS:-2}"
 
 export USE_LLM_SCALER_MOE="${USE_LLM_SCALER_MOE:-1}"
 export XPU_GRAPH="${XPU_GRAPH:-1}"
 export VLLM_XPU_FORCE_GRAPH_WITH_COMM="${VLLM_XPU_FORCE_GRAPH_WITH_COMM:-1}"
 export VLLM_XPU_GRAPH_NOOP_COMM_CAPTURE="${VLLM_XPU_GRAPH_NOOP_COMM_CAPTURE:-1}"
 export VLLM_MINIMAX_M2_ATTN_DELAY_ALLREDUCE="${VLLM_MINIMAX_M2_ATTN_DELAY_ALLREDUCE:-1}"
+if [ "$QK_NORM_RESTORE_WEIGHT" = "1" ]; then
+  export VLLM_MINIMAX_QK_NORM_RESTORE_WEIGHT=1
+  export VLLM_MINIMAX_QK_NORM_RESTORE_WEIGHT_MIN_TOKENS="$QK_NORM_RESTORE_WEIGHT_MIN_TOKENS"
+else
+  unset VLLM_MINIMAX_QK_NORM_RESTORE_WEIGHT
+  unset VLLM_MINIMAX_QK_NORM_RESTORE_WEIGHT_MIN_TOKENS
+fi
 
 mkdir -p "$OUTDIR"
 ts="$(date -u +%Y%m%dT%H%M%SZ)"
@@ -81,6 +90,12 @@ if [ -n "$GPU_MEMORY_UTILIZATION" ]; then
 fi
 if [ "$QUALITY_RAW_PROMPT" = "1" ]; then
   quality_cmd+=(--raw-prompt)
+fi
+if [ "$QK_NORM_RESTORE_WEIGHT" = "1" ]; then
+  quality_cmd+=(
+    --qk-norm-restore-weight
+    --qk-norm-restore-weight-min-tokens "$QK_NORM_RESTORE_WEIGHT_MIN_TOKENS"
+  )
 fi
 if [ -n "$QUALITY_EXPECTED_TOKEN_SHA256" ]; then
   quality_cmd+=(--expected-token-sha256 "$QUALITY_EXPECTED_TOKEN_SHA256")
@@ -134,6 +149,8 @@ jq -n \
   --argjson max_num_batched_tokens "$MAX_BATCHED_TOKENS" \
   --argjson block_size "$BLOCK_SIZE" \
   --arg gpu_memory_utilization "$GPU_MEMORY_UTILIZATION" \
+  --argjson qk_norm_restore_weight "$QK_NORM_RESTORE_WEIGHT" \
+  --argjson qk_norm_restore_weight_min_tokens "$QK_NORM_RESTORE_WEIGHT_MIN_TOKENS" \
   --argjson bench_jsons "$(printf '%s\n' "${bench_jsons[@]}" | jq -R . | jq -s .)" \
   --argjson bench_logs "$(printf '%s\n' "${bench_logs[@]}" | jq -R . | jq -s .)" \
   '{
@@ -146,6 +163,8 @@ jq -n \
     max_num_batched_tokens: $max_num_batched_tokens,
     block_size: $block_size,
     gpu_memory_utilization: (if $gpu_memory_utilization == "" then null else ($gpu_memory_utilization | tonumber) end),
+    qk_norm_restore_weight: ($qk_norm_restore_weight == 1),
+    qk_norm_restore_weight_min_tokens: $qk_norm_restore_weight_min_tokens,
     bench_jsons: $bench_jsons,
     bench_logs: $bench_logs
   }' > "$summary_json"

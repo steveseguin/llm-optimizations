@@ -65,3 +65,24 @@ once the prompt crosses a small number of blocks for this prompt family.
 - Test 4096 graph with async scheduling disabled on the `114` and `147` points.
 - Do not submit these results to LocalMaxxing; they are correctness/stability
   diagnostics, not benchmark achievements.
+
+## Follow-Up: Q/K RMS Weight Corruption
+
+Later finite tracing found a concrete corruption point: layer 58
+`q_norm.weight` was finite during profile/warmup, then became partially NaN and
+wildly out of range during real prompt execution. The checkpoint weights were
+clean. This explains the all-NUL output as downstream NaN propagation rather
+than a sampling-only bug.
+
+The default-off clean-weight guard in
+`patches/vllm-minimax-qk-rms-clean-weight-guard-20260515.patch` fixes the raw
+prompt boundary for `max_model_len=2048` while keeping full-decode graph mode:
+
+- `121` raw-token graph canary passed:
+  `/home/steve/bench-results/minimax-m2.7-quality-gated/ctx4096-prompt-sweep/graph-raw-neutral121-clean-weight-min2-ctx2048-n32-20260515T010220Z.json`
+- Raw prompt gate with tokenizer-count `145` passed before a two-repeat
+  throughput run:
+  `/home/steve/bench-results/minimax-m2.7-quality-gated/minimax-clean-weight-full-decode-graph-triton-raw147-repeat-tp4-ctx2048-mbt512-bs256-p512n1536-20260515T011222Z-quality.json`
+
+The original `max_model_len=4096` path still needs retest with the guard before
+it can be promoted.

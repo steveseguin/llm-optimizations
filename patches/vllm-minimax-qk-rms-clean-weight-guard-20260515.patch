@@ -1,0 +1,257 @@
+diff --git a/vllm/model_executor/layers/mamba/linear_attn.py b/vllm/model_executor/layers/mamba/linear_attn.py
+index b277c9ed6..1232f6196 100644
+--- a/vllm/model_executor/layers/mamba/linear_attn.py
++++ b/vllm/model_executor/layers/mamba/linear_attn.py
+@@ -2,6 +2,7 @@
+ # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
+ 
+ import math
++import os
+ from collections.abc import Callable
+ from functools import partial
+ 
+@@ -29,10 +30,31 @@ from vllm.model_executor.layers.mamba.mamba_utils import (
+     MambaStateShapeCalculator,
+ )
+ from vllm.model_executor.layers.quantization import QuantizationConfig
++from vllm.utils.xpu_decode_timing import allreduce_label
++from vllm.utils.xpu_finite_trace import trace_tensor_graph
+ from vllm.utils.torch_utils import direct_register_custom_op
+ from vllm.v1.attention.backend import AttentionMetadata
+ from vllm.v1.attention.backends.linear_attn import LinearAttentionMetadata
+ 
++_MINIMAX_QK_VAR_SPLIT_ALLREDUCE = (
++    os.environ.get("VLLM_MINIMAX_QK_VAR_SPLIT_ALLREDUCE", "0") == "1"
++)
++_MINIMAX_QK_NORM_DECOMPOSED = (
++    os.environ.get("VLLM_MINIMAX_QK_NORM_DECOMPOSED", "0") == "1"
++)
++_MINIMAX_QK_NORM_TOKEN_CHUNK = int(
++    os.environ.get("VLLM_MINIMAX_QK_NORM_TOKEN_CHUNK", "0") or "0"
++)
++_MINIMAX_QK_NORM_CPU_PREFILL_THRESHOLD = int(
++    os.environ.get("VLLM_MINIMAX_QK_NORM_CPU_PREFILL_THRESHOLD", "0") or "0"
++)
++_MINIMAX_QK_NORM_RESTORE_WEIGHT = (
++    os.environ.get("VLLM_MINIMAX_QK_NORM_RESTORE_WEIGHT", "0") == "1"
++)
++_MINIMAX_QK_NORM_RESTORE_WEIGHT_MIN_TOKENS = int(
++    os.environ.get("VLLM_MINIMAX_QK_NORM_RESTORE_WEIGHT_MIN_TOKENS", "2") or "2"
++)
++
+ 
+ @CustomOp.register("minimax_text01_rmsnorm_tp")
+ class MiniMaxText01RMSNormTP(CustomOp):
+@@ -76,6 +98,68 @@ class MiniMaxText01RMSNormTP(CustomOp):
+         shard = slice(shard_rank * shard_size, (shard_rank + 1) * shard_size)
+         param.data.copy_(loaded_weight[shard])
+ 
++    @staticmethod
++    def _weight_is_sane(weight_cpu: torch.Tensor) -> bool:
++        return bool(
++            torch.isfinite(weight_cpu).all()
++            and weight_cpu.abs().max().item() < 1024.0
++        )
++
++    @staticmethod
++    def _guard_weight(
++        norm: "MiniMaxText01RMSNormTP",
++        trace_name: str,
++        token_count: int,
++    ) -> torch.Tensor:
++        restore_weight = (
++            os.environ.get(
++                "VLLM_MINIMAX_QK_NORM_RESTORE_WEIGHT",
++                "1" if _MINIMAX_QK_NORM_RESTORE_WEIGHT else "0",
++            )
++            == "1"
++        )
++        if not restore_weight:
++            return norm.weight
++        clean_weight_xpu = getattr(norm, "_minimax_clean_weight_xpu", None)
++        if norm.weight.is_xpu and torch.xpu.is_current_stream_capturing():
++            return clean_weight_xpu if clean_weight_xpu is not None else norm.weight
++        min_tokens = int(
++            os.environ.get(
++                "VLLM_MINIMAX_QK_NORM_RESTORE_WEIGHT_MIN_TOKENS",
++                str(_MINIMAX_QK_NORM_RESTORE_WEIGHT_MIN_TOKENS),
++            )
++            or "2"
++        )
++        if token_count < min_tokens:
++            return clean_weight_xpu if clean_weight_xpu is not None else norm.weight
++
++        weight_cpu = norm.weight.detach().cpu()
++        if MiniMaxText01RMSNormTP._weight_is_sane(weight_cpu):
++            if getattr(norm, "_minimax_clean_weight_cpu", None) is None:
++                norm._minimax_clean_weight_cpu = weight_cpu.clone()
++                if norm.weight.is_xpu:
++                    norm._minimax_clean_weight_xpu = norm.weight.detach().clone()
++                    clean_weight_xpu = norm._minimax_clean_weight_xpu
++            return clean_weight_xpu if clean_weight_xpu is not None else norm.weight
++
++        clean_weight_cpu = getattr(norm, "_minimax_clean_weight_cpu", None)
++        if clean_weight_cpu is None:
++            trace_tensor_graph(f"{trace_name}.weight_corrupt_no_clean_cpu", weight_cpu)
++            return norm.weight
++
++        trace_tensor_graph(f"{trace_name}.weight_corrupt_cpu", weight_cpu)
++        with torch.no_grad():
++            norm.weight.copy_(
++                clean_weight_cpu.to(device=norm.weight.device, dtype=norm.weight.dtype)
++            )
++        if norm.weight.is_xpu and clean_weight_xpu is None:
++            norm._minimax_clean_weight_xpu = clean_weight_cpu.to(
++                device=norm.weight.device, dtype=norm.weight.dtype
++            )
++            clean_weight_xpu = norm._minimax_clean_weight_xpu
++        trace_tensor_graph(f"{trace_name}.weight_restored_cpu", clean_weight_cpu)
++        return clean_weight_xpu if clean_weight_xpu is not None else norm.weight
++
+     def _forward(
+         self,
+         x: torch.Tensor,
+@@ -84,7 +168,8 @@ class MiniMaxText01RMSNormTP(CustomOp):
+         x = x.to(torch.float32)
+         variance = x.pow(2).mean(dim=-1, keepdim=True, dtype=torch.float32)
+         if self.tp_world > 1:
+-            variance = tensor_model_parallel_all_reduce(variance) / self.tp_world
++            with allreduce_label("minimax_text01_rmsnorm_tp"):
++                variance = tensor_model_parallel_all_reduce(variance) / self.tp_world
+         x = x * torch.rsqrt(variance + self.variance_epsilon)
+         x = (x * self.weight).to(orig_dtype)
+         return x
+@@ -103,18 +188,129 @@ class MiniMaxText01RMSNormTP(CustomOp):
+         k_norm: "MiniMaxText01RMSNormTP",
+         q: torch.Tensor,
+         k: torch.Tensor,
++    ) -> tuple[torch.Tensor, torch.Tensor]:
++        return MiniMaxText01RMSNormTP._forward_qk_no_chunk(q_norm, k_norm, q, k)
++
++    @staticmethod
++    def _forward_qk_no_chunk(
++        q_norm: "MiniMaxText01RMSNormTP",
++        k_norm: "MiniMaxText01RMSNormTP",
++        q: torch.Tensor,
++        k: torch.Tensor,
+     ) -> tuple[torch.Tensor, torch.Tensor]:
+         orig_dtype = q.dtype
+         q = q.to(torch.float32)
+         k = k.to(torch.float32)
++        trace_prefix = getattr(q_norm, "trace_name", "minimax.qk_norm")
+         q_var = q.pow(2).mean(dim=-1, keepdim=True)
+         k_var = k.pow(2).mean(dim=-1, keepdim=True)
+-        if q_norm.tp_world > 1:
++        trace_tensor_graph(f"{trace_prefix}.q_var_pre_allreduce", q_var)
++        trace_tensor_graph(f"{trace_prefix}.k_var_pre_allreduce", k_var)
++        if q_norm.tp_world > 1 and _MINIMAX_QK_VAR_SPLIT_ALLREDUCE:
++            with allreduce_label("minimax_q_var"):
++                q_var = tensor_model_parallel_all_reduce(q_var) / q_norm.tp_world
++            with allreduce_label("minimax_k_var"):
++                k_var = tensor_model_parallel_all_reduce(k_var) / q_norm.tp_world
++            trace_tensor_graph(f"{trace_prefix}.q_var_post_split_allreduce", q_var)
++            trace_tensor_graph(f"{trace_prefix}.k_var_post_split_allreduce", k_var)
++        elif q_norm.tp_world > 1:
+             qk_var = torch.cat([q_var, k_var], dim=-1)
+-            qk_var = tensor_model_parallel_all_reduce(qk_var) / q_norm.tp_world
++            trace_tensor_graph(f"{trace_prefix}.qk_var_pre_allreduce", qk_var)
++            with allreduce_label("minimax_qk_var"):
++                qk_var = tensor_model_parallel_all_reduce(qk_var) / q_norm.tp_world
++            trace_tensor_graph(f"{trace_prefix}.qk_var_post_allreduce", qk_var)
+             q_var, k_var = qk_var.chunk(2, dim=-1)
+-        q = q * torch.rsqrt(q_var + q_norm.variance_epsilon) * q_norm.weight
+-        k = k * torch.rsqrt(k_var + k_norm.variance_epsilon) * k_norm.weight
++        trace_tensor_graph(f"{trace_prefix}.q_var_final", q_var)
++        trace_tensor_graph(f"{trace_prefix}.k_var_final", k_var)
++        cpu_prefill_threshold = int(
++            os.environ.get(
++                "VLLM_MINIMAX_QK_NORM_CPU_PREFILL_THRESHOLD",
++                str(_MINIMAX_QK_NORM_CPU_PREFILL_THRESHOLD),
++            )
++            or "0"
++        )
++        token_chunk = int(
++            os.environ.get(
++                "VLLM_MINIMAX_QK_NORM_TOKEN_CHUNK",
++                str(_MINIMAX_QK_NORM_TOKEN_CHUNK),
++            )
++            or "0"
++        )
++        q_weight = MiniMaxText01RMSNormTP._guard_weight(
++            q_norm, f"{trace_prefix}.q_norm", q.shape[0]
++        )
++        k_weight = MiniMaxText01RMSNormTP._guard_weight(
++            k_norm, f"{trace_prefix}.k_norm", k.shape[0]
++        )
++        if (
++            cpu_prefill_threshold > 0
++            and q.is_xpu
++            and q.shape[0] > cpu_prefill_threshold
++        ):
++            device = q.device
++            q_cpu = q.cpu()
++            k_cpu = k.cpu()
++            q_var_cpu = q_var.cpu()
++            k_var_cpu = k_var.cpu()
++            q_weight_cpu = q_weight.detach().cpu().view(1, -1)
++            k_weight_cpu = k_weight.detach().cpu().view(1, -1)
++            trace_tensor_graph(f"{trace_prefix}.q_weight_cpu", q_weight_cpu)
++            trace_tensor_graph(f"{trace_prefix}.k_weight_cpu", k_weight_cpu)
++            q = q_cpu * torch.rsqrt(q_var_cpu + q_norm.variance_epsilon)
++            k = k_cpu * torch.rsqrt(k_var_cpu + k_norm.variance_epsilon)
++            q = (q * q_weight_cpu).to(device=device, dtype=orig_dtype)
++            k = (k * k_weight_cpu).to(device=device, dtype=orig_dtype)
++            trace_tensor_graph(f"{trace_prefix}.q_after_cpu_prefill_norm", q)
++            trace_tensor_graph(f"{trace_prefix}.k_after_cpu_prefill_norm", k)
++            return q, k
++        elif (
++            token_chunk > 0
++            and q.is_xpu
++            and q.shape[0] > token_chunk
++        ):
++            q_out = []
++            k_out = []
++            q_weight = q_weight.view(1, -1)
++            k_weight = k_weight.view(1, -1)
++            for q_chunk, q_var_chunk in zip(
++                q.split(token_chunk, dim=0),
++                q_var.split(token_chunk, dim=0),
++                strict=True,
++            ):
++                q_chunk = q_chunk.contiguous()
++                q_var_chunk = q_var_chunk.contiguous()
++                q_part = q_chunk * torch.rsqrt(
++                    q_var_chunk + q_norm.variance_epsilon
++                )
++                q_part = q_part * q_weight
++                q_out.append(q_part.to(orig_dtype))
++            for k_chunk, k_var_chunk in zip(
++                k.split(token_chunk, dim=0),
++                k_var.split(token_chunk, dim=0),
++                strict=True,
++            ):
++                k_chunk = k_chunk.contiguous()
++                k_var_chunk = k_var_chunk.contiguous()
++                k_part = k_chunk * torch.rsqrt(
++                    k_var_chunk + k_norm.variance_epsilon
++                )
++                k_part = k_part * k_weight
++                k_out.append(k_part.to(orig_dtype))
++            q = torch.cat(q_out, dim=0)
++            k = torch.cat(k_out, dim=0)
++            trace_tensor_graph(f"{trace_prefix}.q_after_token_chunk_norm", q)
++            trace_tensor_graph(f"{trace_prefix}.k_after_token_chunk_norm", k)
++            return q, k
++        elif _MINIMAX_QK_NORM_DECOMPOSED:
++            q_scale = torch.rsqrt(q_var + q_norm.variance_epsilon).contiguous()
++            k_scale = torch.rsqrt(k_var + k_norm.variance_epsilon).contiguous()
++            q = (q * q_scale).contiguous()
++            k = (k * k_scale).contiguous()
++            q = (q * q_weight.view(1, -1)).contiguous()
++            k = (k * k_weight.view(1, -1)).contiguous()
++        else:
++            q = q * torch.rsqrt(q_var + q_norm.variance_epsilon) * q_weight
++            k = k * torch.rsqrt(k_var + k_norm.variance_epsilon) * k_weight
+         q = q.to(orig_dtype)
+         k = k.to(orig_dtype)
+         return q, k

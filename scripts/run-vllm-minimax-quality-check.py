@@ -240,6 +240,11 @@ def parse_args() -> argparse.Namespace:
     )
     parser.set_defaults(enable_prefix_caching=False)
     parser.add_argument(
+        "--disable-chunked-prefill",
+        action="store_true",
+        help="Disable vLLM chunked prefill for scheduler-path isolation.",
+    )
+    parser.add_argument(
         "--attention-delay-allreduce",
         action="store_true",
         default=True,
@@ -319,6 +324,41 @@ def parse_args() -> argparse.Namespace:
         help=(
             "Use a decomposed MiniMax Q/K RMSNorm expression with explicit "
             "contiguous boundaries to avoid unsafe compile fusion."
+        ),
+    )
+    parser.add_argument(
+        "--qk-norm-token-chunk",
+        type=int,
+        default=0,
+        help=(
+            "Split MiniMax Q/K RMSNorm prefill over token chunks of this size. "
+            "Zero leaves the model path unchanged."
+        ),
+    )
+    parser.add_argument(
+        "--qk-norm-cpu-prefill-threshold",
+        type=int,
+        default=0,
+        help=(
+            "Run MiniMax Q/K RMSNorm math on CPU when the token count exceeds "
+            "this threshold. Slow diagnostic fallback; zero disables it."
+        ),
+    )
+    parser.add_argument(
+        "--qk-norm-restore-weight",
+        action="store_true",
+        help=(
+            "Cache finite MiniMax Q/K RMSNorm weights and restore them if a later "
+            "forward sees non-finite or wildly out-of-range weight values."
+        ),
+    )
+    parser.add_argument(
+        "--qk-norm-restore-weight-min-tokens",
+        type=int,
+        default=2,
+        help=(
+            "Minimum Q/K token count for --qk-norm-restore-weight checks. "
+            "Default 2 avoids per-token decode synchronization."
         ),
     )
     parser.add_argument(
@@ -456,6 +496,43 @@ def prompt_output_record(prompt_index: int, output) -> dict:
     }
 
 
+def prompt_token_diagnostics(llm, prompts: list[str], args: argparse.Namespace) -> dict:
+    diagnostics = {
+        "raw_prompt_token_counts": [],
+        "rendered_prompt_token_counts": None,
+        "rendered_prompt_char_counts": None,
+        "error": None,
+    }
+    try:
+        tokenizer = llm.get_tokenizer()
+        diagnostics["raw_prompt_token_counts"] = [
+            len(tokenizer(prompt, add_special_tokens=False).input_ids)
+            for prompt in prompts
+        ]
+        if not args.raw_prompt:
+            template_path = Path(args.chat_template or Path(args.model) / "chat_template.jinja")
+            chat_template = template_path.read_text()
+            rendered_prompts = [
+                tokenizer.apply_chat_template(
+                    [{"role": "user", "content": prompt}],
+                    tokenize=False,
+                    chat_template=chat_template,
+                    add_generation_prompt=True,
+                )
+                for prompt in prompts
+            ]
+            diagnostics["rendered_prompt_token_counts"] = [
+                len(tokenizer(prompt, add_special_tokens=False).input_ids)
+                for prompt in rendered_prompts
+            ]
+            diagnostics["rendered_prompt_char_counts"] = [
+                len(prompt) for prompt in rendered_prompts
+            ]
+    except Exception as exc:  # pragma: no cover - diagnostic best effort.
+        diagnostics["error"] = f"{type(exc).__name__}: {exc}"
+    return diagnostics
+
+
 def configure_env(args: argparse.Namespace) -> None:
     os.environ.setdefault("ONEAPI_DEVICE_SELECTOR", "level_zero:0,1,2,3")
     os.environ.setdefault("ZE_AFFINITY_MASK", "0,1,2,3")
@@ -510,6 +587,26 @@ def configure_env(args: argparse.Namespace) -> None:
         os.environ["VLLM_MINIMAX_QK_NORM_DECOMPOSED"] = "1"
     else:
         os.environ.pop("VLLM_MINIMAX_QK_NORM_DECOMPOSED", None)
+    if args.qk_norm_token_chunk > 0:
+        os.environ["VLLM_MINIMAX_QK_NORM_TOKEN_CHUNK"] = str(
+            args.qk_norm_token_chunk
+        )
+    else:
+        os.environ.pop("VLLM_MINIMAX_QK_NORM_TOKEN_CHUNK", None)
+    if args.qk_norm_cpu_prefill_threshold > 0:
+        os.environ["VLLM_MINIMAX_QK_NORM_CPU_PREFILL_THRESHOLD"] = str(
+            args.qk_norm_cpu_prefill_threshold
+        )
+    else:
+        os.environ.pop("VLLM_MINIMAX_QK_NORM_CPU_PREFILL_THRESHOLD", None)
+    if args.qk_norm_restore_weight:
+        os.environ["VLLM_MINIMAX_QK_NORM_RESTORE_WEIGHT"] = "1"
+        os.environ["VLLM_MINIMAX_QK_NORM_RESTORE_WEIGHT_MIN_TOKENS"] = str(
+            args.qk_norm_restore_weight_min_tokens
+        )
+    else:
+        os.environ.pop("VLLM_MINIMAX_QK_NORM_RESTORE_WEIGHT", None)
+        os.environ.pop("VLLM_MINIMAX_QK_NORM_RESTORE_WEIGHT_MIN_TOKENS", None)
     if args.qk_rms_xpu_helper:
         os.environ["VLLM_MINIMAX_QK_RMS_XPU_HELPER"] = "1"
         os.environ["VLLM_MINIMAX_QK_RMS_XPU_HELPER_MAX_TOKENS"] = str(
@@ -608,7 +705,7 @@ def main() -> None:
         block_size=args.block_size,
         enforce_eager=args.enforce_eager,
         disable_custom_all_reduce=args.disable_custom_all_reduce,
-        enable_chunked_prefill=True,
+        enable_chunked_prefill=not args.disable_chunked_prefill,
         enable_prefix_caching=args.enable_prefix_caching,
         compilation_config=compilation_config,
         attention_backend=args.attention_backend,
@@ -631,6 +728,7 @@ def main() -> None:
         prompts.extend(Path(path).read_text().rstrip("\n") for path in args.prompt_file)
     if not prompts:
         prompts = list(DEFAULT_PROMPTS)
+    prompt_diagnostics = prompt_token_diagnostics(llm, prompts, args)
     run_records = []
     if args.raw_prompt:
         rendered_prompt = None
@@ -776,6 +874,7 @@ def main() -> None:
             "enforce_eager": args.enforce_eager,
             "disable_inductor_graph_partition": args.disable_inductor_graph_partition,
             "enable_prefix_caching": args.enable_prefix_caching,
+            "enable_chunked_prefill": not args.disable_chunked_prefill,
             "attention_delay_allreduce": args.attention_delay_allreduce,
             "preserve_cudagraph_warmups": args.preserve_cudagraph_warmups,
             "disable_auto_compile_ranges": args.disable_auto_compile_ranges,
@@ -786,6 +885,12 @@ def main() -> None:
             "split_qk_var_allreduce": args.split_qk_var_allreduce,
             "eager_qk_norm": args.eager_qk_norm,
             "decomposed_qk_norm": args.decomposed_qk_norm,
+            "qk_norm_token_chunk": args.qk_norm_token_chunk,
+            "qk_norm_cpu_prefill_threshold": args.qk_norm_cpu_prefill_threshold,
+            "qk_norm_restore_weight": args.qk_norm_restore_weight,
+            "qk_norm_restore_weight_min_tokens": (
+                args.qk_norm_restore_weight_min_tokens
+            ),
             "qk_rms_xpu_helper": args.qk_rms_xpu_helper,
             "qk_rms_xpu_helper_max_tokens": args.qk_rms_xpu_helper_max_tokens,
             "inductor_disable_combo_kernels": args.inductor_disable_combo_kernels,
@@ -808,6 +913,7 @@ def main() -> None:
             "cudagraph_num_warmups": args.cudagraph_num_warmups,
             "compile_ranges_endpoints": args.compile_ranges_endpoints,
         },
+        "prompt_diagnostics": prompt_diagnostics,
         "compilation_config": compilation_config,
     }
     out = Path(args.out)

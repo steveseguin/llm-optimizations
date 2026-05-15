@@ -11,8 +11,11 @@ Current best stable baseline:
 - GPUs: 4x Intel Arc Pro B70 32GB
 - Recipe: TP4, llm-scaler INT4 MoE decode, TRITON_ATTN, full-decode-only XPU
   graph, MiniMax attention delayed allreduce, `block-size=256`
-- Quality-gated fresh repeat: `61.0808` output tok/s, `81.4411` total tok/s
-- LocalMaxxing: `cmp5e0t6w007ho301nw1qq45h`
+- Fastest submitted repeat: `61.7528` output tok/s, `82.3371` total tok/s
+  (`cmp52gqmb000vo3015qj4kl9t`)
+- Stronger raw-corruption-canary repeat with Q/K RMS clean-weight guard:
+  `61.3490` output tok/s, `81.7987` total tok/s
+  (`cmp68grii00kdo301g5kqwapp`)
 - No power-limit increase.
 
 ## Promotion Rules
@@ -198,6 +201,12 @@ Rules:
 - A non-sync timing probe on the valid path only sees uncaptured regions, but
   the visible costs still point at MoE experts, Q/K RMS scheduling, and
   prefill-shaped TP allreduce as the next code-level optimization targets.
+- New root cause found for the graph corruption family: MiniMax layer 58
+  `q_norm.weight` can become partially NaN/out-of-range between warmup/profile
+  and real prompt execution. A default-off clean CPU/XPU weight guard restored
+  full-decode graph correctness on raw `121` and tokenizer-count `145` prompt
+  canaries while preserving `>60` output tok/s. See
+  `notes/2026-05-14-minimax-qk-clean-weight-guard.md`.
 
 See `notes/2026-05-14-minimax-compiled-path-repair.md` for the active repair
 matrix and exact JSON/log paths.
