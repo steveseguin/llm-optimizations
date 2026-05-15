@@ -101,6 +101,17 @@
       "decision": "rejected"
     },
     {
+      "name": "long_context_skip_compiled_prefill_without_xpu_graph",
+      "purpose": "Check whether original Python prefill plus no XPU graph capture can avoid the long-context compiled hidden-state corruption.",
+      "mode": "graph",
+      "cudagraph_mode": "none",
+      "max_model_len": 8192,
+      "max_num_batched_tokens": 1024,
+      "quality_log": "/home/steve/bench-results/minimax-m2.7-quality-gated/prefill-longctx-8192-skipcompiled-nograph-20260515T142849Z.log",
+      "outcome": "compiled_1024_range_then_hung_with_repeated_shared_memory_broadcast_waits",
+      "decision": "rejected"
+    },
+    {
       "name": "long_context_safe_hidden_select",
       "purpose": "Replace advanced hidden-state indexing before logits with torch.index_select on XPU.",
       "mode": "graph",
@@ -131,5 +142,75 @@
       "decision": "inconclusive_harness_instability"
     }
   ],
-  "conclusion": "The only confirmed quality-correct long-context control in this batch is full eager execution. The compiled/piecewise graph path for longer prefill shapes either emits token id 0/NUL or hangs after cached/compiled range setup. Do not publish the rejected long-context timings. Keep the current 2k-context p512/n1536 baseline as the promoted MiniMax result."
+  "finite_trace": {
+    "graph_token0": {
+      "quality_json": "/home/steve/bench-results/minimax-m2.7-finite-trace/longctx-graph-token0-20260515T142246Z.json",
+      "quality_log": "/home/steve/bench-results/minimax-m2.7-finite-trace/longctx-graph-token0-20260515T142246Z.log",
+      "trace_jsonl": "/home/steve/bench-results/minimax-m2.7-finite-trace/longctx-graph-token0-20260515T142246Z.trace.jsonl",
+      "generated_token_id": 0,
+      "trace_summary": {
+        "first_prefill_chunk_hidden_states_before_logits_index": {
+          "shape": [1024, 3072],
+          "finite": 0,
+          "nan": 3145728
+        },
+        "first_prefill_chunk_sample_hidden_states": {
+          "shape": [1, 3072],
+          "finite": 0,
+          "nan": 3072
+        },
+        "first_prefill_chunk_logits_after_compute": {
+          "shape": [1, 200064],
+          "finite": 0,
+          "nan": 200064
+        },
+        "second_prefill_chunk_hidden_states_before_logits_index": {
+          "shape": [382, 3072],
+          "finite": 0,
+          "nan": 1173504
+        }
+      }
+    },
+    "eager_reference": {
+      "quality_json": "/home/steve/bench-results/minimax-m2.7-finite-trace/longctx-eager-reference-20260515T142535Z.json",
+      "quality_log": "/home/steve/bench-results/minimax-m2.7-finite-trace/longctx-eager-reference-20260515T142535Z.log",
+      "trace_jsonl": "/home/steve/bench-results/minimax-m2.7-finite-trace/longctx-eager-reference-20260515T142535Z.trace.jsonl",
+      "generated_token_id": 758,
+      "trace_summary": {
+        "first_prefill_chunk_hidden_states_before_logits_index": {
+          "shape": [1024, 3072],
+          "finite": 3145728,
+          "nan": 0,
+          "min": -61.40625,
+          "max": 64.5625,
+          "mean": -0.02592017501592636
+        },
+        "first_prefill_chunk_sample_hidden_states": {
+          "shape": [1, 3072],
+          "finite": 3072,
+          "nan": 0,
+          "min": -43.34375,
+          "max": 40.28125,
+          "mean": -0.038334526121616364
+        },
+        "first_prefill_chunk_logits_after_compute": {
+          "shape": [1, 200064],
+          "finite": 200064,
+          "nan": 0,
+          "min": -13.4375,
+          "max": 32.09375,
+          "mean": 1.7454417943954468
+        },
+        "second_prefill_chunk_hidden_states_before_logits_index": {
+          "shape": [382, 3072],
+          "finite": 1173504,
+          "nan": 0,
+          "min": -59.53125,
+          "max": 54.15625,
+          "mean": -0.03398509323596954
+        }
+      }
+    }
+  },
+  "conclusion": "The only confirmed quality-correct long-context control in this batch is full eager execution. The compiled/piecewise graph path for longer prefill shapes either emits token id 0/NUL or hangs after cached/compiled range setup. Finite tracing shows the graph path returns all-NaN hidden states before logits for 1024-token and remainder prefill chunks, while eager keeps those tensors finite. Do not publish the rejected long-context timings. Keep the current 2k-context p512/n1536 baseline as the promoted MiniMax result."
 }

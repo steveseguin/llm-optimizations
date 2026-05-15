@@ -289,11 +289,34 @@ Follow-up controls after the `8192`/`MBT1024` NUL-token failure:
   and then hung. This points beyond XPU graph replay alone; the compiled
   piecewise prefill path is suspect.
 - `VLLM_XPU_SAFE_SAMPLE_HIDDEN_SELECT=1` did not fix the NUL-token output.
+- `--skip-compiled-prefill` plus `--cudagraph-mode none` also hung after
+  compiling the `1024` range, so original-Python prefill is not yet a usable
+  workaround inside this graph/compile harness.
 
 Conclusion: long-context correctness is currently only confirmed under full
 eager execution. The compiled/piecewise path for larger prefill shapes remains
 unsafe. Do not publish long-context compiled-graph numbers until the first
 generated-token NUL corruption is fixed and a quality canary passes.
+
+Finite tracing narrowed the failure:
+
+- Graph path trace:
+  `/home/steve/bench-results/minimax-m2.7-finite-trace/longctx-graph-token0-20260515T142246Z.trace.jsonl`
+- Eager reference trace:
+  `/home/steve/bench-results/minimax-m2.7-finite-trace/longctx-eager-reference-20260515T142535Z.trace.jsonl`
+- Graph generated token id `0`; eager generated token id `758`.
+- Graph `gpu_model_runner.hidden_states_before_logits_index` for the first
+  `1024 x 3072` prefill chunk had `0` finite values and `3145728` NaNs on all
+  ranks.
+- Graph `gpu_model_runner.logits_after_compute` for that chunk had `0` finite
+  values and `200064` NaNs.
+- The second `382 x 3072` chunk was also all NaN before logits.
+- Eager, same prompt and model settings, kept those tensors finite:
+  first chunk min/max approximately `-61.41` / `64.56`, logits min/max
+  approximately `-13.44` / `32.09`, with `0` NaNs.
+
+This means token id `0` is a symptom of NaN hidden states/logits from the
+compiled long-prefill forward path, not a sampler-only issue.
 
 Additional serving control:
 
