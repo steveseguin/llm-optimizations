@@ -356,9 +356,54 @@ baseline repeat:
 | same-session baseline | `66.1183` | `88.1577` | keep |
 | deferred copy, global XPU sync | `62.4365` | `83.2486` | reject |
 | deferred copy, no global XPU sync | `62.0221` | `82.6961` | reject |
+| sync copy at output construction | `62.4609` | `83.2812` | reject |
 
 Decision: keep `VLLM_XPU_DEFER_ASYNC_OUTPUT_COPY` unset for MiniMax TP4 decode.
-This was not submitted to LocalMaxxing because it is a negative result.
+Also keep `VLLM_XPU_SYNC_ASYNC_OUTPUT_COPY` unset. This was not submitted to
+LocalMaxxing because it is a negative result.
+
+## Decode Timing And CCL Worker Affinity
+
+Record:
+`data/minimax-m27-decode-timing-and-ccl-affinity-20260515.json`
+
+Patch:
+`patches/vllm-xpu-decode-timing-compileguard-skipfirst-20260515.patch`
+
+The XPU timing helper now no-ops `allreduce_label()` while Dynamo is compiling
+and supports `VLLM_XPU_DECODE_TIMING_SKIP_FIRST=<N>` so profile/warmup calls can
+be excluded from the summary.
+
+Rank-0 eager timing with `p1/n32`, `--enforce-eager`, sync timing, and
+`VLLM_XPU_DECODE_TIMING_SKIP_FIRST=124` showed these largest buckets:
+
+| Label | Count | Total ms | Avg ms |
+| --- | ---: | ---: | ---: |
+| `minimax.attn.qk_norm` | `1984` | `1048.35` | `0.5284` |
+| `minimax.moe.experts_total` | `1984` | `594.12` | `0.2995` |
+| `minimax.attn.kv_attention` | `1984` | `565.33` | `0.2849` |
+| `all_reduce:(1, 3072):torch.float16` | `4001` | `494.25` | `0.1235` |
+| `minimax.attn.delayed_residual_allreduce` | `1984` | `447.47` | `0.2255` |
+| `all_reduce:minimax_qk_var:(1, 2):torch.float32` | `1922` | `310.85` | `0.1617` |
+
+This is diagnostic only because eager timing is much slower than the compiled
+path, but it keeps pointing the source work toward Q/K RMSNorm, MoE experts,
+attention/KV, and the TP collective boundaries.
+
+I also screened oneCCL worker affinity after checking the oneCCL docs for
+`CCL_WORKER_AFFINITY=<cpulist>`:
+
+| Candidate | Output tok/s | Total tok/s | Decision |
+| --- | ---: | ---: | --- |
+| no affinity, same source hash | `66.3660` | `88.4880` | baseline |
+| `CCL_WORKER_AFFINITY=12,13,14,15` warmed repeat 1 | `66.6822` | `88.9096` | neutral |
+| `CCL_WORKER_AFFINITY=12,13,14,15` warmed repeat 2 | `66.3983` | `88.5311` | neutral |
+| `CCL_WORKER_AFFINITY=4,5,6,7` | `65.7865` | `87.7153` | reject |
+
+Decision: affinity `12-15` is a small local scheduling hint, not a promoted
+benchmark. The two warmed repeats averaged `66.5403` output tok/s, only about
+`0.27%` above the same-source baseline and inside the noise band. Do not submit
+to LocalMaxxing.
 
 ## Skip-Compiled Prefill Profile Patch
 
