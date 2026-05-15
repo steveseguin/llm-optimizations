@@ -1,5 +1,5 @@
 diff --git a/vllm/model_executor/layers/mamba/linear_attn.py b/vllm/model_executor/layers/mamba/linear_attn.py
-index b277c9ed6..1232f6196 100644
+index b277c9ed6..d0f06f426 100644
 --- a/vllm/model_executor/layers/mamba/linear_attn.py
 +++ b/vllm/model_executor/layers/mamba/linear_attn.py
 @@ -2,6 +2,7 @@
@@ -42,10 +42,17 @@ index b277c9ed6..1232f6196 100644
  
  @CustomOp.register("minimax_text01_rmsnorm_tp")
  class MiniMaxText01RMSNormTP(CustomOp):
-@@ -76,6 +98,68 @@ class MiniMaxText01RMSNormTP(CustomOp):
-         shard = slice(shard_rank * shard_size, (shard_rank + 1) * shard_size)
-         param.data.copy_(loaded_weight[shard])
+@@ -74,7 +96,81 @@ class MiniMaxText01RMSNormTP(CustomOp):
  
+         shard_size = loaded_weight.shape[0] // shard_world_size
+         shard = slice(shard_rank * shard_size, (shard_rank + 1) * shard_size)
+-        param.data.copy_(loaded_weight[shard])
++        clean_weight = loaded_weight[shard].detach()
++        param.data.copy_(clean_weight)
++        param._minimax_clean_weight_cpu = clean_weight.cpu().clone()
++        if param.is_xpu:
++            param._minimax_clean_weight_xpu = param.detach().clone()
++
 +    @staticmethod
 +    def _weight_is_sane(weight_cpu: torch.Tensor) -> bool:
 +        return bool(
@@ -68,7 +75,11 @@ index b277c9ed6..1232f6196 100644
 +        )
 +        if not restore_weight:
 +            return norm.weight
-+        clean_weight_xpu = getattr(norm, "_minimax_clean_weight_xpu", None)
++        clean_weight_xpu = getattr(
++            norm,
++            "_minimax_clean_weight_xpu",
++            getattr(norm.weight, "_minimax_clean_weight_xpu", None),
++        )
 +        if norm.weight.is_xpu and torch.xpu.is_current_stream_capturing():
 +            return clean_weight_xpu if clean_weight_xpu is not None else norm.weight
 +        min_tokens = int(
@@ -90,7 +101,11 @@ index b277c9ed6..1232f6196 100644
 +                    clean_weight_xpu = norm._minimax_clean_weight_xpu
 +            return clean_weight_xpu if clean_weight_xpu is not None else norm.weight
 +
-+        clean_weight_cpu = getattr(norm, "_minimax_clean_weight_cpu", None)
++        clean_weight_cpu = getattr(
++            norm,
++            "_minimax_clean_weight_cpu",
++            getattr(norm.weight, "_minimax_clean_weight_cpu", None),
++        )
 +        if clean_weight_cpu is None:
 +            trace_tensor_graph(f"{trace_name}.weight_corrupt_no_clean_cpu", weight_cpu)
 +            return norm.weight
@@ -107,11 +122,10 @@ index b277c9ed6..1232f6196 100644
 +            clean_weight_xpu = norm._minimax_clean_weight_xpu
 +        trace_tensor_graph(f"{trace_name}.weight_restored_cpu", clean_weight_cpu)
 +        return clean_weight_xpu if clean_weight_xpu is not None else norm.weight
-+
+ 
      def _forward(
          self,
-         x: torch.Tensor,
-@@ -84,7 +168,8 @@ class MiniMaxText01RMSNormTP(CustomOp):
+@@ -84,7 +180,8 @@ class MiniMaxText01RMSNormTP(CustomOp):
          x = x.to(torch.float32)
          variance = x.pow(2).mean(dim=-1, keepdim=True, dtype=torch.float32)
          if self.tp_world > 1:
@@ -121,7 +135,7 @@ index b277c9ed6..1232f6196 100644
          x = x * torch.rsqrt(variance + self.variance_epsilon)
          x = (x * self.weight).to(orig_dtype)
          return x
-@@ -103,18 +188,129 @@ class MiniMaxText01RMSNormTP(CustomOp):
+@@ -103,18 +200,129 @@ class MiniMaxText01RMSNormTP(CustomOp):
          k_norm: "MiniMaxText01RMSNormTP",
          q: torch.Tensor,
          k: torch.Tensor,

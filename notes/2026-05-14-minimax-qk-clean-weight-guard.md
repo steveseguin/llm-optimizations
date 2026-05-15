@@ -24,6 +24,9 @@ RMSNorm path.
 Added a default-off guard in `MiniMaxText01RMSNormTP`:
 
 - Cache a clean CPU and XPU clone of finite, in-range Q/K RMSNorm weights.
+- Seed the clean copy in the weight loader and attach it to the parameter, so
+  graph capture does not depend on a prior sane forward to initialize the
+  fallback copy.
 - For graph capture/decode, return the clean XPU clone without CPU waits.
 - For prefill or larger token counts, check the live parameter. If it is
   non-finite or wildly out of range, restore from the clean copy.
@@ -35,6 +38,15 @@ Patch snapshots:
 
 - `patches/vllm-minimax-qk-rms-clean-weight-guard-20260515.patch`
 - `patches/minimax-quality-gate-clean-weight-runner-20260515.patch`
+
+Loader-seeded refinement validation:
+
+- JSON: `/home/steve/bench-results/minimax-m2.7-quality-gated/ctx4096-prompt-sweep/graph-raw121-loader-clean-weight-ctx2048-n32-20260515T013655Z.json`
+- Result: passed full-decode graph canary after moving clean-copy seeding into
+  `weight_loader`; `0` NUL tokens, `0` non-space control chars, `27` distinct
+  generated token ids.
+- Local record:
+  `data/minimax-m27-loader-seeded-clean-weight-canary-20260515.json`
 
 ## Validation
 
@@ -98,8 +110,8 @@ INPUT_LEN=512 OUTPUT_LEN=1536 DTYPE=float16 BLOCK_SIZE=256 \
 
 ## Next
 
-- Make a cleaner upstreamable version that initializes the clean weight copy at
-  load time instead of first sane forward.
+- Convert the guard into a cleaner upstreamable version, likely with a named
+  corruption workaround flag and less diagnostic tracing.
 - Expand quality gates from corruption checks to a small semantic canary suite
   before claiming any new speed work.
 - Retest 4096 with longer prompts and actual long-context prompts; the current
