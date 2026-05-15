@@ -67,6 +67,13 @@ trap cleanup EXIT
   echo "bench_log=$bench_log"
   echo "result=$result_path"
   echo "model=$MODEL"
+  echo "vllm_cache_root=${VLLM_CACHE_ROOT:-}"
+  echo "ccl_topo_p2p_access=${CCL_TOPO_P2P_ACCESS:-}"
+  echo "ccl_topo_fabric_vertex_connection_check=${CCL_TOPO_FABRIC_VERTEX_CONNECTION_CHECK:-}"
+  echo "xpu_graph=${VLLM_XPU_ENABLE_XPU_GRAPH:-}"
+  echo "use_llm_scaler_moe=${VLLM_XPU_USE_LLM_SCALER_MOE:-}"
+  echo "extra_server_args=$EXTRA_SERVER_ARGS"
+  echo "extra_bench_args=$EXTRA_BENCH_ARGS"
   echo "start=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
   vllm serve "$MODEL" \
     --served-model-name "$SERVED_MODEL_NAME" \

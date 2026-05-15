@@ -203,6 +203,70 @@ The mean is only about `0.6%` above the accepted `65.7525` tok/s baseline and
 below the accepted run maximum of `66.6589` tok/s. Do not submit to
 LocalMaxxing unless later repeats show a larger, stable gap.
 
+## Serving TTFT Split And Long-Prefill Control
+
+Record:
+`data/minimax-m27-serve-and-prefill-controls-20260515.json`
+
+Serving p512/n1536 for the accepted clean-weight piecewise recipe:
+
+- Result JSON:
+  `/home/steve/bench-results/minimax-m2.7-serve-metrics-aot-cleanweight/vllm-minimax-m27-autoround-serve-tp4-p512n1536-np1-20260515T131006Z.json`
+- Output throughput: `65.9048` tok/s
+- Total throughput: `87.8730` tok/s
+- Mean TTFT: `605.50` ms
+- Mean TPOT/ITL: `14.7886` ms/token
+
+Interpretation: for the single p512/n1536 request shape, TTFT is not the main
+ceiling. The steady decode interval is about `14.79` ms/token, so the next
+headline speed work still needs to reduce decode-step cost.
+
+Serving p512/n1536 with
+`CCL_TOPO_FABRIC_VERTEX_CONNECTION_CHECK=0`:
+
+- Result JSON:
+  `/home/steve/bench-results/minimax-m2.7-serve-metrics-aot-cleanweight-ccltopo/vllm-minimax-m27-autoround-serve-tp4-p512n1536-np1-20260515T131505Z.json`
+- Output throughput: `65.4255` tok/s
+- Total throughput: `87.2339` tok/s
+- Mean TTFT: `765.84` ms
+- Mean TPOT/ITL: `14.7954` ms/token
+
+Decision: reject as a serving/decode improvement. The direct throughput repeats
+for this oneCCL topology override were slightly positive, but serving ITL is
+effectively unchanged and TTFT/output throughput are worse. Keep default
+oneCCL topology recognition for serving.
+
+Long-prefill p4096/n512 with `max_model_len=8192` and `MBT=1024` was then
+screened because prefill is still a separate optimization target:
+
+- Serving JSON:
+  `/home/steve/bench-results/minimax-m2.7-serve-metrics-prefill-cleanweight/vllm-minimax-m27-autoround-serve-tp4-p4096n512-np1-20260515T131811Z.json`
+- Direct throughput JSON:
+  `/home/steve/bench-results/minimax-m2.7-prefill-cleanweight-throughput/vllm-minimax-m27-autoround-tp4-p4096n512-20260515T132414Z.json`
+- Long-context quality JSON:
+  `/home/steve/bench-results/minimax-m2.7-quality-gated/prefill-longctx-8192-mbt1024-cleanweight-20260515T132810Z.json`
+
+Timing:
+
+- Serving p4096/n512: `24.5689` output tok/s, `221.1204` total tok/s,
+  `8164.85` ms TTFT, `24.8015` ms mean ITL.
+- Direct throughput p4096/n512: `39.6848` computed output tok/s,
+  `357.1635` total tok/s.
+
+Quality result:
+
+- Long-context canary passed: `false`
+- Generated tokens: `64`
+- Distinct token ids: `1`
+- NUL tokens: `64`
+- Non-space control characters: `64`
+
+Decision: reject `max_model_len=8192` / `MBT=1024` for this clean-weight
+piecewise path. The random serving output was all NUL characters and the
+long-context quality canary reproduced the same NUL-token failure. These timing
+numbers are retained only as failure diagnostics and must not be submitted to
+LocalMaxxing or compared as valid performance.
+
 ## Next Work
 
 1. Continue to treat `65.7525` output tok/s as the published quality-valid
@@ -217,3 +281,6 @@ LocalMaxxing unless later repeats show a larger, stable gap.
 6. Promote only repeatable improvements that clearly exceed the current
    noise band, ideally by at least `3%` on mean output tok/s while preserving
    token/text quality hashes.
+7. Keep long-context work behind quality gates. The `8192`/`MBT1024` prefill
+   path currently corrupts into token id `0`; debug it with finite tracing
+   before spending more benchmark time on long-context speed.

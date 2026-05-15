@@ -1,0 +1,111 @@
+{
+  "date": "2026-05-15",
+  "model": "/mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround",
+  "engine": "vLLM 0.20.1-local XPU",
+  "hardware": "4x Intel Arc Pro B70 32GB",
+  "accepted_baseline_localmaxxing_id": "cmp6a5c1o00mpo3011hg8ncyp",
+  "baseline_recipe": {
+    "tensor_parallel": 4,
+    "dtype": "float16",
+    "max_model_len": 2048,
+    "max_num_batched_tokens": 512,
+    "block_size": 256,
+    "prefix_caching": false,
+    "attention_backend": "TRITON_ATTN",
+    "xpu_graph": true,
+    "cudagraph_mode": "PIECEWISE",
+    "llm_scaler_moe": true,
+    "attention_delay_allreduce": true,
+    "qk_norm_restore_weight": true,
+    "qk_norm_restore_weight_min_tokens": 2,
+    "ccl_topo_p2p_access": 1
+  },
+  "p512_n1536_server_baseline": {
+    "description": "OpenAI serving benchmark for the accepted quality-valid p512/n1536 recipe, used to split TTFT from steady decode.",
+    "result_json": "/home/steve/bench-results/minimax-m2.7-serve-metrics-aot-cleanweight/vllm-minimax-m27-autoround-serve-tp4-p512n1536-np1-20260515T131006Z.json",
+    "server_log": "/home/steve/bench-results/minimax-m2.7-serve-metrics-aot-cleanweight/vllm-minimax-m27-autoround-serve-server-tp4-p512n1536-np1-20260515T131006Z.log",
+    "bench_log": "/home/steve/bench-results/minimax-m2.7-serve-metrics-aot-cleanweight/vllm-minimax-m27-autoround-serve-bench-tp4-p512n1536-np1-20260515T131006Z.log",
+    "completed": 1,
+    "prompt_tokens": 512,
+    "output_tokens": 1536,
+    "output_tok_s": 65.90476647869566,
+    "total_tok_s": 87.87302197159421,
+    "mean_ttft_ms": 605.4954989958787,
+    "mean_tpot_ms": 14.788631968737159,
+    "mean_itl_ms": 14.788632157656094,
+    "median_itl_ms": 14.899892994435504,
+    "decision": "Valid latency split for the accepted recipe. TTFT is modest for a single p512 request; steady decode remains the main limiter."
+  },
+  "p512_n1536_server_topology_override": {
+    "description": "Same serving benchmark with CCL_TOPO_FABRIC_VERTEX_CONNECTION_CHECK=0 after that flag was slightly faster in direct throughput repeats.",
+    "environment_delta": {
+      "CCL_TOPO_FABRIC_VERTEX_CONNECTION_CHECK": "0"
+    },
+    "result_json": "/home/steve/bench-results/minimax-m2.7-serve-metrics-aot-cleanweight-ccltopo/vllm-minimax-m27-autoround-serve-tp4-p512n1536-np1-20260515T131505Z.json",
+    "server_log": "/home/steve/bench-results/minimax-m2.7-serve-metrics-aot-cleanweight-ccltopo/vllm-minimax-m27-autoround-serve-server-tp4-p512n1536-np1-20260515T131505Z.log",
+    "bench_log": "/home/steve/bench-results/minimax-m2.7-serve-metrics-aot-cleanweight-ccltopo/vllm-minimax-m27-autoround-serve-bench-tp4-p512n1536-np1-20260515T131505Z.log",
+    "completed": 1,
+    "prompt_tokens": 512,
+    "output_tokens": 1536,
+    "output_tok_s": 65.42545820379475,
+    "total_tok_s": 87.23394427172632,
+    "mean_ttft_ms": 765.8402619999833,
+    "mean_tpot_ms": 14.795398655372553,
+    "mean_itl_ms": 14.795398850813783,
+    "median_itl_ms": 14.841408003121614,
+    "decision": "Rejected as a serving/decode improvement. ITL is effectively unchanged and TTFT/output throughput are worse than the default-topology serving control."
+  },
+  "p4096_n512_prefill_server_mbt1024": {
+    "description": "Long-prefill serving probe at max_model_len=8192 and MBT=1024 using the clean-weight recipe.",
+    "result_json": "/home/steve/bench-results/minimax-m2.7-serve-metrics-prefill-cleanweight/vllm-minimax-m27-autoround-serve-tp4-p4096n512-np1-20260515T131811Z.json",
+    "server_log": "/home/steve/bench-results/minimax-m2.7-serve-metrics-prefill-cleanweight/vllm-minimax-m27-autoround-serve-server-tp4-p4096n512-np1-20260515T131811Z.log",
+    "bench_log": "/home/steve/bench-results/minimax-m2.7-serve-metrics-prefill-cleanweight/vllm-minimax-m27-autoround-serve-bench-tp4-p4096n512-np1-20260515T131811Z.log",
+    "vllm_cache_root": "/mnt/fast-ai/vllm-cache-exp/minimax-cleanweight-prefill-server-mbt1024-p4096n512-20260515T131811Z",
+    "completed": 1,
+    "prompt_tokens": 4096,
+    "output_tokens": 512,
+    "output_tok_s": 24.56893864213167,
+    "total_tok_s": 221.120447779185,
+    "mean_ttft_ms": 8164.853584006778,
+    "mean_tpot_ms": 24.801451371802262,
+    "mean_itl_ms": 24.80145215458709,
+    "median_itl_ms": 19.098577002296224,
+    "generated_nul_chars": 512,
+    "decision": "Invalid as a quality result. The random long-prefill serving output was all NUL characters."
+  },
+  "p4096_n512_direct_throughput_mbt1024": {
+    "description": "Direct vllm bench throughput repeat with the same p4096/n512 cache to separate server streaming overhead from model/runtime behavior.",
+    "result_json": "/home/steve/bench-results/minimax-m2.7-prefill-cleanweight-throughput/vllm-minimax-m27-autoround-tp4-p4096n512-20260515T132414Z.json",
+    "log": "/home/steve/bench-results/minimax-m2.7-prefill-cleanweight-throughput/vllm-minimax-m27-autoround-tp4-p4096n512-20260515T132414Z.log",
+    "prompt_tokens": 4096,
+    "output_tokens": 512,
+    "elapsed_s": 12.90165256599721,
+    "output_tok_s_computed": 39.68483861899949,
+    "total_tok_s": 357.16354757099543,
+    "decision": "Not promotable because the same cache/config failed the long-context quality canary. Useful only as a timing/control artifact."
+  },
+  "p4096_long_context_quality_mbt1024": {
+    "description": "Long-context quality canary for the same max_model_len=8192, MBT=1024 cache/config.",
+    "quality_json": "/home/steve/bench-results/minimax-m2.7-quality-gated/prefill-longctx-8192-mbt1024-cleanweight-20260515T132810Z.json",
+    "quality_log": "/home/steve/bench-results/minimax-m2.7-quality-gated/prefill-longctx-8192-mbt1024-cleanweight-20260515T132810Z.log",
+    "passed": false,
+    "failure_reasons": [
+      "degenerate or corrupt generated output"
+    ],
+    "generated_tokens": 64,
+    "distinct_generated_tokens": 1,
+    "nul_tokens": 64,
+    "control_nonspace_chars": 64,
+    "decision": "Reject max_model_len=8192/MBT1024 for this clean-weight piecewise path until long-context graph corruption is fixed."
+  },
+  "localmaxxing": {
+    "submitted": false,
+    "reason": "No new quality-valid improvement. The p512 serving control is a diagnostic latency split, the topology override is a serving regression, and the p4096/8192-context probe failed quality."
+  },
+  "next_targets": [
+    "Keep max_model_len=2048/MBT512 as the accepted quality-valid MiniMax headline path.",
+    "Treat long-context/prefill as blocked by graph corruption at max_model_len=8192 before optimizing speed.",
+    "Investigate the p4096/8192 NUL failure with finite tracing around prefill and the first decode token.",
+    "Return decode-speed work to source-level allreduce/residual/RMS/MoE boundary fusion, because p512 TTFT is not the main limiter."
+  ]
+}
