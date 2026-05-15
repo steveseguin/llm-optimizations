@@ -1,0 +1,15 @@
+diff --git a/vllm/v1/worker/gpu_model_runner.py b/vllm/v1/worker/gpu_model_runner.py
+--- a/vllm/v1/worker/gpu_model_runner.py
++++ b/vllm/v1/worker/gpu_model_runner.py
+@@
+     def finish_deferred_xpu_output_copy(self) -> None:
+         if not self._deferred_xpu_output_copy:
+             return
+-        if os.environ.get("VLLM_XPU_DEFERRED_COPY_SYNC_DEVICE", "1") != "0":
+-            torch.xpu.synchronize()
+-        self.sampled_token_ids_cpu.copy_(self._sampled_token_ids)
++        with torch.inference_mode():
++            if os.environ.get("VLLM_XPU_DEFERRED_COPY_SYNC_DEVICE", "1") != "0":
++                torch.xpu.synchronize()
++            self.sampled_token_ids_cpu.copy_(self._sampled_token_ids)
+         self._deferred_xpu_output_copy = False
