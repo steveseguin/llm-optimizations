@@ -1,0 +1,69 @@
+{
+  "date": "2026-05-15",
+  "model": "/mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround",
+  "hardware": "4x Intel Arc Pro B70 32GB",
+  "objective": "Try a decode-only Q/K RMS variance expression rewrite as a quality-preserving speed candidate for MiniMax M2.7 AutoRound TP4.",
+  "candidate": {
+    "name": "VLLM_MINIMAX_QK_NORM_DECODE_SUMMEAN",
+    "status": "rejected",
+    "change": "For decode token counts <= 1, replace q.pow(2).mean(...)/k.pow(2).mean(...) with q.square().sum(...)/hidden_size and k.square().sum(...)/hidden_size before the existing Q/K variance allreduce.",
+    "intended_effect": "Keep equivalent RMS variance math while giving Inductor a different lowering opportunity for the hottest Q/K norm decode path.",
+    "active_runtime_after_test": false
+  },
+  "quality_gate": {
+    "json": "/home/steve/bench-results/minimax-m2.7-decode-candidates/qk-decode-summean/compiled-piecewise-raw145-qk-decode-summean-ctx2048-n64-20260515T232436Z.json",
+    "log": "/home/steve/bench-results/minimax-m2.7-decode-candidates/qk-decode-summean/compiled-piecewise-raw145-qk-decode-summean-ctx2048-n64-20260515T232436Z.log",
+    "cache_root": "/mnt/fast-ai/vllm-cache-exp/minimax-qk-decode-summean-20260515T232436Z",
+    "prompt_tokens": 145,
+    "output_tokens": 64,
+    "passed": false,
+    "failure_reasons": [
+      "combined token hash mismatch"
+    ],
+    "expected_combined_token_sha256": "267cbf30208d84929ee79284ac695467f7e80597bf8694130e1e1f8b180eb5bd",
+    "observed_combined_token_sha256": "21404821eb70a2ee3de9e82c039b5cbb5c9eef884c5019579f442c6a272a9c5a",
+    "quality_checks": {
+      "n_tokens": 64,
+      "distinct_generated_token_count": 4,
+      "first_distinct_generated_tokens": [
+        46,
+        296,
+        6091,
+        34807
+      ],
+      "printable_nonspace_text_chars": 256,
+      "control_nonspace_text_chars": 0,
+      "nul_token_count": 0
+    },
+    "observed_text": " Answer in English. Answer in English. Answer in English. Answer in English. Answer in English. Answer in English. Answer in English. Answer in English. Answer in English. Answer in English. Answer in English. Answer in English. Answer in English. Answer in English. Answer in English. Answer in English."
+  },
+  "runtime": {
+    "tensor_parallel_size": 4,
+    "dtype": "float16",
+    "max_model_len": 2048,
+    "max_num_batched_tokens": 512,
+    "max_num_seqs": 1,
+    "block_size": 256,
+    "attention_backend": "TRITON_ATTN",
+    "enable_chunked_prefill": true,
+    "enable_prefix_caching": false,
+    "qk_norm_restore_weight": true,
+    "qk_norm_restore_weight_min_tokens": 2,
+    "compilation_config": {
+      "compile_sizes": [
+        1
+      ],
+      "use_inductor_graph_partition": true,
+      "cudagraph_mode": "PIECEWISE"
+    },
+    "environment": {
+      "FI_TCP_IFACE": "wlxe865d47e3a48",
+      "CCL_KVS_IFACE": "wlxe865d47e3a48",
+      "VLLM_MINIMAX_QK_NORM_DECODE_SUMMEAN": "1",
+      "VLLM_MINIMAX_QK_NORM_DECODE_SUMMEAN_MAX_TOKENS": "1",
+      "VLLM_MINIMAX_QK_NORM_RESTORE_WEIGHT": "1",
+      "VLLM_MINIMAX_QK_NORM_RESTORE_WEIGHT_MIN_TOKENS": "2"
+    }
+  },
+  "decision": "Do not benchmark or submit to LocalMaxxing. This algebraic rewrite changed greedy output and collapsed the raw canary into a repeated phrase, so it is not quality-preserving."
+}
