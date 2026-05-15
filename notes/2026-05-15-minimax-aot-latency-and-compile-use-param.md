@@ -267,6 +267,48 @@ long-context quality canary reproduced the same NUL-token failure. These timing
 numbers are retained only as failure diagnostics and must not be submitted to
 LocalMaxxing or compared as valid performance.
 
+## Long-Context Graph Controls
+
+Record:
+`data/minimax-m27-long-context-graph-controls-20260515.json`
+
+Follow-up controls after the `8192`/`MBT1024` NUL-token failure:
+
+- Full eager, `max_model_len=8192`, `MBT=1024`: passed the long-context
+  canary with `16` distinct generated tokens, `0` NUL tokens, and `0`
+  non-space control characters.
+- Graph mode with `--skip-compiled-prefill`: hung after cached graph/AOT load
+  with repeated shared-memory broadcast waits. No JSON result was produced.
+- Graph mode with `MBT=512`: compiled the `512` range, then hung with repeated
+  shared-memory broadcast waits. No JSON result was produced.
+- Decode-graph plus eager fallback for uncovered prefill shapes:
+  `VLLM_XPU_DISABLE_AUTO_COMPILE_RANGES=1` and
+  `VLLM_XPU_EAGER_FOR_UNCOVERED_COMPILE_RANGES=1` reached generation but
+  produced `16/16` NUL tokens. Reject for quality.
+- `--cudagraph-mode none` with torch.compile still compiled the `1024` range
+  and then hung. This points beyond XPU graph replay alone; the compiled
+  piecewise prefill path is suspect.
+- `VLLM_XPU_SAFE_SAMPLE_HIDDEN_SELECT=1` did not fix the NUL-token output.
+
+Conclusion: long-context correctness is currently only confirmed under full
+eager execution. The compiled/piecewise path for larger prefill shapes remains
+unsafe. Do not publish long-context compiled-graph numbers until the first
+generated-token NUL corruption is fixed and a quality canary passes.
+
+Additional serving control:
+
+- `VLLM_XPU_SET_CCL_LOCAL_RANK=1` on p512/n1536 serving produced `64.7703`
+  output tok/s, `86.3604` total tok/s, `840.98` ms TTFT, and `14.9011` ms
+  mean ITL.
+- Decision: reject for speed. It is below the accepted `65.7525` tok/s mean
+  and does not reduce decode ITL.
+
+Harness note: a late current-best repeatability canary using the existing 2k
+cache hung after cached AOT load before prompt processing. Since serving with
+the same accepted cache still completed, treat this as harness/runtime
+instability after repeated graph experiments, not as a quality failure of the
+published baseline.
+
 ## Next Work
 
 1. Continue to treat `65.7525` output tok/s as the published quality-valid
@@ -281,6 +323,7 @@ LocalMaxxing or compared as valid performance.
 6. Promote only repeatable improvements that clearly exceed the current
    noise band, ideally by at least `3%` on mean output tok/s while preserving
    token/text quality hashes.
-7. Keep long-context work behind quality gates. The `8192`/`MBT1024` prefill
-   path currently corrupts into token id `0`; debug it with finite tracing
-   before spending more benchmark time on long-context speed.
+7. Keep long-context work behind quality gates. The `8192` compiled/piecewise
+   prefill path currently corrupts into token id `0` or hangs; debug it with
+   finite tracing and source-level shape guards before spending more benchmark
+   time on long-context speed.

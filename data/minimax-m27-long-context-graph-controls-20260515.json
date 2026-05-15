@@ -1,0 +1,135 @@
+{
+  "date": "2026-05-15",
+  "model": "/mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround",
+  "hardware": "4x Intel Arc Pro B70 32GB",
+  "engine": "vLLM 0.20.1-local XPU",
+  "accepted_baseline": {
+    "localmaxxing_id": "cmp6a5c1o00mpo3011hg8ncyp",
+    "context_length": 2048,
+    "prompt_tokens": 512,
+    "output_tokens": 1536,
+    "mean_output_tok_s": 65.75245827198079,
+    "mean_total_tok_s": 87.66994436264105,
+    "quality_status": "passed"
+  },
+  "controls": [
+    {
+      "name": "serving_ccl_local_rank",
+      "purpose": "Check whether explicitly setting CCL local rank/size improves TP4 serving decode.",
+      "env_delta": {
+        "VLLM_XPU_SET_CCL_LOCAL_RANK": "1"
+      },
+      "result_json": "/home/steve/bench-results/minimax-m2.7-serve-metrics-aot-cleanweight-ccllocal/vllm-minimax-m27-autoround-serve-tp4-p512n1536-np1-20260515T135552Z.json",
+      "server_log": "/home/steve/bench-results/minimax-m2.7-serve-metrics-aot-cleanweight-ccllocal/vllm-minimax-m27-autoround-serve-server-tp4-p512n1536-np1-20260515T135552Z.log",
+      "bench_log": "/home/steve/bench-results/minimax-m2.7-serve-metrics-aot-cleanweight-ccllocal/vllm-minimax-m27-autoround-serve-bench-tp4-p512n1536-np1-20260515T135552Z.log",
+      "metrics": {
+        "output_tok_s": 64.77029239877989,
+        "total_tok_s": 86.36038986503985,
+        "mean_ttft_ms": 840.9832539909985,
+        "mean_tpot_ms": 14.901111680780712,
+        "mean_itl_ms": 14.901111869709126
+      },
+      "decision": "rejected_for_speed"
+    },
+    {
+      "name": "long_context_eager_reference",
+      "purpose": "Confirm that the model, prompt, KV sizing, and eager execution are not intrinsically corrupt at max_model_len=8192.",
+      "mode": "eager",
+      "max_model_len": 8192,
+      "max_num_batched_tokens": 1024,
+      "quality_json": "/home/steve/bench-results/minimax-m2.7-quality-gated/prefill-longctx-8192-mbt1024-eager-20260515T133838Z.json",
+      "quality_log": "/home/steve/bench-results/minimax-m2.7-quality-gated/prefill-longctx-8192-mbt1024-eager-20260515T133838Z.log",
+      "quality": {
+        "passed": true,
+        "generated_tokens": 16,
+        "distinct_generated_token_count": 16,
+        "nul_token_count": 0,
+        "control_nonspace_text_chars": 0
+      },
+      "decision": "valid_correctness_reference"
+    },
+    {
+      "name": "long_context_skip_compiled_prefill",
+      "purpose": "Keep graph mode but skip the compiled wrapper for prefill tokens.",
+      "mode": "graph",
+      "max_model_len": 8192,
+      "max_num_batched_tokens": 1024,
+      "quality_log": "/home/steve/bench-results/minimax-m2.7-quality-gated/prefill-longctx-8192-mbt1024-skipcompiledprefill-20260515T134116Z.log",
+      "outcome": "hung_after_cached_compile_load_with_repeated_shared_memory_broadcast_waits",
+      "decision": "rejected"
+    },
+    {
+      "name": "long_context_mbt512_graph",
+      "purpose": "Check whether corruption is specific to the 1024-token compiled prefill shape.",
+      "mode": "graph",
+      "max_model_len": 8192,
+      "max_num_batched_tokens": 512,
+      "quality_log": "/home/steve/bench-results/minimax-m2.7-quality-gated/prefill-longctx-8192-mbt512-graph-20260515T134824Z.log",
+      "outcome": "compiled_512_range_then_hung_with_repeated_shared_memory_broadcast_waits",
+      "decision": "rejected"
+    },
+    {
+      "name": "long_context_decode_graph_prefill_eager",
+      "purpose": "Compile decode only and force uncovered prefill shapes through eager FX graph.",
+      "mode": "graph",
+      "max_model_len": 8192,
+      "max_num_batched_tokens": 1024,
+      "env_delta": {
+        "VLLM_XPU_DISABLE_AUTO_COMPILE_RANGES": "1",
+        "VLLM_XPU_EAGER_FOR_UNCOVERED_COMPILE_RANGES": "1"
+      },
+      "quality_json": "/home/steve/bench-results/minimax-m2.7-quality-gated/prefill-longctx-8192-decodegraph-prefilleager-20260515T135902Z.json",
+      "quality_log": "/home/steve/bench-results/minimax-m2.7-quality-gated/prefill-longctx-8192-decodegraph-prefilleager-20260515T135902Z.log",
+      "quality": {
+        "passed": false,
+        "generated_tokens": 16,
+        "distinct_generated_token_count": 1,
+        "nul_token_count": 16,
+        "control_nonspace_text_chars": 16
+      },
+      "decision": "rejected_for_quality"
+    },
+    {
+      "name": "long_context_compile_without_xpu_graph",
+      "purpose": "Check whether torch.compile without XPU graph capture remains healthy on the 1024-token prefill shape.",
+      "mode": "graph",
+      "cudagraph_mode": "none",
+      "max_model_len": 8192,
+      "max_num_batched_tokens": 1024,
+      "quality_log": "/home/steve/bench-results/minimax-m2.7-quality-gated/prefill-longctx-8192-compile-nograph-20260515T140338Z.log",
+      "outcome": "compiled_1024_range_then_hung_with_repeated_shared_memory_broadcast_waits",
+      "decision": "rejected"
+    },
+    {
+      "name": "long_context_safe_hidden_select",
+      "purpose": "Replace advanced hidden-state indexing before logits with torch.index_select on XPU.",
+      "mode": "graph",
+      "max_model_len": 8192,
+      "max_num_batched_tokens": 1024,
+      "env_delta": {
+        "VLLM_XPU_SAFE_SAMPLE_HIDDEN_SELECT": "1"
+      },
+      "quality_json": "/home/steve/bench-results/minimax-m2.7-quality-gated/prefill-longctx-8192-safe-hidden-select-20260515T141104Z.json",
+      "quality_log": "/home/steve/bench-results/minimax-m2.7-quality-gated/prefill-longctx-8192-safe-hidden-select-20260515T141104Z.log",
+      "quality": {
+        "passed": false,
+        "generated_tokens": 16,
+        "distinct_generated_token_count": 1,
+        "nul_token_count": 16,
+        "control_nonspace_text_chars": 16
+      },
+      "decision": "rejected_for_quality"
+    },
+    {
+      "name": "current_best_repeatability_harness",
+      "purpose": "Re-run the 2k-context current-best quality harness after long-context graph probes.",
+      "mode": "graph",
+      "max_model_len": 2048,
+      "max_num_batched_tokens": 512,
+      "quality_log": "/home/steve/bench-results/minimax-m2.7-quality-gated/current-best-repeatability-20260515T141342Z.log",
+      "outcome": "hung_after_cached_aot_load_before_prompt_processing",
+      "decision": "inconclusive_harness_instability"
+    }
+  ],
+  "conclusion": "The only confirmed quality-correct long-context control in this batch is full eager execution. The compiled/piecewise graph path for longer prefill shapes either emits token id 0/NUL or hangs after cached/compiled range setup. Do not publish the rejected long-context timings. Keep the current 2k-context p512/n1536 baseline as the promoted MiniMax result."
+}
