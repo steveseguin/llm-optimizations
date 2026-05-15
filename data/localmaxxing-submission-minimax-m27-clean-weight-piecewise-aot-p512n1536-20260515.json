@@ -1,0 +1,43 @@
+{
+  "hfId": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+  "modelRevision": "main",
+  "hardware": {
+    "hwClass": "DISCRETE_GPU",
+    "gpuName": "Intel Arc Pro B70 32GB",
+    "gpuCount": 4,
+    "vramGb": 32,
+    "cpu": "AMD EPYC 9015 8-Core Processor",
+    "ramGb": 15,
+    "os": "Ubuntu 24.04.4 LTS, kernel 6.17.0-23-generic"
+  },
+  "engineName": "vllm",
+  "engineVersion": "0.20.1-local",
+  "quantization": "INT4 AutoRound W4A16",
+  "promptTokens": 512,
+  "outputTokens": 1536,
+  "contextLength": 2048,
+  "batchSize": 1,
+  "tokSOut": 65.75245827198079,
+  "tokSTotal": 87.66994436264105,
+  "peakVramGb": 29.23,
+  "notes": "MiniMax M2.7 AutoRound W4A16 on 4x Intel Arc Pro B70 via vLLM/XPU TP4. Mean of three p512/n1536 repeats after repairing the previously invalid fast piecewise/AOT path with a default-off MiniMax Q/K RMSNorm clean-weight guard: 64.622, 66.659, and 65.976 output tok/s; mean 65.752 output tok/s and 87.670 total tok/s. Quality gates passed on the same compiled recipe: raw 145-token prompt generated 64 and 256-token canaries with 0 NUL tokens, 0 non-space control chars, and nontrivial token diversity. No speculative decoding, no expert dropping, no quantization/model change, and no power-limit increase. Uses llm-scaler INT4 MoE decode path, MiniMax attention delayed allreduce, TRITON_ATTN, XPU graph forced with no-op communicator capture, piecewise Inductor/AOT cache, block-size 256, max_num_batched_tokens 512, prefix caching off. Throughput benchmark reports total tok/s for prompt+decode; no isolated prefill-only tok/s is emitted by this vLLM bench mode.",
+  "engineFlags": {
+    "commandSnippet": "FI_TCP_IFACE=wlxe865d47e3a48 CCL_KVS_IFACE=wlxe865d47e3a48 VLLM_MINIMAX_QK_NORM_RESTORE_WEIGHT=1 VLLM_MINIMAX_QK_NORM_RESTORE_WEIGHT_MIN_TOKENS=2 VLLM_MINIMAX_M2_ATTN_DELAY_ALLREDUCE=1 VLLM_XPU_ENABLE_XPU_GRAPH=1 VLLM_XPU_FORCE_GRAPH_WITH_COMM=1 VLLM_XPU_GRAPH_NOOP_COMM_CAPTURE=1 VLLM_XPU_USE_LLM_SCALER_MOE=1 CCL_TOPO_P2P_ACCESS=1 VLLM_CACHE_ROOT=/mnt/fast-ai/vllm-cache-exp/minimax-cleanweight-piecewise-quality-dynsafe-20260515T015044Z vllm bench throughput --backend vllm --async-engine --block-size 256 --no-enable-prefix-caching --attention-backend TRITON_ATTN --model /mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround --tokenizer /mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround --trust-remote-code --dtype float16 --tensor-parallel-size 4 --distributed-executor-backend mp --max-model-len 2048 --max-num-batched-tokens 512 --max-num-seqs 1 --dataset-name random --random-input-len 512 --random-output-len 1536 --random-range-ratio 0 --num-prompts 1 --disable-log-stats --compilation-config '{\"use_inductor_graph_partition\":true,\"compile_sizes\":[1],\"cudagraph_mode\":\"PIECEWISE\"}'",
+    "tensorParallel": 4,
+    "pipelineParallel": 1,
+    "kvCacheDtype": "auto",
+    "prefixCaching": false,
+    "attentionBackend": "TRITON_ATTN",
+    "flashAttn": false,
+    "chunkedPrefill": true,
+    "prefillChunkSize": 512,
+    "contBatching": true,
+    "engineQuant": "inc",
+    "maxRunningSeqs": 1,
+    "concurrency": 1,
+    "specDecoding": false,
+    "mtpEnabled": false,
+    "temperature": 0,
+    "extraFlags": "XPU/Level Zero; piecewise Inductor/AOT graph; compile_sizes=[1]; cudagraph_mode=PIECEWISE; MiniMax Q/K RMSNorm clean-weight guard enabled with min_tokens=2; llm-scaler INT4 MoE decode path; MiniMax attention delayed allreduce; VLLM_XPU_FORCE_GRAPH_WITH_COMM=1; VLLM_XPU_GRAPH_NOOP_COMM_CAPTURE=1; FI_TCP_IFACE and CCL_KVS_IFACE pinned to wlxe865d47e3a48; no power-limit increase; quality canaries passed at 64 and 256 generated tokens with no NUL/control output."
+  }
+}

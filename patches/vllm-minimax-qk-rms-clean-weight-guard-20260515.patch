@@ -1,5 +1,5 @@
 diff --git a/vllm/model_executor/layers/mamba/linear_attn.py b/vllm/model_executor/layers/mamba/linear_attn.py
-index b277c9ed6..d0f06f426 100644
+index b277c9ed6..5cab2b4ea 100644
 --- a/vllm/model_executor/layers/mamba/linear_attn.py
 +++ b/vllm/model_executor/layers/mamba/linear_attn.py
 @@ -2,6 +2,7 @@
@@ -42,7 +42,7 @@ index b277c9ed6..d0f06f426 100644
  
  @CustomOp.register("minimax_text01_rmsnorm_tp")
  class MiniMaxText01RMSNormTP(CustomOp):
-@@ -74,7 +96,81 @@ class MiniMaxText01RMSNormTP(CustomOp):
+@@ -74,7 +96,83 @@ class MiniMaxText01RMSNormTP(CustomOp):
  
          shard_size = loaded_weight.shape[0] // shard_world_size
          shard = slice(shard_rank * shard_size, (shard_rank + 1) * shard_size)
@@ -80,6 +80,8 @@ index b277c9ed6..d0f06f426 100644
 +            "_minimax_clean_weight_xpu",
 +            getattr(norm.weight, "_minimax_clean_weight_xpu", None),
 +        )
++        if torch.compiler.is_compiling():
++            return clean_weight_xpu if clean_weight_xpu is not None else norm.weight
 +        if norm.weight.is_xpu and torch.xpu.is_current_stream_capturing():
 +            return clean_weight_xpu if clean_weight_xpu is not None else norm.weight
 +        min_tokens = int(
@@ -125,7 +127,7 @@ index b277c9ed6..d0f06f426 100644
  
      def _forward(
          self,
-@@ -84,7 +180,8 @@ class MiniMaxText01RMSNormTP(CustomOp):
+@@ -84,7 +182,8 @@ class MiniMaxText01RMSNormTP(CustomOp):
          x = x.to(torch.float32)
          variance = x.pow(2).mean(dim=-1, keepdim=True, dtype=torch.float32)
          if self.tp_world > 1:
@@ -135,7 +137,7 @@ index b277c9ed6..d0f06f426 100644
          x = x * torch.rsqrt(variance + self.variance_epsilon)
          x = (x * self.weight).to(orig_dtype)
          return x
-@@ -103,18 +200,129 @@ class MiniMaxText01RMSNormTP(CustomOp):
+@@ -103,18 +202,129 @@ class MiniMaxText01RMSNormTP(CustomOp):
          k_norm: "MiniMaxText01RMSNormTP",
          q: torch.Tensor,
          k: torch.Tensor,

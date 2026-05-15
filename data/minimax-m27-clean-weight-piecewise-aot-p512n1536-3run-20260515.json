@@ -1,0 +1,47 @@
+{
+  "runs": [
+    {
+      "elapsed_time": 23.768866664999223,
+      "num_requests": 1,
+      "total_num_tokens": 2048,
+      "requests_per_second": 0.04207184188014093,
+      "tokens_per_second": 86.16313217052863,
+      "output_tokens_per_second": 64.62234912789647,
+      "prompt_plus_output_tokens": 2048
+    },
+    {
+      "elapsed_time": 23.042700478996267,
+      "num_requests": 1,
+      "total_num_tokens": 2048,
+      "requests_per_second": 0.04339769120861131,
+      "tokens_per_second": 88.87847159523596,
+      "output_tokens_per_second": 66.65885369642697,
+      "prompt_plus_output_tokens": 2048
+    },
+    {
+      "elapsed_time": 23.28113246999419,
+      "num_requests": 1,
+      "total_num_tokens": 2048,
+      "requests_per_second": 0.04295323697371022,
+      "tokens_per_second": 87.96822932215854,
+      "output_tokens_per_second": 65.9761719916189,
+      "prompt_plus_output_tokens": 2048
+    }
+  ],
+  "output_toks_per_second": [
+    64.62234912789647,
+    66.65885369642697,
+    65.9761719916189
+  ],
+  "total_toks_per_second": [
+    86.16313217052863,
+    88.87847159523596,
+    87.96822932215854
+  ],
+  "mean_output_toks_per_second": 65.75245827198079,
+  "min_output_toks_per_second": 64.62234912789647,
+  "max_output_toks_per_second": 66.65885369642697,
+  "mean_total_toks_per_second": 87.66994436264105,
+  "min_total_toks_per_second": 86.16313217052863,
+  "max_total_toks_per_second": 88.87847159523596
+}

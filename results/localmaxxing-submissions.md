@@ -1,5 +1,22 @@
 # LocalMaxxing Submissions
 
+Date: 2026-05-15
+
+Model: `Lasimeri/MiniMax-M2.7-int4-AutoRound`, AutoRound W4A16 safetensors,
+vLLM/XPU TP4.
+
+| Label | LocalMaxxing ID | GPUs | Input | Output | tok/s out | tok/s total |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| `vllm-minimax-m27-clean-weight-piecewise-aot-p512-n1536` | `cmp6a5c1o00mpo3011hg8ncyp` | 4 | 512 | 1536 | 65.752 | 87.670 |
+
+Note: repaired piecewise/AOT compiled path with the default-off MiniMax Q/K
+RMSNorm clean-weight guard enabled. Three p512/n1536 repeats were `64.622`,
+`66.659`, and `65.976` output tok/s. Raw-prompt quality canaries at 64 and
+256 generated tokens both passed with `0` NUL tokens, `0` non-space control
+chars, and nontrivial token diversity. This supersedes the earlier quality-
+corrected `~61` tok/s TP4 baseline, but the older `~73` tok/s AOT diagnostic
+remains invalid because it failed the raw corruption gate.
+
 Date: 2026-05-09
 
 Model: `Lasimeri/MiniMax-M2.7-int4-AutoRound`, AutoRound W4A16 safetensors, vLLM/XPU TP4.

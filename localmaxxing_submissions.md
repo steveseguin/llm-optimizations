@@ -22,6 +22,16 @@ Model: `Lasimeri/MiniMax-M2.7-int4-AutoRound`, AutoRound W4A16 safetensors, vLLM
 | `vllm-minimax-m27-autoround-ep-tuned-p512-n1536` | `cmozofyv5005hlo01puv9rjs6` | 4 | 512 | 1536 | 30.911 | 41.214 |
 | `vllm-minimax-m27-autoround-quality-qkallreduce-p512-n1536` | `cmozow03v005wlo01q81bnspx` | 4 | 512 | 1536 | 37.553 | 50.070 |
 | `vllm-minimax-m27-autoround-full-decode-graph-triton-p512-n1536` | `cmp52gqmb000vo3015qj4kl9t` | 4 | 512 | 1536 | 61.753 | 82.337 |
+| `vllm-minimax-m27-clean-weight-piecewise-aot-p512-n1536` | `cmp6a5c1o00mpo3011hg8ncyp` | 4 | 512 | 1536 | 65.752 | 87.670 |
+
+Note: `cmp6a5c1o00mpo3011hg8ncyp` is the current quality-gated MiniMax
+AutoRound high on the four B70 system. It repairs the previously invalid fast
+piecewise/AOT path with the default-off MiniMax Q/K RMSNorm clean-weight guard.
+Three p512/n1536 repeats were `64.622`, `66.659`, and `65.976` output tok/s.
+Raw-prompt quality canaries at 64 and 256 generated tokens both passed with
+`0` NUL tokens, `0` non-space control chars, and nontrivial token diversity.
+It keeps the same model/quantization, no speculative decoding, no expert
+dropping, and no power-limit increase.
 
 Note: `cmp52gqmb000vo3015qj4kl9t` is the current quality-cleared MiniMax AutoRound reference on the four B70 system. It uses `CompilationMode.NONE`, `TRITON_ATTN`, `FULL_DECODE_ONLY` XPU graph capture, the unsigned llm-scaler INT4 MoE decode path, MiniMax attention delayed allreduce, no speculative decoding, no expert dropping, and no power-limit changes. It is the mean of two p512/n1536 repeats: `61.761` and `61.744` output tok/s. Separate chat-template smoke under the same recipe passed with `nul_token_count=0`, `control_char_output=false`, and `degenerate_output=false`.
 

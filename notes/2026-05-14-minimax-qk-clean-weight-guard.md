@@ -104,6 +104,31 @@ This is not a LocalMaxxing submission because it is a server-latency probe with
 multiple queued requests and shorter output length. Use it to track interactive
 latency and prefill/first-token behavior, not as the headline decode result.
 
+Piecewise/AOT compiled path repair:
+
+- Short canary JSON:
+  `/home/steve/bench-results/minimax-m2.7-quality-gated/compiled-piecewise-raw145-clean-weight-dynamo-safe-ctx2048-n64-20260515T015044Z.json`
+- Longer canary JSON:
+  `/home/steve/bench-results/minimax-m2.7-quality-gated/compiled-piecewise-raw145-clean-weight-dynamo-safe-ctx2048-n256-20260515T020231Z.json`
+- Throughput summary:
+  `/home/steve/bench-results/minimax-m2.7-quality-gated/piecewise-throughput/minimax-clean-weight-piecewise-tp4-ctx2048-mbt512-bs256-p512n1536-3run-20260515T020502Z-summary.json`
+- Local records:
+  - `data/minimax-m27-clean-weight-piecewise-aot-quality64-20260515.json`
+  - `data/minimax-m27-clean-weight-piecewise-aot-quality256-20260515.json`
+  - `data/minimax-m27-clean-weight-piecewise-aot-p512n1536-3run-20260515.json`
+- Quality gates: both raw-prompt canaries passed on the compiled piecewise/AOT
+  recipe; the 256-token canary generated `0` NUL tokens, `0` non-space control
+  chars, and `28` distinct generated token ids.
+- Throughput repeats: `64.6223`, `66.6589`, and `65.9762` output tok/s.
+- Mean: `65.7525` output tok/s, `87.6699` total tok/s.
+- LocalMaxxing submission: `cmp6a5c1o00mpo3011hg8ncyp`
+
+This is the first repaired piecewise/AOT result promoted after the raw-prompt
+NUL-token failure was understood. It is slower than the old invalid `~73` tok/s
+speed-only diagnostic, but faster than the earlier quality-corrected
+full-decode graph baseline. The important distinction is that this result keeps
+the same model/quantization and passes the corruption gates.
+
 ## Reproduction
 
 ```bash
@@ -136,3 +161,6 @@ INPUT_LEN=512 OUTPUT_LEN=1536 DTYPE=float16 BLOCK_SIZE=256 \
   repair is proven for the earlier raw-prompt boundary, not for 128k-style use.
 - Continue profiling the valid graph path. The likely remaining speed limit is
   still TP communication plus MiniMax MoE dispatch, not model quality.
+- For the compiled recipe, the clean-weight guard needed a Dynamo-safe branch:
+  under `torch.compiler.is_compiling()`, return the clean XPU copy directly and
+  avoid calling stream-capture inspection from inside Dynamo tracing.
