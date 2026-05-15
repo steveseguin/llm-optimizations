@@ -61,6 +61,8 @@ fi
   echo "json=$json"
   echo "model=$MODEL"
   echo "vllm_cache_root=${VLLM_CACHE_ROOT:-}"
+  echo "ccl_topo_p2p_access=${CCL_TOPO_P2P_ACCESS:-}"
+  echo "ccl_topo_fabric_vertex_connection_check=${CCL_TOPO_FABRIC_VERTEX_CONNECTION_CHECK:-}"
   echo "extra_args=$EXTRA_ARGS"
   echo "run_timeout=$RUN_TIMEOUT"
   echo "shm_stall_max_warnings=$SHM_STALL_MAX_WARNINGS"

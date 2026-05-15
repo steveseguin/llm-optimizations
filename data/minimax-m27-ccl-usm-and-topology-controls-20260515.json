@@ -1,0 +1,105 @@
+{
+  "baseline": {
+    "description": "Accepted quality-valid MiniMax AutoRound W4A16 TP4 piecewise/AOT recipe with Q/K RMS clean-weight guard.",
+    "localmaxxing_id": "cmp6a5c1o00mpo3011hg8ncyp",
+    "mean_output_tok_s": 65.75245827198079,
+    "mean_total_tok_s": 87.66994436264105,
+    "output_tok_s_repeats": [
+      64.622349,
+      66.658854,
+      65.976172
+    ],
+    "command_shape": "VLLM_MINIMAX_QK_NORM_RESTORE_WEIGHT=1 VLLM_XPU_USE_LLM_SCALER_MOE=1 VLLM_MINIMAX_M2_ATTN_DELAY_ALLREDUCE=1 VLLM_XPU_ENABLE_XPU_GRAPH=1 VLLM_XPU_FORCE_GRAPH_WITH_COMM=1 VLLM_XPU_GRAPH_NOOP_COMM_CAPTURE=1 CCL_TOPO_P2P_ACCESS=1 vllm bench throughput ... --tensor-parallel-size 4 --max-model-len 2048 --max-num-batched-tokens 512 --random-input-len 512 --random-output-len 1536 --block-size 256 --attention-backend TRITON_ATTN --compilation-config '{\"use_inductor_graph_partition\":true,\"compile_sizes\":[1],\"cudagraph_mode\":\"PIECEWISE\"}'"
+  },
+  "ccl_usm_control": {
+    "description": "Switch oneCCL from P2P mode to USM mode while reusing the accepted clean-weight AOT recipe.",
+    "environment_delta": {
+      "CCL_TOPO_P2P_ACCESS": "0"
+    },
+    "quality_json": "/home/steve/bench-results/minimax-m2.7-quality-gated/ccl-usm/compiled-piecewise-raw145-ccl-usm-clean-weight-ctx2048-n64-20260515T123841Z.json",
+    "quality_log": "/home/steve/bench-results/minimax-m2.7-quality-gated/ccl-usm/compiled-piecewise-raw145-ccl-usm-clean-weight-ctx2048-n64-20260515T123841Z.log",
+    "quality_result": {
+      "passed": true,
+      "combined_token_sha256": "267cbf30208d84929ee79284ac695467f7e80597bf8694130e1e1f8b180eb5bd",
+      "combined_text_sha256": "4f72ba3cd480774951b53d131d188c21f24e113e69ce011580567d7d9baf3a07",
+      "generated_tokens": 64,
+      "distinct_generated_tokens": 28,
+      "nul_tokens": 0,
+      "control_nonspace_chars": 0
+    },
+    "throughput_runs": [
+      {
+        "json": "/home/steve/bench-results/minimax-m2.7-quality-gated/ccl-usm-throughput/vllm-minimax-m27-autoround-ccl-usm-tp4-p512n1536-run1-20260515T124128Z.json",
+        "log": "/home/steve/bench-results/minimax-m2.7-quality-gated/ccl-usm-throughput/vllm-minimax-m27-autoround-ccl-usm-tp4-p512n1536-run1-20260515T124128Z.log",
+        "elapsed_s": 25.379305306996685,
+        "output_tok_s": 60.52175114409252,
+        "total_tok_s": 80.69566819212336
+      },
+      {
+        "json": "/home/steve/bench-results/minimax-m2.7-quality-gated/ccl-usm-throughput/vllm-minimax-m27-autoround-ccl-usm-tp4-p512n1536-run2-20260515T124128Z.json",
+        "log": "/home/steve/bench-results/minimax-m2.7-quality-gated/ccl-usm-throughput/vllm-minimax-m27-autoround-ccl-usm-tp4-p512n1536-run2-20260515T124128Z.log",
+        "elapsed_s": 25.69557395800075,
+        "output_tok_s": 59.77683170302333,
+        "total_tok_s": 79.70244227069777
+      },
+      {
+        "json": "/home/steve/bench-results/minimax-m2.7-quality-gated/ccl-usm-throughput/vllm-minimax-m27-autoround-ccl-usm-tp4-p512n1536-run3-20260515T124128Z.json",
+        "log": "/home/steve/bench-results/minimax-m2.7-quality-gated/ccl-usm-throughput/vllm-minimax-m27-autoround-ccl-usm-tp4-p512n1536-run3-20260515T124128Z.log",
+        "elapsed_s": 25.591319705999922,
+        "output_tok_s": 60.020351339672516,
+        "total_tok_s": 80.02713511956335
+      }
+    ],
+    "mean_output_tok_s": 60.10631139559612,
+    "mean_total_tok_s": 80.1417485274615,
+    "decision": "Rejected as a speed path. Quality passed, but USM mode is about 8.6 percent slower than the accepted P2P baseline."
+  },
+  "topology_assume_fabric_control": {
+    "description": "Keep P2P enabled but disable oneCCL topology vertex connection checking, making oneCCL assume fabric-style connectivity despite the PCIe topology warning.",
+    "environment_delta": {
+      "CCL_TOPO_P2P_ACCESS": "1",
+      "CCL_TOPO_FABRIC_VERTEX_CONNECTION_CHECK": "0"
+    },
+    "quality_json": "/home/steve/bench-results/minimax-m2.7-quality-gated/ccl-topology-assume-xelink/compiled-piecewise-raw145-ccl-topology-assume-xelink-clean-weight-ctx2048-n64-20260515T125120Z.json",
+    "quality_log": "/home/steve/bench-results/minimax-m2.7-quality-gated/ccl-topology-assume-xelink/compiled-piecewise-raw145-ccl-topology-assume-xelink-clean-weight-ctx2048-n64-20260515T125120Z.log",
+    "quality_result": {
+      "passed": true,
+      "combined_token_sha256": "267cbf30208d84929ee79284ac695467f7e80597bf8694130e1e1f8b180eb5bd",
+      "combined_text_sha256": "4f72ba3cd480774951b53d131d188c21f24e113e69ce011580567d7d9baf3a07",
+      "generated_tokens": 64,
+      "distinct_generated_tokens": 28,
+      "nul_tokens": 0,
+      "control_nonspace_chars": 0
+    },
+    "throughput_runs": [
+      {
+        "json": "/home/steve/bench-results/minimax-m2.7-quality-gated/ccl-topology-assume-xelink-throughput/vllm-minimax-m27-autoround-tp4-p512n1536-20260515T125430Z.json",
+        "log": "/home/steve/bench-results/minimax-m2.7-quality-gated/ccl-topology-assume-xelink-throughput/vllm-minimax-m27-autoround-tp4-p512n1536-20260515T125430Z.log",
+        "elapsed_s": 23.208017381999525,
+        "output_tok_s": 66.18402488750908,
+        "total_tok_s": 88.24536651667879
+      },
+      {
+        "json": "/home/steve/bench-results/minimax-m2.7-quality-gated/ccl-topology-assume-xelink-throughput/vllm-minimax-m27-autoround-tp4-p512n1536-20260515T125703Z.json",
+        "log": "/home/steve/bench-results/minimax-m2.7-quality-gated/ccl-topology-assume-xelink-throughput/vllm-minimax-m27-autoround-tp4-p512n1536-20260515T125703Z.log",
+        "elapsed_s": 23.28382452999358,
+        "output_tok_s": 65.96854387136302,
+        "total_tok_s": 87.9580584951507
+      },
+      {
+        "json": "/home/steve/bench-results/minimax-m2.7-quality-gated/ccl-topology-assume-xelink-throughput/vllm-minimax-m27-autoround-tp4-p512n1536-20260515T125946Z.json",
+        "log": "/home/steve/bench-results/minimax-m2.7-quality-gated/ccl-topology-assume-xelink-throughput/vllm-minimax-m27-autoround-tp4-p512n1536-20260515T125946Z.log",
+        "elapsed_s": 23.191920367011335,
+        "output_tok_s": 66.22996180104334,
+        "total_tok_s": 88.30661573472447
+      }
+    ],
+    "mean_output_tok_s": 66.12751018663849,
+    "mean_total_tok_s": 88.17001358218465,
+    "decision": "Quality-valid and stable, but only about 0.6 percent above the accepted mean and below the accepted run maximum. Record as a useful CCL boundary condition, not a LocalMaxxing-worthy new tier."
+  },
+  "localmaxxing": {
+    "submitted": false,
+    "reason": "The USM control is a clear regression. The topology override is valid and slightly faster on mean, but the gain is small enough to treat as repeatability-level evidence rather than a public leaderboard update."
+  }
+}

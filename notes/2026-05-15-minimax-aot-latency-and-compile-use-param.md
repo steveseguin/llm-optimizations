@@ -161,12 +161,59 @@ Decision: neutral diagnostic. The fused RMS/INT4 markers alone do not explain
 the old invalid `~73` tok/s result. This candidate is quality-valid but is
 slightly below the accepted baseline. Do not submit to LocalMaxxing.
 
+## CCL P2P/USM And Topology Controls
+
+Record:
+`data/minimax-m27-ccl-usm-and-topology-controls-20260515.json`
+
+USM control:
+
+```bash
+CCL_TOPO_P2P_ACCESS=0
+```
+
+- Quality JSON:
+  `/home/steve/bench-results/minimax-m2.7-quality-gated/ccl-usm/compiled-piecewise-raw145-ccl-usm-clean-weight-ctx2048-n64-20260515T123841Z.json`
+- Quality: passed with the same raw-prompt token/text hashes as the accepted
+  clean-weight canary; `64` generated tokens, `28` distinct token ids, `0`
+  NUL, `0` non-space control characters.
+- Three p512/n1536 repeats: `60.5218`, `59.7768`, `60.0204` output tok/s.
+- Mean: `60.1063` output tok/s, `80.1417` total tok/s.
+
+Decision: reject USM mode for this TP4 MiniMax decode path. It is quality-safe
+but about `8.6%` slower than the accepted P2P baseline.
+
+Topology-recognition override:
+
+```bash
+CCL_TOPO_P2P_ACCESS=1
+CCL_TOPO_FABRIC_VERTEX_CONNECTION_CHECK=0
+```
+
+- Quality JSON:
+  `/home/steve/bench-results/minimax-m2.7-quality-gated/ccl-topology-assume-xelink/compiled-piecewise-raw145-ccl-topology-assume-xelink-clean-weight-ctx2048-n64-20260515T125120Z.json`
+- Quality: passed with the same raw-prompt token/text hashes as the accepted
+  clean-weight canary; `64` generated tokens, `28` distinct token ids, `0`
+  NUL, `0` non-space control characters.
+- Three p512/n1536 repeats: `66.1840`, `65.9685`, `66.2300` output tok/s.
+- Mean: `66.1275` output tok/s, `88.1700` total tok/s.
+
+Decision: useful CCL boundary condition, but not a meaningful new public result.
+The mean is only about `0.6%` above the accepted `65.7525` tok/s baseline and
+below the accepted run maximum of `66.6589` tok/s. Do not submit to
+LocalMaxxing unless later repeats show a larger, stable gap.
+
 ## Next Work
 
-1. Continue to treat `65.7525` output tok/s as the quality-valid baseline.
-2. Move beyond graph-shape counters: the provider-priority and custom-RMS
+1. Continue to treat `65.7525` output tok/s as the published quality-valid
+   baseline; treat `66.1275` with topology override as a local repeatability
+   datapoint, not yet a new tier.
+2. Keep P2P enabled. USM mode is rejected for this path.
+3. Move beyond graph-shape counters: the provider-priority and custom-RMS
    controls show that nicer AOT markers do not automatically improve decode.
-3. Target actual runtime costs next: communication scheduling, allreduce
+4. Target actual runtime costs next: communication scheduling, allreduce
    placement, TTFT/prefill, or a real fused allreduce/RMS/MoE epilogue path.
-4. Run the raw quality canary before any speed benchmark.
-5. Promote only repeatable improvements over `65.7525` output tok/s.
+5. Run the raw quality canary before any speed benchmark.
+6. Promote only repeatable improvements that clearly exceed the current
+   noise band, ideally by at least `3%` on mean output tok/s while preserving
+   token/text quality hashes.
