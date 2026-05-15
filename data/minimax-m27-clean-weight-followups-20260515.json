@@ -21,6 +21,14 @@
       "total_toks_per_second": 86.65038461316973,
       "result": "negative for speed: quality passed, slower than promoted 65.75 tok/s mean",
       "note": "Patched the optional Q/K RMS XPU helper to consume clean guarded Q/K norm weights. This makes the helper compatible with the clean-weight repair when enabled, but the first p512/n1536 throughput sample was not faster."
+    },
+    {
+      "label": "ccl-ipc-pidfd",
+      "throughput_json": "/home/steve/bench-results/minimax-m2.7-quality-gated/piecewise-throughput-cclipc-pidfd/vllm-minimax-m27-autoround-tp4-p512n1536-20260515T023930Z.json",
+      "output_toks_per_second": 48.97476618561618,
+      "total_toks_per_second": 65.29968824748825,
+      "result": "negative: much slower than promoted 65.75 tok/s mean",
+      "note": "Forcing CCL_ZE_IPC_EXCHANGE=pidfd through CCL_IPC=pidfd on the repaired piecewise/AOT path reached only about 48.97 output tok/s / 65.30 total tok/s. Leave IPC exchange at the default for the headline recipe."
     }
   ]
 }

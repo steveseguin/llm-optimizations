@@ -143,6 +143,10 @@ Follow-up controls:
   Q/K norm weights when `VLLM_MINIMAX_QK_RMS_XPU_HELPER=1`. The helper-enabled
   raw quality gate passed, but one p512/n1536 sample reached only `64.9878`
   output tok/s, so the helper remains off for the headline recipe.
+- Forcing `CCL_ZE_IPC_EXCHANGE=pidfd` through `CCL_IPC=pidfd` was also a
+  negative on the repaired piecewise/AOT path: one p512/n1536 sample reached
+  only `48.9748` output tok/s and `65.2997` total tok/s. Leave IPC exchange at
+  the default for the current headline recipe.
 - Patch snapshot:
   `patches/vllm-minimax-qk-rms-helper-clean-weight-guard-20260515.patch`
 

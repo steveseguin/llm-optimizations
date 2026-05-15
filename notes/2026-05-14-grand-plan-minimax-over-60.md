@@ -230,6 +230,9 @@ Rules:
   helper reached `64.9878` output tok/s after quality passed. Keep the helper
   patch as a compatibility improvement, but leave it disabled for the headline
   recipe.
+- `CCL_IPC=pidfd` is also rejected for this repaired path. It fell to
+  `48.9748` output tok/s on a p512/n1536 sample, so the current default IPC
+  exchange remains preferred.
 
 See `notes/2026-05-14-minimax-compiled-path-repair.md` for the active repair
 matrix and exact JSON/log paths.
