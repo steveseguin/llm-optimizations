@@ -1,0 +1,94 @@
+{
+  "date_utc": "2026-05-15",
+  "model": "/mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround",
+  "hardware": "4x Intel Arc Pro B70 32GB",
+  "engine": "vLLM 0.20.1-local XPU",
+  "baseline": {
+    "description": "Accepted clean-weight piecewise/AOT TP4 p512/n1536 result",
+    "quality_valid": true,
+    "localmaxxing_id": "cmp6a5c1o00mpo3011hg8ncyp",
+    "output_tps_runs": [
+      64.622349,
+      66.658854,
+      65.976172
+    ],
+    "mean_output_tps": 65.752458,
+    "mean_total_tps": 87.669944
+  },
+  "experiments": [
+    {
+      "name": "clean-weight rms_norm priority xpu_kernels,native",
+      "quality_json": "/home/steve/bench-results/minimax-m2.7-quality-gated/rms-xpu-priority/compiled-piecewise-raw145-rms-xpu-priority-clean-weight-ctx2048-n64-20260515T120232Z.json",
+      "aot_cache": "/mnt/fast-ai/vllm-cache-exp/minimax-rms-xpu-priority-cleanweight-20260515T120232Z/torch_compile_cache/torch_aot_compile/1adc6533d493aed52ae552ea450e8ca00e84179d617c46903552857b0a7b395e/inductor_cache",
+      "quality_valid": true,
+      "quality_summary": {
+        "generated_tokens": 64,
+        "distinct_generated_token_count": 28,
+        "nul_token_count": 0,
+        "control_nonspace_text_chars": 0
+      },
+      "aot_summary": {
+        "all_reduce_call_lines": 1496,
+        "wait_tensor_call_lines": 1496,
+        "rms_int4_lines": 0,
+        "fused_add_rms_lines": 0,
+        "allreduce_rms_moe_boundary_lines": 0,
+        "compiled_int4_rms_kernels": 0,
+        "compiled_ar_rms_moe_kernels": 0
+      },
+      "throughput": {
+        "timestamp": "20260515T121219Z",
+        "json_glob": "/home/steve/bench-results/minimax-m2.7-quality-gated/rms-xpu-priority-throughput/*20260515T121219Z.json",
+        "output_tps_runs": [
+          65.42497225187695,
+          65.99017546310189,
+          66.35406747947036
+        ],
+        "mean_output_tps": 65.92307173148306,
+        "min_output_tps": 65.42497225187695,
+        "max_output_tps": 66.35406747947036,
+        "mean_total_tps": 87.89742897531075
+      },
+      "decision": "neutral diagnostic; quality valid but not meaningfully faster than baseline"
+    },
+    {
+      "name": "clean-weight compilation custom_ops none,+rms_norm",
+      "quality_json": "/home/steve/bench-results/minimax-m2.7-quality-gated/custom-rms-op/compiled-piecewise-raw145-custom-rms-op-clean-weight-ctx2048-n64-20260515T122132Z.json",
+      "aot_cache": "/mnt/fast-ai/vllm-cache-exp/minimax-custom-rms-op-cleanweight-20260515T122132Z/torch_compile_cache/torch_aot_compile/e970952d6f89295d3966efc4ee9a87f45890fccc42b51034a54240246322c323/inductor_cache",
+      "quality_valid": true,
+      "quality_summary": {
+        "generated_tokens": 64,
+        "distinct_generated_token_count": 28,
+        "nul_token_count": 0,
+        "control_nonspace_text_chars": 0
+      },
+      "aot_summary": {
+        "all_reduce_call_lines": 1496,
+        "wait_tensor_call_lines": 1496,
+        "rms_int4_lines": 32,
+        "fused_add_rms_lines": 992,
+        "allreduce_rms_moe_boundary_lines": 0,
+        "compiled_int4_rms_kernels": 24,
+        "compiled_ar_rms_moe_kernels": 0
+      },
+      "throughput": {
+        "timestamp": "20260515T122720Z",
+        "json_glob": "/home/steve/bench-results/minimax-m2.7-quality-gated/custom-rms-op-throughput/*20260515T122720Z.json",
+        "output_tps_runs": [
+          65.13077543969219,
+          65.72451405595196,
+          66.04665909809074
+        ],
+        "mean_output_tps": 65.6339828645783,
+        "min_output_tps": 65.13077543969219,
+        "max_output_tps": 66.04665909809074,
+        "mean_total_tps": 87.51197715277107
+      },
+      "decision": "neutral diagnostic; quality valid but slightly below baseline"
+    }
+  ],
+  "localmaxxing": {
+    "submitted": false,
+    "reason": "Both experiments were quality-valid but did not materially improve the already submitted baseline."
+  }
+}

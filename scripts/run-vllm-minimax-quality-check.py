@@ -131,6 +131,14 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--compilation-custom-ops",
+        default=None,
+        help=(
+            "Comma-separated compilation_config.custom_ops entries, for example "
+            "'none,+rms_norm'. Leave unset for vLLM defaults."
+        ),
+    )
+    parser.add_argument(
         "--rms-norm-priority",
         default=None,
         help=(
@@ -665,6 +673,13 @@ def main() -> None:
             if part
         ]
         compilation_config["compile_ranges_endpoints"] = endpoints
+    if args.compilation_custom_ops is not None:
+        custom_ops = [
+            part.strip()
+            for part in args.compilation_custom_ops.split(",")
+            if part.strip()
+        ]
+        compilation_config["custom_ops"] = custom_ops
     inductor_compile_config = {}
     if args.inductor_disable_combo_kernels:
         inductor_compile_config["combo_kernels"] = False
@@ -912,6 +927,7 @@ def main() -> None:
             "async_scheduling": args.async_scheduling,
             "cudagraph_num_warmups": args.cudagraph_num_warmups,
             "compile_ranges_endpoints": args.compile_ranges_endpoints,
+            "compilation_custom_ops": args.compilation_custom_ops,
         },
         "prompt_diagnostics": prompt_diagnostics,
         "compilation_config": compilation_config,

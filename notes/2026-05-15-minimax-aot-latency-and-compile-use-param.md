@@ -106,11 +106,67 @@ Decision: reject this as a speed route. It is quality-safe in this canary, but
 it does not improve speed or graph shape. Do not submit this control to
 LocalMaxxing.
 
+## RMSNorm Provider Priority Control
+
+Tested:
+
+```bash
+--ir-op-priority '{"rms_norm":["xpu_kernels","native"]}'
+VLLM_MINIMAX_QK_NORM_RESTORE_WEIGHT=1
+```
+
+Result:
+
+- Quality JSON:
+  `/home/steve/bench-results/minimax-m2.7-quality-gated/rms-xpu-priority/compiled-piecewise-raw145-rms-xpu-priority-clean-weight-ctx2048-n64-20260515T120232Z.json`
+- AOT hash:
+  `1adc6533d493aed52ae552ea450e8ca00e84179d617c46903552857b0a7b395e`
+- AOT graph: `1496` allreduce calls, `1496` wait-tensor calls,
+  `0` allreduce/RMS/MoE boundary lines.
+- Quality: passed; `64` generated tokens, `28` distinct token ids, `0` NUL,
+  `0` non-space control characters.
+- Three p512/n1536 repeats: `65.4250`, `65.9902`, `66.3541` output tok/s.
+- Mean: `65.9231` output tok/s, `87.8974` total tok/s.
+
+Decision: neutral diagnostic. This restored the boundary count to the old
+fast-graph shape, but did not deliver a meaningful throughput gain over the
+accepted `65.7525` tok/s baseline. Do not submit to LocalMaxxing as a new win.
+
+## Custom RMS Op Control
+
+Added harness support for:
+
+```bash
+--compilation-custom-ops 'none,+rms_norm'
+```
+
+Tested with the clean Q/K weight guard enabled.
+
+Result:
+
+- Quality JSON:
+  `/home/steve/bench-results/minimax-m2.7-quality-gated/custom-rms-op/compiled-piecewise-raw145-custom-rms-op-clean-weight-ctx2048-n64-20260515T122132Z.json`
+- AOT hash:
+  `e970952d6f89295d3966efc4ee9a87f45890fccc42b51034a54240246322c323`
+- AOT graph: `1496` allreduce calls, `1496` wait-tensor calls,
+  `32` RMS+INT4 source lines, `24` compiled INT4/RMS kernels, and `0`
+  allreduce/RMS/MoE boundary lines.
+- Quality: passed with the same token and text hashes as the accepted
+  clean-weight canary; `64` generated tokens, `28` distinct token ids, `0`
+  NUL, `0` non-space control characters.
+- Three p512/n1536 repeats: `65.1308`, `65.7245`, `66.0467` output tok/s.
+- Mean: `65.6340` output tok/s, `87.5120` total tok/s.
+
+Decision: neutral diagnostic. The fused RMS/INT4 markers alone do not explain
+the old invalid `~73` tok/s result. This candidate is quality-valid but is
+slightly below the accepted baseline. Do not submit to LocalMaxxing.
+
 ## Next Work
 
-1. Inspect why the valid clean-weight graph has Aten RMS/MoE boundary kernels
-   where the old invalid graph stayed in `vllm_ir.rms_norm`.
-2. Try a minimal graph-shape repair that does not change model math or router
-   behavior.
-3. Run the raw quality canary before any speed benchmark.
-4. Promote only repeatable improvements over `65.7525` output tok/s.
+1. Continue to treat `65.7525` output tok/s as the quality-valid baseline.
+2. Move beyond graph-shape counters: the provider-priority and custom-RMS
+   controls show that nicer AOT markers do not automatically improve decode.
+3. Target actual runtime costs next: communication scheduling, allreduce
+   placement, TTFT/prefill, or a real fused allreduce/RMS/MoE epilogue path.
+4. Run the raw quality canary before any speed benchmark.
+5. Promote only repeatable improvements over `65.7525` output tok/s.
