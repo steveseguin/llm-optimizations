@@ -332,6 +332,34 @@ the same accepted cache still completed, treat this as harness/runtime
 instability after repeated graph experiments, not as a quality failure of the
 published baseline.
 
+## Deferred XPU Output-Copy Screen
+
+Record:
+`data/minimax-m27-deferred-output-copy-20260515.json`
+
+Patch:
+`patches/vllm-xpu-deferred-output-copy-inference-mode-20260515.patch`
+
+The default-off `VLLM_XPU_DEFER_ASYNC_OUTPUT_COPY=1` path first failed in the
+async output thread:
+
+```text
+RuntimeError: Inplace update to inference tensor outside InferenceMode is not allowed.
+```
+
+Wrapping `finish_deferred_xpu_output_copy()` in `torch.inference_mode()` fixed
+the crash. The completed p512/n1536 runs were slower than a same-session
+baseline repeat:
+
+| Candidate | Output tok/s | Total tok/s | Decision |
+| --- | ---: | ---: | --- |
+| same-session baseline | `66.1183` | `88.1577` | keep |
+| deferred copy, global XPU sync | `62.4365` | `83.2486` | reject |
+| deferred copy, no global XPU sync | `62.0221` | `82.6961` | reject |
+
+Decision: keep `VLLM_XPU_DEFER_ASYNC_OUTPUT_COPY` unset for MiniMax TP4 decode.
+This was not submitted to LocalMaxxing because it is a negative result.
+
 ## Skip-Compiled Prefill Profile Patch
 
 Record:
