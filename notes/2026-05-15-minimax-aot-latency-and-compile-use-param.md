@@ -360,6 +360,13 @@ Validated controls:
 - Same long-context settings with piecewise graph capture: rejected. It hung
   after model load with repeated shared-memory broadcast waits while the
   workers remained CPU-bound.
+- Same long-context settings with `FULL_DECODE_ONLY` and the default
+  FlashAttention backend: rejected. XPU/SYCL graph capture fails because
+  `sycl_ext_oneapi_work_group_scratch_memory` is not available for the SYCL
+  Graph extension.
+- Same long-context settings with `FULL_DECODE_ONLY` and `TRITON_ATTN`:
+  rejected for quality. It reached generation, but produced `45/48` NUL
+  tokens and only `2` distinct token ids.
 - Current accepted p512/n1536 piecewise recipe after the patch: non-regressing.
   One repeat produced `66.0956` output tok/s and `88.1275` total tok/s.
 - Current accepted raw 145-token quality canary after the patch: passed and
@@ -389,6 +396,7 @@ Do not submit to LocalMaxxing because there is no new speed win.
    prefill path currently corrupts into token id `0` or hangs; debug it with
    finite tracing and source-level shape guards before spending more benchmark
    time on long-context speed.
-8. For long-context speed, next try to isolate decode graph capture from
-   prefill graph capture more narrowly. The no-graph prefill workaround is
-   correct but slow; full piecewise capture still hangs at `8192`/`MBT1024`.
+8. For long-context speed, do not use the currently tested graph-capture
+   variants. The no-graph prefill workaround is correct but slow; piecewise
+   capture hangs; FlashAttention full-decode capture fails at SYCL Graph
+   startup; Triton full-decode capture corrupts into NUL tokens.

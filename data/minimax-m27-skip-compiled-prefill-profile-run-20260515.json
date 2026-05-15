@@ -76,6 +76,37 @@
       "decision": "rejected_until_piecewise_capture_hang_is_fixed"
     },
     {
+      "name": "skip_compiled_prefill_disable_auto_ranges_full_decode_only_flash",
+      "mode": "graph",
+      "cudagraph_mode": "full_decode_only",
+      "attention_backend": "FlashAttention",
+      "max_model_len": 8192,
+      "max_num_batched_tokens": 1024,
+      "quality_log": "/home/steve/bench-results/minimax-m2.7-quality-gated/prefill-longctx-8192-skipcompiled-disableautorange-fulldecodeonly-patched2-20260515T151021Z.log",
+      "outcome": "failed_engine_startup",
+      "failure": "SYCL Graph capture of FlashAttention failed: sycl_ext_oneapi_work_group_scratch_memory is not yet available for use with the SYCL Graph extension.",
+      "decision": "rejected_for_backend_graph_compatibility"
+    },
+    {
+      "name": "skip_compiled_prefill_disable_auto_ranges_full_decode_only_triton",
+      "mode": "graph",
+      "cudagraph_mode": "full_decode_only",
+      "attention_backend": "TRITON_ATTN",
+      "max_model_len": 8192,
+      "max_num_batched_tokens": 1024,
+      "quality_json": "/home/steve/bench-results/minimax-m2.7-quality-gated/prefill-longctx-8192-skipcompiled-disableautorange-fulldecodeonly-triton-patched2-20260515T151436Z.json",
+      "quality_log": "/home/steve/bench-results/minimax-m2.7-quality-gated/prefill-longctx-8192-skipcompiled-disableautorange-fulldecodeonly-triton-patched2-20260515T151436Z.log",
+      "quality": {
+        "passed": false,
+        "combined_token_sha256": "a56db98269c613eb4d7cbb4966f524cf9ecef69fe70f93cf6da337ed8dc83988",
+        "generated_tokens": 48,
+        "distinct_generated_token_count": 2,
+        "nul_token_count": 45,
+        "control_nonspace_text_chars": 45
+      },
+      "decision": "rejected_for_quality"
+    },
+    {
       "name": "current_best_non_regression_throughput",
       "mode": "vllm bench throughput",
       "context_length": 2048,
@@ -114,7 +145,7 @@
     "reason": "No new public speed win over the accepted cmp6a5c1o00mpo3011hg8ncyp result. The useful outcome is a correctness/workaround patch and a non-regression check."
   },
   "next_steps": [
-    "Find a narrower way to keep decode graph capture while bypassing only unsafe long-prefill compiled shapes; current piecewise capture hangs at 8k/1024 after the dummy-run patch.",
+    "Find a narrower way to keep decode acceleration while bypassing unsafe long-prefill compiled shapes. Piecewise capture hangs at 8k/1024, FlashAttention full-decode graph cannot capture under SYCL Graph, and Triton full-decode graph corrupts into token id 0/NUL.",
     "Investigate why compiled long-prefill returns all-NaN hidden states while eager remains finite; the failure is upstream of logits/sampling.",
     "Continue decode-speed work separately against the accepted 65.75 output tok/s baseline, with quality hash checks required before publication."
   ]
