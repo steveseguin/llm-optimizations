@@ -166,6 +166,8 @@ write_summary() {
     --arg vllm_minimax_m2_candidate_router_xpu_repair "${VLLM_MINIMAX_M2_CANDIDATE_ROUTER_XPU_REPAIR:-}" \
     --arg vllm_minimax_m2_fp16_router "${VLLM_MINIMAX_M2_FP16_ROUTER:-}" \
     --arg vllm_minimax_qk_rms_xpu_helper "${VLLM_MINIMAX_QK_RMS_XPU_HELPER:-}" \
+    --arg vllm_xpu_compile_allreduce_no_clone "${VLLM_XPU_COMPILE_ALLREDUCE_NO_CLONE:-}" \
+    --arg vllm_xpu_compile_out_of_place_allreduce "${VLLM_XPU_COMPILE_OUT_OF_PLACE_ALLREDUCE:-}" \
     --arg ccl_topo_fabric_vertex_connection_check "${CCL_TOPO_FABRIC_VERTEX_CONNECTION_CHECK:-}" \
     --arg ccl_topo_p2p_access "${CCL_TOPO_P2P_ACCESS:-}" \
     '{
@@ -202,6 +204,8 @@ write_summary() {
         VLLM_MINIMAX_M2_CANDIDATE_ROUTER_XPU_REPAIR: $vllm_minimax_m2_candidate_router_xpu_repair,
         VLLM_MINIMAX_M2_FP16_ROUTER: $vllm_minimax_m2_fp16_router,
         VLLM_MINIMAX_QK_RMS_XPU_HELPER: $vllm_minimax_qk_rms_xpu_helper,
+        VLLM_XPU_COMPILE_ALLREDUCE_NO_CLONE: $vllm_xpu_compile_allreduce_no_clone,
+        VLLM_XPU_COMPILE_OUT_OF_PLACE_ALLREDUCE: $vllm_xpu_compile_out_of_place_allreduce,
         VLLM_XPU_ENABLE_XPU_GRAPH: env.VLLM_XPU_ENABLE_XPU_GRAPH,
         VLLM_XPU_FORCE_GRAPH_WITH_COMM: env.VLLM_XPU_FORCE_GRAPH_WITH_COMM,
         VLLM_XPU_GRAPH_NOOP_COMM_CAPTURE: env.VLLM_XPU_GRAPH_NOOP_COMM_CAPTURE,
