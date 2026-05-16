@@ -1,0 +1,111 @@
+diff --git a/vllm/v1/worker/gpu_model_runner.py b/vllm/v1/worker/gpu_model_runner.py
+index 000000000..000000000 100644
+--- a/vllm/v1/worker/gpu_model_runner.py
++++ b/vllm/v1/worker/gpu_model_runner.py
+@@
+ class _CompletedCopyEvent:
+     def synchronize(self) -> None:
+         return
+ 
+ 
++def _new_copy_stream(device_type: str):
++    if device_type == "xpu":
++        return torch.xpu.Stream()
++    return torch.cuda.Stream()
++
++
++def _new_copy_event(device_type: str):
++    if device_type == "xpu":
++        return torch.xpu.Event()
++    return torch.Event()
++
++
++def _current_copy_stream(device_type: str):
++    if device_type == "xpu":
++        return torch.xpu.current_stream()
++    return torch.cuda.current_stream()
++
++
++def _copy_stream_context(stream, device_type: str):
++    if device_type == "xpu":
++        return torch.xpu.stream(stream)
++    return torch.cuda.stream(stream)
++
++
+ class AsyncGPUModelRunnerOutput(AsyncModelRunnerOutput):
+@@
+-        self.async_copy_ready_event = torch.Event()
++        device_type = sampled_token_ids.device.type
++        self.async_copy_ready_event = _new_copy_event(device_type)
+@@
+-        default_stream = torch.cuda.current_stream()
+-        with torch.cuda.stream(async_output_copy_stream):
++        default_stream = _current_copy_stream(device_type)
++        with _copy_stream_context(async_output_copy_stream, device_type):
+             async_output_copy_stream.wait_stream(default_stream)
+             self.sampled_token_ids_cpu = self._sampled_token_ids.to(
+                 "cpu", non_blocking=True
+             )
+@@
+ class AsyncGPUPoolingModelRunnerOutput(AsyncModelRunnerOutput):
+@@
+-        self.async_copy_ready_event = torch.Event()
++        device_type = pooled_data.device.type
++        self.async_copy_ready_event = _new_copy_event(device_type)
+@@
+-        default_stream = torch.cuda.current_stream()
+-        with torch.cuda.stream(async_output_copy_stream):
++        default_stream = _current_copy_stream(device_type)
++        with _copy_stream_context(async_output_copy_stream, device_type):
+             async_output_copy_stream.wait_stream(default_stream)
+@@
+-        self.async_output_copy_stream: torch.cuda.Stream | None = None
+-        self.prepare_inputs_event: torch.Event | None = None
++        self.async_output_copy_stream: torch.cuda.Stream | None = None
++        self.prepare_inputs_event: torch.Event | None = None
+         if self.use_async_scheduling:
+-            self.async_output_copy_stream = torch.cuda.Stream()
+-            self.prepare_inputs_event = torch.Event()
++            device_type = self.device.type
++            self.async_output_copy_stream = _new_copy_stream(device_type)
++            self.prepare_inputs_event = _new_copy_event(device_type)
+@@
+     def _get_or_create_async_output_copy_stream(self) -> torch.cuda.Stream:
+         stream = self.async_output_copy_stream
+         if stream is None:
+-            stream = torch.cuda.Stream()
++            stream = _new_copy_stream(self.device.type)
+             self.async_output_copy_stream = stream
+         return stream
+@@
+         with record_function_or_nullcontext("gpu_model_runner: sample"):
+             sampler_output = self._sample(logits, spec_decode_metadata)
+ 
++        if (
++            self.use_async_scheduling
++            and os.environ.get("VLLM_XPU_ASYNC_CLONE_SAMPLED_TOKEN_IDS", "0") == "1"
++            and sampler_output.sampled_token_ids.device.type == "xpu"
++        ):
++            # XPU async scheduling reuses the sampled-token tensor both as the
++            # next decode input and for an overlapped D2H output copy. Keep a
++            # private device allocation to avoid sampler-buffer lifetime/order
++            # issues while staying on the GPU fast path.
++            sampler_output.sampled_token_ids = sampler_output.sampled_token_ids.clone()
++
+         self._update_states_after_model_execute(
+             sampler_output.sampled_token_ids, scheduler_output
+         )
+diff --git a/scripts/run-minimax-strict-quality-gated-candidate.sh b/scripts/run-minimax-strict-quality-gated-candidate.sh
+index 0000000..0000000 100755
+--- a/scripts/run-minimax-strict-quality-gated-candidate.sh
++++ b/scripts/run-minimax-strict-quality-gated-candidate.sh
+@@
+     --arg vllm_xpu_compile_allreduce_no_clone "${VLLM_XPU_COMPILE_ALLREDUCE_NO_CLONE:-}" \
+     --arg vllm_xpu_compile_out_of_place_allreduce "${VLLM_XPU_COMPILE_OUT_OF_PLACE_ALLREDUCE:-}" \
++    --arg vllm_xpu_async_clone_sampled_token_ids "${VLLM_XPU_ASYNC_CLONE_SAMPLED_TOKEN_IDS:-}" \
+     --arg ccl_topo_fabric_vertex_connection_check "${CCL_TOPO_FABRIC_VERTEX_CONNECTION_CHECK:-}" \
+@@
+         VLLM_XPU_COMPILE_ALLREDUCE_NO_CLONE: $vllm_xpu_compile_allreduce_no_clone,
+         VLLM_XPU_COMPILE_OUT_OF_PLACE_ALLREDUCE: $vllm_xpu_compile_out_of_place_allreduce,
++        VLLM_XPU_ASYNC_CLONE_SAMPLED_TOKEN_IDS: $vllm_xpu_async_clone_sampled_token_ids,
+         VLLM_XPU_ENABLE_XPU_GRAPH: env.VLLM_XPU_ENABLE_XPU_GRAPH,
