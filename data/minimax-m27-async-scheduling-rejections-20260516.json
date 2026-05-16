@@ -1,0 +1,91 @@
+{
+  "date_utc": "2026-05-16",
+  "model": "/mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround",
+  "model_family": "MiniMax M2.7 INT4 AutoRound W4A16",
+  "hardware": "4x Intel Arc Pro B70 32GB",
+  "runtime": {
+    "engine": "vLLM 0.20.1-local XPU",
+    "tensor_parallel_size": 4,
+    "dtype": "float16",
+    "context_length": 2048,
+    "max_num_batched_tokens": 512,
+    "block_size": 256,
+    "attention_backend": "TRITON_ATTN",
+    "graph_mode": "PIECEWISE",
+    "llm_scaler_moe": true,
+    "quality_async_scheduling": "on",
+    "bench_async_scheduling": "on"
+  },
+  "quality_valid_reference": {
+    "label": "minimax-reliability-pass-only",
+    "async_scheduling": false,
+    "tok_s_out_mean": 62.662,
+    "tok_s_total_mean": 83.55,
+    "localmaxxing_id": "cmp7sf8xo00dko4018nmrmckc",
+    "quality": "passed raw145 n64/n256 exact token hashes, semantic suite, and extended six-prompt canary"
+  },
+  "rejected_candidates": [
+    {
+      "label": "xpu-async-copy-stream-fix",
+      "summary_json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-xpu-async-copy-stream-fix-strict-tp4-ctx2048-mbt512-bs256-20260516T201446Z-summary.json",
+      "status": "quality_failed_semantic_suite",
+      "changes_tested": [
+        "Use torch.xpu.Stream/Event/current_stream/stream for XPU async output copy instead of torch.cuda equivalents."
+      ],
+      "exact_hash_checks": {
+        "raw145_n64": "passed",
+        "raw145_n256": "passed"
+      },
+      "semantic_suite": {
+        "passed": false,
+        "failure_reasons": [
+          "nondeterministic token hashes"
+        ],
+        "observed_drift": "Arithmetic canary generated '\\n\\n42' in one repeat and '\\n\\n 42' in another repeat."
+      },
+      "benchmark_run": false,
+      "submission": "not submitted to LocalMaxxing; failed repeatability gate"
+    },
+    {
+      "label": "xpu-async-cloned-sampled-token-ids",
+      "summary_json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-xpu-async-cloned-sampled-token-ids-strict-tp4-ctx2048-mbt512-bs256-20260516T202435Z-summary.json",
+      "status": "quality_failed_semantic_suite",
+      "changes_tested": [
+        "Keep the XPU stream/event fix.",
+        "Clone sampler_output.sampled_token_ids on XPU immediately after sampling when VLLM_XPU_ASYNC_CLONE_SAMPLED_TOKEN_IDS=1."
+      ],
+      "exact_hash_checks": {
+        "raw145_n64": "passed",
+        "raw145_n256": "passed"
+      },
+      "semantic_suite": {
+        "passed": false,
+        "failure_reasons": [
+          "nondeterministic token hashes"
+        ],
+        "observed_drift": "Same arithmetic canary token drift as the stream-only candidate."
+      },
+      "benchmark_run": false,
+      "submission": "not submitted to LocalMaxxing; failed repeatability gate"
+    },
+    {
+      "label": "async-scheduling-with-sync-output-copy-control",
+      "summary_json": null,
+      "quality_json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/semantic-async-sync-output-copy-20260516T203204Z.json",
+      "status": "quality_failed_semantic_suite",
+      "changes_tested": [
+        "VLLM_XPU_SYNC_ASYNC_OUTPUT_COPY=1 with async scheduling still enabled."
+      ],
+      "semantic_suite": {
+        "passed": false,
+        "failure_reasons": [
+          "nondeterministic token hashes"
+        ],
+        "observed_drift": "Arithmetic canary generated '\\n\\n42' in one repeat and '\\n\\n 42' in another repeat."
+      },
+      "benchmark_run": false,
+      "submission": "not submitted to LocalMaxxing; failed repeatability gate"
+    }
+  ],
+  "conclusion": "The faster async-scheduling path remains unsafe for quality-preserving published results on this MiniMax/XPU graph configuration. Synchronous output copy does not fix the repeat drift, so the likely issue is upstream in async scheduling, XPU graph interaction, or decode input state ordering rather than only D2H output copy. Continue using the no-async quality-valid path while pursuing GPU-side fusion and collective-boundary reductions."
+}
