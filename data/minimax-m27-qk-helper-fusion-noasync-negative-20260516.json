@@ -1,0 +1,152 @@
+{
+  "experiment": "minimax-m27-qk-helper-fusion-noasync",
+  "date_utc": "2026-05-16",
+  "decision": "reject",
+  "reason": "Strict semantic suite was nondeterministic across two greedy repeats, and AOT collective census did not reduce allreduce/wait boundaries.",
+  "summary": {
+    "label": "qk-helper-fusion-noasync",
+    "status": "quality_failed_semantic_suite",
+    "timestamp_utc": "20260516T195029Z",
+    "model": "/mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround",
+    "hardware": "4x Intel Arc Pro B70 32GB",
+    "runtime": {
+      "tensor_parallel_size": 4,
+      "dtype": "float16",
+      "max_model_len": 2048,
+      "max_num_batched_tokens": 512,
+      "max_num_seqs": 1,
+      "block_size": 256,
+      "quality_async_scheduling": "off",
+      "bench_async_scheduling": "off",
+      "bench_async_engine": true,
+      "compilation_config_json": "{\"use_inductor_graph_partition\":true,\"compile_sizes\":[1],\"cudagraph_mode\":\"PIECEWISE\",\"pass_config\":{\"fuse_minimax_qk_norm\":true}}",
+      "vllm_cache_root": "/mnt/fast-ai/vllm-cache-exp/minimax-qk-helper-fusion-noasync-20260516T195029Z"
+    },
+    "quality_policy": {
+      "raw145_n64_expected_combined_token_sha256": "267cbf30208d84929ee79284ac695467f7e80597bf8694130e1e1f8b180eb5bd",
+      "raw145_n256_expected_combined_token_sha256": "58f6e8251c7a0a17e8c441278b5861f7d5da914fa1823ecd10484b296f2d7537",
+      "semantic_suite": "PASS, arithmetic 42, add_one function with return x + 1; two greedy repeats must be deterministic",
+      "extended_sixpack_enabled": true,
+      "extended_sixpack": "PASS, arithmetic, code, JSON, sort, SQL; two greedy repeats must be deterministic and non-degenerate when enabled"
+    },
+    "candidate_env": {
+      "VLLM_MINIMAX_MOE_DELAY_ALLREDUCE": "",
+      "VLLM_MINIMAX_M2_DIST_RESIDUAL_ALLREDUCE": "",
+      "VLLM_MINIMAX_M2_ATTN_DELAY_ALLREDUCE": "1",
+      "VLLM_MINIMAX_QK_NORM_RESTORE_WEIGHT": "1",
+      "VLLM_MINIMAX_QK_NORM_RESTORE_WEIGHT_MIN_TOKENS": "2",
+      "VLLM_XPU_USE_LLM_SCALER_MOE": "1",
+      "VLLM_XPU_USE_LLM_SCALER_MOE_MINIMAX_LOGITS": "",
+      "VLLM_XPU_USE_LLM_SCALER_MOE_LOGITS": "",
+      "VLLM_XPU_USE_LLM_SCALER_MOE_WS": "",
+      "VLLM_MINIMAX_M2_CANDIDATE_ROUTER_TOPM": "",
+      "VLLM_MINIMAX_M2_CANDIDATE_ROUTER_XPU_REPAIR": "",
+      "VLLM_MINIMAX_M2_FP16_ROUTER": "",
+      "VLLM_MINIMAX_QK_RMS_XPU_HELPER": "",
+      "VLLM_XPU_COMPILE_ALLREDUCE_NO_CLONE": "1",
+      "VLLM_XPU_COMPILE_OUT_OF_PLACE_ALLREDUCE": "",
+      "VLLM_XPU_ENABLE_XPU_GRAPH": "1",
+      "VLLM_XPU_FORCE_GRAPH_WITH_COMM": "1",
+      "VLLM_XPU_GRAPH_NOOP_COMM_CAPTURE": "1",
+      "CCL_TOPO_P2P_ACCESS": "1",
+      "CCL_TOPO_FABRIC_VERTEX_CONNECTION_CHECK": ""
+    },
+    "quality_artifacts": [
+      {
+        "name": "raw145-n64-exact",
+        "json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-qk-helper-fusion-noasync-strict-tp4-ctx2048-mbt512-bs256-20260516T195029Z-quality/raw145-n64-exact.json",
+        "log": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-qk-helper-fusion-noasync-strict-tp4-ctx2048-mbt512-bs256-20260516T195029Z-quality/raw145-n64-exact.log"
+      },
+      {
+        "name": "raw145-n256-exact",
+        "json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-qk-helper-fusion-noasync-strict-tp4-ctx2048-mbt512-bs256-20260516T195029Z-quality/raw145-n256-exact.json",
+        "log": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-qk-helper-fusion-noasync-strict-tp4-ctx2048-mbt512-bs256-20260516T195029Z-quality/raw145-n256-exact.log"
+      },
+      {
+        "name": "semantic-suite-n64-r2",
+        "json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-qk-helper-fusion-noasync-strict-tp4-ctx2048-mbt512-bs256-20260516T195029Z-quality/semantic-suite-n64-r2.json",
+        "log": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-qk-helper-fusion-noasync-strict-tp4-ctx2048-mbt512-bs256-20260516T195029Z-quality/semantic-suite-n64-r2.log"
+      }
+    ],
+    "benchmark_policy": {
+      "prompt_tokens": 512,
+      "output_tokens": 1536,
+      "num_prompts": 1,
+      "repeats_requested": 2,
+      "benchmarked_only_after_quality_pass": true
+    },
+    "benchmark_jsons": []
+  },
+  "semantic_suite": {
+    "passed": false,
+    "failure_reasons": [
+      "nondeterministic token hashes"
+    ],
+    "deterministic_across_runs": false,
+    "run_hashes": [
+      "a0286d7d2b27dd9c7e565f252b415e0261e8bd5648787faebf2b9d4506f31ac1",
+      "def6899500b2364bc97d561fc5f9cc78aa9fbcd5a0eb032eab1f2c6735d2bbec",
+      "89f95624e14afdbde880e69697b3b1bf31a97a1357ee541046b91c682c5ba235",
+      "a0286d7d2b27dd9c7e565f252b415e0261e8bd5648787faebf2b9d4506f31ac1",
+      "505714fdf4edf3b2e004c3b2824e7be53760365c40d0b2bcc309b97d8955e4df",
+      "89f95624e14afdbde880e69697b3b1bf31a97a1357ee541046b91c682c5ba235"
+    ],
+    "texts": [
+      "\n\nPASS",
+      "\n\n42",
+      "\n\n```python\ndef add_one(x):\n    return x + 1\n```",
+      "\n\nPASS",
+      "\n\n\n42",
+      "\n\n```python\ndef add_one(x):\n    return x + 1\n```"
+    ],
+    "semantic_checks": {
+      "required_substrings": [
+        {
+          "substring": "PASS",
+          "matched": true
+        },
+        {
+          "substring": "42",
+          "matched": true
+        },
+        {
+          "substring": "def add_one",
+          "matched": true
+        }
+      ],
+      "required_regexes": [
+        {
+          "regex": "return\\s+x\\s*\\+\\s*1",
+          "matched": true
+        }
+      ],
+      "all_required_substrings_matched": true,
+      "all_required_regexes_matched": true
+    }
+  },
+  "aot_collective_census": {
+    "cache": "/mnt/fast-ai/vllm-cache-exp/minimax-qk-helper-fusion-noasync-20260516T195029Z/torch_compile_cache/torch_aot_compile/dffa4213474dcaf63e2feca57a7dad4ad4cfab759a74c9f17bfe4beb48537de0",
+    "actual_allreduce_call_lines": 1496,
+    "actual_wait_tensor_call_lines": 1496,
+    "actual_allreduce_wait_pairs_within_7_lines": 1496,
+    "actual_allreduce_categories": {
+      "attention_o_proj_hidden": 496,
+      "embedding_hidden": 8,
+      "moe_hidden": 496,
+      "qk_rms_variance": 496
+    },
+    "wait_gap_lines": {
+      "2": 1496
+    },
+    "files_with_actual_calls": {
+      "inductor_cache/3s/c3shdl6kdfc3y7mfxiyhrrdigmr2x5dph3e4dwid5gfvkyjv4n6n.py": 187,
+      "inductor_cache/6w/c6wp3ren6w6pp77mnqrsq3pnm7zg7wbjomqojolmfvfwywggu7yo.py": 187,
+      "inductor_cache/ax/caxo6otdt4r3obvttfuiv3s7rs4jlfdcmtgbkjrxhstn46zd5u2v.py": 187,
+      "inductor_cache/ei/cei7kyazvmqkggkn5kees6ixewe2g3hdlzetll2xjm3jtnd6peol.py": 187,
+      "inductor_cache/jw/cjwdgc66jp5j3m72nhatesid65fqlrancgtciuicsmrat6cz6ivm.py": 187,
+      "inductor_cache/kf/ckf6r7dezhq3dbnrklcn33jfzdxxkb7myzhcepcihluiql47jq7a.py": 187,
+      "inductor_cache/wm/cwmvu2eo4g7garsr32x7tev32pzs27yj7kxfon4d6esvf4imswzy.py": 187,
+      "inductor_cache/wt/cwtw366bekg2wwogxogjgolwu6pk5vpmroe6u2h3kxiozcklwe4d.py": 187
+    }
+  }
+}
