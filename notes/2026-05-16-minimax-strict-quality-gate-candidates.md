@@ -126,6 +126,47 @@ Decision: reject. The intended `moe_forward_tiny_cutlass_nmajor_int4_u4_minimax`
 logits path was exercised, but it failed the semantic determinism gate. Do not
 promote or submit to LocalMaxxing.
 
+## Candidate: Functional Out-of-Place Compile Allreduce
+
+Env:
+
+```bash
+VLLM_XPU_COMPILE_OUT_OF_PLACE_ALLREDUCE=1
+VLLM_XPU_COMPILE_ALLREDUCE_NO_CLONE=0
+```
+
+Result:
+
+- Raw145 64-token exact hash: pass.
+- Raw145 256-token exact hash: pass.
+- Semantic suite: fail, nondeterministic greedy token hashes.
+- Semantic requirements still matched (`PASS`, `42`, `def add_one`, and
+  `return x + 1`), but exact two-repeat token hashes differed.
+- Benchmark: not run.
+
+Artifacts:
+
+- Summary:
+  `/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-compile-out-of-place-allreduce-quality-strict-tp4-ctx2048-mbt512-bs256-20260516T020234Z-summary.json`
+- Semantic failure:
+  `/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-compile-out-of-place-allreduce-quality-strict-tp4-ctx2048-mbt512-bs256-20260516T020234Z-quality/semantic-suite-n64-r2.json`
+- AOT census:
+  `/home/steve/bench-results/minimax-m2.7-strict-candidates/strict-computation-graph-census-out-of-place-f7f565e3a0-20260516.json`
+
+AOT census of the decode graph showed:
+
+- 748 all-reduces
+- 748 waits
+- 0 copy-backs
+
+Interpretation: the functional collective path can remove the explicit
+copy-back boundary that remains in the quality-valid no-clone path. However, it
+changes runtime behavior enough to fail deterministic greedy generation, so it
+is not quality-safe and must not be used for published speed results.
+
+Decision: reject. Do not promote, benchmark, or submit to LocalMaxxing until a
+lower-level implementation preserves deterministic output.
+
 ## Lessons
 
 The raw exact canary is necessary but not sufficient. Both rejected candidates
@@ -139,7 +180,14 @@ Python-level collective boundary rearrangements: real XPU fused allreduce plus
 RMS/epilogue kernels, lower-level XCCL/Level Zero timing, and MoE kernel
 profiling that does not alter residual/allreduce ordering.
 
-The rejected MiniMax logits path reinforces the same rule: matching long-form
-token hashes is not enough if short semantic canaries are not deterministic. It
-may still be useful as a source reference for future XPU kernel work, but not as
-a runtime option for quality-preserving submissions.
+The rejected MiniMax logits and out-of-place allreduce paths reinforce the same
+rule: matching long-form token hashes is not enough if short semantic canaries
+are not deterministic. They may still be useful as source references for future
+XPU kernel work, but not as runtime options for quality-preserving submissions.
+
+The no-clone path is the only candidate from this pass that both preserved
+quality and improved repeatable decode speed. The out-of-place path is the most
+interesting source clue: it proves the copy-back can be removed from the AOT
+graph, but a correct implementation likely needs a deterministic custom XPU
+collective/fusion rather than `torch.distributed._functional_collectives` in
+this vLLM/XPU graph.
