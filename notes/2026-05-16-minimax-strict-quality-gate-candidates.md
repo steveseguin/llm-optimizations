@@ -18,6 +18,9 @@ testing more TP communication-boundary changes.
 New artifacts:
 
 - `prompts/minimax-raw145-tokenhash-canary.txt`
+- `prompts/minimax-json-canary-raw.txt`
+- `prompts/minimax-sort-canary-raw.txt`
+- `prompts/minimax-sql-canary-raw.txt`
 - `scripts/run-minimax-strict-quality-gated-candidate.sh`
 - `data/minimax-m27-strict-quality-gate-candidates-20260516.json`
 
@@ -191,3 +194,27 @@ interesting source clue: it proves the copy-back can be removed from the AOT
 graph, but a correct implementation likely needs a deterministic custom XPU
 collective/fusion rather than `torch.distributed._functional_collectives` in
 this vLLM/XPU graph.
+
+## Follow-up: Extended Six-Prompt Reliability Gate
+
+After the no-clone candidate was accepted, a stricter six-prompt raw canary pack
+was added: PASS, arithmetic, code, JSON, sort, and SQL. That pack intentionally
+exercises repeated short requests in one engine instance.
+
+Results:
+
+- No-clone plus async scheduling enabled failed the six-prompt pack.
+- The older clone/copy-back path also failed the same pack with the same
+  symptom: second repeat, first PASS prompt generated 64 token-id-0 NUL tokens.
+- No-clone plus `--no-async-scheduling` passed the six-prompt pack and preserved
+  the raw145 n256 exact token hash.
+
+Decision: keep the 66.28 tok/s no-clone async-enabled result as a useful
+performance datapoint, but promote the 62.66 tok/s no-clone async-disabled
+recipe as the safer quality-sensitive recipe until the vLLM/XPU async scheduling
+state transition is fixed.
+
+Detailed artifact:
+
+- `notes/2026-05-16-minimax-async-scheduling-reliability.md`
+- `data/minimax-m27-async-scheduling-reliability-20260516.json`
