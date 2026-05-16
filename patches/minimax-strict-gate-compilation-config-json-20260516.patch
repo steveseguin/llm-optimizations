@@ -1,0 +1,127 @@
+diff --git a/scripts/run-minimax-strict-quality-gated-candidate.sh b/scripts/run-minimax-strict-quality-gated-candidate.sh
+index 8343112..bab1df6 100755
+--- a/scripts/run-minimax-strict-quality-gated-candidate.sh
++++ b/scripts/run-minimax-strict-quality-gated-candidate.sh
+@@ -28,6 +28,13 @@ QUALITY_ASYNC_SCHEDULING="${QUALITY_ASYNC_SCHEDULING:-default}"
+ BENCH_ASYNC_SCHEDULING="${BENCH_ASYNC_SCHEDULING:-default}"
+ BENCH_ASYNC_ENGINE="${BENCH_ASYNC_ENGINE:-1}"
+ RUN_EXTENDED_QUALITY="${RUN_EXTENDED_QUALITY:-0}"
++if [ -z "${COMPILATION_CONFIG_JSON:-}" ]; then
++  COMPILATION_CONFIG_JSON='{"use_inductor_graph_partition":true,"compile_sizes":[1],"cudagraph_mode":"PIECEWISE"}'
++fi
++if ! jq -e 'type == "object"' >/dev/null <<<"$COMPILATION_CONFIG_JSON"; then
++  echo "Invalid COMPILATION_CONFIG_JSON; expected a JSON object" >&2
++  exit 2
++fi
+ CACHE_ROOT="${VLLM_CACHE_ROOT:-/mnt/fast-ai/vllm-cache-exp/minimax-strict-${LABEL}}"
+ RAW145_PROMPT="${RAW145_PROMPT:-/home/steve/llm-optimizations-publish/prompts/minimax-raw145-tokenhash-canary.txt}"
+ RAW145_N64_HASH="${RAW145_N64_HASH:-267cbf30208d84929ee79284ac695467f7e80597bf8694130e1e1f8b180eb5bd}"
+@@ -96,6 +103,7 @@ run_quality_check() {
+       --block-size "$BLOCK_SIZE" \
+       --attention-backend TRITON_ATTN \
+       --async-scheduling "$QUALITY_ASYNC_SCHEDULING" \
++      --compilation-config-json "$COMPILATION_CONFIG_JSON" \
+       --qk-norm-restore-weight \
+       --qk-norm-restore-weight-min-tokens "$VLLM_MINIMAX_QK_NORM_RESTORE_WEIGHT_MIN_TOKENS" \
+       --vllm-cache-root "$CACHE_ROOT" \
+@@ -129,6 +137,7 @@ run_semantic_suite() {
+       --block-size "$BLOCK_SIZE" \
+       --attention-backend TRITON_ATTN \
+       --async-scheduling "$QUALITY_ASYNC_SCHEDULING" \
++      --compilation-config-json "$COMPILATION_CONFIG_JSON" \
+       --qk-norm-restore-weight \
+       --qk-norm-restore-weight-min-tokens "$VLLM_MINIMAX_QK_NORM_RESTORE_WEIGHT_MIN_TOKENS" \
+       --vllm-cache-root "$CACHE_ROOT" \
+@@ -169,6 +178,7 @@ run_extended_suite() {
+       --block-size "$BLOCK_SIZE" \
+       --attention-backend TRITON_ATTN \
+       --async-scheduling "$QUALITY_ASYNC_SCHEDULING" \
++      --compilation-config-json "$COMPILATION_CONFIG_JSON" \
+       --qk-norm-restore-weight \
+       --qk-norm-restore-weight-min-tokens "$VLLM_MINIMAX_QK_NORM_RESTORE_WEIGHT_MIN_TOKENS" \
+       --vllm-cache-root "$CACHE_ROOT" \
+@@ -195,6 +205,7 @@ write_summary() {
+     --argjson bench_repeats "$BENCH_REPEATS" \
+     --arg quality_async_scheduling "$QUALITY_ASYNC_SCHEDULING" \
+     --arg bench_async_scheduling "$BENCH_ASYNC_SCHEDULING" \
++    --arg compilation_config_json "$COMPILATION_CONFIG_JSON" \
+     --argjson bench_async_engine "$BENCH_ASYNC_ENGINE" \
+     --argjson run_extended_quality "$RUN_EXTENDED_QUALITY" \
+     --arg raw145_n64_hash "$RAW145_N64_HASH" \
+@@ -232,6 +243,7 @@ write_summary() {
+         quality_async_scheduling: $quality_async_scheduling,
+         bench_async_scheduling: $bench_async_scheduling,
+         bench_async_engine: ($bench_async_engine == 1),
++        compilation_config_json: $compilation_config_json,
+         vllm_cache_root: $cache_root
+       },
+       quality_policy: {
+@@ -341,7 +353,7 @@ if [ "$BENCH_REPEATS" -gt 0 ]; then
+       RUN_TIMEOUT="$BENCH_TIMEOUT" \
+       RUN_TIMEOUT_KILL_AFTER="$RUN_TIMEOUT_KILL_AFTER" \
+       SHM_STALL_MAX_WARNINGS="$SHM_STALL_MAX_WARNINGS" \
+-      EXTRA_ARGS="${bench_async_flags[*]} --block-size $BLOCK_SIZE --no-enable-prefix-caching --attention-backend TRITON_ATTN --compilation-config {\"use_inductor_graph_partition\":true,\"compile_sizes\":[1],\"cudagraph_mode\":\"PIECEWISE\"}" \
++      EXTRA_ARGS="${bench_async_flags[*]} --block-size $BLOCK_SIZE --no-enable-prefix-caching --attention-backend TRITON_ATTN --compilation-config $COMPILATION_CONFIG_JSON" \
+       /home/steve/llm-optimizations-publish/scripts/bench-vllm-minimax-autoround-xpu.sh
+     )"
+     printf '%s\n' "$run_out"
+diff --git a/scripts/run-vllm-minimax-quality-check.py b/scripts/run-vllm-minimax-quality-check.py
+index a359084..7392e30 100755
+--- a/scripts/run-vllm-minimax-quality-check.py
++++ b/scripts/run-vllm-minimax-quality-check.py
+@@ -161,6 +161,14 @@ def parse_args() -> argparse.Namespace:
+             "--mode graph uses PIECEWISE."
+         ),
+     )
++    parser.add_argument(
++        "--compilation-config-json",
++        default=None,
++        help=(
++            "JSON object merged into vLLM compilation_config after local "
++            "defaults. Nested objects are merged recursively."
++        ),
++    )
+     parser.add_argument(
+         "--attention-backend",
+         default=None,
+@@ -411,6 +419,15 @@ def parse_args() -> argparse.Namespace:
+     return parser.parse_args()
+ 
+ 
++def deep_update(base: dict, override: dict) -> dict:
++    for key, value in override.items():
++        if isinstance(value, dict) and isinstance(base.get(key), dict):
++            deep_update(base[key], value)
++        else:
++            base[key] = value
++    return base
++
++
+ def serialize_logprobs(logprobs):
+     if logprobs is None:
+         return None
+@@ -692,6 +709,16 @@ def main() -> None:
+         inductor_compile_config["triton.persistent_reductions"] = False
+     if inductor_compile_config:
+         compilation_config["inductor_compile_config"] = inductor_compile_config
++    if args.compilation_config_json:
++        try:
++            compilation_config_override = json.loads(args.compilation_config_json)
++        except json.JSONDecodeError as exc:
++            raise SystemExit(
++                f"invalid --compilation-config-json: {exc}"
++            ) from exc
++        if not isinstance(compilation_config_override, dict):
++            raise SystemExit("--compilation-config-json must decode to an object")
++        deep_update(compilation_config, compilation_config_override)
+ 
+     llm_kwargs = {}
+     if args.rms_norm_priority:
+@@ -928,6 +955,7 @@ def main() -> None:
+             "cudagraph_num_warmups": args.cudagraph_num_warmups,
+             "compile_ranges_endpoints": args.compile_ranges_endpoints,
+             "compilation_custom_ops": args.compilation_custom_ops,
++            "compilation_config_json": args.compilation_config_json,
+         },
+         "prompt_diagnostics": prompt_diagnostics,
+         "compilation_config": compilation_config,
