@@ -143,13 +143,56 @@
         "reason": "Candidate failed the deterministic semantic quality gate."
       },
       "decision": "Reject. Do not promote or submit to LocalMaxxing. The intended MiniMax logits decode path was exercised, but exact raw-token canaries were not enough to prove quality."
+    },
+    {
+      "label": "compile-out-of-place-allreduce",
+      "env": {
+        "VLLM_XPU_COMPILE_OUT_OF_PLACE_ALLREDUCE": "1",
+        "VLLM_XPU_COMPILE_ALLREDUCE_NO_CLONE": "0"
+      },
+      "summary_json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-compile-out-of-place-allreduce-quality-strict-tp4-ctx2048-mbt512-bs256-20260516T020234Z-summary.json",
+      "quality": {
+        "raw145_n64": {
+          "passed": true,
+          "expected_token_sha256_match": true,
+          "combined_token_sha256": "267cbf30208d84929ee79284ac695467f7e80597bf8694130e1e1f8b180eb5bd"
+        },
+        "raw145_n256": {
+          "passed": true,
+          "expected_token_sha256_match": true,
+          "combined_token_sha256": "58f6e8251c7a0a17e8c441278b5861f7d5da914fa1823ecd10484b296f2d7537"
+        },
+        "semantic_suite": {
+          "passed": false,
+          "failure_reasons": [
+            "nondeterministic token hashes"
+          ],
+          "deterministic_across_runs": false,
+          "semantic_requirements_matched": true,
+          "combined_token_sha256": "9f27b9824c1caea1b7e08a59d1013206b9010f75f915e045d5a87f1aca5c1ec1",
+          "json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-compile-out-of-place-allreduce-quality-strict-tp4-ctx2048-mbt512-bs256-20260516T020234Z-quality/semantic-suite-n64-r2.json"
+        }
+      },
+      "aot_census": {
+        "json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/strict-computation-graph-census-out-of-place-f7f565e3a0-20260516.json",
+        "allreduce_count": 748,
+        "wait_count": 748,
+        "copy_count": 0,
+        "copy_target_kinds": {}
+      },
+      "benchmark": {
+        "ran": false,
+        "reason": "Candidate failed the deterministic semantic quality gate."
+      },
+      "decision": "Reject. The graph removes copy-backs, but the functional collective path is not deterministic enough to preserve quality."
     }
   ],
   "lessons": [
     "The raw145 exact token-hash canary catches graph corruption, but it is not sufficient by itself for quality-preserving optimization.",
     "Both communication-boundary candidates preserved the long repetitive raw canary yet introduced nondeterministic greedy output on a simple semantic arithmetic canary.",
     "Do not benchmark or publish a candidate that fails deterministic greedy output, even if semantic substrings still match.",
-    "Future speed work should keep the strict gate as the default pre-benchmark screen."
+    "Future speed work should keep the strict gate as the default pre-benchmark screen.",
+    "The functional out-of-place allreduce graph removes the c10d copy-back boundary, but deterministic quality failed. Future copy-back removal likely needs a lower-level deterministic XPU collective/fusion rather than this functional collective path."
   ],
   "localmaxxing": {
     "submitted": false,
