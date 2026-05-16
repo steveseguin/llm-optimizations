@@ -1,0 +1,85 @@
+{
+  "title": "MiniMax M2.7 AutoRound XPU allreduce boundary probes",
+  "date": "2026-05-16",
+  "hardware": "4x Intel Arc Pro B70 32GB",
+  "model": "/mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround",
+  "engine": "vLLM 0.20.1-local XPU",
+  "baseline_for_comparison": {
+    "description": "Strict quality-valid no-async path, TP4, XPU graph forced, llm-scaler INT4 MoE, TRITON_ATTN, block-size 256, max_num_batched_tokens 512.",
+    "mean_output_tok_s": 62.662,
+    "mean_total_tok_s": 83.55,
+    "localmaxxing_id": "cmp7sf8xo00dko4018nmrmckc"
+  },
+  "reason_for_probe": "Investigate reducing framework-visible collective/callback boundaries by changing how TP allreduce is represented during XPU compilation, without changing model weights, quantization, routing, sampler, KV dtype, or power limits.",
+  "candidates": [
+    {
+      "label": "custom-allreduce-sp-only",
+      "summary_json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-custom-allreduce-sp-only-strict-tp4-ctx2048-mbt512-bs256-20260516T204658Z-summary.json",
+      "status": "rejected",
+      "stage": "raw145-n64 exact quality gate",
+      "env": {
+        "VLLM_XPU_COMPILE_ALLREDUCE_CUSTOM_OP": "1",
+        "VLLM_XPU_EXPERIMENTAL_ENABLE_SP": "1"
+      },
+      "compilation_config_json": "{\"use_inductor_graph_partition\":true,\"compile_sizes\":[1],\"cudagraph_mode\":\"PIECEWISE\",\"pass_config\":{\"enable_sp\":true,\"sp_min_token_num\":1}}",
+      "outcome": "The custom allreduce pattern avoided the previous torchbind pattern-construction crash, but stock sequence parallelism failed during Inductor compile with a shape mismatch.",
+      "failure": "RuntimeError: The size of tensor a (s72) must match the size of tensor b ((s72//4)) at non-singleton dimension 0.",
+      "interpretation": "The stock sequence-parallel rewrite changes the token dimension for reduce-scatter/all-gather, but the MiniMax decode graph still has full-size residual users. It is not safe to enable as-is for this MiniMax TP4 decode path."
+    },
+    {
+      "label": "custom-allreduce-only",
+      "summary_json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-custom-allreduce-only-strict-tp4-ctx2048-mbt512-bs256-20260516T205019Z-summary.json",
+      "status": "rejected",
+      "stage": "raw145-n64 exact quality gate",
+      "env": {
+        "VLLM_XPU_COMPILE_ALLREDUCE_CUSTOM_OP": "1"
+      },
+      "compilation_config_json": "{\"use_inductor_graph_partition\":true,\"compile_sizes\":[1],\"cudagraph_mode\":\"PIECEWISE\"}",
+      "outcome": "The graph compiled and output was deterministic/non-degenerate, but exact token hash changed.",
+      "expected_raw145_n64_token_sha256": "267cbf30208d84929ee79284ac695467f7e80597bf8694130e1e1f8b180eb5bd",
+      "actual_raw145_n64_token_sha256": "0ada9ce5efa523a4d6bfebe6f1da45543df1a38a6a595a7b1b71296179ac1e20",
+      "failure": "combined token hash mismatch",
+      "warning": "PyTorch warned that vllm::all_reduce output may alias its input even though the custom op schema says it must not.",
+      "interpretation": "A custom-op allreduce representation needs correct mutation/alias semantics, or a real out-of-place runtime implementation, before it can be used for quality-sensitive runs."
+    },
+    {
+      "label": "functional-out-of-place-allreduce",
+      "summary_json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-functional-out-of-place-allreduce-strict-tp4-ctx2048-mbt512-bs256-20260516T205631Z-summary.json",
+      "status": "rejected",
+      "stage": "semantic deterministic quality gate",
+      "env": {
+        "VLLM_XPU_COMPILE_OUT_OF_PLACE_ALLREDUCE": "1"
+      },
+      "compilation_config_json": "{\"use_inductor_graph_partition\":true,\"compile_sizes\":[1],\"cudagraph_mode\":\"PIECEWISE\"}",
+      "raw145_n64": {
+        "passed": true,
+        "token_sha256": "267cbf30208d84929ee79284ac695467f7e80597bf8694130e1e1f8b180eb5bd"
+      },
+      "raw145_n256": {
+        "passed": true,
+        "token_sha256": "58f6e8251c7a0a17e8c441278b5861f7d5da914fa1823ecd10484b296f2d7537"
+      },
+      "semantic_suite": {
+        "passed": false,
+        "failure": "nondeterministic token hashes",
+        "required_substrings_and_regexes_matched": true
+      },
+      "outcome": "Closer than custom-op allreduce because exact raw canaries passed, but still not promotion-safe because greedy semantic repeats were nondeterministic.",
+      "interpretation": "Functional out-of-place allreduce may be useful for future debugging/fusion because it preserves the long raw prompt hashes, but it cannot replace the accepted no-clone c10d path until semantic repeat determinism is fixed."
+    }
+  ],
+  "patch": {
+    "path": "patches/vllm-xpu-allreduce-boundary-probes-20260516.patch",
+    "notes": "Focused patch artifact for opt-in XPU allreduce custom-op tracing, functional out-of-place allreduce support, and the sequence-parallel pattern probe support used in these tests."
+  },
+  "localmaxxing": {
+    "submitted": false,
+    "reason": "No new result passed the full strict quality gate; rejected candidates are recorded locally and in GitHub notes instead."
+  },
+  "next_steps": [
+    "Do not promote stock sequence parallelism for MiniMax TP4 decode without a residual-shape-safe rewrite.",
+    "If revisiting custom-op allreduce, first make the operator schema/runtime alias semantics correct and rerun raw plus semantic quality gates.",
+    "Investigate why functional out-of-place allreduce is deterministic on raw145 exact prompts but nondeterministic on the multi-prompt semantic repeat suite.",
+    "Continue prioritizing true fused allreduce plus Q/K RMS or allreduce plus RMS/MoE epilogue kernels that preserve current accepted math and determinism."
+  ]
+}
