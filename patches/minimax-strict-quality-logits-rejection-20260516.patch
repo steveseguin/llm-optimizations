@@ -1,0 +1,124 @@
+diff --git a/data/minimax-m27-strict-quality-gate-candidates-20260516.json b/data/minimax-m27-strict-quality-gate-candidates-20260516.json
+index 073353c..dd6cfe0 100644
+--- a/data/minimax-m27-strict-quality-gate-candidates-20260516.json
++++ b/data/minimax-m27-strict-quality-gate-candidates-20260516.json
+@@ -109,6 +109,40 @@
+         "reason": "Candidate failed the deterministic semantic quality gate."
+       },
+       "decision": "Reject. Do not promote or submit to LocalMaxxing."
++    },
++    {
++      "label": "minimax-logits",
++      "env": {
++        "VLLM_XPU_USE_LLM_SCALER_MOE_MINIMAX_LOGITS": "1"
++      },
++      "summary_json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-minimax-logits-strict-tp4-ctx2048-mbt512-bs256-20260516T004653Z-summary.json",
++      "quality": {
++        "raw145_n64": {
++          "passed": true,
++          "expected_token_sha256_match": true,
++          "combined_token_sha256": "267cbf30208d84929ee79284ac695467f7e80597bf8694130e1e1f8b180eb5bd"
++        },
++        "raw145_n256": {
++          "passed": true,
++          "expected_token_sha256_match": true,
++          "combined_token_sha256": "58f6e8251c7a0a17e8c441278b5861f7d5da914fa1823ecd10484b296f2d7537"
++        },
++        "semantic_suite": {
++          "passed": false,
++          "failure_reasons": [
++            "nondeterministic token hashes"
++          ],
++          "deterministic_across_runs": false,
++          "observed_difference": "Arithmetic canary emitted token-stable '42' in run 0 and ' 42' in run 1.",
++          "combined_token_sha256": "d6a0ba0da74af3abc61570d577a9adfffd335cf067943cc65694f0d007b073c4",
++          "json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-minimax-logits-strict-tp4-ctx2048-mbt512-bs256-20260516T004653Z-quality/semantic-suite-n64-r2.json"
++        }
++      },
++      "benchmark": {
++        "ran": false,
++        "reason": "Candidate failed the deterministic semantic quality gate."
++      },
++      "decision": "Reject. Do not promote or submit to LocalMaxxing. The intended MiniMax logits decode path was exercised, but exact raw-token canaries were not enough to prove quality."
+     }
+   ],
+   "lessons": [
+diff --git a/notes/2026-05-16-minimax-strict-quality-gate-candidates.md b/notes/2026-05-16-minimax-strict-quality-gate-candidates.md
+index 4fc53b8..5ddaf07 100644
+--- a/notes/2026-05-16-minimax-strict-quality-gate-candidates.md
++++ b/notes/2026-05-16-minimax-strict-quality-gate-candidates.md
+@@ -99,6 +99,33 @@ Artifacts:
+ 
+ Decision: reject. Do not promote or submit to LocalMaxxing.
+ 
++## Candidate: MiniMax Logits MoE Path
++
++Env:
++
++```bash
++VLLM_XPU_USE_LLM_SCALER_MOE_MINIMAX_LOGITS=1
++```
++
++Result:
++
++- Raw145 64-token exact hash: pass.
++- Raw145 256-token exact hash: pass.
++- Semantic suite: fail, nondeterministic greedy token hashes.
++- Difference: arithmetic canary emitted `42` in one run and ` 42` in the next.
++- Benchmark: not run.
++
++Artifacts:
++
++- Summary:
++  `/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-minimax-logits-strict-tp4-ctx2048-mbt512-bs256-20260516T004653Z-summary.json`
++- Semantic failure:
++  `/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-minimax-logits-strict-tp4-ctx2048-mbt512-bs256-20260516T004653Z-quality/semantic-suite-n64-r2.json`
++
++Decision: reject. The intended `moe_forward_tiny_cutlass_nmajor_int4_u4_minimax`
++logits path was exercised, but it failed the semantic determinism gate. Do not
++promote or submit to LocalMaxxing.
++
+ ## Lessons
+ 
+ The raw exact canary is necessary but not sufficient. Both rejected candidates
+@@ -111,3 +138,8 @@ Next speed work should focus on deterministic device-level changes rather than
+ Python-level collective boundary rearrangements: real XPU fused allreduce plus
+ RMS/epilogue kernels, lower-level XCCL/Level Zero timing, and MoE kernel
+ profiling that does not alter residual/allreduce ordering.
++
++The rejected MiniMax logits path reinforces the same rule: matching long-form
++token hashes is not enough if short semantic canaries are not deterministic. It
++may still be useful as a source reference for future XPU kernel work, but not as
++a runtime option for quality-preserving submissions.
+diff --git a/scripts/run-minimax-strict-quality-gated-candidate.sh b/scripts/run-minimax-strict-quality-gated-candidate.sh
+index 9694746..68846ae 100755
+--- a/scripts/run-minimax-strict-quality-gated-candidate.sh
++++ b/scripts/run-minimax-strict-quality-gated-candidate.sh
+@@ -159,6 +159,13 @@ write_summary() {
+     --argjson bench_jsons "$(json_array "${bench_jsons[@]}")" \
+     --arg vllm_minimax_moe_delay_allreduce "${VLLM_MINIMAX_MOE_DELAY_ALLREDUCE:-}" \
+     --arg vllm_minimax_dist_residual_allreduce "${VLLM_MINIMAX_M2_DIST_RESIDUAL_ALLREDUCE:-}" \
++    --arg vllm_xpu_use_llm_scaler_moe_minimax_logits "${VLLM_XPU_USE_LLM_SCALER_MOE_MINIMAX_LOGITS:-}" \
++    --arg vllm_xpu_use_llm_scaler_moe_logits "${VLLM_XPU_USE_LLM_SCALER_MOE_LOGITS:-}" \
++    --arg vllm_xpu_use_llm_scaler_moe_ws "${VLLM_XPU_USE_LLM_SCALER_MOE_WS:-}" \
++    --arg vllm_minimax_m2_candidate_router_topm "${VLLM_MINIMAX_M2_CANDIDATE_ROUTER_TOPM:-}" \
++    --arg vllm_minimax_m2_candidate_router_xpu_repair "${VLLM_MINIMAX_M2_CANDIDATE_ROUTER_XPU_REPAIR:-}" \
++    --arg vllm_minimax_m2_fp16_router "${VLLM_MINIMAX_M2_FP16_ROUTER:-}" \
++    --arg vllm_minimax_qk_rms_xpu_helper "${VLLM_MINIMAX_QK_RMS_XPU_HELPER:-}" \
+     --arg ccl_topo_fabric_vertex_connection_check "${CCL_TOPO_FABRIC_VERTEX_CONNECTION_CHECK:-}" \
+     --arg ccl_topo_p2p_access "${CCL_TOPO_P2P_ACCESS:-}" \
+     '{
+@@ -188,6 +195,13 @@ write_summary() {
+         VLLM_MINIMAX_QK_NORM_RESTORE_WEIGHT: env.VLLM_MINIMAX_QK_NORM_RESTORE_WEIGHT,
+         VLLM_MINIMAX_QK_NORM_RESTORE_WEIGHT_MIN_TOKENS: env.VLLM_MINIMAX_QK_NORM_RESTORE_WEIGHT_MIN_TOKENS,
+         VLLM_XPU_USE_LLM_SCALER_MOE: env.VLLM_XPU_USE_LLM_SCALER_MOE,
++        VLLM_XPU_USE_LLM_SCALER_MOE_MINIMAX_LOGITS: $vllm_xpu_use_llm_scaler_moe_minimax_logits,
++        VLLM_XPU_USE_LLM_SCALER_MOE_LOGITS: $vllm_xpu_use_llm_scaler_moe_logits,
++        VLLM_XPU_USE_LLM_SCALER_MOE_WS: $vllm_xpu_use_llm_scaler_moe_ws,
++        VLLM_MINIMAX_M2_CANDIDATE_ROUTER_TOPM: $vllm_minimax_m2_candidate_router_topm,
++        VLLM_MINIMAX_M2_CANDIDATE_ROUTER_XPU_REPAIR: $vllm_minimax_m2_candidate_router_xpu_repair,
++        VLLM_MINIMAX_M2_FP16_ROUTER: $vllm_minimax_m2_fp16_router,
++        VLLM_MINIMAX_QK_RMS_XPU_HELPER: $vllm_minimax_qk_rms_xpu_helper,
+         VLLM_XPU_ENABLE_XPU_GRAPH: env.VLLM_XPU_ENABLE_XPU_GRAPH,
+         VLLM_XPU_FORCE_GRAPH_WITH_COMM: env.VLLM_XPU_FORCE_GRAPH_WITH_COMM,
+         VLLM_XPU_GRAPH_NOOP_COMM_CAPTURE: env.VLLM_XPU_GRAPH_NOOP_COMM_CAPTURE,

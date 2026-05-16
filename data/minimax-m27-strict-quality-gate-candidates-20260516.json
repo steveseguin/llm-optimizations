@@ -109,6 +109,40 @@
         "reason": "Candidate failed the deterministic semantic quality gate."
       },
       "decision": "Reject. Do not promote or submit to LocalMaxxing."
+    },
+    {
+      "label": "minimax-logits",
+      "env": {
+        "VLLM_XPU_USE_LLM_SCALER_MOE_MINIMAX_LOGITS": "1"
+      },
+      "summary_json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-minimax-logits-strict-tp4-ctx2048-mbt512-bs256-20260516T004653Z-summary.json",
+      "quality": {
+        "raw145_n64": {
+          "passed": true,
+          "expected_token_sha256_match": true,
+          "combined_token_sha256": "267cbf30208d84929ee79284ac695467f7e80597bf8694130e1e1f8b180eb5bd"
+        },
+        "raw145_n256": {
+          "passed": true,
+          "expected_token_sha256_match": true,
+          "combined_token_sha256": "58f6e8251c7a0a17e8c441278b5861f7d5da914fa1823ecd10484b296f2d7537"
+        },
+        "semantic_suite": {
+          "passed": false,
+          "failure_reasons": [
+            "nondeterministic token hashes"
+          ],
+          "deterministic_across_runs": false,
+          "observed_difference": "Arithmetic canary emitted token-stable '42' in run 0 and ' 42' in run 1.",
+          "combined_token_sha256": "d6a0ba0da74af3abc61570d577a9adfffd335cf067943cc65694f0d007b073c4",
+          "json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-minimax-logits-strict-tp4-ctx2048-mbt512-bs256-20260516T004653Z-quality/semantic-suite-n64-r2.json"
+        }
+      },
+      "benchmark": {
+        "ran": false,
+        "reason": "Candidate failed the deterministic semantic quality gate."
+      },
+      "decision": "Reject. Do not promote or submit to LocalMaxxing. The intended MiniMax logits decode path was exercised, but exact raw-token canaries were not enough to prove quality."
     }
   ],
   "lessons": [

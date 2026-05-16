@@ -99,6 +99,33 @@ Artifacts:
 
 Decision: reject. Do not promote or submit to LocalMaxxing.
 
+## Candidate: MiniMax Logits MoE Path
+
+Env:
+
+```bash
+VLLM_XPU_USE_LLM_SCALER_MOE_MINIMAX_LOGITS=1
+```
+
+Result:
+
+- Raw145 64-token exact hash: pass.
+- Raw145 256-token exact hash: pass.
+- Semantic suite: fail, nondeterministic greedy token hashes.
+- Difference: arithmetic canary emitted `42` in one run and ` 42` in the next.
+- Benchmark: not run.
+
+Artifacts:
+
+- Summary:
+  `/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-minimax-logits-strict-tp4-ctx2048-mbt512-bs256-20260516T004653Z-summary.json`
+- Semantic failure:
+  `/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-minimax-logits-strict-tp4-ctx2048-mbt512-bs256-20260516T004653Z-quality/semantic-suite-n64-r2.json`
+
+Decision: reject. The intended `moe_forward_tiny_cutlass_nmajor_int4_u4_minimax`
+logits path was exercised, but it failed the semantic determinism gate. Do not
+promote or submit to LocalMaxxing.
+
 ## Lessons
 
 The raw exact canary is necessary but not sufficient. Both rejected candidates
@@ -111,3 +138,8 @@ Next speed work should focus on deterministic device-level changes rather than
 Python-level collective boundary rearrangements: real XPU fused allreduce plus
 RMS/epilogue kernels, lower-level XCCL/Level Zero timing, and MoE kernel
 profiling that does not alter residual/allreduce ordering.
+
+The rejected MiniMax logits path reinforces the same rule: matching long-form
+token hashes is not enough if short semantic canaries are not deterministic. It
+may still be useful as a source reference for future XPU kernel work, but not as
+a runtime option for quality-preserving submissions.

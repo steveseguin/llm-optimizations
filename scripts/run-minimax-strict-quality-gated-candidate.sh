@@ -159,6 +159,13 @@ write_summary() {
     --argjson bench_jsons "$(json_array "${bench_jsons[@]}")" \
     --arg vllm_minimax_moe_delay_allreduce "${VLLM_MINIMAX_MOE_DELAY_ALLREDUCE:-}" \
     --arg vllm_minimax_dist_residual_allreduce "${VLLM_MINIMAX_M2_DIST_RESIDUAL_ALLREDUCE:-}" \
+    --arg vllm_xpu_use_llm_scaler_moe_minimax_logits "${VLLM_XPU_USE_LLM_SCALER_MOE_MINIMAX_LOGITS:-}" \
+    --arg vllm_xpu_use_llm_scaler_moe_logits "${VLLM_XPU_USE_LLM_SCALER_MOE_LOGITS:-}" \
+    --arg vllm_xpu_use_llm_scaler_moe_ws "${VLLM_XPU_USE_LLM_SCALER_MOE_WS:-}" \
+    --arg vllm_minimax_m2_candidate_router_topm "${VLLM_MINIMAX_M2_CANDIDATE_ROUTER_TOPM:-}" \
+    --arg vllm_minimax_m2_candidate_router_xpu_repair "${VLLM_MINIMAX_M2_CANDIDATE_ROUTER_XPU_REPAIR:-}" \
+    --arg vllm_minimax_m2_fp16_router "${VLLM_MINIMAX_M2_FP16_ROUTER:-}" \
+    --arg vllm_minimax_qk_rms_xpu_helper "${VLLM_MINIMAX_QK_RMS_XPU_HELPER:-}" \
     --arg ccl_topo_fabric_vertex_connection_check "${CCL_TOPO_FABRIC_VERTEX_CONNECTION_CHECK:-}" \
     --arg ccl_topo_p2p_access "${CCL_TOPO_P2P_ACCESS:-}" \
     '{
@@ -188,6 +195,13 @@ write_summary() {
         VLLM_MINIMAX_QK_NORM_RESTORE_WEIGHT: env.VLLM_MINIMAX_QK_NORM_RESTORE_WEIGHT,
         VLLM_MINIMAX_QK_NORM_RESTORE_WEIGHT_MIN_TOKENS: env.VLLM_MINIMAX_QK_NORM_RESTORE_WEIGHT_MIN_TOKENS,
         VLLM_XPU_USE_LLM_SCALER_MOE: env.VLLM_XPU_USE_LLM_SCALER_MOE,
+        VLLM_XPU_USE_LLM_SCALER_MOE_MINIMAX_LOGITS: $vllm_xpu_use_llm_scaler_moe_minimax_logits,
+        VLLM_XPU_USE_LLM_SCALER_MOE_LOGITS: $vllm_xpu_use_llm_scaler_moe_logits,
+        VLLM_XPU_USE_LLM_SCALER_MOE_WS: $vllm_xpu_use_llm_scaler_moe_ws,
+        VLLM_MINIMAX_M2_CANDIDATE_ROUTER_TOPM: $vllm_minimax_m2_candidate_router_topm,
+        VLLM_MINIMAX_M2_CANDIDATE_ROUTER_XPU_REPAIR: $vllm_minimax_m2_candidate_router_xpu_repair,
+        VLLM_MINIMAX_M2_FP16_ROUTER: $vllm_minimax_m2_fp16_router,
+        VLLM_MINIMAX_QK_RMS_XPU_HELPER: $vllm_minimax_qk_rms_xpu_helper,
         VLLM_XPU_ENABLE_XPU_GRAPH: env.VLLM_XPU_ENABLE_XPU_GRAPH,
         VLLM_XPU_FORCE_GRAPH_WITH_COMM: env.VLLM_XPU_FORCE_GRAPH_WITH_COMM,
         VLLM_XPU_GRAPH_NOOP_COMM_CAPTURE: env.VLLM_XPU_GRAPH_NOOP_COMM_CAPTURE,
