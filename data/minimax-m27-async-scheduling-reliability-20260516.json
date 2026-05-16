@@ -1,0 +1,88 @@
+{
+  "date": "2026-05-16",
+  "model": "/mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround",
+  "hardware": "4x Intel Arc Pro B70 32GB",
+  "engine": "vLLM 0.20.1-local XPU with llm-scaler INT4 MoE path",
+  "accepted_recipe": {
+    "VLLM_XPU_COMPILE_ALLREDUCE_NO_CLONE": "1",
+    "VLLM_MINIMAX_M2_ATTN_DELAY_ALLREDUCE": "1",
+    "VLLM_XPU_ENABLE_XPU_GRAPH": "1",
+    "VLLM_XPU_FORCE_GRAPH_WITH_COMM": "1",
+    "VLLM_XPU_GRAPH_NOOP_COMM_CAPTURE": "1",
+    "VLLM_XPU_USE_LLM_SCALER_MOE": "1",
+    "vllm_flag": "--no-async-scheduling",
+    "tensor_parallel_size": 4,
+    "dtype": "float16",
+    "max_model_len": 2048,
+    "max_num_batched_tokens": 512,
+    "block_size": 256,
+    "attention_backend": "TRITON_ATTN"
+  },
+  "quality_results": [
+    {
+      "name": "pass_only_no_clone_r5",
+      "result": "pass",
+      "json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-reliability-no-clone-pass-only-r5-20260516T023607Z.json",
+      "combined_token_sha256": "1911e55a013ed9636674df05505f8ad99cd0d98e70902543d82ccd9a65355251"
+    },
+    {
+      "name": "pass_sql_no_clone_r3",
+      "result": "pass",
+      "json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-reliability-no-clone-pass-sql-r3-20260516T024531Z.json",
+      "combined_token_sha256": "65b16c12b687e8da245b4834fe62f9935c998ed9814ebd82ceeb04f619185cdb"
+    },
+    {
+      "name": "sixpack_no_clone_async_enabled_r2",
+      "result": "fail",
+      "json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-extended-raw-pack-no-clone-v2-20260516T023041Z.json",
+      "failure": "nondeterministic token hashes plus 64 token-id-0 NUL tokens on second-repeat PASS prompt"
+    },
+    {
+      "name": "sixpack_clone_async_enabled_r2",
+      "result": "fail",
+      "json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-reliability-clone-sixpack-v2-r2-20260516T025347Z.json",
+      "failure": "same second-repeat PASS prompt NUL pattern as no-clone"
+    },
+    {
+      "name": "sixpack_no_clone_async_disabled_r2",
+      "result": "pass",
+      "json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-reliability-no-clone-sixpack-v2-asyncoff-r2-20260516T030123Z.json",
+      "combined_token_sha256": "1e3560554f57b2b56cec8f49f28bc8ba12e9e0ced26bdc99a976f1433c99caa7"
+    },
+    {
+      "name": "raw145_n256_no_clone_async_disabled",
+      "result": "pass",
+      "json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-reliability-no-clone-raw145-n256-asyncoff-20260516T031651Z.json",
+      "combined_token_sha256": "58f6e8251c7a0a17e8c441278b5861f7d5da914fa1823ecd10484b296f2d7537"
+    }
+  ],
+  "throughput_results": {
+    "prompt_tokens": 512,
+    "output_tokens": 1536,
+    "context_length": 2048,
+    "batch_size": 1,
+    "runs": [
+      {
+        "json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/vllm-minimax-m27-autoround-tp4-p512n1536-20260516T031032Z.json",
+        "elapsed_s": 24.51060544399661,
+        "output_toks_per_second": 62.66675066470922,
+        "total_toks_per_second": 83.55566755294562
+      },
+      {
+        "json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/vllm-minimax-m27-autoround-tp4-p512n1536-20260516T031317Z.json",
+        "elapsed_s": 24.51408784899104,
+        "output_toks_per_second": 62.65784839566116,
+        "total_toks_per_second": 83.54379786088155
+      }
+    ],
+    "mean_output_toks_per_second": 62.662299530185194,
+    "mean_total_toks_per_second": 83.54973270691359
+  },
+  "localmaxxing": {
+    "submitted": true,
+    "id": "cmp7sf8xo00dko4018nmrmckc",
+    "payload": "data/localmaxxing-minimax-m27-autoround-no-clone-asyncoff-p512n1536-20260516.payload.json",
+    "response": "data/localmaxxing-responses/minimax-m27-autoround-no-clone-asyncoff-p512n1536-20260516.response.json"
+  },
+  "decision": "Promote no-clone plus async scheduling disabled as the safer quality-sensitive TP4 recipe. Treat the earlier 66.28 tok/s no-clone async-enabled result as a performance datapoint with weaker reliability clearance."
+}

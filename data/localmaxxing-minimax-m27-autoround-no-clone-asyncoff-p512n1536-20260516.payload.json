@@ -1,0 +1,43 @@
+{
+  "hfId": "MiniMaxAI/MiniMax-M2.7",
+  "modelRevision": "main",
+  "hardware": {
+    "hwClass": "DISCRETE_GPU",
+    "gpuName": "Intel Arc Pro B70 32GB",
+    "gpuCount": 4,
+    "vramGb": 32,
+    "cpu": "AMD EPYC 9015 8-Core Processor",
+    "ramGb": 15,
+    "os": "Ubuntu 24.04.4 LTS, kernel 6.17.0-23-generic"
+  },
+  "engineName": "vllm",
+  "engineVersion": "0.20.1-local",
+  "quantization": "INT4 AutoRound W4A16",
+  "promptTokens": 512,
+  "outputTokens": 1536,
+  "contextLength": 2048,
+  "batchSize": 1,
+  "peakVramGb": 29.23,
+  "tokSOut": 62.662299530185194,
+  "tokSTotal": 83.54973270691359,
+  "notes": "MiniMax M2.7 AutoRound W4A16 on 4x Intel Arc Pro B70 via vLLM/XPU TP4. Quality-safe rerun of the no-clone compile allreduce recipe with vLLM async scheduling disabled after a stricter six-prompt canary found NUL-token corruption in the async-scheduling path. Passed raw145 n256 exact token hash and six-prompt PASS/42/code/JSON/sort/SQL deterministic gate with no degenerate output. Mean of 2 p512/n1536 repeats: 62.66 output tok/s, 83.55 total tok/s. Total tok/s includes prompt plus decode; this vLLM bench mode does not emit isolated prefill tok/s. No speculative decoding, no expert drop, no model/quantization change, no power-limit change.",
+  "engineFlags": {
+    "commandSnippet": "VLLM_XPU_COMPILE_ALLREDUCE_NO_CLONE=1 VLLM_MINIMAX_M2_ATTN_DELAY_ALLREDUCE=1 VLLM_XPU_ENABLE_XPU_GRAPH=1 VLLM_XPU_FORCE_GRAPH_WITH_COMM=1 VLLM_XPU_GRAPH_NOOP_COMM_CAPTURE=1 VLLM_XPU_USE_LLM_SCALER_MOE=1 CCL_TOPO_P2P_ACCESS=1 VLLM_CACHE_ROOT=/mnt/fast-ai/vllm-cache-exp/minimax-reliability-pass-only vllm bench throughput --backend vllm --no-async-scheduling --block-size 256 --no-enable-prefix-caching --attention-backend TRITON_ATTN --model /mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround --tokenizer /mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround --trust-remote-code --dtype float16 --tensor-parallel-size 4 --distributed-executor-backend mp --max-model-len 2048 --max-num-batched-tokens 512 --max-num-seqs 1 --dataset-name random --random-input-len 512 --random-output-len 1536 --random-range-ratio 0 --num-prompts 1 --disable-log-stats --compilation-config '{\"use_inductor_graph_partition\":true,\"compile_sizes\":[1],\"cudagraph_mode\":\"PIECEWISE\"}'",
+    "tensorParallel": 4,
+    "pipelineParallel": 1,
+    "kvCacheDtype": "auto",
+    "gpuMemUtil": 0.9,
+    "prefixCaching": false,
+    "attentionBackend": "TRITON_ATTN",
+    "flashAttn": true,
+    "chunkedPrefill": true,
+    "prefillChunkSize": 512,
+    "contBatching": true,
+    "engineQuant": "inc",
+    "maxRunningSeqs": 1,
+    "concurrency": 1,
+    "specDecoding": false,
+    "mtpEnabled": false,
+    "extraFlags": "XPU/Level Zero; B70 tuned MoE config E=256,N=384,dtype=int4_w4a16; llm-scaler u4 MoE decode path; VLLM_XPU_COMPILE_ALLREDUCE_NO_CLONE=1; --no-async-scheduling; async-scheduling enabled was rejected after six-prompt pack produced second-repeat token-id-0 NUL output; no power-limit change"
+  }
+}

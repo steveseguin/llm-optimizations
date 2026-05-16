@@ -1,0 +1,8 @@
+]~!b[]~b]system
+You are a precise assistant. Your name is MiniMax-M2.7 and is built by MiniMax.[e~[
+]~b]user
+Return exactly one line of JSON with keys status, count, and items. Use status "ok", count 3, and items alpha, beta, gamma. No markdown.[e~[
+]~b]ai
+<think>
+</think>
+

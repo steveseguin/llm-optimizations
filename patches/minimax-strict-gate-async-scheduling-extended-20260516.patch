@@ -1,0 +1,144 @@
+diff --git a/scripts/run-minimax-strict-quality-gated-candidate.sh b/scripts/run-minimax-strict-quality-gated-candidate.sh
+index a1c8e0d..8343112 100755
+--- a/scripts/run-minimax-strict-quality-gated-candidate.sh
++++ b/scripts/run-minimax-strict-quality-gated-candidate.sh
+@@ -24,6 +24,10 @@ QUALITY_TIMEOUT="${QUALITY_TIMEOUT:-30m}"
+ BENCH_TIMEOUT="${BENCH_TIMEOUT:-25m}"
+ RUN_TIMEOUT_KILL_AFTER="${RUN_TIMEOUT_KILL_AFTER:-30s}"
+ SHM_STALL_MAX_WARNINGS="${SHM_STALL_MAX_WARNINGS:-3}"
++QUALITY_ASYNC_SCHEDULING="${QUALITY_ASYNC_SCHEDULING:-default}"
++BENCH_ASYNC_SCHEDULING="${BENCH_ASYNC_SCHEDULING:-default}"
++BENCH_ASYNC_ENGINE="${BENCH_ASYNC_ENGINE:-1}"
++RUN_EXTENDED_QUALITY="${RUN_EXTENDED_QUALITY:-0}"
+ CACHE_ROOT="${VLLM_CACHE_ROOT:-/mnt/fast-ai/vllm-cache-exp/minimax-strict-${LABEL}}"
+ RAW145_PROMPT="${RAW145_PROMPT:-/home/steve/llm-optimizations-publish/prompts/minimax-raw145-tokenhash-canary.txt}"
+ RAW145_N64_HASH="${RAW145_N64_HASH:-267cbf30208d84929ee79284ac695467f7e80597bf8694130e1e1f8b180eb5bd}"
+@@ -91,6 +95,7 @@ run_quality_check() {
+       --max-num-seqs "$MAX_NUM_SEQS" \
+       --block-size "$BLOCK_SIZE" \
+       --attention-backend TRITON_ATTN \
++      --async-scheduling "$QUALITY_ASYNC_SCHEDULING" \
+       --qk-norm-restore-weight \
+       --qk-norm-restore-weight-min-tokens "$VLLM_MINIMAX_QK_NORM_RESTORE_WEIGHT_MIN_TOKENS" \
+       --vllm-cache-root "$CACHE_ROOT" \
+@@ -123,6 +128,7 @@ run_semantic_suite() {
+       --max-num-seqs "$MAX_NUM_SEQS" \
+       --block-size "$BLOCK_SIZE" \
+       --attention-backend TRITON_ATTN \
++      --async-scheduling "$QUALITY_ASYNC_SCHEDULING" \
+       --qk-norm-restore-weight \
+       --qk-norm-restore-weight-min-tokens "$VLLM_MINIMAX_QK_NORM_RESTORE_WEIGHT_MIN_TOKENS" \
+       --vllm-cache-root "$CACHE_ROOT" \
+@@ -133,6 +139,42 @@ run_semantic_suite() {
+       2>&1 | tee "$log"
+ }
+ 
++run_extended_suite() {
++  local name="extended-sixpack-n64-r2"
++  local json="$quality_dir/${name}.json"
++  local log="$quality_dir/${name}.log"
++  quality_jsons+=("$json")
++  quality_logs+=("$log")
++  quality_names+=("$name")
++  printf 'quality_check=%s\njson=%s\nlog=%s\n' "$name" "$json" "$log"
++  timeout --foreground --signal=TERM --kill-after="$RUN_TIMEOUT_KILL_AFTER" "$QUALITY_TIMEOUT" \
++    python /home/steve/llm-optimizations-publish/scripts/run-vllm-minimax-quality-check.py \
++      --mode graph \
++      --model "$MODEL" \
++      --out "$json" \
++      --raw-prompt \
++      --max-tokens 64 \
++      --runs 2 \
++      --prompt-file /home/steve/llm-optimizations-publish/prompts/minimax-pass-canary-raw.txt \
++      --prompt-file /home/steve/llm-optimizations-publish/prompts/minimax-arithmetic-canary-raw.txt \
++      --prompt-file /home/steve/llm-optimizations-publish/prompts/minimax-code-canary-raw.txt \
++      --prompt-file /home/steve/llm-optimizations-publish/prompts/minimax-json-canary-raw.txt \
++      --prompt-file /home/steve/llm-optimizations-publish/prompts/minimax-sort-canary-raw.txt \
++      --prompt-file /home/steve/llm-optimizations-publish/prompts/minimax-sql-canary-raw.txt \
++      --tensor-parallel-size "$TP" \
++      --dtype "$DTYPE" \
++      --max-model-len "$MAX_MODEL_LEN" \
++      --max-num-batched-tokens "$MAX_BATCHED_TOKENS" \
++      --max-num-seqs "$MAX_NUM_SEQS" \
++      --block-size "$BLOCK_SIZE" \
++      --attention-backend TRITON_ATTN \
++      --async-scheduling "$QUALITY_ASYNC_SCHEDULING" \
++      --qk-norm-restore-weight \
++      --qk-norm-restore-weight-min-tokens "$VLLM_MINIMAX_QK_NORM_RESTORE_WEIGHT_MIN_TOKENS" \
++      --vllm-cache-root "$CACHE_ROOT" \
++      2>&1 | tee "$log"
++}
++
+ write_summary() {
+   local status="$1"
+   shift || true
+@@ -151,6 +193,10 @@ write_summary() {
+     --argjson input_len "$INPUT_LEN" \
+     --argjson output_len "$OUTPUT_LEN" \
+     --argjson bench_repeats "$BENCH_REPEATS" \
++    --arg quality_async_scheduling "$QUALITY_ASYNC_SCHEDULING" \
++    --arg bench_async_scheduling "$BENCH_ASYNC_SCHEDULING" \
++    --argjson bench_async_engine "$BENCH_ASYNC_ENGINE" \
++    --argjson run_extended_quality "$RUN_EXTENDED_QUALITY" \
+     --arg raw145_n64_hash "$RAW145_N64_HASH" \
+     --arg raw145_n256_hash "$RAW145_N256_HASH" \
+     --argjson quality_names "$(json_array "${quality_names[@]}")" \
+@@ -183,12 +229,18 @@ write_summary() {
+         max_num_batched_tokens: $max_batched_tokens,
+         max_num_seqs: $max_num_seqs,
+         block_size: $block_size,
++        quality_async_scheduling: $quality_async_scheduling,
++        bench_async_scheduling: $bench_async_scheduling,
++        bench_async_engine: ($bench_async_engine == 1),
+         vllm_cache_root: $cache_root
+       },
+       quality_policy: {
+         raw145_n64_expected_combined_token_sha256: $raw145_n64_hash,
+         raw145_n256_expected_combined_token_sha256: $raw145_n256_hash,
+         semantic_suite: "PASS, arithmetic 42, add_one function with return x + 1; two greedy repeats must be deterministic"
++        ,
++        extended_sixpack_enabled: ($run_extended_quality == 1),
++        extended_sixpack: "PASS, arithmetic, code, JSON, sort, SQL; two greedy repeats must be deterministic and non-degenerate when enabled"
+       },
+       candidate_env: {
+         VLLM_MINIMAX_MOE_DELAY_ALLREDUCE: $vllm_minimax_moe_delay_allreduce,
+@@ -248,10 +300,30 @@ if ! run_semantic_suite; then
+   printf 'summary_json=%s\n' "$summary_json"
+   exit 1
+ fi
++if [ "$RUN_EXTENDED_QUALITY" -eq 1 ]; then
++  if ! run_extended_suite; then
++    write_summary quality_failed_extended_suite
++    printf 'summary_json=%s\n' "$summary_json"
++    exit 1
++  fi
++fi
+ 
+ bench_jsons=()
+ bench_logs=()
+ if [ "$BENCH_REPEATS" -gt 0 ]; then
++  bench_async_flags=()
++  if [ "$BENCH_ASYNC_ENGINE" -eq 1 ]; then
++    bench_async_flags+=(--async-engine)
++  fi
++  case "$BENCH_ASYNC_SCHEDULING" in
++    default) ;;
++    on) bench_async_flags+=(--async-scheduling) ;;
++    off) bench_async_flags+=(--no-async-scheduling) ;;
++    *)
++      echo "Invalid BENCH_ASYNC_SCHEDULING=$BENCH_ASYNC_SCHEDULING; expected default, on, or off" >&2
++      exit 2
++      ;;
++  esac
+   for i in $(seq 1 "$BENCH_REPEATS"); do
+     run_out="$(
+       MODEL="$MODEL" \
+@@ -269,7 +341,7 @@ if [ "$BENCH_REPEATS" -gt 0 ]; then
+       RUN_TIMEOUT="$BENCH_TIMEOUT" \
+       RUN_TIMEOUT_KILL_AFTER="$RUN_TIMEOUT_KILL_AFTER" \
+       SHM_STALL_MAX_WARNINGS="$SHM_STALL_MAX_WARNINGS" \
+-      EXTRA_ARGS="--async-engine --block-size $BLOCK_SIZE --no-enable-prefix-caching --attention-backend TRITON_ATTN --compilation-config {\"use_inductor_graph_partition\":true,\"compile_sizes\":[1],\"cudagraph_mode\":\"PIECEWISE\"}" \
++      EXTRA_ARGS="${bench_async_flags[*]} --block-size $BLOCK_SIZE --no-enable-prefix-caching --attention-backend TRITON_ATTN --compilation-config {\"use_inductor_graph_partition\":true,\"compile_sizes\":[1],\"cudagraph_mode\":\"PIECEWISE\"}" \
+       /home/steve/llm-optimizations-publish/scripts/bench-vllm-minimax-autoround-xpu.sh
+     )"
+     printf '%s\n' "$run_out"
