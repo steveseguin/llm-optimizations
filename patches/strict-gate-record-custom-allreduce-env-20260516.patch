@@ -1,0 +1,20 @@
+diff --git a/scripts/run-minimax-strict-quality-gated-candidate.sh b/scripts/run-minimax-strict-quality-gated-candidate.sh
+index 8efc4b5..5b8a469 100755
+--- a/scripts/run-minimax-strict-quality-gated-candidate.sh
++++ b/scripts/run-minimax-strict-quality-gated-candidate.sh
+@@ -224,6 +224,7 @@ write_summary() {
+     --arg vllm_minimax_m2_fp16_router "${VLLM_MINIMAX_M2_FP16_ROUTER:-}" \
+     --arg vllm_minimax_qk_rms_xpu_helper "${VLLM_MINIMAX_QK_RMS_XPU_HELPER:-}" \
+     --arg vllm_xpu_compile_allreduce_no_clone "${VLLM_XPU_COMPILE_ALLREDUCE_NO_CLONE:-}" \
++    --arg vllm_xpu_compile_allreduce_custom_op "${VLLM_XPU_COMPILE_ALLREDUCE_CUSTOM_OP:-}" \
+     --arg vllm_xpu_compile_out_of_place_allreduce "${VLLM_XPU_COMPILE_OUT_OF_PLACE_ALLREDUCE:-}" \
+     --arg vllm_xpu_async_clone_sampled_token_ids "${VLLM_XPU_ASYNC_CLONE_SAMPLED_TOKEN_IDS:-}" \
+     --arg ccl_topo_fabric_vertex_connection_check "${CCL_TOPO_FABRIC_VERTEX_CONNECTION_CHECK:-}" \
+@@ -270,6 +271,7 @@ write_summary() {
+         VLLM_MINIMAX_M2_FP16_ROUTER: $vllm_minimax_m2_fp16_router,
+         VLLM_MINIMAX_QK_RMS_XPU_HELPER: $vllm_minimax_qk_rms_xpu_helper,
+         VLLM_XPU_COMPILE_ALLREDUCE_NO_CLONE: $vllm_xpu_compile_allreduce_no_clone,
++        VLLM_XPU_COMPILE_ALLREDUCE_CUSTOM_OP: $vllm_xpu_compile_allreduce_custom_op,
+         VLLM_XPU_COMPILE_OUT_OF_PLACE_ALLREDUCE: $vllm_xpu_compile_out_of_place_allreduce,
+         VLLM_XPU_ASYNC_CLONE_SAMPLED_TOKEN_IDS: $vllm_xpu_async_clone_sampled_token_ids,
+         VLLM_XPU_ENABLE_XPU_GRAPH: env.VLLM_XPU_ENABLE_XPU_GRAPH,
