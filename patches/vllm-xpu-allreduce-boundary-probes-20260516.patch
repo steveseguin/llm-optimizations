@@ -1,0 +1,155 @@
+diff --git a/vllm/compilation/passes/fusion/sequence_parallelism.py b/vllm/compilation/passes/fusion/sequence_parallelism.py
+index 2c7a1390b..f4266f75d 100644
+--- a/vllm/compilation/passes/fusion/sequence_parallelism.py
++++ b/vllm/compilation/passes/fusion/sequence_parallelism.py
+@@ -2,6 +2,7 @@
+ # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
+ 
+ import functools
++import os
+ from collections.abc import Callable, Sequence
+ from typing import Any
+ 
+@@ -117,8 +118,16 @@ class _SequenceParallelPatternHelper:
+         self.device = device
+         self.tp_group = get_tp_group()
+         self.tp_size = get_tensor_model_parallel_world_size()
++        from vllm.platforms import current_platform
++
++        self.use_xpu_custom_allreduce_pattern = (
++            current_platform.is_xpu()
++            and os.environ.get("VLLM_XPU_COMPILE_ALLREDUCE_CUSTOM_OP", "0") == "1"
++        )
+ 
+     def _all_reduce(self, x: torch.Tensor) -> torch.Tensor:
++        if self.use_xpu_custom_allreduce_pattern:
++            return torch.ops.vllm.all_reduce(x, group_name=self.tp_group.unique_name)
+         return tensor_model_parallel_all_reduce(x)
+ 
+     def _reduce_scatter(self, x: torch.Tensor) -> torch.Tensor:
+@@ -396,13 +405,16 @@ class SequenceParallelismPass(VllmPatternMatcherPass):
+         )
+ 
+         for epsilon in [1e-5, 1e-6]:
+-            # RMSNorm + Static FP8 quantization patterns
+-            FirstAllReduceRMSNormStaticFP8Pattern(
+-                epsilon, self.model_dtype, self.device
+-            ).register(self.patterns)
+-            MiddleAllReduceRMSNormStaticFP8Pattern(
+-                epsilon, self.model_dtype, self.device
+-            ).register(self.patterns)
++            from vllm.platforms import current_platform
++
++            if not current_platform.is_xpu():
++                # RMSNorm + Static FP8 quantization patterns
++                FirstAllReduceRMSNormStaticFP8Pattern(
++                    epsilon, self.model_dtype, self.device
++                ).register(self.patterns)
++                MiddleAllReduceRMSNormStaticFP8Pattern(
++                    epsilon, self.model_dtype, self.device
++                ).register(self.patterns)
+ 
+             # Normal RMSNorm patterns
+             FirstAllReduceRMSNormPattern(
+diff --git a/vllm/distributed/device_communicators/xpu_communicator.py b/vllm/distributed/device_communicators/xpu_communicator.py
+index 29c731fbc..cb26c93b8 100644
+--- a/vllm/distributed/device_communicators/xpu_communicator.py
++++ b/vllm/distributed/device_communicators/xpu_communicator.py
+@@ -1,6 +1,7 @@
+ # SPDX-License-Identifier: Apache-2.0
+ # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
+ 
++import os
+ 
+ import torch
+ import torch.distributed as dist
+@@ -42,8 +43,38 @@ class XpuCommunicator(DeviceCommunicatorBase):
+                 logger.info("Using AgRs manager on XPU device.")
+ 
+     def all_reduce(self, input_: torch.Tensor) -> torch.Tensor:
+-        output = input_.clone() if torch.compiler.is_compiling() else input_
+-        dist.all_reduce(output, group=self.device_group)
++        if (
++            torch.compiler.is_compiling()
++            and os.environ.get("VLLM_XPU_COMPILE_ALLREDUCE_CUSTOM_OP", "0") == "1"
++        ):
++            return torch.ops.vllm.all_reduce(input_, group_name=self.unique_name)
++
++        if torch.compiler.is_compiling():
++            if os.environ.get("VLLM_XPU_COMPILE_ALLREDUCE_NO_CLONE", "0") == "1":
++                output = input_
++            else:
++                output = input_.clone()
++        else:
++            output = input_
++        if torch.compiler.is_compiling():
++            dist.all_reduce(output, group=self.device_group)
++            return output
++
++        from vllm.utils.xpu_decode_timing import (
++            current_allreduce_label,
++            timed_region,
++        )
++
++        site = current_allreduce_label()
++        label = f"all_reduce:{tuple(input_.shape)}:{input_.dtype}"
++        if site:
++            label = f"all_reduce:{site}:{tuple(input_.shape)}:{input_.dtype}"
++        with timed_region(label):
++            if os.environ.get("VLLM_XPU_ALLREDUCE_ASYNC_WAIT", "0") == "1":
++                work = dist.all_reduce(output, group=self.device_group, async_op=True)
++                work.wait()
++            else:
++                dist.all_reduce(output, group=self.device_group)
+         return output
+ 
+     def reduce_scatter(self, input_: torch.Tensor, dim: int = -1):
+@@ -126,6 +157,37 @@ class XpuCommunicator(DeviceCommunicatorBase):
+                 assert input_.shape[dim] == sizes[self.rank_in_group], (
+                     f"{input_.shape[dim]} != {sizes[self.rank_in_group]}"
+                 )
++                if os.environ.get("VLLM_XPU_PAD_UNEVEN_ALLGATHERV", "1") != "0":
++                    # XCCL can hang on variable-size all_gather(list, input)
++                    # for XPU. Pad to an equal first dimension, gather with
++                    # all_gather_into_tensor, then slice back to the requested
++                    # per-rank chunk sizes.
++                    max_size = max(sizes)
++                    if input_.shape[dim] == max_size:
++                        padded = input_.contiguous()
++                    else:
++                        padded = torch.empty(
++                            (max_size,) + input_size[1:],
++                            dtype=input_.dtype,
++                            device=input_.device,
++                        )
++                        padded[: input_.shape[dim]].copy_(input_)
++                        padded[input_.shape[dim] :].zero_()
++
++                    gathered = torch.empty(
++                        (max_size * world_size,) + input_size[1:],
++                        dtype=input_.dtype,
++                        device=input_.device,
++                    )
++                    dist.all_gather_into_tensor(
++                        gathered, padded, group=self.device_group
++                    )
++                    chunks = []
++                    for rank, size in enumerate(sizes):
++                        start = rank * max_size
++                        chunks.append(gathered[start : start + size])
++                    return torch.cat(chunks, dim=0)
++
+                 output_size = (sum(sizes),) + input_size[1:]
+             else:
+                 output_size = (input_size[0] * world_size,) + input_size[1:]
+@@ -147,7 +209,9 @@ class XpuCommunicator(DeviceCommunicatorBase):
+                 dist.all_gather(all_gather_list, input_, group=self.device_group)
+                 output_tensor = torch.cat(all_gather_list, dim=0)
+             else:
+-                dist.all_gather([output_tensor], input_, group=self.device_group)
++                dist.all_gather_into_tensor(
++                    output_tensor, input_.contiguous(), group=self.device_group
++                )
+             return output_tensor
+ 
+         if isinstance(input_, torch.Tensor):
