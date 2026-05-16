@@ -1,0 +1,97 @@
+{
+  "date": "2026-05-16",
+  "model": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+  "submitted_model": "MiniMaxAI/MiniMax-M2.7",
+  "hardware": "4x Intel Arc Pro B70 32GB",
+  "engine": "vllm 0.20.1-local",
+  "quantization": "INT4 AutoRound W4A16",
+  "candidate": {
+    "name": "compile-allreduce-no-clone",
+    "flag": "VLLM_XPU_COMPILE_ALLREDUCE_NO_CLONE=1",
+    "description": "Use the original compiled temporary tensor as the XPU all-reduce output instead of first cloning it. The c10d wait/copy-back remains, but the graph no longer copies into clone tensors."
+  },
+  "baseline": {
+    "summary_json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-strict-baseline-strict-tp4-ctx2048-mbt512-bs256-20260516T000402Z-summary.json",
+    "output_toks_per_second": [
+      64.6223,
+      66.6589,
+      65.9762
+    ],
+    "mean_output_toks_per_second": 65.7525,
+    "mean_total_toks_per_second": 87.6699,
+    "aot_census": "/home/steve/bench-results/minimax-m2.7-strict-candidates/strict-computation-graph-census-baseline-2fcf22daa1-v2.json",
+    "aot_copy_target_kinds": {
+      "clone": 748
+    }
+  },
+  "result": {
+    "localmaxxing_id": "cmp7p4cj100clo401sy8gzesk",
+    "localmaxxing_status": "APPROVED",
+    "summary_json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-compile-allreduce-no-clone-strict-tp4-ctx2048-mbt512-bs256-20260516T012032Z-summary.json",
+    "cache_root": "/mnt/fast-ai/vllm-cache-exp/minimax-compile-allreduce-no-clone-strict-20260516",
+    "aot_cache_hashes": [
+      "d5593af7ff",
+      "f7f565e3a0"
+    ],
+    "output_toks_per_second": [
+      65.9362380428826,
+      66.24163600693295,
+      66.64933621352596
+    ],
+    "mean_output_toks_per_second": 66.27573675444717,
+    "mean_total_toks_per_second": 88.36764900592955,
+    "delta_vs_baseline_mean_output_toks_per_second": 0.5232367544471634,
+    "delta_vs_baseline_percent": 0.7957655741717445,
+    "prompt_tokens": 512,
+    "output_tokens": 1536,
+    "context_length": 2048,
+    "batch_size": 1,
+    "peak_model_load_gib": 28.11,
+    "graph_capture_gib": 1.12,
+    "gpu_kv_cache_tokens": 17920,
+    "aot_census": "/home/steve/bench-results/minimax-m2.7-strict-candidates/strict-computation-graph-census-no-clone-f7f565e3a0-v2.json",
+    "aot_collectives": {
+      "allreduce_count": 748,
+      "wait_count": 748,
+      "copy_count": 748,
+      "copy_target_kinds": {
+        "original_or_temp": 748
+      },
+      "by_category": {
+        "embedding_hidden": 4,
+        "qk_rms_variance": 248,
+        "attention_o_proj_hidden": 248,
+        "moe_hidden": 248
+      }
+    }
+  },
+  "quality": {
+    "strict_gate": {
+      "raw145_n64_hash": "267cbf30208d84929ee79284ac695467f7e80597bf8694130e1e1f8b180eb5bd",
+      "raw145_n256_hash": "58f6e8251c7a0a17e8c441278b5861f7d5da914fa1823ecd10484b296f2d7537",
+      "semantic_suite_hash": "adacbf144264486ea7d378ebb6a4c0ba23951b72c4cf86251a762b07ebef5805",
+      "semantic_requirements": [
+        "PASS substring",
+        "42 substring",
+        "def add_one substring",
+        "return x + 1 regex"
+      ],
+      "status": "passed"
+    },
+    "extended_raw145_n512": {
+      "baseline_json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-raw145-n512-baseline-currentclone-20260516.json",
+      "candidate_json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-raw145-n512-no-clone-expected-baseline-20260516.json",
+      "combined_token_sha256": "3872a0eeddffe0e3351dca9eaf5ca7dfc8b9d0383aeb5096e398706e1fdb3244",
+      "exact_match": true,
+      "candidate_expected_hash_match": true,
+      "nul_token_count": 0,
+      "control_nonspace_text_chars": 0
+    },
+    "expanded_default_chat_prompts": {
+      "baseline_json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-expanded-quality-baseline-defaultprompts-n256-r2-20260516.json",
+      "status": "not_used_as_gate",
+      "reason": "The current-clone baseline was nondeterministic across two greedy repeats on this longer default chat-prompt suite, so exact candidate equivalence would not be a valid pass/fail criterion for this patch."
+    }
+  },
+  "decision": "Quality-cleared and useful as a small speed win. Keep behind VLLM_XPU_COMPILE_ALLREDUCE_NO_CLONE while collecting more long-form eval evidence; safe enough for follow-up performance exploration because it preserves exact canaries through 512 generated raw tokens."
+}
