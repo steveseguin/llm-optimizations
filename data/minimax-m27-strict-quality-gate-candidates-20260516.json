@@ -1,0 +1,124 @@
+{
+  "date": "2026-05-16",
+  "model": "/mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround",
+  "hardware": "4x Intel Arc Pro B70 32GB",
+  "engine": "vLLM 0.20.1-local XPU with llm-scaler INT4 MoE path",
+  "goal": "Screen TP communication-boundary candidates for MiniMax M2.7 speed work without sacrificing quality, determinism, or reproducibility.",
+  "strict_gate": {
+    "script": "scripts/run-minimax-strict-quality-gated-candidate.sh",
+    "raw145_prompt": "prompts/minimax-raw145-tokenhash-canary.txt",
+    "policy": [
+      "Run the current quality-valid piecewise XPU graph path, not the older full-decode-only candidate path.",
+      "Pass exact combined token SHA-256 for the 64-token raw145 canary.",
+      "Pass exact combined token SHA-256 for the 256-token raw145 canary.",
+      "Pass a two-repeat semantic canary suite with deterministic greedy token hashes.",
+      "Benchmark only after all quality gates pass."
+    ],
+    "expected_hashes": {
+      "raw145_n64_combined_token_sha256": "267cbf30208d84929ee79284ac695467f7e80597bf8694130e1e1f8b180eb5bd",
+      "raw145_n256_combined_token_sha256": "58f6e8251c7a0a17e8c441278b5861f7d5da914fa1823ecd10484b296f2d7537"
+    }
+  },
+  "baseline_validation": {
+    "label": "strict-baseline",
+    "summary_json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-strict-baseline-strict-tp4-ctx2048-mbt512-bs256-20260516T000402Z-summary.json",
+    "status": "quality_passed",
+    "quality_artifacts": {
+      "raw145_n64": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-strict-baseline-strict-tp4-ctx2048-mbt512-bs256-20260516T000402Z-quality/raw145-n64-exact.json",
+      "raw145_n256": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-strict-baseline-strict-tp4-ctx2048-mbt512-bs256-20260516T000402Z-quality/raw145-n256-exact.json",
+      "semantic_suite": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-strict-baseline-strict-tp4-ctx2048-mbt512-bs256-20260516T000402Z-quality/semantic-suite-n64-r2.json"
+    },
+    "semantic_suite": {
+      "passed": true,
+      "deterministic_across_runs": true,
+      "combined_token_sha256": "adacbf144264486ea7d378ebb6a4c0ba23951b72c4cf86251a762b07ebef5805",
+      "outputs": [
+        "PASS",
+        "42",
+        "def add_one(x): return x + 1"
+      ]
+    }
+  },
+  "candidates": [
+    {
+      "label": "moe-delay-allreduce",
+      "env": {
+        "VLLM_MINIMAX_MOE_DELAY_ALLREDUCE": "1"
+      },
+      "summary_json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-moe-delay-allreduce-strict-tp4-ctx2048-mbt512-bs256-20260516T001127Z-summary.json",
+      "quality": {
+        "raw145_n64": {
+          "passed": true,
+          "expected_token_sha256_match": true,
+          "nul_token_count": 0,
+          "control_nonspace_text_chars": 0
+        },
+        "raw145_n256": {
+          "passed": true,
+          "expected_token_sha256_match": true,
+          "nul_token_count": 0,
+          "control_nonspace_text_chars": 0
+        },
+        "semantic_suite": {
+          "passed": false,
+          "failure_reasons": [
+            "nondeterministic token hashes"
+          ],
+          "deterministic_across_runs": false,
+          "observed_difference": "Arithmetic canary emitted token-stable '42' in run 0 and ' 42' in run 1.",
+          "json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-moe-delay-allreduce-strict-tp4-ctx2048-mbt512-bs256-20260516T001127Z-quality/semantic-suite-n64-r2.json"
+        }
+      },
+      "benchmark": {
+        "ran": false,
+        "reason": "Candidate failed the deterministic semantic quality gate."
+      },
+      "decision": "Reject. Do not promote or submit to LocalMaxxing."
+    },
+    {
+      "label": "dist-residual-allreduce",
+      "env": {
+        "VLLM_MINIMAX_M2_DIST_RESIDUAL_ALLREDUCE": "1"
+      },
+      "summary_json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-dist-residual-allreduce-strict-tp4-ctx2048-mbt512-bs256-20260516T002241Z-summary.json",
+      "quality": {
+        "raw145_n64": {
+          "passed": true,
+          "expected_token_sha256_match": true,
+          "nul_token_count": 0,
+          "control_nonspace_text_chars": 0
+        },
+        "raw145_n256": {
+          "passed": true,
+          "expected_token_sha256_match": true,
+          "nul_token_count": 0,
+          "control_nonspace_text_chars": 0
+        },
+        "semantic_suite": {
+          "passed": false,
+          "failure_reasons": [
+            "nondeterministic token hashes"
+          ],
+          "deterministic_across_runs": false,
+          "observed_difference": "Arithmetic canary emitted token-stable '42' in run 0 and ' 42' in run 1.",
+          "json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-dist-residual-allreduce-strict-tp4-ctx2048-mbt512-bs256-20260516T002241Z-quality/semantic-suite-n64-r2.json"
+        }
+      },
+      "benchmark": {
+        "ran": false,
+        "reason": "Candidate failed the deterministic semantic quality gate."
+      },
+      "decision": "Reject. Do not promote or submit to LocalMaxxing."
+    }
+  ],
+  "lessons": [
+    "The raw145 exact token-hash canary catches graph corruption, but it is not sufficient by itself for quality-preserving optimization.",
+    "Both communication-boundary candidates preserved the long repetitive raw canary yet introduced nondeterministic greedy output on a simple semantic arithmetic canary.",
+    "Do not benchmark or publish a candidate that fails deterministic greedy output, even if semantic substrings still match.",
+    "Future speed work should keep the strict gate as the default pre-benchmark screen."
+  ],
+  "localmaxxing": {
+    "submitted": false,
+    "reason": "No valid quality-preserving speed result. These are negative internal optimization screens."
+  }
+}
