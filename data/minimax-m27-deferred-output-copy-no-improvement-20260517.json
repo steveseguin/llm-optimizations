@@ -1,0 +1,70 @@
+{
+  "id": "minimax-m27-deferred-output-copy-no-improvement-20260517",
+  "date_utc": "2026-05-17",
+  "status": "quality_screen_passed_no_improvement",
+  "model": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+  "hardware": "4x Intel Arc Pro B70 32GB",
+  "engine": "vLLM 0.20.1-local XPU",
+  "quantization": "AutoRound INT4 W4A16",
+  "shape": {
+    "prompt_tokens": 512,
+    "output_tokens": 1536,
+    "context_length": 2048,
+    "batch_size": 1,
+    "tensor_parallel": 4,
+    "block_size": 256,
+    "max_num_batched_tokens": 512,
+    "max_num_seqs": 1
+  },
+  "candidate": {
+    "name": "deferred XPU async sampled-token output copy without explicit device synchronize",
+    "environment": {
+      "VLLM_XPU_DEFER_ASYNC_OUTPUT_COPY": "1",
+      "VLLM_XPU_DEFERRED_COPY_SYNC_DEVICE": "0",
+      "VLLM_XPU_LOCAL_ARGMAX_DECODE": "1",
+      "VLLM_XPU_LOCAL_ARGMAX_ASSUME_SAFE": "1",
+      "VLLM_XPU_USE_LLM_SCALER_MOE": "1",
+      "VLLM_XPU_ENABLE_XPU_GRAPH": "1",
+      "VLLM_XPU_FORCE_GRAPH_WITH_COMM": "1",
+      "VLLM_XPU_GRAPH_NOOP_COMM_CAPTURE": "1",
+      "CCL_TOPO_P2P_ACCESS": "1"
+    }
+  },
+  "quality": {
+    "raw145_n64_exact_passed": true,
+    "expected_combined_token_sha256": "267cbf30208d84929ee79284ac695467f7e80597bf8694130e1e1f8b180eb5bd",
+    "full_strict_gate_run": false,
+    "reason_full_gate_skipped": "p512/n1536 benchmark did not beat the promoted strict baseline"
+  },
+  "throughput": {
+    "output_tok_s_repeats": [
+      61.18219478220638,
+      61.1134397771433
+    ],
+    "total_tok_s_repeats": [
+      81.57625970960851,
+      81.4845863695244
+    ],
+    "output_tok_s_mean": 61.14781727967484,
+    "total_tok_s_mean": 81.53042303956644
+  },
+  "baseline_for_comparison": {
+    "id": "minimax-m27-localargmax-tightquality-20260517",
+    "localmaxxing_id": "cmp9xpe3w04pdo4013acdikt7",
+    "output_tok_s_mean": 61.40403471892818,
+    "total_tok_s_mean": 81.87204629190424
+  },
+  "artifacts": {
+    "quality_json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/deferred-output-copy-screen/raw145-n64-defer-copy-sync0-20260517T183414Z.json",
+    "quality_log": "/home/steve/bench-results/minimax-m2.7-strict-candidates/deferred-output-copy-screen/raw145-n64-defer-copy-sync0-20260517T183414Z.log",
+    "benchmark_jsons": [
+      "/home/steve/bench-results/minimax-m2.7-strict-candidates/deferred-output-copy-v1-bench/vllm-minimax-m27-autoround-tp4-p512n1536-20260517T184013Z.json",
+      "/home/steve/bench-results/minimax-m2.7-strict-candidates/deferred-output-copy-v1-bench/vllm-minimax-m27-autoround-tp4-p512n1536-20260517T184306Z.json"
+    ]
+  },
+  "localmaxxing": {
+    "submitted": false,
+    "reason": "Quality screen passed, but the candidate did not beat the current promoted strict baseline."
+  },
+  "decision": "Reject as a performance promotion. Deferred-copy without explicit device synchronize does not recover enough CPU handoff overhead to improve p512/n1536 decode throughput."
+}
