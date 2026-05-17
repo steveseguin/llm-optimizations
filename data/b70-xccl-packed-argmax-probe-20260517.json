@@ -1,0 +1,57 @@
+{
+  "id": "b70-xccl-packed-argmax-probe-20260517",
+  "date_utc": "2026-05-17",
+  "status": "diagnostic_reproducer",
+  "hardware": "4x Intel Arc Pro B70 32GB",
+  "backend": "torch.distributed xccl on XPU",
+  "script": "benchmarks/b70_xccl_packed_argmax_probe.py",
+  "command_shape": "python -m torch.distributed.run --nproc_per_node=4 benchmarks/b70_xccl_packed_argmax_probe.py --batch 8 --iters 50",
+  "artifacts": {
+    "raw_json_with_ccl_warnings": "/home/steve/bench-results/minimax-m2.7-strict-candidates/xccl-packed-argmax-probe-20260517T123004Z.json",
+    "clean_json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/xccl-packed-argmax-probe-20260517T123004Z.clean.json",
+    "log": "/home/steve/bench-results/minimax-m2.7-strict-candidates/xccl-packed-argmax-probe-20260517T123004Z.log"
+  },
+  "packed_argmax_results": [
+    {
+      "case": "rank_wins",
+      "all_ranks_ok": false,
+      "mismatch_counts": [8, 8, 8, 8],
+      "reference_first_tokens": [300000, 300001, 300002, 300003],
+      "candidate_first_tokens": [600003, 600007, 600011, 600015]
+    },
+    {
+      "case": "mixed_sign",
+      "all_ranks_ok": false,
+      "mismatch_counts": [8, 8, 8, 8],
+      "reference_first_tokens": [300000, 300001, 300002, 300003],
+      "candidate_first_tokens": [600003, 600007, 600011, 600015]
+    },
+    {
+      "case": "negative_only",
+      "all_ranks_ok": false,
+      "mismatch_counts": [8, 8, 8, 8],
+      "reference_first_tokens": [300000, 300001, 300002, 300003],
+      "candidate_first_tokens": [600003, 600007, 600011, 600015]
+    },
+    {
+      "case": "token_tie",
+      "all_ranks_ok": false,
+      "mismatch_counts": [8, 8, 8, 8],
+      "reference_first_tokens": [400, 401, 402, 403],
+      "candidate_first_tokens": [1003, 1007, 1011, 1015]
+    },
+    {
+      "case": "random",
+      "all_ranks_ok": false,
+      "mismatch_counts": [8, 8, 8, 8],
+      "reference_first_tokens": [300000, 100001, 200002, 100003],
+      "candidate_first_tokens": [600003, 600007, 600011, 600015]
+    }
+  ],
+  "reduceop_smoke_observation": {
+    "max_expected": 4,
+    "sum_expected": 10,
+    "notes": "ReduceOp.MAX did not return the expected max for XPU int32, int64, or float32 tensors in this probe. Some SUM sequences also showed suspicious state interaction, so new XCCL reduction-op use must be validated independently before model integration."
+  },
+  "conclusion": "The packed int64 MAX all-reduce local-argmax branch is invalid on the current B70/XCCL stack and explains the MiniMax raw145 quality failure. Keep pair all-gather local argmax as baseline and pursue a custom XPU pair reducer instead."
+}
