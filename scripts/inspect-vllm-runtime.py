@@ -66,6 +66,9 @@ def module_info(module_name: str) -> dict:
             "local_argmax_allreduce": (
                 "VLLM_XPU_LOCAL_ARGMAX_ALLREDUCE" in text
             ),
+            "local_argmax_xpu_reduce": (
+                "VLLM_XPU_LOCAL_ARGMAX_XPU_REDUCE" in text
+            ),
             "local_argmax_pair_all_gather_label": (
                 "logits.local_argmax_pair_all_gather" in text
             ),
