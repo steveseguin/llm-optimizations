@@ -5,15 +5,15 @@ Date: 2026-05-17
 ## Current Frame
 
 The current promoted MiniMax M2.7 AutoRound result is no longer a theoretical
-target: it is an honest, runtime-guarded baseline.
+target: it is an honest, runtime-guarded baseline with a stricter follow-up.
 
-- Promoted baseline: `61.317497` output tok/s, `81.756663` total tok/s
-- LocalMaxxing: `cmp9q9fzn04cto401tjcila06`
+- Strictest promoted baseline: `61.404035` output tok/s, `81.872046` total tok/s
+- LocalMaxxing: `cmp9xpe3w04pdo4013acdikt7`
 - Model: `Lasimeri/MiniMax-M2.7-int4-AutoRound`
 - Hardware: 4x Intel Arc Pro B70 32GB
 - Engine: vLLM `0.20.1-local`, XPU, TP4, llm-scaler INT4 MoE path
-- Quality: raw145 n64/n256 exact token hashes, semantic suite, and arithmetic
-  repeat suite all pass
+- Quality: raw145 n64/n256 exact token hashes, tightened exact arithmetic,
+  semantic suite, 16-run arithmetic repeat, and extended sixpack all pass
 
 The working path is greedy local argmax over vocab-parallel logits. It avoids
 full-vocab logits gather, preserves target greedy tokens, and uses the proven
@@ -105,5 +105,5 @@ skipped Q/K RMS variance allreduce counts as an improvement.
    marker.
 4. Run strict quality gates.
 5. Benchmark at p512/n1536 with at least two repeats only after quality passes.
-6. Submit to LocalMaxxing only if the result beats the promoted `61.317497`
+6. Submit to LocalMaxxing only if the result beats the promoted `61.404035`
    output tok/s baseline or is otherwise clearly useful as a labeled diagnostic.
