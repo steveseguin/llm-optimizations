@@ -1,0 +1,142 @@
+{
+  "id": "minimax-m27-autoround-gather-broadcast-argmax-20260517",
+  "date_utc": "2026-05-17",
+  "model": {
+    "hf_id": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+    "local_path": "/mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround",
+    "quantization": "AutoRound W4A16"
+  },
+  "hardware": {
+    "gpu": "Intel Arc Pro B70",
+    "gpu_count": 4,
+    "vram_gb_per_gpu": 32,
+    "cpu": "AMD EPYC 9015 8-Core Processor",
+    "ram_gb": 15,
+    "os": "Ubuntu 24.04.4 LTS"
+  },
+  "runtime": {
+    "engine": "vllm",
+    "engine_version": "0.20.1-local",
+    "tensor_parallel": 4,
+    "dtype": "float16",
+    "backend": "XPU/Level Zero",
+    "attention_backend": "TRITON_ATTN",
+    "context_length": 2048,
+    "max_num_batched_tokens": 512,
+    "max_num_seqs": 1,
+    "block_size": 256,
+    "temperature": 0,
+    "prefix_caching": false,
+    "xpu_graph": true,
+    "speculative_decode": false
+  },
+  "candidate_env": {
+    "VLLM_XPU_USE_LLM_SCALER_MOE": "1",
+    "VLLM_XPU_USE_LLM_SCALER_MOE_MINIMAX_LOGITS": "1",
+    "VLLM_XPU_LOCAL_ARGMAX_DECODE": "1",
+    "VLLM_XPU_LOCAL_ARGMAX_ASSUME_SAFE": "1",
+    "VLLM_XPU_LOCAL_ARGMAX_GATHER_BROADCAST": "1",
+    "VLLM_MINIMAX_QK_NORM_RESTORE_WEIGHT": "1",
+    "VLLM_MINIMAX_QK_NORM_RESTORE_WEIGHT_MIN_TOKENS": "2",
+    "VLLM_MINIMAX_M2_ATTN_DELAY_ALLREDUCE": "1",
+    "VLLM_XPU_ENABLE_XPU_GRAPH": "1",
+    "VLLM_XPU_FORCE_GRAPH_WITH_COMM": "1",
+    "VLLM_XPU_GRAPH_NOOP_COMM_CAPTURE": "1",
+    "CCL_ATL_TRANSPORT": "ofi",
+    "CCL_TOPO_P2P_ACCESS": "1"
+  },
+  "quality": {
+    "status": "passed",
+    "summary": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-minimaxlogits-localargmax-gatherbroadcast-qualityonly-strict-tp4-ctx2048-mbt512-bs256-20260517T083707Z-summary.json",
+    "artifacts_dir": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-minimaxlogits-localargmax-gatherbroadcast-qualityonly-strict-tp4-ctx2048-mbt512-bs256-20260517T083707Z-quality",
+    "gates": [
+      {
+        "name": "raw145-n64-exact",
+        "passed": true,
+        "combined_token_sha256": "267cbf30208d84929ee79284ac695467f7e80597bf8694130e1e1f8b180eb5bd"
+      },
+      {
+        "name": "raw145-n256-exact",
+        "passed": true,
+        "combined_token_sha256": "58f6e8251c7a0a17e8c441278b5861f7d5da914fa1823ecd10484b296f2d7537"
+      },
+      {
+        "name": "semantic-suite-n64-r2",
+        "passed": true,
+        "combined_token_sha256": "adacbf144264486ea7d378ebb6a4c0ba23951b72c4cf86251a762b07ebef5805"
+      },
+      {
+        "name": "arithmetic-repeat-n64-r8",
+        "passed": true,
+        "combined_token_sha256": "261779104d5abf1642713bfc560ca8d2d6c0f16edbcc929c8b0819b5a760dd7c"
+      }
+    ]
+  },
+  "benchmark": {
+    "prompt_tokens": 512,
+    "output_tokens": 1536,
+    "batch_size": 1,
+    "runs": [
+      {
+        "artifact": "/home/steve/bench-results/minimax-m2.7-strict-candidates/vllm-minimax-m27-autoround-tp4-p512n1536-20260517T085018Z.json",
+        "elapsed_time_s": 25.014784383005463,
+        "output_tok_s": 61.40368737471618,
+        "total_tok_s": 81.87158316628825
+      },
+      {
+        "artifact": "/home/steve/bench-results/minimax-m2.7-strict-candidates/vllm-minimax-m27-autoround-tp4-p512n1536-20260517T085449Z.json",
+        "elapsed_time_s": 24.91892694501439,
+        "output_tok_s": 61.63989337860764,
+        "total_tok_s": 82.18652450481018
+      },
+      {
+        "artifact": "/home/steve/bench-results/minimax-m2.7-strict-candidates/vllm-minimax-m27-autoround-tp4-p512n1536-20260517T085750Z.json",
+        "elapsed_time_s": 25.022643392003374,
+        "output_tok_s": 61.38440195694385,
+        "total_tok_s": 81.84586927592514
+      }
+    ],
+    "mean_output_tok_s": 61.47599423675589,
+    "min_output_tok_s": 61.38440195694385,
+    "max_output_tok_s": 61.63989337860764,
+    "mean_total_tok_s": 81.96799231567452,
+    "min_total_tok_s": 81.84586927592514,
+    "max_total_tok_s": 82.18652450481018,
+    "previous_strict_best_output_tok_s": 61.46449885836371,
+    "delta_vs_previous_strict_best_output_tok_s": 0.011495378392179813,
+    "delta_vs_previous_strict_best_percent": 0.018702469066812324,
+    "interpretation": "Quality-safe but performance-neutral/noise-level tie versus the previous strict local-argmax result."
+  },
+  "localmaxxing": {
+    "submitted": true,
+    "id": "cmp9jyd8m049ko401kk2n1pju",
+    "status": "APPROVED",
+    "payload": "/home/steve/llm-optimizations-publish/data/localmaxxing-minimax-m27-autoround-gatherbroadcast-localargmax-p512n1536-20260517.payload.json",
+    "response": "/home/steve/llm-optimizations-publish/data/localmaxxing-responses/minimax-m27-autoround-gatherbroadcast-localargmax-p512n1536-20260517.response.json",
+    "note": "Submitted as a valid quality-safe benchmark but marked in notes as a marginal/noise-level tie."
+  },
+  "negative_results": [
+    {
+      "name": "two-allreduce local argmax",
+      "env": "VLLM_XPU_LOCAL_ARGMAX_ALLREDUCE=1",
+      "status": "quality_failed_raw145_n64",
+      "artifact": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-minimaxlogits-localargmax-twoallreduce-qualityonly-strict-tp4-ctx2048-mbt512-bs256-20260517T083040Z-summary.json",
+      "failure": "Corrupt invalid token id -4; exact token hash mismatch."
+    }
+  ],
+  "diagnostics": {
+    "low_overhead_timing": {
+      "artifact_json": "/home/steve/bench-results/minimax-m2.7-low-overhead-timing/vllm-minimax-m27-autoround-tp4-p512n512-20260517T081945Z.json",
+      "artifact_log": "/home/steve/bench-results/minimax-m2.7-low-overhead-timing/vllm-minimax-m27-autoround-tp4-p512n512-20260517T081945Z.log",
+      "output_tok_s_with_timing": 29.651019482126915,
+      "total_tok_s_with_timing": 59.30203896425383,
+      "rank0_pair_all_gather_avg_ms": 7.858599,
+      "rank0_pair_all_gather_max_ms": 9.489847
+    },
+    "transient_failure": {
+      "artifact_log": "/home/steve/bench-results/minimax-m2.7-strict-candidates/vllm-minimax-m27-autoround-tp4-p512n1536-20260517T085310Z.log",
+      "error": "oneCCL atl_ofi_comm.cpp:232 init_transport failed to initialize ATL before model load",
+      "recovered": true
+    }
+  }
+}
