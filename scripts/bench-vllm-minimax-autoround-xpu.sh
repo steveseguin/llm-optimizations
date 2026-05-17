@@ -77,6 +77,7 @@ fi
   echo "vllm_xpu_reuse_async_output_copy_buffer=${VLLM_XPU_REUSE_ASYNC_OUTPUT_COPY_BUFFER:-}"
   echo "vllm_xpu_async_output_copy_buffer_slots=${VLLM_XPU_ASYNC_OUTPUT_COPY_BUFFER_SLOTS:-}"
   echo "vllm_xpu_fast_async_output_list=${VLLM_XPU_FAST_ASYNC_OUTPUT_LIST:-}"
+  echo "vllm_xpu_fast_async_update_output_ids=${VLLM_XPU_FAST_ASYNC_UPDATE_OUTPUT_IDS:-}"
   echo "extra_args=$EXTRA_ARGS"
   echo "run_timeout=$RUN_TIMEOUT"
   echo "shm_stall_max_warnings=$SHM_STALL_MAX_WARNINGS"
