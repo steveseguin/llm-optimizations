@@ -15,6 +15,7 @@ MODULES = {
     "logits_processor": "vllm.model_executor.layers.logits_processor",
     "minimax_m2": "vllm.model_executor.models.minimax_m2",
     "moe_wna16": "vllm.model_executor.layers.quantization.moe_wna16",
+    "xpu_communicator": "vllm.distributed.device_communicators.xpu_communicator",
 }
 
 
@@ -65,10 +66,14 @@ def main() -> int:
 
     required_markers = split_env_list(os.environ.get("VLLM_RUNTIME_REQUIRE_MARKERS"))
     forbidden_markers = split_env_list(os.environ.get("VLLM_RUNTIME_FORBID_MARKERS"))
+    required_any_markers = split_env_list(
+        os.environ.get("VLLM_RUNTIME_REQUIRE_ANY_MARKERS")
+    )
     expected_logits_path = os.environ.get("VLLM_RUNTIME_EXPECT_LOGITS_PROCESSOR")
 
     modules: dict[str, dict] = {}
     missing_modules: dict[str, str] = {}
+    module_texts: dict[str, str] = {}
     for label, module_name in MODULES.items():
         try:
             info = module_info(module_name)
@@ -76,6 +81,7 @@ def main() -> int:
             missing_modules[label] = f"{type(exc).__name__}: {exc}"
             continue
         text = info.pop("text")
+        module_texts[label] = text
         info["required_marker_hits"] = {
             marker: marker in text for marker in required_markers
         }
@@ -103,11 +109,20 @@ def main() -> int:
                     "logits_processor import path mismatch: "
                     f"actual={actual} expected={expected}"
                 )
+    required_any_hits = {
+        marker: [label for label, text in module_texts.items() if marker in text]
+        for marker in required_any_markers
+    }
+    for marker, labels in required_any_hits.items():
+        if not labels:
+            errors.append(f"required marker missing from all inspected modules: {marker}")
 
     result = {
         "python": sys.executable,
         "cwd": os.getcwd(),
         "vllm_runtime_require_markers": required_markers,
+        "vllm_runtime_require_any_markers": required_any_markers,
+        "vllm_runtime_require_any_marker_hits": required_any_hits,
         "vllm_runtime_forbid_markers": forbidden_markers,
         "vllm_runtime_expect_logits_processor": expected_logits_path,
         "modules": {
