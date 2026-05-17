@@ -1,0 +1,53 @@
+{
+  "id": "minimax-m27-gather-broadcast-erratum-20260517",
+  "date_utc": "2026-05-17",
+  "status": "erratum",
+  "affected_localmaxxing_id": "cmp9jyd8m049ko401kk2n1pju",
+  "affected_files": [
+    "notes/2026-05-17-minimax-gather-broadcast-argmax.md",
+    "data/minimax-m27-gather-broadcast-argmax-20260517.json",
+    "data/localmaxxing-minimax-m27-autoround-gatherbroadcast-localargmax-p512n1536-20260517.payload.json",
+    "data/localmaxxing-responses/minimax-m27-autoround-gatherbroadcast-localargmax-p512n1536-20260517.response.json"
+  ],
+  "error": {
+    "summary": "The active vLLM runtime imported the installed site-packages logits_processor.py, not the patched source-tree logits_processor.py, when the first gather-broadcast benchmark was run.",
+    "source_tree_file": "/home/steve/src/vllm/vllm/model_executor/layers/logits_processor.py",
+    "runtime_file": "/home/steve/.venvs/vllm-xpu/lib/python3.12/site-packages/vllm/model_executor/layers/logits_processor.py",
+    "runtime_had_gather_broadcast_at_submission_time": false
+  },
+  "mislabeled_submission": {
+    "localmaxxing_id": "cmp9jyd8m049ko401kk2n1pju",
+    "should_be_interpreted_as": "strict-quality MiniMax-logits local-argmax pair-all-gather run",
+    "should_not_be_interpreted_as": "gather-broadcast local-argmax validation",
+    "mean_output_tok_s": 61.47599423675589,
+    "mean_total_tok_s": 81.96799231567452,
+    "shape": {
+      "prompt_tokens": 512,
+      "output_tokens": 1536,
+      "batch_size": 1,
+      "tensor_parallel": 4
+    }
+  },
+  "localmaxxing_update_attempt": {
+    "method": "PATCH",
+    "url": "https://localmaxxing.com/api/benchmarks/cmp9jyd8m049ko401kk2n1pju",
+    "http_status": 404,
+    "result": "Could not update the public row through the available API."
+  },
+  "real_gather_broadcast_test": {
+    "runtime_patched": true,
+    "active_runtime_file": "/home/steve/.venvs/vllm-xpu/lib/python3.12/site-packages/vllm/model_executor/layers/logits_processor.py",
+    "label": "minimaxlogits-localargmax-real-gatherbroadcast-qualityonly",
+    "quality_gate": "raw145-n64-exact",
+    "artifact_log": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-minimaxlogits-localargmax-real-gatherbroadcast-qualityonly-strict-tp4-ctx2048-mbt512-bs256-20260517T092752Z-quality/raw145-n64-exact.log",
+    "artifact_json": null,
+    "result": "hung",
+    "failure_mode": "After graph capture and prompt render, decode stalled at Processed prompts 0/1 and emitted repeated shared-memory broadcast warnings.",
+    "decision": "Reject VLLM_XPU_LOCAL_ARGMAX_GATHER_BROADCAST=1 for the current XPU graph path."
+  },
+  "corrected_decision": {
+    "promoted_path": "MiniMax-logits local-argmax pair-all-gather",
+    "rejected_path": "gather-broadcast local-argmax in graph mode",
+    "required_future_guard": "Before claiming a source patch result, verify the active venv import path contains the patch and/or require unique timing labels from the new branch."
+  }
+}
