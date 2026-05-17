@@ -1,0 +1,125 @@
+{
+  "id": "minimax-m27-xpu-reduce-localargmax-no-uplift-20260517",
+  "date_utc": "2026-05-17",
+  "status": "quality_passed_no_uplift",
+  "model": {
+    "hf_id": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+    "local_path": "/mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround",
+    "quantization": "AutoRound INT4 W4A16"
+  },
+  "hardware": {
+    "gpu": "Intel Arc Pro B70 32GB",
+    "gpu_count": 4,
+    "vram_gb_per_gpu": 32,
+    "os": "Ubuntu 24.04.4 LTS"
+  },
+  "engine": {
+    "name": "vLLM",
+    "version": "0.20.1-local",
+    "backend": "xpu",
+    "tensor_parallel": 4
+  },
+  "baseline": {
+    "description": "Current promoted strict MiniMax TP4 path.",
+    "output_tok_s": 61.404035,
+    "total_tok_s": 81.872046,
+    "prompt_tokens": 512,
+    "output_tokens": 1536,
+    "context_length": 2048,
+    "batch_size": 1,
+    "localmaxxing_id": "cmp9xpe3w04pdo4013acdikt7"
+  },
+  "candidate": {
+    "label": "minimaxlogits-localargmax-xpu-reduce-screen",
+    "summary_json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-minimaxlogits-localargmax-xpu-reduce-screen-strict-tp4-ctx2048-mbt512-bs256-20260517T205612Z-summary.json",
+    "runtime_json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-minimaxlogits-localargmax-xpu-reduce-screen-strict-tp4-ctx2048-mbt512-bs256-20260517T205612Z-runtime.json",
+    "env": {
+      "VLLM_XPU_LOCAL_ARGMAX_DECODE": "1",
+      "VLLM_XPU_LOCAL_ARGMAX_ASSUME_SAFE": "1",
+      "VLLM_XPU_LOCAL_ARGMAX_XPU_REDUCE": "1",
+      "VLLM_XPU_USE_LLM_SCALER_MOE": "1",
+      "VLLM_XPU_USE_LLM_SCALER_MOE_MINIMAX_LOGITS": "1",
+      "VLLM_MINIMAX_M2_ATTN_DELAY_ALLREDUCE": "1",
+      "VLLM_MINIMAX_QK_NORM_RESTORE_WEIGHT": "1",
+      "VLLM_MINIMAX_QK_NORM_RESTORE_WEIGHT_MIN_TOKENS": "2",
+      "VLLM_XPU_ENABLE_XPU_GRAPH": "1",
+      "VLLM_XPU_FORCE_GRAPH_WITH_COMM": "1",
+      "VLLM_XPU_GRAPH_NOOP_COMM_CAPTURE": "1",
+      "VLLM_BENCH_TEMPERATURE": "0",
+      "CCL_TOPO_P2P_ACCESS": "1"
+    },
+    "shape": {
+      "prompt_tokens": 512,
+      "output_tokens": 1536,
+      "context_length": 2048,
+      "batch_size": 1,
+      "max_num_batched_tokens": 512,
+      "max_num_seqs": 1,
+      "block_size": 256
+    },
+    "throughput": {
+      "elapsed_s": 25.569478787016124,
+      "requests_per_second": 0.03910912726573793,
+      "output_tok_s": 60.07161948017347,
+      "total_tok_s": 80.09549264023129,
+      "benchmark_json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/vllm-minimax-m27-autoround-tp4-p512n1536-20260517T210910Z.json",
+      "benchmark_log": "/home/steve/bench-results/minimax-m2.7-strict-candidates/vllm-minimax-m27-autoround-tp4-p512n1536-20260517T210910Z.log"
+    }
+  },
+  "quality_gate": {
+    "result": "passed",
+    "checks": [
+      {
+        "name": "raw145-n64-exact",
+        "passed": true,
+        "combined_token_sha256": "267cbf30208d84929ee79284ac695467f7e80597bf8694130e1e1f8b180eb5bd",
+        "expected_token_sha256_match": true
+      },
+      {
+        "name": "raw145-n256-exact",
+        "passed": true,
+        "combined_token_sha256": "58f6e8251c7a0a17e8c441278b5861f7d5da914fa1823ecd10484b296f2d7537",
+        "expected_token_sha256_match": true
+      },
+      {
+        "name": "semantic-suite-n64-r2",
+        "passed": true,
+        "combined_token_sha256": "adacbf144264486ea7d378ebb6a4c0ba23951b72c4cf86251a762b07ebef5805",
+        "deterministic_across_runs": true,
+        "semantic_required_content_matched": true,
+        "regex_required_content_matched": true
+      },
+      {
+        "name": "arithmetic-repeat-n64-r8",
+        "passed": true,
+        "combined_token_sha256": "261779104d5abf1642713bfc560ca8d2d6c0f16edbcc929c8b0819b5a760dd7c",
+        "deterministic_across_runs": true,
+        "semantic_required_content_matched": true,
+        "regex_required_content_matched": true
+      }
+    ]
+  },
+  "standalone_probe": {
+    "collective_probe_dir": "/home/steve/bench-results/minimax-m2.7-strict-candidates/pair-collective-probe-single-20260517T203739Z",
+    "xpu_reduce_probe_dir": "/home/steve/bench-results/minimax-m2.7-strict-candidates/pair-argmax-xpu-reduceonly-oraclefix-20260517T205352Z",
+    "findings": [
+      "all_gather_into_tensor was correct in the standalone pair probe at about 0.118-0.125 ms for batch=1.",
+      "all_gather_list was correct but slower at about 0.238-0.240 ms.",
+      "gather_broadcast and all_to_all_repeated timed out or hung in this XCCL stack.",
+      "The full helper path using c10d functional all_gather_into_tensor mis-reduced the rank_wins case and was not wired into vLLM.",
+      "The reduce_flat_pairs-only SYCL helper passed rank_wins, mixed_sign, negative_only, token_tie, and random cases, but the end-to-end vLLM candidate did not improve throughput."
+    ]
+  },
+  "decision": {
+    "promote": false,
+    "submit_to_localmaxxing": false,
+    "reason": "Strict quality passed, but p512/n1536 output throughput was below the promoted strict baseline and within known run-to-run variance.",
+    "keep_enabled_for_real_runs": false,
+    "next_targets": [
+      "MoE expert dispatch and INT4 expert kernel behavior.",
+      "Q/K RMS variance allreduce plus RMS application with real boundary removal.",
+      "KV attention and RoPE scheduling.",
+      "Residual allreduce scheduling or fusion."
+    ]
+  }
+}
