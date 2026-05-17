@@ -1,0 +1,36 @@
+{
+  "hfId": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+  "modelRevision": "main",
+  "hardware": {
+    "hwClass": "DISCRETE_GPU",
+    "gpuName": "Intel Arc Pro B70 32GB",
+    "gpuCount": 4,
+    "vramGb": 32,
+    "cpu": "AMD EPYC 9015 8-Core Processor",
+    "ramGb": 16,
+    "os": "Ubuntu 24.04.4 LTS"
+  },
+  "engineName": "vllm",
+  "engineVersion": "0.20.1-local",
+  "quantization": "INT4 AutoRound W4A16",
+  "promptTokens": 512,
+  "outputTokens": 1536,
+  "contextLength": 2048,
+  "batchSize": 1,
+  "peakVramGb": 29.3,
+  "tokSOut": 66.48535508598121,
+  "tokSTotal": 88.64714011464162,
+  "notes": "Quality-passed promoted MiniMax M2.7 AutoRound TP4 result on 4x Intel Arc Pro B70. Full-logits path with VLLM_XPU_COMPILE_ALLREDUCE_NO_CLONE=1 and VLLM_MINIMAX_M2_CLONE_FINAL_HIDDEN=1; local-argmax disabled. Strict gates passed before benchmarking: raw145 n64/n256 exact token hashes, semantic suite, 16-repeat arithmetic exact 42, and extended sixpack. Two p512/n1536 repeats: 66.470/66.501 output tok/s; 88.627/88.667 total tok/s. No quality degradation detected under this corruption-focused harness.",
+  "engineFlags": {
+    "commandSnippet": "LABEL=no-clone-clonefinal-fulllogits-bench BENCH_REPEATS=2 RUN_EXTENDED_QUALITY=1 RUN_REPEAT_ARITHMETIC_QUALITY=1 REPEAT_ARITHMETIC_RUNS=16 VLLM_CACHE_ROOT=/mnt/fast-ai/vllm-cache-exp/minimax-strict-no-clone-clonefinal-fulllogits-20260517 VLLM_RUNTIME_REQUIRE_ANY_MARKERS=VLLM_XPU_COMPILE_ALLREDUCE_NO_CLONE,VLLM_MINIMAX_M2_CLONE_FINAL_HIDDEN VLLM_XPU_COMPILE_ALLREDUCE_NO_CLONE=1 VLLM_MINIMAX_M2_CLONE_FINAL_HIDDEN=1 VLLM_BENCH_TEMPERATURE=0 CCL_TOPO_P2P_ACCESS=1 ONEAPI_DEVICE_SELECTOR=level_zero:0,1,2,3 ZE_AFFINITY_MASK=0,1,2,3 /home/steve/llm-optimizations-publish/scripts/run-minimax-strict-quality-gated-candidate.sh",
+    "tensorParallel": 4,
+    "contextLength": 2048,
+    "attentionBackend": "TRITON_ATTN",
+    "chunkedPrefill": true,
+    "prefillChunkSize": 512,
+    "prefixCaching": false,
+    "concurrency": 1,
+    "temperature": 0,
+    "extraFlags": "VLLM_XPU_COMPILE_ALLREDUCE_NO_CLONE=1; VLLM_MINIMAX_M2_CLONE_FINAL_HIDDEN=1; VLLM_XPU_ENABLE_XPU_GRAPH=1; VLLM_XPU_FORCE_GRAPH_WITH_COMM=1; VLLM_XPU_GRAPH_NOOP_COMM_CAPTURE=1; VLLM_XPU_USE_LLM_SCALER_MOE=1; VLLM_MINIMAX_M2_ATTN_DELAY_ALLREDUCE=1; VLLM_MINIMAX_QK_NORM_RESTORE_WEIGHT=1; VLLM_MINIMAX_QK_NORM_RESTORE_WEIGHT_MIN_TOKENS=2; CCL_TOPO_P2P_ACCESS=1; local-argmax disabled"
+  }
+}
