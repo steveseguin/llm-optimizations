@@ -13,6 +13,7 @@ from pathlib import Path
 
 MODULES = {
     "logits_processor": "vllm.model_executor.layers.logits_processor",
+    "gpu_input_batch": "vllm.v1.worker.gpu_input_batch",
     "gpu_model_runner": "vllm.v1.worker.gpu_model_runner",
     "minimax_m2": "vllm.model_executor.models.minimax_m2",
     "moe_wna16": "vllm.model_executor.layers.quantization.moe_wna16",
@@ -73,6 +74,9 @@ def module_info(module_name: str) -> dict:
             ),
             "fast_async_output_list": (
                 "VLLM_XPU_FAST_ASYNC_OUTPUT_LIST" in text
+            ),
+            "fast_async_update_output_ids": (
+                "VLLM_XPU_FAST_ASYNC_UPDATE_OUTPUT_IDS" in text
             ),
             "minimax_logits_moe": "MINIMAX_LOGITS" in text,
             "qk_norm_restore_weight": "QK_NORM_RESTORE_WEIGHT" in text,
