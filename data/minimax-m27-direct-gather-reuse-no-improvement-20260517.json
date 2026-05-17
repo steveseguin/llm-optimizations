@@ -1,0 +1,107 @@
+{
+  "id": "minimax-m27-direct-gather-reuse-no-improvement-20260517",
+  "date_utc": "2026-05-17",
+  "status": "quality_passed_no_improvement",
+  "model": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+  "hardware": "4x Intel Arc Pro B70 32GB",
+  "engine": "vLLM 0.20.1-local XPU",
+  "quantization": "AutoRound INT4 W4A16",
+  "shape": {
+    "prompt_tokens": 512,
+    "output_tokens": 1536,
+    "context_length": 2048,
+    "batch_size": 1,
+    "tensor_parallel": 4,
+    "block_size": 256,
+    "max_num_batched_tokens": 512,
+    "max_num_seqs": 1
+  },
+  "candidate": {
+    "name": "direct all_gather_into_tensor local argmax with reused output buffer and no post-gather contiguous copy",
+    "required_marker": "logits.local_argmax_pair_direct_gather_reuse",
+    "environment": {
+      "VLLM_XPU_USE_LLM_SCALER_MOE_MINIMAX_LOGITS": "1",
+      "VLLM_XPU_LOCAL_ARGMAX_DECODE": "1",
+      "VLLM_XPU_LOCAL_ARGMAX_ASSUME_SAFE": "1",
+      "VLLM_XPU_LOCAL_ARGMAX_DIRECT_GATHER_REUSE": "1",
+      "VLLM_BENCH_TEMPERATURE": "0",
+      "VLLM_XPU_ENABLE_XPU_GRAPH": "1",
+      "VLLM_XPU_FORCE_GRAPH_WITH_COMM": "1",
+      "VLLM_XPU_GRAPH_NOOP_COMM_CAPTURE": "1",
+      "CCL_TOPO_P2P_ACCESS": "1"
+    }
+  },
+  "throughput": {
+    "output_tok_s_mean": 61.28949718255154,
+    "total_tok_s_mean": 81.71932957673539,
+    "output_tok_s_repeats": [
+      61.34475193237827,
+      61.23424243272482
+    ],
+    "total_tok_s_repeats": [
+      81.79300257650436,
+      81.64565657696643
+    ]
+  },
+  "baseline_for_comparison": {
+    "id": "minimax-m27-localargmax-tightquality-20260517",
+    "localmaxxing_id": "cmp9xpe3w04pdo4013acdikt7",
+    "output_tok_s_mean": 61.40403471892818,
+    "total_tok_s_mean": 81.87204629190424
+  },
+  "quality_gates": {
+    "raw145_n64": {
+      "passed": true,
+      "expected_combined_token_sha256": "267cbf30208d84929ee79284ac695467f7e80597bf8694130e1e1f8b180eb5bd"
+    },
+    "raw145_n256": {
+      "passed": true,
+      "expected_combined_token_sha256": "58f6e8251c7a0a17e8c441278b5861f7d5da914fa1823ecd10484b296f2d7537"
+    },
+    "semantic_suite_n64_r2": {
+      "passed": true
+    },
+    "arithmetic_repeat_n64_r16": {
+      "passed": true,
+      "require_regex": "^\\s*42\\s*$"
+    },
+    "extended_sixpack_n64_r2": {
+      "passed": true
+    }
+  },
+  "artifacts": {
+    "summary_json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-minimaxlogits-localargmax-direct-gather-reuse-tightquality-strict-tp4-ctx2048-mbt512-bs256-20260517T160531Z-summary.json",
+    "benchmark_jsons": [
+      "/home/steve/bench-results/minimax-m2.7-strict-candidates/vllm-minimax-m27-autoround-tp4-p512n1536-20260517T162050Z.json",
+      "/home/steve/bench-results/minimax-m2.7-strict-candidates/vllm-minimax-m27-autoround-tp4-p512n1536-20260517T162345Z.json"
+    ],
+    "runtime_logits_processor_sha256": "f3543b4f222ab073571eb03fd85ccde5a3683cd8bc0541d9ba29f16c7609437c"
+  },
+  "standalone_collective_probe": {
+    "script": "benchmarks/b70_xccl_pair_collective_probe.py",
+    "all_gather_into_tensor": {
+      "status": "correct",
+      "rank0_ms_range": [
+        0.09808586008148268,
+        0.11665341997286305
+      ]
+    },
+    "all_gather_list": {
+      "status": "rejected",
+      "reason": "slower than all_gather_into_tensor and mismatched the random case on all ranks"
+    },
+    "gather_broadcast": {
+      "status": "rejected",
+      "reason": "timed out under standalone XCCL probe"
+    },
+    "all_to_all_repeated": {
+      "status": "rejected",
+      "reason": "timed out under standalone XCCL probe"
+    }
+  },
+  "localmaxxing": {
+    "submitted": false,
+    "reason": "Quality passed, but throughput did not beat the current promoted strict baseline."
+  },
+  "decision": "Keep the existing pair all-gather local-argmax path as the promoted baseline. Leave VLLM_XPU_LOCAL_ARGMAX_DIRECT_GATHER_REUSE default-off as a reproducible negative candidate."
+}
