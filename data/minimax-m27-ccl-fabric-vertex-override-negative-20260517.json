@@ -1,0 +1,89 @@
+{
+  "date": "2026-05-17",
+  "label": "ccl-fabric-vertex-override-localargmax-bench",
+  "decision": "reject_performance_negative",
+  "submit_to_localmaxxing": false,
+  "reason": "quality-safe but slower than strict baseline",
+  "model": {
+    "hf_id": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+    "local_path": "/mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround",
+    "quantization": "AutoRound INT4 W4A16"
+  },
+  "hardware": {
+    "gpu": "Intel Arc Pro B70 32GB",
+    "gpu_count": 4
+  },
+  "engine": {
+    "name": "vLLM",
+    "version": "0.20.1-local",
+    "backend": "xpu",
+    "tensor_parallel_size": 4
+  },
+  "runtime_flags": {
+    "VLLM_XPU_LOCAL_ARGMAX_DECODE": "1",
+    "VLLM_XPU_LOCAL_ARGMAX_ASSUME_SAFE": "1",
+    "CCL_TOPO_P2P_ACCESS": "1",
+    "CCL_TOPO_FABRIC_VERTEX_CONNECTION_CHECK": "0",
+    "VLLM_BENCH_TEMPERATURE": "0",
+    "VLLM_XPU_ENABLE_XPU_GRAPH": "1",
+    "VLLM_XPU_FORCE_GRAPH_WITH_COMM": "1",
+    "VLLM_XPU_GRAPH_NOOP_COMM_CAPTURE": "1"
+  },
+  "benchmark_shape": {
+    "prompt_tokens": 512,
+    "output_tokens": 1536,
+    "context_length": 2048,
+    "batch_size": 1,
+    "max_num_batched_tokens": 512,
+    "block_size": 256,
+    "prefix_cache": false,
+    "temperature": 0
+  },
+  "quality": {
+    "status": "passed",
+    "raw145_n64_token_sha256": "267cbf30208d84929ee79284ac695467f7e80597bf8694130e1e1f8b180eb5bd",
+    "raw145_n256_token_sha256": "58f6e8251c7a0a17e8c441278b5861f7d5da914fa1823ecd10484b296f2d7537",
+    "semantic_suite": "passed",
+    "arithmetic_repeat_runs": 16,
+    "extended_sixpack": "passed"
+  },
+  "baseline": {
+    "mean_output_toks_per_second": 61.404035,
+    "mean_total_toks_per_second": 81.872046,
+    "localmaxxing_id": "cmp9xpe3w04pdo4013acdikt7"
+  },
+  "candidate": {
+    "output_toks_per_second": [
+      59.40646211456654,
+      59.573264993039885
+    ],
+    "total_toks_per_second": [
+      79.20861615275538,
+      79.43101999071985
+    ],
+    "mean_output_toks_per_second": 59.48986355380321,
+    "mean_total_toks_per_second": 79.31981807173761
+  },
+  "delta_vs_baseline": {
+    "output_toks_per_second": -1.91417144619679,
+    "total_toks_per_second": -2.55222792826239,
+    "decode_percent": -3.1173375867150836
+  },
+  "compiler_observation": {
+    "recoverable": true,
+    "failed_kernel": "triton_red_fused__to_copy_mm_t_10",
+    "ocloc_exit_code": 245,
+    "igc_error": "Internal Compiler Error: Floating point exception",
+    "build_error_code": -11,
+    "device": "bmg",
+    "notes": "Happened during graph capture; vLLM continued and quality gates passed."
+  },
+  "artifacts": {
+    "summary_json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-ccl-fabric-vertex-override-localargmax-bench-strict-tp4-ctx2048-mbt512-bs256-20260517T221412Z-summary.json",
+    "quality_dir": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-ccl-fabric-vertex-override-localargmax-bench-strict-tp4-ctx2048-mbt512-bs256-20260517T221412Z-quality",
+    "benchmark_jsons": [
+      "/home/steve/bench-results/minimax-m2.7-strict-candidates/vllm-minimax-m27-autoround-tp4-p512n1536-20260517T222939Z.json",
+      "/home/steve/bench-results/minimax-m2.7-strict-candidates/vllm-minimax-m27-autoround-tp4-p512n1536-20260517T223237Z.json"
+    ]
+  }
+}
