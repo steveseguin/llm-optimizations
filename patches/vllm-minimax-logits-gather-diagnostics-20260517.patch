@@ -1,0 +1,215 @@
+diff --git a/vllm/model_executor/layers/logits_processor.py b/vllm/model_executor/layers/logits_processor.py
+index 3541b9706..02716f072 100644
+--- a/vllm/model_executor/layers/logits_processor.py
++++ b/vllm/model_executor/layers/logits_processor.py
+@@ -2,16 +2,22 @@
+ # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
+ """A layer that compute logits from hidden_stats."""
+ 
++import os
++
+ import torch
++import torch.distributed as dist
+ 
+ from vllm.distributed import (
+     get_tensor_model_parallel_world_size,
++    get_tp_group,
+     tensor_model_parallel_all_gather,
+     tensor_model_parallel_gather,
+ )
+ from vllm.model_executor.custom_op import PluggableLayer
+ from vllm.model_executor.layers.vocab_parallel_embedding import VocabParallelEmbedding
+ from vllm.platforms import current_platform
++from vllm.utils.xpu_decode_timing import timed_region
++from vllm.utils.xpu_finite_trace import trace_tensor
+ 
+ 
+ # --8<-- [start:logits_processor]
+@@ -74,12 +80,36 @@ class LogitsProcessor(PluggableLayer):
+ 
+     def _gather_logits(self, logits: torch.Tensor) -> torch.Tensor:
+         """gather/all-gather the logits tensor across model parallel group."""
++        if (
++            os.environ.get("VLLM_XPU_GATHER_LOGITS_FP32", "0") == "1"
++            and logits.device.type == "xpu"
++            and logits.dtype != torch.float32
++        ):
++            logits = logits.float()
+         if self.use_all_gather:
+             # Gather is not supported for some devices such as TPUs.
+             # Use all-gather instead.
+             # NOTE(woosuk): Here, the outputs of every device should not be None
+             # because XLA requires strict SPMD among all devices. Every device
+             # should execute the same operations after gathering the logits.
++            chunk_size = int(os.environ.get("VLLM_XPU_LOGITS_CHUNKED_GATHER", "0"))
++            if (
++                chunk_size > 0
++                and logits.device.type == "xpu"
++                and logits.dim() >= 2
++                and logits.shape[-1] > chunk_size
++            ):
++                tp_size = get_tensor_model_parallel_world_size()
++                gathered_chunks = []
++                for chunk in torch.split(logits, chunk_size, dim=-1):
++                    gathered = tensor_model_parallel_all_gather(chunk)
++                    gathered = gathered.reshape(
++                        *logits.shape[:-1], tp_size, chunk.shape[-1]
++                    )
++                    gathered_chunks.append(gathered)
++                logits = torch.cat(gathered_chunks, dim=-1)
++                logits = logits.reshape(*logits.shape[:-2], tp_size * logits.shape[-1])
++                return logits
+             logits = tensor_model_parallel_all_gather(logits)
+         else:
+             # None may be returned for rank > 0
+@@ -93,14 +123,21 @@ class LogitsProcessor(PluggableLayer):
+         embedding_bias: torch.Tensor | None,
+     ) -> torch.Tensor | None:
+         # Get the logits for the next tokens.
+-        logits = lm_head.quant_method.apply(lm_head, hidden_states, bias=embedding_bias)
++        trace_tensor("logits_processor.hidden_states", hidden_states)
++        with timed_region("logits.local_argmax_lm_head"):
++            logits = lm_head.quant_method.apply(
++                lm_head, hidden_states, bias=embedding_bias
++            )
++        trace_tensor("logits_processor.local_logits", logits)
+ 
+         # Gather logits for TP
+         logits = self._gather_logits(logits)
++        trace_tensor("logits_processor.gathered_logits", logits)
+ 
+         # Remove paddings in vocab (if any).
+         if logits is not None:
+             logits = logits[..., : self.org_vocab_size]
++            trace_tensor("logits_processor.trimmed_logits", logits)
+         return logits
+ 
+     def get_top_tokens(
+@@ -123,6 +160,7 @@ class LogitsProcessor(PluggableLayer):
+         tp_size = get_tensor_model_parallel_world_size()
+ 
+         logits = lm_head.quant_method.apply(lm_head, hidden_states, bias=embedding_bias)
++        trace_tensor("logits_processor.local_argmax_logits", logits)
+         if self.soft_cap is not None:
+             logits = torch.tanh(logits / self.soft_cap) * self.soft_cap
+         if self.scale != 1.0:
+@@ -133,7 +171,8 @@ class LogitsProcessor(PluggableLayer):
+         if num_pad > 0:
+             logits[..., -num_pad:] = -float("inf")
+ 
+-        local_max_vals, local_max_indices = logits.max(dim=-1)
++        with timed_region("logits.local_argmax_local_max"):
++            local_max_vals, local_max_indices = logits.max(dim=-1)
+ 
+         # Convert shard-local indices to global vocab indices.
+         vocab_start = lm_head.shard_indices.org_vocab_start_index
+@@ -142,18 +181,101 @@ class LogitsProcessor(PluggableLayer):
+         if tp_size == 1:
+             return global_indices
+ 
++        if os.environ.get("VLLM_XPU_LOCAL_ARGMAX_ALLREDUCE", "0") == "1":
++            with timed_region("logits.local_argmax_allreduce_values"):
++                global_max_vals = local_max_vals.float().clone()
++                dist.all_reduce(
++                    global_max_vals,
++                    op=dist.ReduceOp.MAX,
++                    group=get_tp_group().device_group,
++                )
++            # Ties are not expected for the quality gates or random benchmark
++            # path; exact gates must pass before this mode is promoted.
++            with timed_region("logits.local_argmax_allreduce_indices"):
++                local_winner_indices = torch.where(
++                    local_max_vals.float() == global_max_vals,
++                    global_indices.float(),
++                    torch.full_like(global_indices, -1, dtype=torch.float32),
++                )
++                dist.all_reduce(
++                    local_winner_indices,
++                    op=dist.ReduceOp.MAX,
++                    group=get_tp_group().device_group,
++                )
++            top_tokens = local_winner_indices.to(torch.int64)
++            trace_tensor("logits_processor.local_argmax_allreduce_top_tokens", top_tokens)
++            return top_tokens
++
+         # All-gather (value, index) pairs, then reduce to global argmax.
+         # Use float32 to avoid bf16 precision loss on large vocab indices.
+-        local_pair = torch.stack(
+-            [local_max_vals.float(), global_indices.float()], dim=-1
+-        )
++        with timed_region("logits.local_argmax_pair_stack"):
++            local_pair = torch.stack(
++                [local_max_vals.float(), global_indices.float()], dim=-1
++            )
++        trace_tensor("logits_processor.local_argmax_pair", local_pair)
++        if os.environ.get("VLLM_XPU_LOCAL_ARGMAX_CPU_GATHER", "0") == "1":
++            if local_pair.device.type == "xpu":
++                torch.xpu.synchronize()
++            local_vals = local_max_vals.detach().float().cpu().tolist()
++            local_indices = global_indices.detach().to(torch.int64).cpu().tolist()
++            local_obj = [
++                (float(value), int(index))
++                for value, index in zip(local_vals, local_indices, strict=True)
++            ]
++            gathered_obj: list[list[tuple[float, int]] | None] = [None] * tp_size
++            torch.distributed.all_gather_object(
++                gathered_obj, local_obj, group=get_tp_group().cpu_group
++            )
++            top_tokens: list[int] = []
++            for batch_idx in range(hidden_states.shape[0]):
++                best_value = None
++                best_token = 0
++                for rank_obj in gathered_obj:
++                    if rank_obj is None:
++                        continue
++                    value, token = rank_obj[batch_idx]
++                    if best_value is None or value > best_value:
++                        best_value = value
++                        best_token = token
++                top_tokens.append(best_token)
++            result = torch.tensor(
++                top_tokens, dtype=torch.int64, device=hidden_states.device
++            )
++            trace_tensor("logits_processor.local_argmax_cpu_top_tokens", result)
++            return result
++        if (
++            os.environ.get("VLLM_XPU_LOCAL_ARGMAX_DIRECT_GATHER", "0") == "1"
++            and local_pair.device.type == "xpu"
++        ):
++            with timed_region("logits.local_argmax_pair_direct_gather"):
++                gathered = torch.empty(
++                    (tp_size,) + tuple(local_pair.shape),
++                    dtype=local_pair.dtype,
++                    device=local_pair.device,
++                )
++                dist.all_gather_into_tensor(
++                    gathered, local_pair.contiguous(), group=get_tp_group().device_group
++                )
++                gathered = gathered.movedim(0, 1).contiguous()
++            trace_tensor("logits_processor.local_argmax_direct_gathered", gathered)
++            with timed_region("logits.local_argmax_direct_reduce"):
++                max_rank_idx = gathered[:, :, 0].argmax(dim=-1, keepdim=True)
++                top_tokens = gathered[:, :, 1].gather(dim=-1, index=max_rank_idx)
++                top_tokens = top_tokens.squeeze(-1).to(torch.int64)
++            trace_tensor("logits_processor.local_argmax_direct_top_tokens", top_tokens)
++            return top_tokens
+         # [batch, 2] -> [batch, 2 * tp_size]
+-        gathered = tensor_model_parallel_all_gather(local_pair, dim=-1)
++        with timed_region("logits.local_argmax_pair_all_gather"):
++            gathered = tensor_model_parallel_all_gather(local_pair, dim=-1)
++        trace_tensor("logits_processor.local_argmax_gathered", gathered)
+         # [batch, tp_size, 2] where [:, :, 0]=values, [:, :, 1]=indices
+-        gathered = gathered.view(hidden_states.shape[0], tp_size, 2)
+-        max_rank_idx = gathered[:, :, 0].argmax(dim=-1, keepdim=True)
+-        top_tokens = gathered[:, :, 1].gather(dim=-1, index=max_rank_idx)
+-        return top_tokens.squeeze(-1).to(torch.int64)
++        with timed_region("logits.local_argmax_reduce"):
++            gathered = gathered.view(hidden_states.shape[0], tp_size, 2)
++            max_rank_idx = gathered[:, :, 0].argmax(dim=-1, keepdim=True)
++            top_tokens = gathered[:, :, 1].gather(dim=-1, index=max_rank_idx)
++            top_tokens = top_tokens.squeeze(-1).to(torch.int64)
++        trace_tensor("logits_processor.local_argmax_top_tokens", top_tokens)
++        return top_tokens
+ 
+     def extra_repr(self) -> str:
+         s = f"vocab_size={self.vocab_size}"

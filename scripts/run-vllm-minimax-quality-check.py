@@ -172,6 +172,14 @@ def parse_args() -> argparse.Namespace:
         help="Disable vLLM custom all-reduce. Default mirrors benchmark scripts.",
     )
     parser.add_argument(
+        "--enable-expert-parallel",
+        action="store_true",
+        help=(
+            "Enable vLLM expert parallelism for MoE models. This should be "
+            "quality-equivalent, but must pass exact-token gates before use."
+        ),
+    )
+    parser.add_argument(
         "--disable-llm-scaler-moe",
         action="store_true",
         help="Disable the llm-scaler MiniMax INT4 MoE path for control probes.",
@@ -915,6 +923,8 @@ def main() -> None:
         llm_kwargs["gpu_memory_utilization"] = args.gpu_memory_utilization
     if args.async_scheduling != "default":
         llm_kwargs["async_scheduling"] = args.async_scheduling == "on"
+    if args.enable_expert_parallel:
+        llm_kwargs["enable_expert_parallel"] = True
 
     llm = LLM(
         model=args.model,
