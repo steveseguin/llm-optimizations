@@ -1,0 +1,52 @@
+{
+  "created_utc": "2026-05-17T04:55:00Z",
+  "model": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+  "hardware": "4x Intel Arc Pro B70 32GB",
+  "engine": "vLLM 0.20.1-local XPU",
+  "baseline": {
+    "description": "Strict greedy local-argmax pair-gather path",
+    "localmaxxing_id": "cmp940h1703tpo401scj5tftf",
+    "tok_s_out_mean": 60.49722737140732,
+    "tok_s_total_mean": 80.66296982854308
+  },
+  "rejections": [
+    {
+      "name": "local_argmax_plus_compile_allreduce_no_clone_asyncoff",
+      "env": {
+        "VLLM_XPU_LOCAL_ARGMAX_DECODE": "1",
+        "VLLM_XPU_COMPILE_ALLREDUCE_NO_CLONE": "1",
+        "async_scheduling": "off"
+      },
+      "attempted_gate": "extended six-prompt semantic suite, n64, r2",
+      "result": "rejected",
+      "reason": "AOT loaded, then decode made no progress and emitted repeated shared-memory broadcast wait warnings.",
+      "log": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-extended-sixpack-n64-r2-piecewise-local-argmax-noclone-asyncoff-20260517T043730Z.log"
+    },
+    {
+      "name": "local_argmax_packed_int64_single_allreduce",
+      "env": {
+        "VLLM_XPU_LOCAL_ARGMAX_DECODE": "1",
+        "VLLM_XPU_LOCAL_ARGMAX_PACKED_ALLREDUCE": "1"
+      },
+      "attempted_gate": "raw145 exact token hash, n64",
+      "result": "rejected",
+      "reason": "AOT loaded, then generation did not reach JSON and emitted repeated shared-memory broadcast wait warnings.",
+      "log": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-raw145-n64-piecewise-local-argmax-packed-allreduce-20260517T044543Z.log",
+      "patch": "patches/vllm-minimax-local-argmax-packed-allreduce-negative-20260517.patch"
+    }
+  ],
+  "default_off_sanity": {
+    "env": {
+      "VLLM_XPU_LOCAL_ARGMAX_DECODE": "1",
+      "VLLM_XPU_LOCAL_ARGMAX_PACKED_ALLREDUCE": "unset"
+    },
+    "gate": "raw145 exact token hash, n64",
+    "result": "passed",
+    "combined_token_sha256": "267cbf30208d84929ee79284ac695467f7e80597bf8694130e1e1f8b180eb5bd",
+    "nul_token_count": 0,
+    "control_nonspace_text_chars": 0,
+    "json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-raw145-n64-piecewise-local-argmax-defaultoff-sanity-20260517T045205Z.json",
+    "log": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-raw145-n64-piecewise-local-argmax-defaultoff-sanity-20260517T045205Z.log"
+  },
+  "decision": "Do not benchmark or submit either collective variant. Keep the pair all-gather local-argmax path as the current quality-safe greedy baseline."
+}

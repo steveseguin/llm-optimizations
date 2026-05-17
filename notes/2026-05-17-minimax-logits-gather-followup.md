@@ -222,3 +222,66 @@ promoted path.
   - tune or repair EP-specific INT4 MoE handling before retrying EP speed runs;
   - investigate a fused/local greedy-decode kernel that keeps pair selection on
     GPU without reintroducing the corrupted full-vocab logits gather.
+
+## Later 2026-05-17 Follow-Ups
+
+### No-Clone Allreduce With Local Argmax
+
+Patch surface:
+
+- `VLLM_XPU_LOCAL_ARGMAX_DECODE=1`
+- `VLLM_XPU_COMPILE_ALLREDUCE_NO_CLONE=1`
+- vLLM async scheduling disabled for the quality run
+
+Result:
+
+- Raw145 n64 exact and n256 exact had passed in separate smaller probes, but
+  the extended six-prompt suite did not complete:
+  `/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-extended-sixpack-n64-r2-piecewise-local-argmax-noclone-asyncoff-20260517T043730Z.log`
+- The engine reached AOT load, then emitted repeated
+  `No available shared memory broadcast block found in 60 seconds` warnings
+  before being killed.
+
+Interpretation: combining the strict local-argmax sampler bypass with the
+no-clone compiled allreduce path is not reliable enough to publish. The older
+no-clone async-off result remains a useful historical datapoint, but the current
+strict greedy path should not enable no-clone until the shared-memory broadcast
+stall is understood.
+
+### Packed Single-Allreduce Local Argmax
+
+Patch surface:
+
+- `VLLM_XPU_LOCAL_ARGMAX_PACKED_ALLREDUCE=1`
+- Added a default-off reducer that packs the local max float32 bit-order key
+  and global token id into one signed int64, then calls one XCCL MAX allreduce.
+- Patch snapshot:
+  `patches/vllm-minimax-local-argmax-packed-allreduce-negative-20260517.patch`
+
+Result:
+
+- Attempted raw145 n64 exact:
+  `/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-raw145-n64-piecewise-local-argmax-packed-allreduce-20260517T044543Z.log`
+- The run did not reach generation JSON. It stalled after AOT load with the
+  same repeated shared-memory broadcast warning and had to be killed.
+
+Interpretation: the current XPU graph path does not tolerate adding a logits
+stage allreduce, even when it is only one packed int64 reduction. Keep the patch
+default-off as a negative diagnostic. The quality-safe local-argmax path remains
+the pair all-gather reducer.
+
+Default-off sanity after installing the packed reducer patch:
+
+- Raw145 n64 exact passed with `VLLM_XPU_LOCAL_ARGMAX_PACKED_ALLREDUCE` unset:
+  `/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-raw145-n64-piecewise-local-argmax-defaultoff-sanity-20260517T045205Z.json`
+- Combined token hash matched
+  `267cbf30208d84929ee79284ac695467f7e80597bf8694130e1e1f8b180eb5bd`;
+  `0` NUL tokens and `0` non-space control characters.
+
+### Harness Repair
+
+`scripts/run-minimax-strict-quality-gated-candidate.sh` was updated because it
+still passed an obsolete `--compilation-config-json` argument to
+`run-vllm-minimax-quality-check.py`. The wrapper now relies on the quality
+script's current default piecewise graph config for the quality gates and
+records the local-argmax env flags in its summary JSON.

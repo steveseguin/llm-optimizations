@@ -106,7 +106,6 @@ run_quality_check() {
       --attention-backend TRITON_ATTN \
       --async-scheduling "$QUALITY_ASYNC_SCHEDULING" \
       --determinism-mode lstrip_text \
-      --compilation-config-json "$COMPILATION_CONFIG_JSON" \
       --qk-norm-restore-weight \
       --qk-norm-restore-weight-min-tokens "$VLLM_MINIMAX_QK_NORM_RESTORE_WEIGHT_MIN_TOKENS" \
       --vllm-cache-root "$CACHE_ROOT" \
@@ -141,7 +140,6 @@ run_semantic_suite() {
       --attention-backend TRITON_ATTN \
       --async-scheduling "$QUALITY_ASYNC_SCHEDULING" \
       --determinism-mode lstrip_text \
-      --compilation-config-json "$COMPILATION_CONFIG_JSON" \
       --qk-norm-restore-weight \
       --qk-norm-restore-weight-min-tokens "$VLLM_MINIMAX_QK_NORM_RESTORE_WEIGHT_MIN_TOKENS" \
       --vllm-cache-root "$CACHE_ROOT" \
@@ -178,7 +176,6 @@ run_repeat_arithmetic_suite() {
       --attention-backend TRITON_ATTN \
       --async-scheduling "$QUALITY_ASYNC_SCHEDULING" \
       --determinism-mode lstrip_text \
-      --compilation-config-json "$COMPILATION_CONFIG_JSON" \
       --qk-norm-restore-weight \
       --qk-norm-restore-weight-min-tokens "$VLLM_MINIMAX_QK_NORM_RESTORE_WEIGHT_MIN_TOKENS" \
       --vllm-cache-root "$CACHE_ROOT" \
@@ -276,6 +273,11 @@ write_summary() {
     --arg vllm_minimax_qk_rms_xpu_helper "${VLLM_MINIMAX_QK_RMS_XPU_HELPER:-}" \
     --arg vllm_xpu_compile_allreduce_no_clone "${VLLM_XPU_COMPILE_ALLREDUCE_NO_CLONE:-}" \
     --arg vllm_xpu_compile_out_of_place_allreduce "${VLLM_XPU_COMPILE_OUT_OF_PLACE_ALLREDUCE:-}" \
+    --arg vllm_xpu_local_argmax_decode "${VLLM_XPU_LOCAL_ARGMAX_DECODE:-}" \
+    --arg vllm_xpu_local_argmax_direct_gather "${VLLM_XPU_LOCAL_ARGMAX_DIRECT_GATHER:-}" \
+    --arg vllm_xpu_local_argmax_packed_allreduce "${VLLM_XPU_LOCAL_ARGMAX_PACKED_ALLREDUCE:-}" \
+    --arg vllm_xpu_local_argmax_allreduce "${VLLM_XPU_LOCAL_ARGMAX_ALLREDUCE:-}" \
+    --arg vllm_bench_temperature "${VLLM_BENCH_TEMPERATURE:-}" \
     --arg ccl_topo_fabric_vertex_connection_check "${CCL_TOPO_FABRIC_VERTEX_CONNECTION_CHECK:-}" \
     --arg ccl_topo_p2p_access "${CCL_TOPO_P2P_ACCESS:-}" \
     '{
@@ -323,6 +325,11 @@ write_summary() {
         VLLM_MINIMAX_QK_RMS_XPU_HELPER: $vllm_minimax_qk_rms_xpu_helper,
         VLLM_XPU_COMPILE_ALLREDUCE_NO_CLONE: $vllm_xpu_compile_allreduce_no_clone,
         VLLM_XPU_COMPILE_OUT_OF_PLACE_ALLREDUCE: $vllm_xpu_compile_out_of_place_allreduce,
+        VLLM_XPU_LOCAL_ARGMAX_DECODE: $vllm_xpu_local_argmax_decode,
+        VLLM_XPU_LOCAL_ARGMAX_DIRECT_GATHER: $vllm_xpu_local_argmax_direct_gather,
+        VLLM_XPU_LOCAL_ARGMAX_PACKED_ALLREDUCE: $vllm_xpu_local_argmax_packed_allreduce,
+        VLLM_XPU_LOCAL_ARGMAX_ALLREDUCE: $vllm_xpu_local_argmax_allreduce,
+        VLLM_BENCH_TEMPERATURE: $vllm_bench_temperature,
         VLLM_XPU_ENABLE_XPU_GRAPH: env.VLLM_XPU_ENABLE_XPU_GRAPH,
         VLLM_XPU_FORCE_GRAPH_WITH_COMM: env.VLLM_XPU_FORCE_GRAPH_WITH_COMM,
         VLLM_XPU_GRAPH_NOOP_COMM_CAPTURE: env.VLLM_XPU_GRAPH_NOOP_COMM_CAPTURE,

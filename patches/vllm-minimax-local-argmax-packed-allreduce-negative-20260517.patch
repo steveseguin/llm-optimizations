@@ -1,0 +1,35 @@
+diff --git a/vllm/model_executor/layers/logits_processor.py b/vllm/model_executor/layers/logits_processor.py
+index 02716f072..0c67124aa 100644
+--- a/vllm/model_executor/layers/logits_processor.py
++++ b/vllm/model_executor/layers/logits_processor.py
+@@ -210,6 +210,31 @@ class LogitsProcessor(PluggableLayer):
+             trace_tensor("logits_processor.local_argmax_allreduce_top_tokens", top_tokens)
+             return top_tokens
+ 
++        if os.environ.get("VLLM_XPU_LOCAL_ARGMAX_PACKED_ALLREDUCE", "0") == "1":
++            with timed_region("logits.local_argmax_packed_key"):
++                value_bits = local_max_vals.float().view(torch.int32).to(torch.int64)
++                value_bits = value_bits & 0xFFFFFFFF
++                ordered_bits = torch.where(
++                    (value_bits & 0x80000000) != 0,
++                    (~value_bits) & 0xFFFFFFFF,
++                    value_bits ^ 0x80000000,
++                )
++                signed_value_key = ordered_bits - 0x80000000
++                # Match torch.argmax tie behavior by preferring lower token ids.
++                tie_key = (0xFFFFFFFF - global_indices.to(torch.int64)) & 0xFFFFFFFF
++                packed = (signed_value_key << 32) | tie_key
++            with timed_region("logits.local_argmax_packed_allreduce"):
++                dist.all_reduce(
++                    packed,
++                    op=dist.ReduceOp.MAX,
++                    group=get_tp_group().device_group,
++                )
++            with timed_region("logits.local_argmax_packed_unpack"):
++                top_tokens = (0xFFFFFFFF - (packed & 0xFFFFFFFF)).to(torch.int64)
++            trace_tensor("logits_processor.local_argmax_packed_top_tokens", top_tokens)
++            return top_tokens
++
+         # All-gather (value, index) pairs, then reduce to global argmax.
+         # Use float32 to avoid bf16 precision loss on large vocab indices.
+         with timed_region("logits.local_argmax_pair_stack"):
