@@ -1,0 +1,18 @@
+{
+  "id": "cmp9xpe3w04pdo4013acdikt7",
+  "status": "APPROVED",
+  "createdAt": "2026-05-17T15:32:56.109Z",
+  "hfId": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+  "engineName": "vllm",
+  "engineVersion": "0.20.1-local",
+  "quantization": "AutoRound INT4 W4A16",
+  "hardware": "4x Intel Arc Pro B70 32GB",
+  "promptTokens": 512,
+  "outputTokens": 1536,
+  "contextLength": 2048,
+  "batchSize": 1,
+  "tokSOut": 61.40403471892818,
+  "tokSTotal": 81.87204629190424,
+  "tokSPrefill": null,
+  "notes": "Accepted LocalMaxxing response was reduced to the fields needed for reproducibility; the local machine retains the full raw API response at the same relative path."
+}
