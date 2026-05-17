@@ -1,0 +1,70 @@
+diff --git a/scripts/run-vllm-minimax-quality-check.py b/scripts/run-vllm-minimax-quality-check.py
+index 847ea20..4b9b928 100755
+--- a/scripts/run-vllm-minimax-quality-check.py
++++ b/scripts/run-vllm-minimax-quality-check.py
+@@ -171,6 +171,15 @@ def parse_args() -> argparse.Namespace:
+         action="store_true",
+         help="Disable vLLM custom all-reduce. Default mirrors benchmark scripts.",
+     )
++    parser.add_argument(
++        "--speculative-config",
++        default=None,
++        help=(
++            "JSON object passed through to vLLM speculative_config. Use behind "
++            "exact-token gates because speculative metadata disables the "
++            "current XPU local-argmax shortcut."
++        ),
++    )
+     parser.add_argument(
+         "--enable-expert-parallel",
+         action="store_true",
+@@ -274,6 +283,15 @@ def parse_args() -> argparse.Namespace:
+         default="default",
+         help="Override vLLM async scheduling for determinism/isolation tests.",
+     )
++    parser.add_argument(
++        "--stream-interval",
++        type=int,
++        default=None,
++        help=(
++            "Optional vLLM scheduler stream interval. Larger values reduce "
++            "host output frequency without changing sampling."
++        ),
++    )
+     parser.add_argument(
+         "--enable-prefix-caching",
+         dest="enable_prefix_caching",
+@@ -923,8 +941,21 @@ def main() -> None:
+         llm_kwargs["gpu_memory_utilization"] = args.gpu_memory_utilization
+     if args.async_scheduling != "default":
+         llm_kwargs["async_scheduling"] = args.async_scheduling == "on"
++    if args.stream_interval is not None:
++        llm_kwargs["stream_interval"] = args.stream_interval
+     if args.enable_expert_parallel:
+         llm_kwargs["enable_expert_parallel"] = True
++    speculative_config = None
++    speculative_config_record = None
++    if args.speculative_config:
++        try:
++            speculative_config = json.loads(args.speculative_config)
++        except json.JSONDecodeError as exc:
++            raise SystemExit(f"invalid --speculative-config JSON: {exc}") from exc
++        if not isinstance(speculative_config, dict):
++            raise SystemExit("--speculative-config must decode to a JSON object")
++        speculative_config_record = json.loads(json.dumps(speculative_config))
++        llm_kwargs["speculative_config"] = json.loads(json.dumps(speculative_config))
+ 
+     llm = LLM(
+         model=args.model,
+@@ -1161,9 +1192,11 @@ def main() -> None:
+             "cudagraph_mode": args.cudagraph_mode,
+             "attention_backend": args.attention_backend,
+             "async_scheduling": args.async_scheduling,
++            "stream_interval": args.stream_interval,
+             "cudagraph_num_warmups": args.cudagraph_num_warmups,
+             "compile_ranges_endpoints": args.compile_ranges_endpoints,
+             "compilation_custom_ops": args.compilation_custom_ops,
++            "speculative_config": speculative_config_record,
+         },
+         "prompt_diagnostics": prompt_diagnostics,
+         "compilation_config": compilation_config,
