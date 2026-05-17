@@ -187,6 +187,18 @@ def parse_args() -> argparse.Namespace:
         help="Record but do not fail if repeated greedy runs produce different token hashes.",
     )
     parser.add_argument(
+        "--determinism-mode",
+        choices=("token", "text", "lstrip_text", "normalized_text", "none"),
+        default="token",
+        help=(
+            "Repeatability criterion for multi-run checks. token is strict "
+            "token-id equality. lstrip_text ignores only leading whitespace "
+            "before comparing text. normalized_text collapses all whitespace "
+            "runs. none records diagnostics without adding a determinism "
+            "failure."
+        ),
+    )
+    parser.add_argument(
         "--min-distinct-generated-tokens",
         type=int,
         default=2,
@@ -226,6 +238,26 @@ def parse_args() -> argparse.Namespace:
         help=(
             "Python regex that must match the combined generated text. May be "
             "repeated. Use with canary prompts."
+        ),
+    )
+    parser.add_argument(
+        "--require-prompt-substring",
+        action="append",
+        default=None,
+        metavar="INDEX:TEXT",
+        help=(
+            "Substring that must appear in every run for a specific prompt "
+            "index. May be repeated. Example: 1:42"
+        ),
+    )
+    parser.add_argument(
+        "--require-prompt-regex",
+        action="append",
+        default=None,
+        metavar="INDEX:REGEX",
+        help=(
+            "Python regex that must match every run for a specific prompt "
+            "index. May be repeated. Example: 2:return\\s+x\\s*\\+\\s*1"
         ),
     )
     parser.add_argument(
@@ -459,6 +491,73 @@ def text_quality_stats(token_ids: list[int], text: str) -> dict:
     }
 
 
+def normalized_text_for_determinism(text: str) -> str:
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def prompt_determinism_results(run_records: list[dict]) -> dict:
+    def prompt_hashes(key: str) -> list[list[str]]:
+        return [
+            [prompt_record[key] for prompt_record in run["prompts"]]
+            for run in run_records
+        ]
+
+    token_hashes = prompt_hashes("token_sha256")
+    text_hashes = prompt_hashes("text_sha256")
+    lstrip_text_hashes = [
+        [
+            hashlib.sha256(prompt_record["text"].lstrip().encode()).hexdigest()
+            for prompt_record in run["prompts"]
+        ]
+        for run in run_records
+    ]
+    normalized_text_hashes = [
+        [
+            hashlib.sha256(
+                normalized_text_for_determinism(prompt_record["text"]).encode()
+            ).hexdigest()
+            for prompt_record in run["prompts"]
+        ]
+        for run in run_records
+    ]
+
+    def across_runs(hashes: list[list[str]]) -> bool:
+        if not hashes:
+            return True
+        first = hashes[0]
+        return all(run_hashes == first for run_hashes in hashes[1:])
+
+    per_prompt = []
+    if run_records:
+        n_prompts = len(run_records[0]["prompts"])
+        for prompt_index in range(n_prompts):
+            token_values = [run[prompt_index] for run in token_hashes]
+            text_values = [run[prompt_index] for run in text_hashes]
+            lstrip_values = [run[prompt_index] for run in lstrip_text_hashes]
+            normalized_values = [run[prompt_index] for run in normalized_text_hashes]
+            per_prompt.append(
+                {
+                    "prompt_index": prompt_index,
+                    "token_hashes": token_values,
+                    "text_hashes": text_values,
+                    "lstrip_text_hashes": lstrip_values,
+                    "normalized_text_hashes": normalized_values,
+                    "token_deterministic": len(set(token_values)) <= 1,
+                    "text_deterministic": len(set(text_values)) <= 1,
+                    "lstrip_text_deterministic": len(set(lstrip_values)) <= 1,
+                    "normalized_text_deterministic": len(set(normalized_values)) <= 1,
+                }
+            )
+
+    return {
+        "token_deterministic": across_runs(token_hashes),
+        "text_deterministic": across_runs(text_hashes),
+        "lstrip_text_deterministic": across_runs(lstrip_text_hashes),
+        "normalized_text_deterministic": across_runs(normalized_text_hashes),
+        "per_prompt": per_prompt,
+    }
+
+
 def semantic_requirement_results(
     generated_text: str,
     required_substrings: list[str] | None,
@@ -484,6 +583,116 @@ def semantic_requirement_results(
             item["matched"] for item in substring_results
         ),
         "all_required_regexes_matched": all(item["matched"] for item in regex_results),
+    }
+
+
+def parse_prompt_requirement(raw: str) -> tuple[int | None, str, str | None]:
+    prefix, sep, value = raw.partition(":")
+    if not sep:
+        return None, raw, "missing ':' separator"
+    try:
+        prompt_index = int(prefix)
+    except ValueError:
+        return None, value, f"invalid prompt index {prefix!r}"
+    if prompt_index < 0:
+        return None, value, "prompt index must be non-negative"
+    return prompt_index, value, None
+
+
+def prompt_scoped_requirement_results(
+    run_records: list[dict],
+    required_substrings: list[str] | None,
+    required_regexes: list[str] | None,
+) -> dict:
+    substring_results = []
+    regex_results = []
+
+    for raw in required_substrings or []:
+        prompt_index, substring, error = parse_prompt_requirement(raw)
+        per_run = []
+        if error is None:
+            for run in run_records:
+                prompts = run["prompts"]
+                if prompt_index >= len(prompts):
+                    per_run.append(
+                        {
+                            "run": run["run"],
+                            "matched": False,
+                            "error": "prompt index out of range",
+                        }
+                    )
+                    continue
+                text = prompts[prompt_index]["text"]
+                per_run.append(
+                    {
+                        "run": run["run"],
+                        "matched": substring in text,
+                        "text_sha256": prompts[prompt_index]["text_sha256"],
+                        "token_sha256": prompts[prompt_index]["token_sha256"],
+                    }
+                )
+        substring_results.append(
+            {
+                "raw": raw,
+                "prompt_index": prompt_index,
+                "substring": substring,
+                "error": error,
+                "runs": per_run,
+                "matched": error is None and all(item["matched"] for item in per_run),
+            }
+        )
+
+    for raw in required_regexes or []:
+        prompt_index, pattern, error = parse_prompt_requirement(raw)
+        compiled = None
+        if error is None:
+            try:
+                compiled = re.compile(pattern, flags=re.MULTILINE)
+            except re.error as exc:
+                error = str(exc)
+        per_run = []
+        if error is None:
+            assert compiled is not None
+            for run in run_records:
+                prompts = run["prompts"]
+                if prompt_index >= len(prompts):
+                    per_run.append(
+                        {
+                            "run": run["run"],
+                            "matched": False,
+                            "error": "prompt index out of range",
+                        }
+                    )
+                    continue
+                text = prompts[prompt_index]["text"]
+                per_run.append(
+                    {
+                        "run": run["run"],
+                        "matched": compiled.search(text) is not None,
+                        "text_sha256": prompts[prompt_index]["text_sha256"],
+                        "token_sha256": prompts[prompt_index]["token_sha256"],
+                    }
+                )
+        regex_results.append(
+            {
+                "raw": raw,
+                "prompt_index": prompt_index,
+                "regex": pattern,
+                "error": error,
+                "runs": per_run,
+                "matched": error is None and all(item["matched"] for item in per_run),
+            }
+        )
+
+    return {
+        "required_prompt_substrings": substring_results,
+        "required_prompt_regexes": regex_results,
+        "all_required_prompt_substrings_matched": all(
+            item["matched"] for item in substring_results
+        ),
+        "all_required_prompt_regexes_matched": all(
+            item["matched"] for item in regex_results
+        ),
     }
 
 
@@ -806,6 +1015,11 @@ def main() -> None:
         args.require_substring,
         args.require_regex,
     )
+    prompt_semantic_checks = prompt_scoped_requirement_results(
+        run_records,
+        args.require_prompt_substring,
+        args.require_prompt_regex,
+    )
     nontrivial_tokens = (
         quality_stats["distinct_generated_token_count"]
         >= args.min_distinct_generated_tokens
@@ -822,19 +1036,23 @@ def main() -> None:
     degenerate_output = (
         not nontrivial_tokens or not nontrivial_text or control_char_output
     )
-    first_run_hashes = [p["token_sha256"] for p in run_records[0]["prompts"]]
-    deterministic = all(
-        [p["token_sha256"] for p in run["prompts"]] == first_run_hashes
-        for run in run_records[1:]
-    )
+    determinism_checks = prompt_determinism_results(run_records)
+    deterministic = determinism_checks["token_deterministic"]
+    selected_determinism = {
+        "token": determinism_checks["token_deterministic"],
+        "text": determinism_checks["text_deterministic"],
+        "lstrip_text": determinism_checks["lstrip_text_deterministic"],
+        "normalized_text": determinism_checks["normalized_text_deterministic"],
+        "none": True,
+    }[args.determinism_mode]
     expected_match = (
         None
         if args.expected_token_sha256 is None
         else combined_token_hash == args.expected_token_sha256
     )
     failure_reasons = []
-    if not deterministic and not args.allow_nondeterministic_output:
-        failure_reasons.append("nondeterministic token hashes")
+    if not selected_determinism and not args.allow_nondeterministic_output:
+        failure_reasons.append(f"nondeterministic {args.determinism_mode}")
     if expected_match is False:
         failure_reasons.append("combined token hash mismatch")
     if degenerate_output and not args.allow_degenerate_output:
@@ -843,6 +1061,10 @@ def main() -> None:
         failure_reasons.append("required substring missing")
     if not semantic_checks["all_required_regexes_matched"]:
         failure_reasons.append("required regex missing or invalid")
+    if not prompt_semantic_checks["all_required_prompt_substrings_matched"]:
+        failure_reasons.append("prompt-scoped required substring missing")
+    if not prompt_semantic_checks["all_required_prompt_regexes_matched"]:
+        failure_reasons.append("prompt-scoped required regex missing or invalid")
     record = {
         "mode": args.mode,
         "elapsed_s": elapsed,
@@ -855,6 +1077,8 @@ def main() -> None:
         "expected_token_sha256": args.expected_token_sha256,
         "expected_token_sha256_match": expected_match,
         "deterministic_across_runs": deterministic,
+        "determinism_mode": args.determinism_mode,
+        "selected_deterministic_across_runs": selected_determinism,
         "passed": not failure_reasons,
         "failure_reasons": failure_reasons,
         "quality_checks": {
@@ -869,9 +1093,11 @@ def main() -> None:
             "max_nul_token_count": args.max_nul_token_count,
             "allow_degenerate_output": args.allow_degenerate_output,
             "allow_nondeterministic_output": args.allow_nondeterministic_output,
+            "determinism_checks": determinism_checks,
             "disable_custom_all_reduce": args.disable_custom_all_reduce,
             "llm_scaler_moe": not args.disable_llm_scaler_moe,
             "semantic_checks": semantic_checks,
+            "prompt_semantic_checks": prompt_semantic_checks,
         },
         "run_records": run_records,
         "prompts": prompts,

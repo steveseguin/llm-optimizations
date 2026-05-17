@@ -1,0 +1,156 @@
+diff --git a/vllm/utils/xpu_finite_trace.py b/vllm/utils/xpu_finite_trace.py
+new file mode 100644
+index 000000000..2ef77cf36
+--- /dev/null
++++ b/vllm/utils/xpu_finite_trace.py
+@@ -0,0 +1,150 @@
++# SPDX-License-Identifier: Apache-2.0
++"""Opt-in tensor finite-value tracing for XPU correctness diagnostics."""
++
++import json
++import os
++import re
++import time
++from collections import defaultdict
++from pathlib import Path
++from typing import Any
++
++import torch
++
++
++_COUNTS: defaultdict[str, int] = defaultdict(int)
++
++
++def _tag_enabled(tag: str) -> bool:
++    tag_regex = os.environ.get("VLLM_XPU_FINITE_TRACE_TAG_REGEX")
++    return tag_regex is None or re.search(tag_regex, tag) is not None
++
++
++def _dist_info() -> dict[str, int | None]:
++    if not torch.distributed.is_available() or not torch.distributed.is_initialized():
++        return {"rank": None, "world_size": None}
++    try:
++        return {
++            "rank": int(torch.distributed.get_rank()),
++            "world_size": int(torch.distributed.get_world_size()),
++        }
++    except Exception:
++        return {"rank": None, "world_size": None}
++
++
++def trace_tensor(tag: str, tensor: torch.Tensor | None) -> None:
++    """Write compact tensor stats when VLLM_XPU_FINITE_TRACE=1.
++
++    This is intentionally sync-heavy and should only be enabled for tiny
++    correctness probes, not throughput runs.
++    """
++    if os.environ.get("VLLM_XPU_FINITE_TRACE", "0") != "1":
++        return
++
++    if not _tag_enabled(tag):
++        return
++
++    limit = int(os.environ.get("VLLM_XPU_FINITE_TRACE_LIMIT", "8"))
++    if _COUNTS[tag] >= limit:
++        return
++    _COUNTS[tag] += 1
++
++    record: dict[str, Any] = {
++        "time": time.time(),
++        "pid": os.getpid(),
++        "tag": tag,
++        "count": _COUNTS[tag],
++        **_dist_info(),
++    }
++
++    if tensor is None:
++        record["tensor"] = None
++    else:
++        with torch.no_grad():
++            t = tensor.detach()
++            record.update(
++                {
++                    "shape": list(t.shape),
++                    "dtype": str(t.dtype),
++                    "device": str(t.device),
++                    "numel": int(t.numel()),
++                }
++            )
++            if t.numel() == 0:
++                record.update({"finite": 0, "nan": 0, "posinf": 0, "neginf": 0})
++            else:
++                stats_t = t.float() if not t.is_floating_point() else t
++                finite_mask = torch.isfinite(stats_t)
++                nan_mask = torch.isnan(stats_t)
++                posinf_mask = stats_t == float("inf")
++                neginf_mask = stats_t == -float("inf")
++                finite_count = int(finite_mask.sum().item())
++                record.update(
++                    {
++                        "finite": finite_count,
++                        "nan": int(nan_mask.sum().item()),
++                        "posinf": int(posinf_mask.sum().item()),
++                        "neginf": int(neginf_mask.sum().item()),
++                    }
++                )
++                if finite_count:
++                    finite_vals = stats_t[finite_mask].float()
++                    record.update(
++                        {
++                            "min": float(finite_vals.min().item()),
++                            "max": float(finite_vals.max().item()),
++                            "mean": float(finite_vals.mean().item()),
++                        }
++                    )
++
++    line = json.dumps(record, sort_keys=True, allow_nan=False)
++    output_path = os.environ.get("VLLM_XPU_FINITE_TRACE_FILE")
++    if output_path:
++        path = Path(output_path)
++        path.parent.mkdir(parents=True, exist_ok=True)
++        with path.open("a", encoding="utf-8") as f:
++            f.write(line + "\n")
++    else:
++        print(f"[xpu-finite-trace] {line}", flush=True)
++
++
++def xpu_finite_trace_op(tensor: torch.Tensor, tag: str) -> None:
++    trace_tensor(tag, tensor)
++
++
++def xpu_finite_trace_op_fake(tensor: torch.Tensor, tag: str) -> None:
++    return
++
++
++_HAS_TRACE_OP = False
++try:
++    from vllm.utils.torch_utils import direct_register_custom_op
++
++    direct_register_custom_op(
++        op_name="xpu_finite_trace",
++        op_func=xpu_finite_trace_op,
++        mutates_args=["tensor"],
++        fake_impl=xpu_finite_trace_op_fake,
++    )
++    _HAS_TRACE_OP = True
++except Exception:
++    _HAS_TRACE_OP = False
++
++
++def trace_tensor_graph(tag: str, tensor: torch.Tensor | None) -> None:
++    if os.environ.get("VLLM_XPU_FINITE_TRACE", "0") != "1":
++        return
++    if (
++        torch.compiler.is_compiling()
++        and os.environ.get("VLLM_XPU_FINITE_TRACE_GRAPH", "0") != "1"
++    ):
++        return
++    if not _tag_enabled(tag):
++        return
++    if tensor is None:
++        trace_tensor(tag, tensor)
++        return
++    if torch.compiler.is_compiling() and _HAS_TRACE_OP:
++        torch.ops.vllm.xpu_finite_trace(tensor, tag)
++    else:
++        trace_tensor(tag, tensor)

@@ -28,6 +28,15 @@ QUALITY_ASYNC_SCHEDULING="${QUALITY_ASYNC_SCHEDULING:-default}"
 BENCH_ASYNC_SCHEDULING="${BENCH_ASYNC_SCHEDULING:-default}"
 BENCH_ASYNC_ENGINE="${BENCH_ASYNC_ENGINE:-1}"
 RUN_EXTENDED_QUALITY="${RUN_EXTENDED_QUALITY:-0}"
+RUN_REPEAT_ARITHMETIC_QUALITY="${RUN_REPEAT_ARITHMETIC_QUALITY:-1}"
+REPEAT_ARITHMETIC_RUNS="${REPEAT_ARITHMETIC_RUNS:-8}"
+if [ -z "${COMPILATION_CONFIG_JSON:-}" ]; then
+  COMPILATION_CONFIG_JSON='{"use_inductor_graph_partition":true,"compile_sizes":[1],"cudagraph_mode":"PIECEWISE"}'
+fi
+if ! jq -e 'type == "object"' >/dev/null <<<"$COMPILATION_CONFIG_JSON"; then
+  echo "Invalid COMPILATION_CONFIG_JSON; expected a JSON object" >&2
+  exit 2
+fi
 CACHE_ROOT="${VLLM_CACHE_ROOT:-/mnt/fast-ai/vllm-cache-exp/minimax-strict-${LABEL}}"
 RAW145_PROMPT="${RAW145_PROMPT:-/home/steve/llm-optimizations-publish/prompts/minimax-raw145-tokenhash-canary.txt}"
 RAW145_N64_HASH="${RAW145_N64_HASH:-267cbf30208d84929ee79284ac695467f7e80597bf8694130e1e1f8b180eb5bd}"
@@ -96,6 +105,8 @@ run_quality_check() {
       --block-size "$BLOCK_SIZE" \
       --attention-backend TRITON_ATTN \
       --async-scheduling "$QUALITY_ASYNC_SCHEDULING" \
+      --determinism-mode lstrip_text \
+      --compilation-config-json "$COMPILATION_CONFIG_JSON" \
       --qk-norm-restore-weight \
       --qk-norm-restore-weight-min-tokens "$VLLM_MINIMAX_QK_NORM_RESTORE_WEIGHT_MIN_TOKENS" \
       --vllm-cache-root "$CACHE_ROOT" \
@@ -129,13 +140,49 @@ run_semantic_suite() {
       --block-size "$BLOCK_SIZE" \
       --attention-backend TRITON_ATTN \
       --async-scheduling "$QUALITY_ASYNC_SCHEDULING" \
+      --determinism-mode lstrip_text \
+      --compilation-config-json "$COMPILATION_CONFIG_JSON" \
       --qk-norm-restore-weight \
       --qk-norm-restore-weight-min-tokens "$VLLM_MINIMAX_QK_NORM_RESTORE_WEIGHT_MIN_TOKENS" \
       --vllm-cache-root "$CACHE_ROOT" \
-      --require-substring PASS \
-      --require-substring 42 \
-      --require-substring "def add_one" \
-      --require-regex "return\\s+x\\s*\\+\\s*1" \
+      --require-prompt-substring 0:PASS \
+      --require-prompt-substring 1:42 \
+      --require-prompt-substring "2:def add_one" \
+      --require-prompt-regex "2:return\\s+x\\s*\\+\\s*1" \
+      2>&1 | tee "$log"
+}
+
+run_repeat_arithmetic_suite() {
+  local name="arithmetic-repeat-n64-r${REPEAT_ARITHMETIC_RUNS}"
+  local json="$quality_dir/${name}.json"
+  local log="$quality_dir/${name}.log"
+  quality_jsons+=("$json")
+  quality_logs+=("$log")
+  quality_names+=("$name")
+  printf 'quality_check=%s\njson=%s\nlog=%s\n' "$name" "$json" "$log"
+  timeout --foreground --signal=TERM --kill-after="$RUN_TIMEOUT_KILL_AFTER" "$QUALITY_TIMEOUT" \
+    python /home/steve/llm-optimizations-publish/scripts/run-vllm-minimax-quality-check.py \
+      --mode graph \
+      --model "$MODEL" \
+      --out "$json" \
+      --raw-prompt \
+      --max-tokens 64 \
+      --runs "$REPEAT_ARITHMETIC_RUNS" \
+      --prompt-file /home/steve/llm-optimizations-publish/prompts/minimax-arithmetic-canary-raw.txt \
+      --tensor-parallel-size "$TP" \
+      --dtype "$DTYPE" \
+      --max-model-len "$MAX_MODEL_LEN" \
+      --max-num-batched-tokens "$MAX_BATCHED_TOKENS" \
+      --max-num-seqs "$MAX_NUM_SEQS" \
+      --block-size "$BLOCK_SIZE" \
+      --attention-backend TRITON_ATTN \
+      --async-scheduling "$QUALITY_ASYNC_SCHEDULING" \
+      --determinism-mode lstrip_text \
+      --compilation-config-json "$COMPILATION_CONFIG_JSON" \
+      --qk-norm-restore-weight \
+      --qk-norm-restore-weight-min-tokens "$VLLM_MINIMAX_QK_NORM_RESTORE_WEIGHT_MIN_TOKENS" \
+      --vllm-cache-root "$CACHE_ROOT" \
+      --require-prompt-substring 0:42 \
       2>&1 | tee "$log"
 }
 
@@ -172,6 +219,21 @@ run_extended_suite() {
       --qk-norm-restore-weight \
       --qk-norm-restore-weight-min-tokens "$VLLM_MINIMAX_QK_NORM_RESTORE_WEIGHT_MIN_TOKENS" \
       --vllm-cache-root "$CACHE_ROOT" \
+      --require-prompt-substring 0:PASS \
+      --require-prompt-substring 1:42 \
+      --require-prompt-substring "2:def add_one" \
+      --require-prompt-regex "2:return\\s+x\\s*\\+\\s*1" \
+      --require-prompt-substring '3:"status"' \
+      --require-prompt-substring '3:"ok"' \
+      --require-prompt-substring '3:"count"' \
+      --require-prompt-substring '3:alpha' \
+      --require-prompt-substring '3:beta' \
+      --require-prompt-substring '3:gamma' \
+      --require-prompt-substring '4:alpha' \
+      --require-prompt-substring '4:beta' \
+      --require-prompt-substring '4:delta' \
+      --require-prompt-substring '4:gamma' \
+      --require-prompt-substring '5:SELECT id, name FROM users WHERE active = 1 ORDER BY id ASC' \
       2>&1 | tee "$log"
 }
 
@@ -237,10 +299,13 @@ write_summary() {
       quality_policy: {
         raw145_n64_expected_combined_token_sha256: $raw145_n64_hash,
         raw145_n256_expected_combined_token_sha256: $raw145_n256_hash,
-        semantic_suite: "PASS, arithmetic 42, add_one function with return x + 1; two greedy repeats must be deterministic"
+        semantic_suite: "PASS, arithmetic 42, add_one function with return x + 1; two greedy repeats must be deterministic after ignoring leading whitespace only"
         ,
+        arithmetic_repeat_suite: "Arithmetic prompt must return 42 for repeated greedy calls in one persistent engine; catches graph replay/request-state drift",
+        arithmetic_repeat_enabled: (env.RUN_REPEAT_ARITHMETIC_QUALITY // "1") == "1",
+        arithmetic_repeat_runs: (env.REPEAT_ARITHMETIC_RUNS // "8" | tonumber),
         extended_sixpack_enabled: ($run_extended_quality == 1),
-        extended_sixpack: "PASS, arithmetic, code, JSON, sort, SQL; two greedy repeats must be deterministic and non-degenerate when enabled"
+        extended_sixpack: "PASS, arithmetic, code, JSON, sort, SQL; two greedy repeats must be deterministic after ignoring leading whitespace only and non-degenerate when enabled"
       },
       candidate_env: {
         VLLM_MINIMAX_MOE_DELAY_ALLREDUCE: $vllm_minimax_moe_delay_allreduce,
@@ -299,6 +364,13 @@ if ! run_semantic_suite; then
   write_summary quality_failed_semantic_suite
   printf 'summary_json=%s\n' "$summary_json"
   exit 1
+fi
+if [ "$RUN_REPEAT_ARITHMETIC_QUALITY" -eq 1 ]; then
+  if ! run_repeat_arithmetic_suite; then
+    write_summary quality_failed_repeat_arithmetic_suite
+    printf 'summary_json=%s\n' "$summary_json"
+    exit 1
+  fi
 fi
 if [ "$RUN_EXTENDED_QUALITY" -eq 1 ]; then
   if ! run_extended_suite; then

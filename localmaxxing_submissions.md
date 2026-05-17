@@ -300,3 +300,13 @@ Note: `cmoz9ayax001cpd01xkr0w54l` is the warmed p512/n1536 8192-context refresh.
 Note: `cmoz8ryb9000bpd014xhl3pxu` keeps `max_model_len=4096` but sets `gpu_memory_utilization=0.95`, recovering much of the lost KV headroom and improving throughput to `36.616` output tok/s.
 
 Note: `cmozofyv5005hlo01puv9rjs6` is a diagnostic vLLM expert-parallel result, not the recommended MiniMax recipe. It uses TP4+EP4, the llm-scaler u4 MoE decode path, and the B70 E64/N1536 tuned MoE config. The tuned config is required: without it, p512/n512 fell to `25.076` output tok/s and 8,768 KV tokens; with it, p512/n512 rose to `29.892` output tok/s and 16,320 KV tokens. The longer p512/n1536 run clears `30.911` output tok/s, but still trails the Q/K-allreduce quality-conservative TP4 reference `cmozow03v005wlo01q81bnspx` at `37.553`. LocalMaxxing rejected `backend=xpu`, so the accepted payload omits backend and preserves XPU details in notes/engine flags.
+
+Date: 2026-05-17
+
+Model: `Lasimeri/MiniMax-M2.7-int4-AutoRound`, AutoRound W4A16 safetensors.
+
+| Label | LocalMaxxing ID | GPUs | Input | Output | tok/s out | tok/s total |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| `vllm-minimax-m27-autoround-local-argmax-quality-p512-n1536` | `cmp940h1703tpo401scj5tftf` | 4 | 512 | 1536 | 60.497 | 80.663 |
+
+Note: `cmp940h1703tpo401scj5tftf` is a correctness-qualified greedy decode result rather than a raw speed high. Finite tracing showed the repeated-request graph corruption first appears at the TP full-vocab logits gather: hidden states and local LM-head logits were finite, but gathered logits developed NaNs. The submitted run enables `VLLM_XPU_LOCAL_ARGMAX_DECODE=1` and `VLLM_BENCH_TEMPERATURE=0`, so each rank computes its local top token and gathers only a tiny `(value,index)` pair tensor. That preserves greedy argmax semantics while bypassing the corrupted full-logits gather. Quality evidence: 32x arithmetic repeat, six-prompt semantic suite, raw145 exact hashes at 64 and 256 generated tokens, 0 NUL tokens, 0 control chars. It is not valid for sampling, penalties, constrained decoding, logprobs, or speculative decode paths until those paths get equivalent correctness work.
