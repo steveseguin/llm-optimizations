@@ -1,0 +1,120 @@
+{
+  "recordedAtUtc": "2026-05-17T17:26:18Z",
+  "model": {
+    "hfId": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+    "localPath": "/mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround",
+    "quantization": "AutoRound W4A16"
+  },
+  "hardware": {
+    "gpuName": "Intel Arc Pro B70 32GB",
+    "gpuCount": 4,
+    "vramGbPerGpu": 32,
+    "os": "Ubuntu 24.04.4 LTS"
+  },
+  "baseline": {
+    "description": "Current strict promoted TP4 local-argmax baseline",
+    "outputTokS": 61.404035,
+    "totalTokS": 81.872046,
+    "localMaxxingId": "cmp9xpe3w04pdo4013acdikt7",
+    "quality": "Passed raw145 n64/n256 exact-token gates, semantic suite, arithmetic repeat, and extended sixpack."
+  },
+  "screens": [
+    {
+      "name": "ngram_gpu_speculative_decode_k4_pl3_8",
+      "status": "failed_startup",
+      "logs": [
+        "/home/steve/bench-results/minimax-m2.7-strict-candidates/ngram-gpu-screen/raw145-n64-ngram-gpu-k4-pl3-8-20260517T170605Z.log",
+        "/home/steve/bench-results/minimax-m2.7-strict-candidates/ngram-gpu-screen/raw145-n16-ngram-gpu-k4-pl3-8-noautoranges-20260517T170753Z.log"
+      ],
+      "config": {
+        "speculativeConfig": {
+          "method": "ngram_gpu",
+          "num_speculative_tokens": 4,
+          "prompt_lookup_min": 3,
+          "prompt_lookup_max": 8
+        },
+        "tp": 4,
+        "contextLength": 2048,
+        "maxNumBatchedTokens": 512,
+        "blockSize": 256,
+        "attentionBackend": "TRITON_ATTN"
+      },
+      "result": {
+        "firstFailure": "piecewise_backend assertion: Expected exactly one compiled range_entry for static shape compilation, but found 2",
+        "withAutoCompileRangesDisabled": "startup passed the assertion but failed loading weights with XPU OOM while allocating 144 MiB on GPU 2",
+        "decision": "Do not promote. The GPU ngram proposer currently consumes enough extra compile/runtime memory to break this 4x32GB configuration."
+      }
+    },
+    {
+      "name": "ngram_cpu_speculative_decode_k4_pl3_8",
+      "status": "performance_negative",
+      "logs": [
+        "/home/steve/bench-results/minimax-m2.7-strict-candidates/ngram-cpu-screen/raw145-n64-ngram-cpu-k4-pl3-8-20260517T170951Z.log",
+        "/home/steve/bench-results/minimax-m2.7-strict-candidates/ngram-cpu-screen/raw145-n64-ngram-cpu-k4-pl3-8-jsonfix-20260517T171612Z.log"
+      ],
+      "config": {
+        "speculativeConfig": {
+          "method": "ngram",
+          "num_speculative_tokens": 4,
+          "prompt_lookup_min": 3,
+          "prompt_lookup_max": 8
+        },
+        "tp": 4,
+        "contextLength": 2048,
+        "maxNumBatchedTokens": 512,
+        "blockSize": 256,
+        "attentionBackend": "TRITON_ATTN"
+      },
+      "result": {
+        "asyncScheduling": "vLLM disables async scheduling for ngram-based speculative decoding.",
+        "localArgmax": "Logs show XPU local argmax is disabled once speculative metadata is present.",
+        "observedOutputTokSFromProgress": 4.49,
+        "rerunFailure": "Later json-fix rerun hit level_zero UR_RESULT_ERROR_OUT_OF_RESOURCES during compiled attention/KV initialization.",
+        "decision": "Do not promote. Even when it runs, CPU ngram sacrifices the local-argmax fast path and is an order of magnitude slower than baseline."
+      }
+    },
+    {
+      "name": "xpu_local_argmax_two_allreduce",
+      "status": "quality_failed",
+      "json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/localargmax-allreduce-screen/raw145-n64-localargmax-allreduce-20260517T172005Z.json",
+      "log": "/home/steve/bench-results/minimax-m2.7-strict-candidates/localargmax-allreduce-screen/raw145-n64-localargmax-allreduce-20260517T172005Z.log",
+      "config": {
+        "env": {
+          "VLLM_XPU_LOCAL_ARGMAX_ALLREDUCE": "1",
+          "VLLM_XPU_LOCAL_ARGMAX_DECODE": "1",
+          "VLLM_XPU_LOCAL_ARGMAX_ASSUME_SAFE": "1"
+        },
+        "tp": 4,
+        "contextLength": 2048,
+        "maxNumBatchedTokens": 512,
+        "blockSize": 256,
+        "attentionBackend": "TRITON_ATTN"
+      },
+      "result": {
+        "passed": false,
+        "elapsedS": 10.631942756008357,
+        "expectedTokenSha256Match": false,
+        "combinedTokenSha256": "2263df6dd85f8bb7b256f4e655caf46f5da8d73cce8a0c4556a7cbf3d85a83e3",
+        "failureReasons": [
+          "combined token hash mismatch",
+          "degenerate or corrupt generated output"
+        ],
+        "firstDistinctGeneratedTokens": [
+          -4
+        ],
+        "decision": "Do not promote. XCCL all-reduce variants for this argmax path are still unsafe on this stack."
+      }
+    }
+  ],
+  "harnessChanges": [
+    {
+      "path": "scripts/run-vllm-minimax-quality-check.py",
+      "change": "Added --speculative-config passthrough and records a JSON-safe copy of the user-provided speculative config."
+    }
+  ],
+  "nextCandidates": [
+    "Avoid stock speculative decoding unless a future patch keeps greedy verification on the local-argmax path.",
+    "Treat XCCL ReduceOp-based argmax collectives as unsafe until a standalone correctness probe proves otherwise.",
+    "Next promising direction is a custom deterministic XPU pair-reduction or eliminating the post-lm-head collective from the decode loop."
+  ]
+}
