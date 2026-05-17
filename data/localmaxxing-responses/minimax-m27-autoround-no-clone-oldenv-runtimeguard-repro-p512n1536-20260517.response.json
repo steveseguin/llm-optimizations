@@ -1,0 +1,16 @@
+{
+  "id": "cmp9tk7co04m3o401lhm2n9gm",
+  "status": "APPROVED",
+  "createdAt": "2026-05-17T13:36:55.608Z",
+  "hfId": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+  "tokSOut": 66.75714322464349,
+  "tokSTotal": 89.00952429952466,
+  "promptTokens": 512,
+  "outputTokens": 1536,
+  "contextLength": 2048,
+  "batchSize": 1,
+  "engineName": "vllm",
+  "engineVersion": "0.20.1-local",
+  "quantization": "AutoRound INT4 W4A16",
+  "note": "Summarized from successful POST /api/benchmarks response. Full local response is stored at the same path on the benchmark host."
+}
