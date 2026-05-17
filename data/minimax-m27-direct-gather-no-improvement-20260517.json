@@ -1,0 +1,82 @@
+{
+  "id": "minimax-m27-direct-gather-no-improvement-20260517",
+  "date_utc": "2026-05-17",
+  "status": "quality_passed_no_improvement",
+  "model": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+  "hardware": "4x Intel Arc Pro B70 32GB",
+  "engine": "vLLM 0.20.1-local XPU",
+  "quantization": "AutoRound INT4 W4A16",
+  "shape": {
+    "prompt_tokens": 512,
+    "output_tokens": 1536,
+    "context_length": 2048,
+    "batch_size": 1,
+    "tensor_parallel": 4,
+    "block_size": 256,
+    "max_num_batched_tokens": 512,
+    "max_num_seqs": 1
+  },
+  "candidate": {
+    "name": "direct all_gather_into_tensor local argmax",
+    "required_marker": "logits.local_argmax_pair_direct_gather",
+    "environment": {
+      "VLLM_XPU_USE_LLM_SCALER_MOE_MINIMAX_LOGITS": "1",
+      "VLLM_XPU_LOCAL_ARGMAX_DECODE": "1",
+      "VLLM_XPU_LOCAL_ARGMAX_ASSUME_SAFE": "1",
+      "VLLM_XPU_LOCAL_ARGMAX_DIRECT_GATHER": "1",
+      "VLLM_BENCH_TEMPERATURE": "0",
+      "VLLM_XPU_ENABLE_XPU_GRAPH": "1",
+      "VLLM_XPU_FORCE_GRAPH_WITH_COMM": "1",
+      "VLLM_XPU_GRAPH_NOOP_COMM_CAPTURE": "1",
+      "FI_TCP_IFACE": "wlxe865d47e3a48",
+      "CCL_KVS_IFACE": "wlxe865d47e3a48",
+      "CCL_TOPO_P2P_ACCESS": "1"
+    }
+  },
+  "throughput": {
+    "output_tok_s": 61.08639139298682,
+    "total_tok_s": 81.44852185731575,
+    "elapsed_seconds": 25.14471660502022
+  },
+  "baseline_for_comparison": {
+    "id": "minimax-m27-runtimeguard-repro-20260517",
+    "localmaxxing_id": "cmp9q9fzn04cto401tjcila06",
+    "output_tok_s_mean": 61.31749740086281,
+    "total_tok_s_mean": 81.75666320115042
+  },
+  "runtime_guard": {
+    "expected_logits_processor_path": "/home/steve/.venvs/vllm-xpu/lib/python3.12/site-packages/vllm/model_executor/layers/logits_processor.py",
+    "logits_processor_sha256": "c032b08de08e929fb38a54624401eeae83c618dd19edfb97e5ecdec379fbe254",
+    "runtime_json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-minimaxlogits-direct-gather-qualityscreen-strict-tp4-ctx2048-mbt512-bs256-20260517T123251Z-runtime.json"
+  },
+  "quality_gates": {
+    "raw145_n64": {
+      "expected_combined_token_sha256": "267cbf30208d84929ee79284ac695467f7e80597bf8694130e1e1f8b180eb5bd",
+      "passed": true,
+      "json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-minimaxlogits-direct-gather-qualityscreen-strict-tp4-ctx2048-mbt512-bs256-20260517T123251Z-quality/raw145-n64-exact.json"
+    },
+    "raw145_n256": {
+      "expected_combined_token_sha256": "58f6e8251c7a0a17e8c441278b5861f7d5da914fa1823ecd10484b296f2d7537",
+      "passed": true,
+      "json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-minimaxlogits-direct-gather-qualityscreen-strict-tp4-ctx2048-mbt512-bs256-20260517T123251Z-quality/raw145-n256-exact.json"
+    },
+    "semantic_suite_n64_r2": {
+      "passed": true,
+      "json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-minimaxlogits-direct-gather-qualityscreen-strict-tp4-ctx2048-mbt512-bs256-20260517T123251Z-quality/semantic-suite-n64-r2.json"
+    },
+    "arithmetic_repeat_n64_r8": {
+      "passed": true,
+      "json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-minimaxlogits-direct-gather-qualityscreen-strict-tp4-ctx2048-mbt512-bs256-20260517T123251Z-quality/arithmetic-repeat-n64-r8.json"
+    }
+  },
+  "artifacts": {
+    "summary_json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-minimaxlogits-direct-gather-qualityscreen-strict-tp4-ctx2048-mbt512-bs256-20260517T123251Z-summary.json",
+    "benchmark_json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/vllm-minimax-m27-autoround-tp4-p512n1536-20260517T124540Z.json",
+    "benchmark_log": "/home/steve/bench-results/minimax-m2.7-strict-candidates/vllm-minimax-m27-autoround-tp4-p512n1536-20260517T124540Z.log"
+  },
+  "localmaxxing": {
+    "submitted": false,
+    "reason": "Quality passed, but throughput did not beat the current promoted runtime-guarded baseline."
+  },
+  "decision": "Keep the current pair all-gather local-argmax path as the promoted baseline. Do not spend more time on direct gather wrappers unless a lower-level implementation removes overhead."
+}
