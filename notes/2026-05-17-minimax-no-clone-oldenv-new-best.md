@@ -2,11 +2,20 @@
 
 Date: 2026-05-17
 
+## Status Update
+
+This result is now demoted to a limited-canary performance datapoint, not a
+fully quality-promoted benchmark. A later extended retest found cold-cache token
+drift, an async cached extended-suite NUL/control-output failure, and an
+async-off arithmetic repeat mismatch. See
+`notes/2026-05-17-minimax-no-clone-extended-quality-erratum.md`.
+
 ## Result
 
-The older `VLLM_XPU_COMPILE_ALLREDUCE_NO_CLONE=1` path reproduced as the new
-best quality-gated 4x B70 MiniMax M2.7 AutoRound result after adding a runtime
-guard for the XPU communicator patch site.
+The older `VLLM_XPU_COMPILE_ALLREDUCE_NO_CLONE=1` path reproduced as a fast
+4x B70 MiniMax M2.7 AutoRound result after adding a runtime guard for the XPU
+communicator patch site. It passed the limited gate described below, but it did
+not survive later extended quality/reproducibility testing.
 
 - Model: `Lasimeri/MiniMax-M2.7-int4-AutoRound`
 - Hardware: 4x Intel Arc Pro B70 32GB
@@ -21,9 +30,10 @@ guard for the XPU communicator patch site.
 - Uplift over prior promoted baseline: `8.87%` output tok/s
 - LocalMaxxing ID: `cmp9tk7co04m3o401lhm2n9gm`
 
-This is a valid performance result and should be shared. It is also an important
-course correction: the local-argmax logits shortcut is not required for the
-current best score and was slightly slower in the latest strict retest.
+This is still an important performance datapoint, but it should not be used as
+the current safe quality baseline. The local-argmax logits shortcut was not
+required for this speed, but the no-clone/graph/scheduling stack still needs a
+stricter reproducibility fix before promotion.
 
 ## Runtime Guard
 
@@ -41,9 +51,9 @@ communicator module before model load.
 The local-argmax code markers are still present in `logits_processor.py`, but
 the local-argmax environment flags were intentionally unset for this run.
 
-## Quality Gates
+## Limited Quality Gates
 
-The result passed the strict gate before benchmarking:
+The result passed this gate before benchmarking:
 
 - raw145 n64 exact combined token hash:
   `267cbf30208d84929ee79284ac695467f7e80597bf8694130e1e1f8b180eb5bd`
