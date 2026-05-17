@@ -1,0 +1,82 @@
+{
+  "date": "2026-05-17",
+  "label": "localargmax-baseline-confirm-20260517",
+  "decision": "same_day_quality_safe_anchor",
+  "submit_to_localmaxxing": false,
+  "reason": "lower repeat of already submitted quality-safe recipe",
+  "model": {
+    "hf_id": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+    "local_path": "/mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround",
+    "quantization": "AutoRound INT4 W4A16"
+  },
+  "hardware": {
+    "gpu": "Intel Arc Pro B70 32GB",
+    "gpu_count": 4
+  },
+  "engine": {
+    "name": "vLLM",
+    "version": "0.20.1-local",
+    "backend": "xpu",
+    "tensor_parallel_size": 4
+  },
+  "runtime_flags": {
+    "VLLM_XPU_LOCAL_ARGMAX_DECODE": "1",
+    "VLLM_XPU_LOCAL_ARGMAX_ASSUME_SAFE": "1",
+    "CCL_TOPO_P2P_ACCESS": "1",
+    "VLLM_BENCH_TEMPERATURE": "0",
+    "VLLM_XPU_ENABLE_XPU_GRAPH": "1",
+    "VLLM_XPU_FORCE_GRAPH_WITH_COMM": "1",
+    "VLLM_XPU_GRAPH_NOOP_COMM_CAPTURE": "1"
+  },
+  "benchmark_shape": {
+    "prompt_tokens": 512,
+    "output_tokens": 1536,
+    "context_length": 2048,
+    "batch_size": 1,
+    "max_num_batched_tokens": 512,
+    "block_size": 256,
+    "prefix_cache": false,
+    "temperature": 0
+  },
+  "quality": {
+    "status": "passed",
+    "raw145_n64_token_sha256": "267cbf30208d84929ee79284ac695467f7e80597bf8694130e1e1f8b180eb5bd",
+    "raw145_n256_token_sha256": "58f6e8251c7a0a17e8c441278b5861f7d5da914fa1823ecd10484b296f2d7537",
+    "semantic_suite": "passed",
+    "arithmetic_repeat_runs": 16,
+    "extended_sixpack": "passed"
+  },
+  "published_strict_baseline": {
+    "mean_output_toks_per_second": 61.404035,
+    "mean_total_toks_per_second": 81.872046,
+    "localmaxxing_id": "cmp9xpe3w04pdo4013acdikt7"
+  },
+  "same_day_anchor": {
+    "output_toks_per_second": [
+      60.67261038003597,
+      60.550416978022525,
+      60.70321830328443
+    ],
+    "total_toks_per_second": [
+      80.89681384004795,
+      80.73388930403003,
+      80.93762440437924
+    ],
+    "mean_output_toks_per_second": 60.64208188711431,
+    "mean_total_toks_per_second": 80.85610918281907
+  },
+  "delta_vs_published_strict_baseline": {
+    "output_toks_per_second": -0.7619531128856873,
+    "total_toks_per_second": -1.015936817180929,
+    "decode_percent": -1.2408843430710642
+  },
+  "artifacts": {
+    "summary_json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-localargmax-baseline-confirm-20260517-strict-tp4-ctx2048-mbt512-bs256-20260517T223801Z-summary.json",
+    "quality_dir": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-localargmax-baseline-confirm-20260517-strict-tp4-ctx2048-mbt512-bs256-20260517T223801Z-quality",
+    "benchmark_jsons": [
+      "/home/steve/bench-results/minimax-m2.7-strict-candidates/vllm-minimax-m27-autoround-tp4-p512n1536-20260517T225330Z.json",
+      "/home/steve/bench-results/minimax-m2.7-strict-candidates/vllm-minimax-m27-autoround-tp4-p512n1536-20260517T225624Z.json",
+      "/home/steve/bench-results/minimax-m2.7-strict-candidates/vllm-minimax-m27-autoround-tp4-p512n1536-20260517T225911Z.json"
+    ]
+  }
+}
