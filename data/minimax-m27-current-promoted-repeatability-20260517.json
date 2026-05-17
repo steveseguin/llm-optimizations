@@ -1,0 +1,49 @@
+{
+  "id": "minimax-m27-current-promoted-repeatability-20260517",
+  "date_utc": "2026-05-17",
+  "status": "repeatability_characterization",
+  "model": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+  "hardware": "4x Intel Arc Pro B70 32GB",
+  "engine": "vLLM 0.20.1-local XPU",
+  "quantization": "AutoRound INT4 W4A16",
+  "shape": {
+    "prompt_tokens": 512,
+    "output_tokens": 1536,
+    "context_length": 2048,
+    "batch_size": 1,
+    "tensor_parallel": 4,
+    "block_size": 256,
+    "max_num_batched_tokens": 512,
+    "max_num_seqs": 1
+  },
+  "throughput": {
+    "runs": [
+      {
+        "elapsed_s": 25.015378442010842,
+        "output_tok_s": 61.402229175171726,
+        "total_tok_s": 81.86963890022896
+      },
+      {
+        "elapsed_s": 25.321432713011745,
+        "output_tok_s": 60.6600747046476,
+        "total_tok_s": 80.8800996061968
+      },
+      {
+        "elapsed_s": 24.954158017004374,
+        "output_tok_s": 61.55286822153374,
+        "total_tok_s": 82.07049096204499
+      }
+    ],
+    "output_tok_s_mean": 61.20505736711769,
+    "output_tok_s_min": 60.6600747046476,
+    "output_tok_s_max": 61.55286822153374,
+    "total_tok_s_mean": 81.60674315615692
+  },
+  "artifacts": {
+    "summary_json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/current-promoted-repeat-20260517/summary.json",
+    "run_1_json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/current-promoted-repeat-20260517/run-1/vllm-minimax-m27-autoround-tp4-p512n1536-20260517T195934Z.json",
+    "run_2_json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/current-promoted-repeat-20260517/run-2/vllm-minimax-m27-autoround-tp4-p512n1536-20260517T200222Z.json",
+    "run_3_json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/current-promoted-repeat-20260517/run-3/vllm-minimax-m27-autoround-tp4-p512n1536-20260517T200508Z.json"
+  },
+  "interpretation": "Single-run deltas below roughly 1 output tok/s should not be trusted without adjacent controls and repeats on this setup."
+}
