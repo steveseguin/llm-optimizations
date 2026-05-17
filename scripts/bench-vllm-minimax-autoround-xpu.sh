@@ -74,6 +74,8 @@ fi
   echo "vllm_xpu_local_argmax_packed_gather=${VLLM_XPU_LOCAL_ARGMAX_PACKED_GATHER:-}"
   echo "vllm_xpu_local_argmax_packed_allreduce=${VLLM_XPU_LOCAL_ARGMAX_PACKED_ALLREDUCE:-}"
   echo "vllm_xpu_local_argmax_allreduce=${VLLM_XPU_LOCAL_ARGMAX_ALLREDUCE:-}"
+  echo "vllm_xpu_reuse_async_output_copy_buffer=${VLLM_XPU_REUSE_ASYNC_OUTPUT_COPY_BUFFER:-}"
+  echo "vllm_xpu_async_output_copy_buffer_slots=${VLLM_XPU_ASYNC_OUTPUT_COPY_BUFFER_SLOTS:-}"
   echo "extra_args=$EXTRA_ARGS"
   echo "run_timeout=$RUN_TIMEOUT"
   echo "shm_stall_max_warnings=$SHM_STALL_MAX_WARNINGS"
