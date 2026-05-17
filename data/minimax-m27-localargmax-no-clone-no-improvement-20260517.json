@@ -1,0 +1,51 @@
+{
+  "date": "2026-05-17",
+  "label": "minimaxlogits-no-clone-runtimeguard-repro",
+  "model": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+  "hardware": "4x Intel Arc Pro B70 32GB",
+  "engine": "vLLM 0.20.1-local XPU TP4",
+  "quantization": "AutoRound INT4 W4A16",
+  "shape": {
+    "prompt_tokens": 512,
+    "output_tokens": 1536,
+    "context_length": 2048,
+    "batch_size": 1,
+    "tensor_parallel": 4,
+    "max_num_batched_tokens": 512,
+    "block_size": 256
+  },
+  "candidate_env": {
+    "VLLM_XPU_COMPILE_ALLREDUCE_NO_CLONE": "1",
+    "VLLM_XPU_LOCAL_ARGMAX_DECODE": "1",
+    "VLLM_XPU_LOCAL_ARGMAX_ASSUME_SAFE": "1",
+    "VLLM_XPU_USE_LLM_SCALER_MOE_MINIMAX_LOGITS": "1",
+    "VLLM_XPU_ENABLE_XPU_GRAPH": "1",
+    "VLLM_XPU_FORCE_GRAPH_WITH_COMM": "1",
+    "VLLM_XPU_GRAPH_NOOP_COMM_CAPTURE": "1"
+  },
+  "result": {
+    "status": "quality_passed_no_improvement",
+    "mean_output_toks_per_second": 61.21791482983834,
+    "mean_total_toks_per_second": 81.62388643978446,
+    "output_toks_per_second": [
+      61.0070101275012,
+      61.42881953217549
+    ],
+    "total_toks_per_second": [
+      81.3426801700016,
+      81.90509270956733
+    ],
+    "promoted_no_clone_oldenv_output_toks_per_second": 66.75714322464349,
+    "promoted_no_clone_oldenv_total_toks_per_second": 89.00952429952466
+  },
+  "quality_gates": {
+    "raw145_n64_exact_token_sha256": "267cbf30208d84929ee79284ac695467f7e80597bf8694130e1e1f8b180eb5bd",
+    "raw145_n256_exact_token_sha256": "58f6e8251c7a0a17e8c441278b5861f7d5da914fa1823ecd10484b296f2d7537",
+    "semantic_suite": "passed",
+    "arithmetic_repeat_n64_r8": "passed"
+  },
+  "artifact_paths": {
+    "summary": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-minimaxlogits-no-clone-runtimeguard-repro-strict-tp4-ctx2048-mbt512-bs256-20260517T125536Z-summary.json"
+  },
+  "interpretation": "The local-argmax plus MiniMax-logits path is quality-correct, but it is slower than the simpler no-clone XPU communicator run. Do not promote or submit unless a future patch improves it."
+}
