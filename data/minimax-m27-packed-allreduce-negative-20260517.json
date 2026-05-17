@@ -1,0 +1,69 @@
+{
+  "id": "minimax-m27-packed-allreduce-negative-20260517",
+  "date_utc": "2026-05-17",
+  "status": "quality_failed_not_benchmarked",
+  "model": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+  "hardware": "4x Intel Arc Pro B70 32GB",
+  "engine": "vLLM 0.20.1-local XPU",
+  "quantization": "AutoRound INT4 W4A16",
+  "candidate": {
+    "name": "packed local-argmax allreduce",
+    "env": {
+      "VLLM_XPU_LOCAL_ARGMAX_DECODE": "1",
+      "VLLM_XPU_LOCAL_ARGMAX_ASSUME_SAFE": "1",
+      "VLLM_XPU_LOCAL_ARGMAX_PACKED_ALLREDUCE": "1",
+      "VLLM_XPU_USE_LLM_SCALER_MOE_MINIMAX_LOGITS": "1",
+      "VLLM_BENCH_TEMPERATURE": "0"
+    },
+    "runtime_required_marker": "logits.local_argmax_packed_allreduce",
+    "runtime_logits_processor_sha256": "c032b08de08e929fb38a54624401eeae83c618dd19edfb97e5ecdec379fbe254"
+  },
+  "quality_failure": {
+    "gate": "raw145-n64-exact",
+    "expected_combined_token_sha256": "267cbf30208d84929ee79284ac695467f7e80597bf8694130e1e1f8b180eb5bd",
+    "candidate_combined_token_sha256": "ade0b2e05944a4964b3dd0ba0bfa90fa8a5341bc3e3f2ea885e413e0e283291f",
+    "failure_reasons": [
+      "combined token hash mismatch",
+      "degenerate or corrupt generated output"
+    ],
+    "deterministic_across_runs": true,
+    "distinct_generated_token_count": 13,
+    "printable_nonspace_text_chars": 0,
+    "degenerate_output": true,
+    "first_distinct_generated_tokens": [
+      333435,
+      362854,
+      365238,
+      377741,
+      383632,
+      384208,
+      384339,
+      384915,
+      403865,
+      404441,
+      404572,
+      405148,
+      429095
+    ]
+  },
+  "artifacts": {
+    "summary_json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-minimaxlogits-packed-allreduce-qualityscreen-strict-tp4-ctx2048-mbt512-bs256-20260517T122021Z-summary.json",
+    "quality_json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-minimaxlogits-packed-allreduce-qualityscreen-strict-tp4-ctx2048-mbt512-bs256-20260517T122021Z-quality/raw145-n64-exact.json",
+    "quality_log": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-minimaxlogits-packed-allreduce-qualityscreen-strict-tp4-ctx2048-mbt512-bs256-20260517T122021Z-quality/raw145-n64-exact.log"
+  },
+  "localmaxxing": {
+    "submitted": false,
+    "reason": "Failed quality gate before throughput benchmark."
+  },
+  "baseline_to_keep": {
+    "localmaxxing_id": "cmp9q9fzn04cto401tjcila06",
+    "output_tok_s_mean": 61.31749740086281,
+    "total_tok_s_mean": 81.75666320115042,
+    "path": "pair all-gather local argmax"
+  },
+  "next_steps": [
+    "Build a standalone XPU/XCCL packed-key ordering reproducer before retrying this branch.",
+    "Prefer a custom XPU argmax collective comparing float32 value plus int32 token directly.",
+    "Keep raw145 and semantic gates mandatory before any benchmark or LocalMaxxing submission."
+  ]
+}
