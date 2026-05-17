@@ -1,0 +1,66 @@
+{
+  "date": "2026-05-17",
+  "model": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+  "hardware": "4x Intel Arc Pro B70 32GB",
+  "engine": "vLLM 0.20.1-local XPU TP4",
+  "candidate": "VLLM_XPU_COMPILE_ALLREDUCE_NO_CLONE=1",
+  "demoted_result": {
+    "localmaxxing_id": "cmp9tk7co04m3o401lhm2n9gm",
+    "output_tok_s_mean": 66.75714322464349,
+    "total_tok_s_mean": 89.00952429952466,
+    "status": "limited-canary-performance-datapoint",
+    "reason": "Later extended quality/reproducibility gates failed."
+  },
+  "failed_retests": [
+    {
+      "label": "no-clone-oldenv-extended-quality-repro",
+      "summary": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-no-clone-oldenv-extended-quality-repro-strict-tp4-ctx2048-mbt512-bs256-20260517T134254Z-summary.json",
+      "status": "quality_failed_raw145_n64",
+      "failure": "raw145 n64 exact token hash mismatch after fresh cache compile",
+      "expected_token_sha256": "267cbf30208d84929ee79284ac695467f7e80597bf8694130e1e1f8b180eb5bd",
+      "actual_token_sha256": "7f4222437a76869f7fde3e202d3c90a5e202583f603b57d4c9950fae6ad8bd67",
+      "nul_token_count": 0,
+      "control_nonspace_text_chars": 0
+    },
+    {
+      "label": "no-clone-oldenv-existingcache-extended-quality",
+      "summary": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-no-clone-oldenv-existingcache-extended-quality-strict-tp4-ctx2048-mbt512-bs256-20260517T134910Z-summary.json",
+      "status": "quality_failed_extended_suite",
+      "artifact": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-no-clone-oldenv-existingcache-extended-quality-strict-tp4-ctx2048-mbt512-bs256-20260517T134910Z-quality/extended-sixpack-n64-r2.json",
+      "failure_reasons": [
+        "nondeterministic token",
+        "degenerate or corrupt generated output",
+        "prompt-scoped required substring missing"
+      ],
+      "nul_token_count": 64,
+      "control_nonspace_text_chars": 64
+    },
+    {
+      "label": "no-clone-asyncoff-extended-runtimeguard",
+      "summary": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-no-clone-asyncoff-extended-runtimeguard-strict-tp4-ctx2048-mbt512-bs256-20260517T140217Z-summary.json",
+      "status": "quality_failed_repeat_arithmetic_suite",
+      "artifact": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-no-clone-asyncoff-extended-runtimeguard-strict-tp4-ctx2048-mbt512-bs256-20260517T140217Z-quality/arithmetic-repeat-n64-r8.json",
+      "failure_reasons": [
+        "nondeterministic lstrip_text",
+        "prompt-scoped required substring missing"
+      ],
+      "expected_repeated_token_sha256": "def6899500b2364bc97d561fc5f9cc78aa9fbcd5a0eb032eab1f2c6735d2bbec",
+      "divergent_run_6_token_sha256": "81659e0f5bc025462926b93246604dd4bb4549ff971ae38139d9f064c07c8213",
+      "nul_token_count": 0,
+      "control_nonspace_text_chars": 0
+    }
+  ],
+  "promotion_rule": [
+    "raw145 n64 exact",
+    "raw145 n256 exact",
+    "semantic suite",
+    "arithmetic repeat suite",
+    "extended sixpack"
+  ],
+  "next_debug_targets": [
+    "rerun async-off/no-clone with the known previous passing cache root",
+    "compare fresh-cache vs existing-cache behavior",
+    "test eager/no-XPU-graph quality to isolate graph replay",
+    "benchmark only after the full quality gate passes"
+  ]
+}
