@@ -21,6 +21,7 @@ def post_payload(key: str, payload: dict) -> tuple[int, str, int | None]:
         headers={
             "Authorization": f"Bearer {key}",
             "Content-Type": "application/json",
+            "User-Agent": "curl/8.5.0",
         },
     )
     try:

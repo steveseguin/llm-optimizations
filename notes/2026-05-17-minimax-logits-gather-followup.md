@@ -432,10 +432,63 @@ CCL transport candidate:
 Interpretation: keep `CCL_ATL_TRANSPORT=ofi`. MPI transport is not stable on
 this current B70 + XCCL stack.
 
+### MiniMax-Logits MoE With Strict Local Argmax
+
+Candidate:
+
+- Label: `minimaxlogits-localargmax-block256`
+- Runtime delta:
+  - `VLLM_XPU_USE_LLM_SCALER_MOE_MINIMAX_LOGITS=1`
+  - `VLLM_XPU_LOCAL_ARGMAX_DECODE=1`
+  - `VLLM_XPU_LOCAL_ARGMAX_ASSUME_SAFE=1`
+  - block size 256, `max_num_batched_tokens=512`
+  - baseline Q/K restore, delayed attention allreduce, forced XPU piecewise
+    graph, Triton attention, prefix cache off, greedy temperature 0
+- Summary:
+  `/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-minimaxlogits-localargmax-block256-strict-tp4-ctx2048-mbt512-bs256-20260517T072727Z-summary.json`
+
+Quality gates:
+
+| Gate | Result | Artifact |
+| --- | --- | --- |
+| raw145 n64 exact | pass, expected hash matched | `/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-minimaxlogits-localargmax-block256-strict-tp4-ctx2048-mbt512-bs256-20260517T072727Z-quality/raw145-n64-exact.json` |
+| raw145 n256 exact | pass, expected hash matched | `/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-minimaxlogits-localargmax-block256-strict-tp4-ctx2048-mbt512-bs256-20260517T072727Z-quality/raw145-n256-exact.json` |
+| semantic suite n64/r2 | pass | `/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-minimaxlogits-localargmax-block256-strict-tp4-ctx2048-mbt512-bs256-20260517T072727Z-quality/semantic-suite-n64-r2.json` |
+| arithmetic repeat n64/r8 | pass | `/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-minimaxlogits-localargmax-block256-strict-tp4-ctx2048-mbt512-bs256-20260517T072727Z-quality/arithmetic-repeat-n64-r8.json` |
+| extended sixpack n64/r2 | pass | `/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-minimaxlogits-localargmax-block256-strict-tp4-ctx2048-mbt512-bs256-20260517T072727Z-quality/extended-sixpack-n64-r2.json` |
+
+Bench repeats, p512/n1536:
+
+| Run | Total tok/s | Output tok/s | Artifact |
+| --- | ---: | ---: | --- |
+| repeat 1 | 81.899 | 61.425 | `/home/steve/bench-results/minimax-m2.7-strict-candidates/vllm-minimax-m27-autoround-tp4-p512n1536-20260517T074243Z.json` |
+| repeat 2 | 82.006 | 61.504 | `/home/steve/bench-results/minimax-m2.7-strict-candidates/vllm-minimax-m27-autoround-tp4-p512n1536-20260517T074532Z.json` |
+| mean | 81.953 | 61.464 | two-run mean |
+
+Interpretation: this is the first strict-quality pass for the MiniMax logits
+MoE path after the local-argmax logits-gather fix. It is a real improvement
+over the promoted strict local-argmax baseline (`60.497` output tok/s), but it
+is not faster than older historical speed-only or weaker-gate rows. Treat it as
+a useful quality-qualified datapoint, not as proof that the 65-73 tok/s paths
+are repaired.
+
+LocalMaxxing:
+
+- Payload:
+  `/home/steve/llm-optimizations-publish/data/localmaxxing-minimax-m27-autoround-minimaxlogits-localargmax-p512n1536-20260517.payload.json`
+- Response:
+  `/home/steve/llm-optimizations-publish/data/localmaxxing-responses/minimax-m27-autoround-minimaxlogits-localargmax-p512n1536-20260517.response.json`
+- ID: `cmp9h7jmo048mo401a17q23jb`
+- API status: `APPROVED`
+
+Submission note: the Python urllib submit helper hit LocalMaxxing/Cloudflare
+HTTP 403 (`error code: 1010`) until it sent a curl-like `User-Agent`. A direct
+`curl` POST with the same payload returned HTTP 201.
+
 ### Current Next Work
 
-The latest safe performance state is still the promoted local-greedy-argmax
-path plus the optional block-size 128 setting. The next useful work is below:
+The latest safe performance state is the promoted local-greedy-argmax path plus
+the strict MiniMax-logits MoE variant above. The next useful work is below:
 
 1. Build a lower-overhead MiniMax-specific decode profile that times attention,
    MoE, residual allreduces, and token selection without per-token device sync
@@ -447,6 +500,6 @@ path plus the optional block-size 128 setting. The next useful work is below:
    only a small part of the per-token time.
 4. Keep 512-token chunking as the stable scheduler value until the IGC/ocloc
    compile instability above is understood or avoided.
-5. Treat any future result above 60.763 output tok/s as a candidate only after
-   exact n64/n256 canaries, semantic canaries, arithmetic repeat, and at least
-   two p512/n1536 repeats.
+5. Treat any future result above 61.464 output tok/s as a candidate only after
+   exact n64/n256 canaries, semantic canaries, arithmetic repeat, extended
+   sixpack, and at least two p512/n1536 repeats.

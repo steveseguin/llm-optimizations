@@ -1,0 +1,47 @@
+[
+  {
+    "label": "minimax-m27-autoround-minimaxlogits-localargmax-p512n1536-20260517",
+    "payload": {
+      "hfId": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+      "modelRevision": "main",
+      "hardware": {
+        "hwClass": "DISCRETE_GPU",
+        "gpuName": "Intel Arc Pro B70",
+        "gpuCount": 4,
+        "vramGb": 32,
+        "cpu": "AMD EPYC 9015 8-Core Processor",
+        "ramGb": 15,
+        "os": "Ubuntu 24.04.4 LTS"
+      },
+      "engineName": "vllm",
+      "engineVersion": "0.20.1-local",
+      "quantization": "AutoRound W4A16",
+      "promptTokens": 512,
+      "outputTokens": 1536,
+      "contextLength": 2048,
+      "batchSize": 1,
+      "tokSOut": 61.46449885836371,
+      "tokSTotal": 81.95266514448494,
+      "notes": "MiniMax M2.7 AutoRound W4A16 on 4x Intel Arc Pro B70 via vLLM/XPU TP4. Strict quality-qualified MiniMax-logits MoE variant with greedy local-argmax decode: two p512/n1536 repeats at 61.425 and 61.504 output tok/s, 81.899 and 82.006 total tok/s. Quality gates passed before benchmark: raw145 exact token hashes at n64 and n256, semantic PASS/arithmetic/code suite, 8x arithmetic repeat, extended sixpack JSON/sort/SQL; 0 NUL/control chars and deterministic greedy repeats. Not the fastest historical speed-only row, but this validates the MiniMax logits MoE path under the stricter local-argmax quality frame. No speculative decoding, no expert dropping, no quantization/model change, no power-limit increase. vLLM bench reports total prompt+decode tok/s; no isolated prefill-only metric is emitted by this mode.",
+      "engineFlags": {
+        "commandSnippet": "VLLM_XPU_USE_LLM_SCALER_MOE_MINIMAX_LOGITS=1 VLLM_XPU_LOCAL_ARGMAX_DECODE=1 VLLM_XPU_LOCAL_ARGMAX_ASSUME_SAFE=1 VLLM_BENCH_TEMPERATURE=0 VLLM_MINIMAX_QK_NORM_RESTORE_WEIGHT=1 VLLM_MINIMAX_QK_NORM_RESTORE_WEIGHT_MIN_TOKENS=2 VLLM_MINIMAX_M2_ATTN_DELAY_ALLREDUCE=1 VLLM_XPU_USE_LLM_SCALER_MOE=1 VLLM_XPU_ENABLE_XPU_GRAPH=1 VLLM_XPU_FORCE_GRAPH_WITH_COMM=1 VLLM_XPU_GRAPH_NOOP_COMM_CAPTURE=1 CCL_ATL_TRANSPORT=ofi CCL_TOPO_P2P_ACCESS=1 VLLM_CACHE_ROOT=/mnt/fast-ai/vllm-cache-exp/minimax-localargmax-minimaxlogits-block256 vllm bench throughput --backend vllm --model /mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround --tokenizer /mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround --trust-remote-code --dtype float16 --tensor-parallel-size 4 --distributed-executor-backend mp --max-model-len 2048 --max-num-batched-tokens 512 --max-num-seqs 1 --dataset-name random --random-input-len 512 --random-output-len 1536 --random-range-ratio 0 --num-prompts 1 --disable-log-stats --async-engine --block-size 256 --no-enable-prefix-caching --attention-backend TRITON_ATTN --compilation-config {\"use_inductor_graph_partition\":true,\"compile_sizes\":[1],\"cudagraph_mode\":\"PIECEWISE\"}",
+        "tensorParallel": 4,
+        "pipelineParallel": 1,
+        "kvCacheDtype": "auto",
+        "prefixCaching": false,
+        "attentionBackend": "TRITON_ATTN",
+        "flashAttn": false,
+        "chunkedPrefill": true,
+        "prefillChunkSize": 512,
+        "contBatching": true,
+        "maxRunningSeqs": 1,
+        "concurrency": 1,
+        "specDecoding": false,
+        "temperature": 0,
+        "topP": 1,
+        "engineQuant": "inc",
+        "extraFlags": "XPU/Level Zero; llm-scaler INT4 MiniMax logits MoE decode path; B70 tuned MoE config E=256,N=384,dtype=int4_w4a16; greedy local-argmax decode pair-gathers per-rank top logits; Q/K clean-weight guard min_tokens=2; MiniMax attention delayed allreduce; XPU piecewise graph forced with no-op communicator capture; block-size 256; max_num_batched_tokens 512; prefix cache off; CCL_ATL_TRANSPORT=ofi; no power-limit change; strict exact-token and semantic canaries passed."
+      }
+    }
+  }
+]
