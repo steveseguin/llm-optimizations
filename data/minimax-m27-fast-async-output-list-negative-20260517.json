@@ -1,0 +1,80 @@
+{
+  "id": "minimax-m27-fast-async-output-list-negative-20260517",
+  "date_utc": "2026-05-17",
+  "status": "quality_screen_passed_no_improvement",
+  "model": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+  "hardware": "4x Intel Arc Pro B70 32GB",
+  "engine": "vLLM 0.20.1-local XPU",
+  "quantization": "AutoRound INT4 W4A16",
+  "shape": {
+    "prompt_tokens": 512,
+    "output_tokens": 1536,
+    "context_length": 2048,
+    "batch_size": 1,
+    "tensor_parallel": 4,
+    "block_size": 256,
+    "max_num_batched_tokens": 512,
+    "max_num_seqs": 1
+  },
+  "candidate": {
+    "name": "fast async output scalar-to-list path",
+    "environment": {
+      "VLLM_XPU_FAST_ASYNC_OUTPUT_LIST": "1",
+      "VLLM_XPU_LOCAL_ARGMAX_DECODE": "1",
+      "VLLM_XPU_LOCAL_ARGMAX_ASSUME_SAFE": "1",
+      "VLLM_XPU_USE_LLM_SCALER_MOE": "1",
+      "VLLM_XPU_USE_LLM_SCALER_MOE_MINIMAX_LOGITS": "1",
+      "VLLM_XPU_ENABLE_XPU_GRAPH": "1",
+      "VLLM_XPU_FORCE_GRAPH_WITH_COMM": "1",
+      "VLLM_XPU_GRAPH_NOOP_COMM_CAPTURE": "1",
+      "VLLM_MINIMAX_M2_ATTN_DELAY_ALLREDUCE": "1",
+      "VLLM_MINIMAX_QK_NORM_RESTORE_WEIGHT": "1",
+      "VLLM_MINIMAX_QK_NORM_RESTORE_WEIGHT_MIN_TOKENS": "2",
+      "CCL_TOPO_P2P_ACCESS": "1",
+      "FI_TCP_IFACE": "wlxe865d47e3a48",
+      "CCL_KVS_IFACE": "wlxe865d47e3a48"
+    }
+  },
+  "quality": {
+    "raw145_n64_exact_passed": true,
+    "expected_combined_token_sha256": "267cbf30208d84929ee79284ac695467f7e80597bf8694130e1e1f8b180eb5bd",
+    "observed_combined_token_sha256": "267cbf30208d84929ee79284ac695467f7e80597bf8694130e1e1f8b180eb5bd",
+    "full_strict_gate_run": false,
+    "reason_full_gate_skipped": "candidate did not beat the adjacent promoted-path control benchmark"
+  },
+  "throughput": {
+    "candidate": {
+      "elapsed_s": 25.073018403956667,
+      "output_tok_s": 61.26107257024987,
+      "total_tok_s": 81.68143009366649
+    },
+    "adjacent_control": {
+      "elapsed_s": 25.061126373999286,
+      "output_tok_s": 61.29014223373405,
+      "total_tok_s": 81.72018964497873
+    },
+    "candidate_minus_control": {
+      "output_tok_s": -0.029069663484179742,
+      "total_tok_s": -0.038759551312244045
+    },
+    "promoted_baseline": {
+      "output_tok_s_mean": 61.40403471892818,
+      "total_tok_s_mean": 81.87204629190424,
+      "localmaxxing_id": "cmp9xpe3w04pdo4013acdikt7"
+    }
+  },
+  "artifacts": {
+    "quality_json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/fast-async-output-list-screen/raw145-n64-fast-async-output-list-20260517T192714Z.json",
+    "quality_log": "/home/steve/bench-results/minimax-m2.7-strict-candidates/fast-async-output-list-screen/raw145-n64-fast-async-output-list-20260517T192714Z.log",
+    "candidate_benchmark_json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/fast-async-output-list-v1-bench/vllm-minimax-m27-autoround-tp4-p512n1536-20260517T193305Z.json",
+    "candidate_benchmark_log": "/home/steve/bench-results/minimax-m2.7-strict-candidates/fast-async-output-list-v1-bench/vllm-minimax-m27-autoround-tp4-p512n1536-20260517T193305Z.log",
+    "control_benchmark_json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/fast-async-output-list-control-bench/vllm-minimax-m27-autoround-tp4-p512n1536-20260517T193002Z.json",
+    "control_benchmark_log": "/home/steve/bench-results/minimax-m2.7-strict-candidates/fast-async-output-list-control-bench/vllm-minimax-m27-autoround-tp4-p512n1536-20260517T193002Z.log",
+    "invalid_import_bug_log": "/home/steve/bench-results/minimax-m2.7-strict-candidates/fast-async-output-list-screen/raw145-n64-fast-async-output-list-20260517T192336Z.log"
+  },
+  "localmaxxing": {
+    "submitted": false,
+    "reason": "quality screen passed, but the candidate was neutral/slightly slower than the adjacent control and below the promoted strict baseline"
+  },
+  "decision": "Reject as a performance promotion. Direct scalar-to-list output packaging is quality-safe but not a meaningful bottleneck."
+}
