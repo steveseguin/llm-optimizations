@@ -32,6 +32,7 @@ ts="$(date -u +%Y%m%dT%H%M%SZ)"
 tag="tp${TP}-p${INPUT_LEN}n${OUTPUT_LEN}-${ts}"
 log="$OUTDIR/vllm-minimax-m27-autoround-${tag}.log"
 json="$OUTDIR/vllm-minimax-m27-autoround-${tag}.json"
+runtime_json="$OUTDIR/vllm-minimax-m27-autoround-${tag}.runtime.json"
 
 source "$VENV/bin/activate"
 
@@ -59,6 +60,7 @@ fi
 {
   echo "log=$log"
   echo "json=$json"
+  echo "runtime_json=$runtime_json"
   echo "model=$MODEL"
   echo "vllm_cache_root=${VLLM_CACHE_ROOT:-}"
   echo "ccl_topo_p2p_access=${CCL_TOPO_P2P_ACCESS:-}"
@@ -67,6 +69,16 @@ fi
   echo "run_timeout=$RUN_TIMEOUT"
   echo "shm_stall_max_warnings=$SHM_STALL_MAX_WARNINGS"
   echo "start=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  runtime_status=0
+  python /home/steve/llm-optimizations-publish/scripts/inspect-vllm-runtime.py \
+    --output "$runtime_json" || runtime_status="$?"
+  if [ -s "$runtime_json" ]; then
+    jq -c . "$runtime_json"
+  fi
+  if [ "$runtime_status" -ne 0 ]; then
+    echo "runtime_inspection_failed=$runtime_status"
+    exit "$runtime_status"
+  fi
   if [ "$SHM_STALL_MAX_WARNINGS" -gt 0 ]; then
     (
       while [ ! -f "$log" ]; do
@@ -108,6 +120,12 @@ fi
     $EXTRA_ARGS
   if [ -n "${stall_guard_pid:-}" ]; then
     kill "$stall_guard_pid" 2>/dev/null || true
+  fi
+  if [ -n "${VLLM_RUNTIME_REQUIRE_LOG_REGEX:-}" ]; then
+    if ! grep -Eq "$VLLM_RUNTIME_REQUIRE_LOG_REGEX" "$log"; then
+      echo "runtime_required_log_regex_missing=$VLLM_RUNTIME_REQUIRE_LOG_REGEX"
+      exit 3
+    fi
   fi
   echo "end=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 } > "$log" 2>&1
