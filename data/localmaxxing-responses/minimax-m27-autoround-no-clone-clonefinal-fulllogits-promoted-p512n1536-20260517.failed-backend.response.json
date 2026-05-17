@@ -1,0 +1,13 @@
+{
+  "http_code": 400,
+  "error": "Validation failed",
+  "details": {
+    "formErrors": [],
+    "fieldErrors": {
+      "backend": [
+        "Backend must be one of: cuda, rocm, metal, vulkan, cpu, openvino"
+      ]
+    }
+  },
+  "resolution": "Removed optional backend=xpu from the payload instead of mislabeling the XPU/Level Zero vLLM run."
+}
