@@ -1,0 +1,67 @@
+Subject: Add diagnostic gather-broadcast local argmax path for XPU TP decode
+
+This is an incremental patch fragment against the local vLLM tree after the
+existing MiniMax local-argmax decode patches. It adds a default-off diagnostic
+mode selected by `VLLM_XPU_LOCAL_ARGMAX_GATHER_BROADCAST=1`.
+
+diff --git a/vllm/model_executor/layers/logits_processor.py b/vllm/model_executor/layers/logits_processor.py
+--- a/vllm/model_executor/layers/logits_processor.py
++++ b/vllm/model_executor/layers/logits_processor.py
+@@
+         trace_tensor("logits_processor.local_argmax_pair", local_pair)
++        if (
++            os.environ.get("VLLM_XPU_LOCAL_ARGMAX_GATHER_BROADCAST", "0") == "1"
++            and local_pair.device.type == "xpu"
++        ):
++            tp_group = get_tp_group()
++            root_rank = tp_group.ranks[0]
++            is_root = tp_group.rank == root_rank
++            with timed_region("logits.local_argmax_pair_gather"):
++                gather_list = (
++                    [
++                        torch.empty_like(local_pair)
++                        for _ in range(tp_group.world_size)
++                    ]
++                    if is_root
++                    else None
++                )
++                dist.gather(
++                    local_pair.contiguous(),
++                    gather_list=gather_list,
++                    dst=root_rank,
++                    group=tp_group.device_group,
++                )
++            top_tokens_i32 = torch.empty(
++                (hidden_states.shape[0],),
++                dtype=torch.int32,
++                device=hidden_states.device,
++            )
++            if is_root:
++                assert gather_list is not None
++                with timed_region("logits.local_argmax_gather_root_reduce"):
++                    gathered = torch.stack(gather_list, dim=0).movedim(0, 1)
++                    max_rank_idx = gathered[:, :, 0].argmax(dim=-1, keepdim=True)
++                    top_tokens = gathered[:, :, 1].gather(dim=-1, index=max_rank_idx)
++                    top_tokens_i32.copy_(top_tokens.squeeze(-1).to(torch.int32))
++            with timed_region("logits.local_argmax_broadcast_token"):
++                dist.broadcast(top_tokens_i32, src=root_rank, group=tp_group.device_group)
++            top_tokens = top_tokens_i32.to(torch.int64)
++            trace_tensor(
++                "logits_processor.local_argmax_gather_broadcast_top_tokens",
++                top_tokens,
++            )
++            return top_tokens
+
+diff --git a/scripts/run-minimax-strict-quality-gated-candidate.sh b/scripts/run-minimax-strict-quality-gated-candidate.sh
+--- a/scripts/run-minimax-strict-quality-gated-candidate.sh
++++ b/scripts/run-minimax-strict-quality-gated-candidate.sh
+@@
+     --arg vllm_xpu_local_argmax_decode "${VLLM_XPU_LOCAL_ARGMAX_DECODE:-}" \
+     --arg vllm_xpu_local_argmax_assume_safe "${VLLM_XPU_LOCAL_ARGMAX_ASSUME_SAFE:-}" \
++    --arg vllm_xpu_local_argmax_gather_broadcast "${VLLM_XPU_LOCAL_ARGMAX_GATHER_BROADCAST:-}" \
+     --arg vllm_xpu_local_argmax_direct_gather "${VLLM_XPU_LOCAL_ARGMAX_DIRECT_GATHER:-}" \
+@@
+         VLLM_XPU_LOCAL_ARGMAX_DECODE: $vllm_xpu_local_argmax_decode,
+         VLLM_XPU_LOCAL_ARGMAX_ASSUME_SAFE: $vllm_xpu_local_argmax_assume_safe,
++        VLLM_XPU_LOCAL_ARGMAX_GATHER_BROADCAST: $vllm_xpu_local_argmax_gather_broadcast,
+         VLLM_XPU_LOCAL_ARGMAX_DIRECT_GATHER: $vllm_xpu_local_argmax_direct_gather,
