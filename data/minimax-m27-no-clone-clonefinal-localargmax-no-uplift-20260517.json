@@ -1,0 +1,77 @@
+{
+  "date": "2026-05-17",
+  "label": "no-clone-clonefinal-localargmax-bench",
+  "model": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+  "hardware": {
+    "gpu_name": "Intel Arc Pro B70 32GB",
+    "gpu_count": 4,
+    "vram_gb_per_gpu": 32
+  },
+  "engine": {
+    "name": "vLLM",
+    "version": "0.20.1-local",
+    "backend": "xpu",
+    "tensor_parallel_size": 4
+  },
+  "quantization": "AutoRound INT4 W4A16",
+  "shape": {
+    "prompt_tokens": 512,
+    "output_tokens": 1536,
+    "context_length": 2048,
+    "batch_size": 1,
+    "block_size": 256,
+    "max_num_batched_tokens": 512,
+    "prefix_cache": false,
+    "temperature": 0
+  },
+  "runtime_flags": {
+    "VLLM_XPU_COMPILE_ALLREDUCE_NO_CLONE": "1",
+    "VLLM_MINIMAX_M2_CLONE_FINAL_HIDDEN": "1",
+    "VLLM_XPU_LOCAL_ARGMAX_DECODE": "1",
+    "VLLM_XPU_LOCAL_ARGMAX_ASSUME_SAFE": "1",
+    "CCL_TOPO_P2P_ACCESS": "1",
+    "ONEAPI_DEVICE_SELECTOR": "level_zero:0,1,2,3",
+    "ZE_AFFINITY_MASK": "0,1,2,3"
+  },
+  "quality": {
+    "status": "passed",
+    "raw145_n64_token_sha256": "267cbf30208d84929ee79284ac695467f7e80597bf8694130e1e1f8b180eb5bd",
+    "raw145_n256_token_sha256": "58f6e8251c7a0a17e8c441278b5861f7d5da914fa1823ecd10484b296f2d7537",
+    "semantic_suite": "passed",
+    "arithmetic_repeat_n64_r16": "passed",
+    "extended_sixpack_n64_r2": "passed"
+  },
+  "throughput": {
+    "output_toks_per_second": [
+      61.12144445645944,
+      60.97411241410409
+    ],
+    "total_toks_per_second": [
+      81.49525927527925,
+      81.29881655213879
+    ],
+    "mean_output_toks_per_second": 61.04777843528177,
+    "mean_total_toks_per_second": 81.39703791370903
+  },
+  "baseline_comparison": {
+    "baseline_label": "minimax-minimaxlogits-localargmax-tightquality-extended-bench",
+    "baseline_mean_output_toks_per_second": 61.404035,
+    "baseline_mean_total_toks_per_second": 81.872046,
+    "delta_output_toks_per_second": -0.35625656471823,
+    "delta_total_toks_per_second": -0.47500808629097,
+    "decision": "reject_no_uplift"
+  },
+  "artifacts": {
+    "summary_json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-no-clone-clonefinal-localargmax-bench-strict-tp4-ctx2048-mbt512-bs256-20260517T215328Z-summary.json",
+    "quality_dir": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-no-clone-clonefinal-localargmax-bench-strict-tp4-ctx2048-mbt512-bs256-20260517T215328Z-quality",
+    "benchmark_jsons": [
+      "/home/steve/bench-results/minimax-m2.7-strict-candidates/vllm-minimax-m27-autoround-tp4-p512n1536-20260517T220531Z.json",
+      "/home/steve/bench-results/minimax-m2.7-strict-candidates/vllm-minimax-m27-autoround-tp4-p512n1536-20260517T220826Z.json"
+    ],
+    "note": "/home/steve/llm-optimizations-publish/notes/2026-05-17-minimax-no-clone-clonefinal-localargmax-no-uplift.md"
+  },
+  "localmaxxing": {
+    "submitted": false,
+    "reason": "Quality-safe but slower than current strict baseline; not an achievement row."
+  }
+}
