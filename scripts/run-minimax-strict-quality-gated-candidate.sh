@@ -24,6 +24,7 @@ QUALITY_TIMEOUT="${QUALITY_TIMEOUT:-30m}"
 BENCH_TIMEOUT="${BENCH_TIMEOUT:-25m}"
 RUN_TIMEOUT_KILL_AFTER="${RUN_TIMEOUT_KILL_AFTER:-30s}"
 SHM_STALL_MAX_WARNINGS="${SHM_STALL_MAX_WARNINGS:-3}"
+QUALITY_STARTUP_GUARD_SECONDS="${QUALITY_STARTUP_GUARD_SECONDS:-300}"
 QUALITY_ASYNC_SCHEDULING="${QUALITY_ASYNC_SCHEDULING:-default}"
 BENCH_ASYNC_SCHEDULING="${BENCH_ASYNC_SCHEDULING:-default}"
 BENCH_ASYNC_ENGINE="${BENCH_ASYNC_ENGINE:-1}"
@@ -47,6 +48,7 @@ ts="$(date -u +%Y%m%dT%H%M%SZ)"
 stem="minimax-${LABEL}-strict-tp${TP}-ctx${MAX_MODEL_LEN}-mbt${MAX_BATCHED_TOKENS}-bs${BLOCK_SIZE}-${ts}"
 summary_json="$OUTDIR/${stem}-summary.json"
 quality_dir="$OUTDIR/${stem}-quality"
+runtime_json="$OUTDIR/${stem}-runtime.json"
 mkdir -p "$quality_dir"
 
 if ip link show wlxe865d47e3a48 >/dev/null 2>&1; then
@@ -69,6 +71,14 @@ export VLLM_CACHE_ROOT="$CACHE_ROOT"
 
 source "$VENV/bin/activate"
 
+runtime_status=0
+python /home/steve/llm-optimizations-publish/scripts/inspect-vllm-runtime.py \
+  --output "$runtime_json" || runtime_status="$?"
+if [ "$runtime_status" -ne 0 ]; then
+  cat "$runtime_json" >&2
+  exit "$runtime_status"
+fi
+
 quality_jsons=()
 quality_logs=()
 quality_names=()
@@ -81,6 +91,45 @@ json_array() {
   fi
 }
 
+start_quality_startup_guard() {
+  local name="$1"
+  local log="$2"
+  local json="$3"
+  quality_startup_guard_pid=""
+  if [ "$QUALITY_STARTUP_GUARD_SECONDS" -le 0 ]; then
+    return 0
+  fi
+  (
+    local start now elapsed
+    start="$(date +%s)"
+    while true; do
+      if grep -Eq 'Starting to load model|Loading weights took|Model loading took|Graph capturing finished' "$log" 2>/dev/null; then
+        exit 0
+      fi
+      now="$(date +%s)"
+      elapsed=$((now - start))
+      if [ "$elapsed" -ge "$QUALITY_STARTUP_GUARD_SECONDS" ]; then
+        {
+          printf 'quality_startup_guard=triggered name=%s elapsed_seconds=%s limit_seconds=%s at=%s\n' \
+            "$name" "$elapsed" "$QUALITY_STARTUP_GUARD_SECONDS" "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          printf 'quality_startup_guard_reason=no model-load milestone before guard limit\n'
+          printf 'quality_startup_guard_tail_begin\n'
+          tail -80 "$log" 2>/dev/null || true
+          printf 'quality_startup_guard_tail_end\n'
+        } >> "$log"
+        pkill -TERM -f "run-vllm-minimax-quality-check.py.*--out ${json}" 2>/dev/null || true
+        pkill -TERM -P "$$" 2>/dev/null || true
+        sleep 10
+        pkill -KILL -f "run-vllm-minimax-quality-check.py.*--out ${json}" 2>/dev/null || true
+        pkill -KILL -P "$$" 2>/dev/null || true
+        exit 0
+      fi
+      sleep 10
+    done
+  ) &
+  quality_startup_guard_pid="$!"
+}
+
 run_quality_check() {
   local name="$1"
   shift
@@ -90,6 +139,9 @@ run_quality_check() {
   quality_logs+=("$log")
   quality_names+=("$name")
   printf 'quality_check=%s\njson=%s\nlog=%s\n' "$name" "$json" "$log"
+  start_quality_startup_guard "$name" "$log" "$json"
+  local guard_pid="$quality_startup_guard_pid"
+  set +e
   timeout --foreground --signal=TERM --kill-after="$RUN_TIMEOUT_KILL_AFTER" "$QUALITY_TIMEOUT" \
     python /home/steve/llm-optimizations-publish/scripts/run-vllm-minimax-quality-check.py \
       --mode graph \
@@ -110,6 +162,12 @@ run_quality_check() {
       --qk-norm-restore-weight-min-tokens "$VLLM_MINIMAX_QK_NORM_RESTORE_WEIGHT_MIN_TOKENS" \
       --vllm-cache-root "$CACHE_ROOT" \
       "$@" 2>&1 | tee "$log"
+  local statuses=("${PIPESTATUS[@]}")
+  set -e
+  if [ -n "$guard_pid" ]; then
+    kill "$guard_pid" 2>/dev/null || true
+  fi
+  return "${statuses[0]}"
 }
 
 run_semantic_suite() {
@@ -120,6 +178,9 @@ run_semantic_suite() {
   quality_logs+=("$log")
   quality_names+=("$name")
   printf 'quality_check=%s\njson=%s\nlog=%s\n' "$name" "$json" "$log"
+  start_quality_startup_guard "$name" "$log" "$json"
+  local guard_pid="$quality_startup_guard_pid"
+  set +e
   timeout --foreground --signal=TERM --kill-after="$RUN_TIMEOUT_KILL_AFTER" "$QUALITY_TIMEOUT" \
     python /home/steve/llm-optimizations-publish/scripts/run-vllm-minimax-quality-check.py \
       --mode graph \
@@ -148,6 +209,12 @@ run_semantic_suite() {
       --require-prompt-substring "2:def add_one" \
       --require-prompt-regex "2:return\\s+x\\s*\\+\\s*1" \
       2>&1 | tee "$log"
+  local statuses=("${PIPESTATUS[@]}")
+  set -e
+  if [ -n "$guard_pid" ]; then
+    kill "$guard_pid" 2>/dev/null || true
+  fi
+  return "${statuses[0]}"
 }
 
 run_repeat_arithmetic_suite() {
@@ -158,6 +225,9 @@ run_repeat_arithmetic_suite() {
   quality_logs+=("$log")
   quality_names+=("$name")
   printf 'quality_check=%s\njson=%s\nlog=%s\n' "$name" "$json" "$log"
+  start_quality_startup_guard "$name" "$log" "$json"
+  local guard_pid="$quality_startup_guard_pid"
+  set +e
   timeout --foreground --signal=TERM --kill-after="$RUN_TIMEOUT_KILL_AFTER" "$QUALITY_TIMEOUT" \
     python /home/steve/llm-optimizations-publish/scripts/run-vllm-minimax-quality-check.py \
       --mode graph \
@@ -181,6 +251,12 @@ run_repeat_arithmetic_suite() {
       --vllm-cache-root "$CACHE_ROOT" \
       --require-prompt-substring 0:42 \
       2>&1 | tee "$log"
+  local statuses=("${PIPESTATUS[@]}")
+  set -e
+  if [ -n "$guard_pid" ]; then
+    kill "$guard_pid" 2>/dev/null || true
+  fi
+  return "${statuses[0]}"
 }
 
 run_extended_suite() {
@@ -191,6 +267,9 @@ run_extended_suite() {
   quality_logs+=("$log")
   quality_names+=("$name")
   printf 'quality_check=%s\njson=%s\nlog=%s\n' "$name" "$json" "$log"
+  start_quality_startup_guard "$name" "$log" "$json"
+  local guard_pid="$quality_startup_guard_pid"
+  set +e
   timeout --foreground --signal=TERM --kill-after="$RUN_TIMEOUT_KILL_AFTER" "$QUALITY_TIMEOUT" \
     python /home/steve/llm-optimizations-publish/scripts/run-vllm-minimax-quality-check.py \
       --mode graph \
@@ -232,6 +311,12 @@ run_extended_suite() {
       --require-prompt-substring '4:gamma' \
       --require-prompt-substring '5:SELECT id, name FROM users WHERE active = 1 ORDER BY id ASC' \
       2>&1 | tee "$log"
+  local statuses=("${PIPESTATUS[@]}")
+  set -e
+  if [ -n "$guard_pid" ]; then
+    kill "$guard_pid" 2>/dev/null || true
+  fi
+  return "${statuses[0]}"
 }
 
 write_summary() {
@@ -262,6 +347,7 @@ write_summary() {
     --argjson quality_jsons "$(json_array "${quality_jsons[@]}")" \
     --argjson quality_logs "$(json_array "${quality_logs[@]}")" \
     --argjson bench_jsons "$(json_array "${bench_jsons[@]}")" \
+    --slurpfile runtime_diag "$runtime_json" \
     --arg vllm_minimax_moe_delay_allreduce "${VLLM_MINIMAX_MOE_DELAY_ALLREDUCE:-}" \
     --arg vllm_minimax_dist_residual_allreduce "${VLLM_MINIMAX_M2_DIST_RESIDUAL_ALLREDUCE:-}" \
     --arg vllm_xpu_use_llm_scaler_moe_minimax_logits "${VLLM_XPU_USE_LLM_SCALER_MOE_MINIMAX_LOGITS:-}" \
@@ -275,6 +361,7 @@ write_summary() {
     --arg vllm_xpu_compile_out_of_place_allreduce "${VLLM_XPU_COMPILE_OUT_OF_PLACE_ALLREDUCE:-}" \
     --arg vllm_xpu_local_argmax_decode "${VLLM_XPU_LOCAL_ARGMAX_DECODE:-}" \
     --arg vllm_xpu_local_argmax_assume_safe "${VLLM_XPU_LOCAL_ARGMAX_ASSUME_SAFE:-}" \
+    --arg vllm_xpu_local_argmax_gather_broadcast "${VLLM_XPU_LOCAL_ARGMAX_GATHER_BROADCAST:-}" \
     --arg vllm_xpu_local_argmax_direct_gather "${VLLM_XPU_LOCAL_ARGMAX_DIRECT_GATHER:-}" \
     --arg vllm_xpu_local_argmax_packed_allreduce "${VLLM_XPU_LOCAL_ARGMAX_PACKED_ALLREDUCE:-}" \
     --arg vllm_xpu_local_argmax_allreduce "${VLLM_XPU_LOCAL_ARGMAX_ALLREDUCE:-}" \
@@ -299,6 +386,7 @@ write_summary() {
         bench_async_engine: ($bench_async_engine == 1),
         vllm_cache_root: $cache_root
       },
+      runtime_vllm: $runtime_diag[0],
       quality_policy: {
         raw145_n64_expected_combined_token_sha256: $raw145_n64_hash,
         raw145_n256_expected_combined_token_sha256: $raw145_n256_hash,
@@ -328,6 +416,7 @@ write_summary() {
         VLLM_XPU_COMPILE_OUT_OF_PLACE_ALLREDUCE: $vllm_xpu_compile_out_of_place_allreduce,
         VLLM_XPU_LOCAL_ARGMAX_DECODE: $vllm_xpu_local_argmax_decode,
         VLLM_XPU_LOCAL_ARGMAX_ASSUME_SAFE: $vllm_xpu_local_argmax_assume_safe,
+        VLLM_XPU_LOCAL_ARGMAX_GATHER_BROADCAST: $vllm_xpu_local_argmax_gather_broadcast,
         VLLM_XPU_LOCAL_ARGMAX_DIRECT_GATHER: $vllm_xpu_local_argmax_direct_gather,
         VLLM_XPU_LOCAL_ARGMAX_PACKED_ALLREDUCE: $vllm_xpu_local_argmax_packed_allreduce,
         VLLM_XPU_LOCAL_ARGMAX_ALLREDUCE: $vllm_xpu_local_argmax_allreduce,
