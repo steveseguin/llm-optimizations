@@ -13,6 +13,7 @@ from pathlib import Path
 
 MODULES = {
     "logits_processor": "vllm.model_executor.layers.logits_processor",
+    "gpu_model_runner": "vllm.v1.worker.gpu_model_runner",
     "minimax_m2": "vllm.model_executor.models.minimax_m2",
     "moe_wna16": "vllm.model_executor.layers.quantization.moe_wna16",
     "xpu_communicator": "vllm.distributed.device_communicators.xpu_communicator",
@@ -110,7 +111,11 @@ def main() -> int:
                     f"actual={actual} expected={expected}"
                 )
     required_any_hits = {
-        marker: [label for label, text in module_texts.items() if marker in text]
+        marker: [
+            label
+            for label, text in module_texts.items()
+            if marker in text
+        ]
         for marker in required_any_markers
     }
     for marker, labels in required_any_hits.items():
