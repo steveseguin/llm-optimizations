@@ -1,0 +1,99 @@
+{
+  "id": "minimax-m27-runtimeguard-repro-20260517",
+  "date_utc": "2026-05-17",
+  "status": "quality_passed_submitted",
+  "model": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+  "hardware": "4x Intel Arc Pro B70 32GB",
+  "engine": "vLLM 0.20.1-local XPU",
+  "quantization": "AutoRound INT4 W4A16",
+  "localmaxxing": {
+    "id": "cmp9q9fzn04cto401tjcila06",
+    "status": "APPROVED",
+    "payload": "data/localmaxxing-minimax-m27-autoround-runtimeguard-repro-p512n1536-20260517.payload.json",
+    "response": "data/localmaxxing-responses/minimax-m27-autoround-runtimeguard-repro-p512n1536-20260517.response.json"
+  },
+  "shape": {
+    "prompt_tokens": 512,
+    "output_tokens": 1536,
+    "context_length": 2048,
+    "batch_size": 1,
+    "tensor_parallel": 4,
+    "block_size": 256,
+    "max_num_batched_tokens": 512,
+    "max_num_seqs": 1
+  },
+  "throughput": {
+    "output_tok_s_mean": 61.31749740086281,
+    "total_tok_s_mean": 81.75666320115042,
+    "output_tok_s_repeats": [
+      60.894365817197986,
+      61.74062898452764
+    ],
+    "total_tok_s_repeats": [
+      81.19248775626399,
+      82.32083864603686
+    ],
+    "elapsed_seconds": [
+      25.224008483986836,
+      24.878269387001637
+    ]
+  },
+  "runtime_guard": {
+    "required_marker": "logits.local_argmax_pair_all_gather",
+    "expected_logits_processor_path": "/home/steve/.venvs/vllm-xpu/lib/python3.12/site-packages/vllm/model_executor/layers/logits_processor.py",
+    "logits_processor_sha256": "c032b08de08e929fb38a54624401eeae83c618dd19edfb97e5ecdec379fbe254",
+    "runtime_json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-minimaxlogits-localargmax-pairgather-runtimeguard-repro2-strict-tp4-ctx2048-mbt512-bs256-20260517T114411Z-runtime.json",
+    "guard_script": "scripts/inspect-vllm-runtime.py"
+  },
+  "quality_gates": {
+    "raw145_n64": {
+      "expected_combined_token_sha256": "267cbf30208d84929ee79284ac695467f7e80597bf8694130e1e1f8b180eb5bd",
+      "passed": true,
+      "json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-minimaxlogits-localargmax-pairgather-runtimeguard-repro2-strict-tp4-ctx2048-mbt512-bs256-20260517T114411Z-quality/raw145-n64-exact.json"
+    },
+    "raw145_n256": {
+      "expected_combined_token_sha256": "58f6e8251c7a0a17e8c441278b5861f7d5da914fa1823ecd10484b296f2d7537",
+      "passed": true,
+      "json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-minimaxlogits-localargmax-pairgather-runtimeguard-repro2-strict-tp4-ctx2048-mbt512-bs256-20260517T114411Z-quality/raw145-n256-exact.json"
+    },
+    "semantic_suite_n64_r2": {
+      "passed": true,
+      "checks": ["PASS", "42", "def add_one", "return x + 1"],
+      "json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-minimaxlogits-localargmax-pairgather-runtimeguard-repro2-strict-tp4-ctx2048-mbt512-bs256-20260517T114411Z-quality/semantic-suite-n64-r2.json"
+    },
+    "arithmetic_repeat_n64_r8": {
+      "passed": true,
+      "deterministic_across_runs": true,
+      "json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-minimaxlogits-localargmax-pairgather-runtimeguard-repro2-strict-tp4-ctx2048-mbt512-bs256-20260517T114411Z-quality/arithmetic-repeat-n64-r8.json"
+    }
+  },
+  "environment": {
+    "FI_TCP_IFACE": "wlxe865d47e3a48",
+    "CCL_KVS_IFACE": "wlxe865d47e3a48",
+    "CCL_ATL_TRANSPORT": "ofi",
+    "CCL_TOPO_P2P_ACCESS": "1",
+    "USE_LLM_SCALER_MOE": "1",
+    "VLLM_XPU_USE_LLM_SCALER_MOE": "1",
+    "VLLM_XPU_USE_LLM_SCALER_MOE_MINIMAX_LOGITS": "1",
+    "VLLM_XPU_ENABLE_XPU_GRAPH": "1",
+    "VLLM_XPU_FORCE_GRAPH_WITH_COMM": "1",
+    "VLLM_XPU_GRAPH_NOOP_COMM_CAPTURE": "1",
+    "VLLM_MINIMAX_M2_ATTN_DELAY_ALLREDUCE": "1",
+    "VLLM_MINIMAX_QK_NORM_RESTORE_WEIGHT": "1",
+    "VLLM_XPU_LOCAL_ARGMAX_DECODE": "1",
+    "VLLM_XPU_LOCAL_ARGMAX_ASSUME_SAFE": "1",
+    "VLLM_BENCH_TEMPERATURE": "0"
+  },
+  "artifacts": {
+    "summary_json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-minimaxlogits-localargmax-pairgather-runtimeguard-repro2-strict-tp4-ctx2048-mbt512-bs256-20260517T114411Z-summary.json",
+    "benchmark_jsons": [
+      "/home/steve/bench-results/minimax-m2.7-strict-candidates/vllm-minimax-m27-autoround-tp4-p512n1536-20260517T115655Z.json",
+      "/home/steve/bench-results/minimax-m2.7-strict-candidates/vllm-minimax-m27-autoround-tp4-p512n1536-20260517T115948Z.json"
+    ],
+    "benchmark_logs": [
+      "/home/steve/bench-results/minimax-m2.7-strict-candidates/vllm-minimax-m27-autoround-tp4-p512n1536-20260517T115655Z.log",
+      "/home/steve/bench-results/minimax-m2.7-strict-candidates/vllm-minimax-m27-autoround-tp4-p512n1536-20260517T115948Z.log"
+    ]
+  },
+  "decision": "Promote as the current honest runtime-guarded MiniMax AutoRound TP4 baseline. Continue speed work only through candidates that pass the same runtime import guard and quality gates."
+}
