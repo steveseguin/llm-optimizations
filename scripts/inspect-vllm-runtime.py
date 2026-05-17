@@ -50,6 +50,9 @@ def module_info(module_name: str) -> dict:
             "local_argmax_direct_gather": (
                 "VLLM_XPU_LOCAL_ARGMAX_DIRECT_GATHER" in text
             ),
+            "local_argmax_direct_gather_reuse": (
+                "VLLM_XPU_LOCAL_ARGMAX_DIRECT_GATHER_REUSE" in text
+            ),
             "local_argmax_pair_all_gather_label": (
                 "logits.local_argmax_pair_all_gather" in text
             ),
