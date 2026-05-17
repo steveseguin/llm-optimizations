@@ -103,6 +103,10 @@ detected.
 
 ## Artifacts
 
+- Required patch references already in the repo:
+  `patches/vllm-xpu-compile-allreduce-no-clone-20260516.patch`
+  and `patches/vllm-minimax-qk-rms-helper-clean-weight-guard-20260515.patch`
+  (contains `VLLM_MINIMAX_M2_CLONE_FINAL_HIDDEN`).
 - Summary:
   `/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-no-clone-clonefinal-fulllogits-bench-strict-tp4-ctx2048-mbt512-bs256-20260517T230432Z-summary.json`
 - Quality directory:
