@@ -274,6 +274,7 @@ write_summary() {
     --arg vllm_xpu_compile_allreduce_no_clone "${VLLM_XPU_COMPILE_ALLREDUCE_NO_CLONE:-}" \
     --arg vllm_xpu_compile_out_of_place_allreduce "${VLLM_XPU_COMPILE_OUT_OF_PLACE_ALLREDUCE:-}" \
     --arg vllm_xpu_local_argmax_decode "${VLLM_XPU_LOCAL_ARGMAX_DECODE:-}" \
+    --arg vllm_xpu_local_argmax_assume_safe "${VLLM_XPU_LOCAL_ARGMAX_ASSUME_SAFE:-}" \
     --arg vllm_xpu_local_argmax_direct_gather "${VLLM_XPU_LOCAL_ARGMAX_DIRECT_GATHER:-}" \
     --arg vllm_xpu_local_argmax_packed_allreduce "${VLLM_XPU_LOCAL_ARGMAX_PACKED_ALLREDUCE:-}" \
     --arg vllm_xpu_local_argmax_allreduce "${VLLM_XPU_LOCAL_ARGMAX_ALLREDUCE:-}" \
@@ -326,6 +327,7 @@ write_summary() {
         VLLM_XPU_COMPILE_ALLREDUCE_NO_CLONE: $vllm_xpu_compile_allreduce_no_clone,
         VLLM_XPU_COMPILE_OUT_OF_PLACE_ALLREDUCE: $vllm_xpu_compile_out_of_place_allreduce,
         VLLM_XPU_LOCAL_ARGMAX_DECODE: $vllm_xpu_local_argmax_decode,
+        VLLM_XPU_LOCAL_ARGMAX_ASSUME_SAFE: $vllm_xpu_local_argmax_assume_safe,
         VLLM_XPU_LOCAL_ARGMAX_DIRECT_GATHER: $vllm_xpu_local_argmax_direct_gather,
         VLLM_XPU_LOCAL_ARGMAX_PACKED_ALLREDUCE: $vllm_xpu_local_argmax_packed_allreduce,
         VLLM_XPU_LOCAL_ARGMAX_ALLREDUCE: $vllm_xpu_local_argmax_allreduce,

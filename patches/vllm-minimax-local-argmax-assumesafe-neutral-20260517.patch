@@ -1,0 +1,38 @@
+diff --git a/vllm/v1/worker/gpu_model_runner.py b/vllm/v1/worker/gpu_model_runner.py
+--- a/vllm/v1/worker/gpu_model_runner.py
++++ b/vllm/v1/worker/gpu_model_runner.py
+@@
+         if os.environ.get("VLLM_XPU_LOCAL_ARGMAX_DECODE", "0") != "1":
+             return disabled("env flag is not enabled")
+         if spec_decode_metadata is not None:
+             return disabled("spec decode metadata is present")
++        if os.environ.get("VLLM_XPU_LOCAL_ARGMAX_ASSUME_SAFE", "0") == "1":
++            if not hasattr(self.model, "get_top_tokens"):
++                return disabled("model has no get_top_tokens method")
++            self._xpu_local_argmax_debug("enabled by assume-safe override")
++            return True
+         sampling_metadata = self.input_batch.sampling_metadata
+         if not sampling_metadata.all_greedy:
+             return disabled("not all requests are greedy")
+         if sampling_metadata.max_num_logprobs is not None:
+             return disabled("logprobs requested")
+diff --git a/scripts/run-minimax-strict-quality-gated-candidate.sh b/scripts/run-minimax-strict-quality-gated-candidate.sh
+index 9969e74..f420d9c 100755
+--- a/scripts/run-minimax-strict-quality-gated-candidate.sh
++++ b/scripts/run-minimax-strict-quality-gated-candidate.sh
+@@ -274,6 +274,7 @@ write_summary() {
+     --arg vllm_xpu_compile_allreduce_no_clone "${VLLM_XPU_COMPILE_ALLREDUCE_NO_CLONE:-}" \
+     --arg vllm_xpu_compile_out_of_place_allreduce "${VLLM_XPU_COMPILE_OUT_OF_PLACE_ALLREDUCE:-}" \
+     --arg vllm_xpu_local_argmax_decode "${VLLM_XPU_LOCAL_ARGMAX_DECODE:-}" \
++    --arg vllm_xpu_local_argmax_assume_safe "${VLLM_XPU_LOCAL_ARGMAX_ASSUME_SAFE:-}" \
+     --arg vllm_xpu_local_argmax_direct_gather "${VLLM_XPU_LOCAL_ARGMAX_DIRECT_GATHER:-}" \
+     --arg vllm_xpu_local_argmax_packed_allreduce "${VLLM_XPU_LOCAL_ARGMAX_PACKED_ALLREDUCE:-}" \
+     --arg vllm_xpu_local_argmax_allreduce "${VLLM_XPU_LOCAL_ARGMAX_ALLREDUCE:-}" \
+@@ -326,6 +327,7 @@ write_summary() {
+         VLLM_XPU_COMPILE_ALLREDUCE_NO_CLONE: $vllm_xpu_compile_allreduce_no_clone,
+         VLLM_XPU_COMPILE_OUT_OF_PLACE_ALLREDUCE: $vllm_xpu_compile_out_of_place_allreduce,
+         VLLM_XPU_LOCAL_ARGMAX_DECODE: $vllm_xpu_local_argmax_decode,
++        VLLM_XPU_LOCAL_ARGMAX_ASSUME_SAFE: $vllm_xpu_local_argmax_assume_safe,
+         VLLM_XPU_LOCAL_ARGMAX_DIRECT_GATHER: $vllm_xpu_local_argmax_direct_gather,
+         VLLM_XPU_LOCAL_ARGMAX_PACKED_ALLREDUCE: $vllm_xpu_local_argmax_packed_allreduce,
+         VLLM_XPU_LOCAL_ARGMAX_ALLREDUCE: $vllm_xpu_local_argmax_allreduce,

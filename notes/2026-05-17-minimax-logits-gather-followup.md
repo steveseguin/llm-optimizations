@@ -285,3 +285,168 @@ still passed an obsolete `--compilation-config-json` argument to
 `run-vllm-minimax-quality-check.py`. The wrapper now relies on the quality
 script's current default piecewise graph config for the quality gates and
 records the local-argmax env flags in its summary JSON.
+
+### Assume-Safe Local Argmax Guard Skip
+
+Patch surface:
+
+- `VLLM_XPU_LOCAL_ARGMAX_ASSUME_SAFE=1`
+- Default-off shortcut in `gpu_model_runner.py` that skips the per-token Python
+  sampling-safety scan after the strict greedy env checks have already passed.
+- This does not change model math or token selection; it is only valid for the
+  current greedy `temperature=0` benchmark path with local argmax enabled.
+
+Quality gates:
+
+| Gate | Result | Artifact |
+| --- | --- | --- |
+| raw145 n64 exact | pass, expected hash matched | `/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-local-argmax-assumesafe-strict-tp4-ctx2048-mbt512-bs256-20260517T050137Z-quality/raw145-n64-exact.json` |
+| raw145 n256 exact | pass, expected hash matched | `/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-local-argmax-assumesafe-strict-tp4-ctx2048-mbt512-bs256-20260517T050137Z-quality/raw145-n256-exact.json` |
+| semantic suite n64/r2 | pass | `/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-local-argmax-assumesafe-strict-tp4-ctx2048-mbt512-bs256-20260517T050137Z-quality/semantic-suite-n64-r2.json` |
+| arithmetic repeat n64/r8 | pass | `/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-local-argmax-assumesafe-strict-tp4-ctx2048-mbt512-bs256-20260517T050137Z-quality/arithmetic-repeat-n64-r8.json` |
+| extended sixpack n64/r2 | pass | `/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-local-argmax-assumesafe-strict-tp4-ctx2048-mbt512-bs256-20260517T050137Z-quality/extended-sixpack-n64-r2.json` |
+
+Speed screen, p512/n1536:
+
+- JSON: `/home/steve/bench-results/minimax-m2.7-strict-candidates/vllm-minimax-m27-autoround-tp4-p512n1536-20260517T051700Z.json`
+- Output tok/s: 60.663
+- Total tok/s: 80.883
+
+Interpretation: the guard skip is quality-safe but performance-neutral against
+the promoted 60.497 output tok/s mean. Keep it default-off as a minor harness
+optimization/diagnostic, not as a new promoted result.
+
+### MoE Delay Allreduce With Local Argmax
+
+Patch surface:
+
+- `VLLM_MINIMAX_MOE_DELAY_ALLREDUCE=1`
+- `VLLM_XPU_LOCAL_ARGMAX_DECODE=1`
+- `VLLM_XPU_LOCAL_ARGMAX_ASSUME_SAFE=1`
+- Baseline Q/K restore, delayed attention allreduce, forced XPU piecewise graph,
+  Triton attention, block size 256, and llm-scaler INT4 MoE path kept enabled.
+
+Quality gates:
+
+| Gate | Result | Artifact |
+| --- | --- | --- |
+| raw145 n64 exact | pass, expected hash matched | `/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-moe-delay-localargmax-extended-strict-tp4-ctx2048-mbt512-bs256-20260517T054817Z-quality/raw145-n64-exact.json` |
+| raw145 n256 exact | pass, expected hash matched | `/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-moe-delay-localargmax-extended-strict-tp4-ctx2048-mbt512-bs256-20260517T054817Z-quality/raw145-n256-exact.json` |
+| semantic suite n64/r2 | pass | `/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-moe-delay-localargmax-extended-strict-tp4-ctx2048-mbt512-bs256-20260517T054817Z-quality/semantic-suite-n64-r2.json` |
+| arithmetic repeat n64/r8 | pass | `/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-moe-delay-localargmax-extended-strict-tp4-ctx2048-mbt512-bs256-20260517T054817Z-quality/arithmetic-repeat-n64-r8.json` |
+| extended sixpack n64/r2 | pass | `/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-moe-delay-localargmax-extended-strict-tp4-ctx2048-mbt512-bs256-20260517T054817Z-quality/extended-sixpack-n64-r2.json` |
+
+Speed screen, p512/n1536:
+
+- JSON: `/home/steve/bench-results/minimax-m2.7-strict-candidates/vllm-minimax-m27-autoround-tp4-p512n1536-20260517T060021Z.json`
+- Output tok/s: 60.178
+- Total tok/s: 80.238
+
+Interpretation: local argmax fixes the earlier semantic instability seen with
+MoE-delay alone, but this candidate is slightly slower than the promoted strict
+baseline. Do not submit it to LocalMaxxing; keep it as a quality-safe negative
+datapoint showing that delaying the MiniMax MoE allreduce is not enough to move
+the current bottleneck.
+
+### Block Size And Scheduler Follow-up
+
+Baseline for comparison:
+
+- Promoted strict LocalMaxxing result:
+  `cmp940h1703tpo401scj5tftf`
+- Mean output tok/s: 60.497
+- Mean total tok/s: 80.663
+- Runtime: TP4, 4x B70, float16, block size 256,
+  `max_num_batched_tokens=512`, Triton attention, XPU piecewise graph,
+  llm-scaler INT4 MoE, local greedy argmax, temperature 0.
+
+Block size 128 candidate:
+
+- Label: `block128-localargmax-extended`
+- Runtime delta: `--block-size 128`, still
+  `max_num_batched_tokens=512`.
+- Quality summary:
+  `/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-block128-localargmax-extended-strict-tp4-ctx2048-mbt512-bs128-20260517T062121Z-summary.json`
+- Quality gates passed:
+  raw145 n64 exact, raw145 n256 exact, semantic suite, arithmetic repeat
+  n64/r8, extended sixpack n64/r2.
+- Bench repeats:
+  - `/home/steve/bench-results/minimax-m2.7-strict-candidates/vllm-minimax-m27-autoround-tp4-p512n1536-20260517T063314Z.json`
+    - Output tok/s: 60.839
+    - Total tok/s: 81.118
+  - `/home/steve/bench-results/minimax-m2.7-strict-candidates/vllm-minimax-m27-autoround-tp4-p512n1536-20260517T063601Z.json`
+    - Output tok/s: 60.688
+    - Total tok/s: 80.917
+- Repeat mean:
+  - Output tok/s: 60.763
+  - Total tok/s: 81.018
+
+Interpretation: quality-safe, but the speed gain is only about 0.44% over the
+promoted strict baseline. Keep this as a low-risk default candidate for future
+work because it is repeatable and harmless, but do not present it as a major
+performance breakthrough.
+
+Scheduler chunk tests:
+
+| Candidate | Result | Artifact | Notes |
+| --- | --- | --- | --- |
+| `block128-mbt1024-localargmax` | reject | `/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-block128-mbt1024-localargmax-strict-tp4-ctx2048-mbt1024-bs128-20260517T063918Z-summary.json` | First raw145 n64 exact canary failed with 64 NUL tokens, combined hash mismatch, degenerate output. Do not benchmark. |
+| `block128-mbt768-localargmax` | no promotion | `/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-block128-mbt768-localargmax-strict-tp4-ctx2048-mbt768-bs128-20260517T064513Z-summary.json` | Staged gates passed, but compile produced repeated `ocloc` / IGC floating-point exceptions during graph capture and speed was slower: 60.389 output tok/s, 80.519 total tok/s. |
+
+Interpretation: `max_num_batched_tokens=512` remains the stable ceiling for
+this graph path. Larger compile ranges either corrupt output (`1024`) or do not
+improve decode while exposing Intel compiler fragility (`768`). This is a
+quality and reliability constraint, not just a speed result.
+
+### Device Order And CCL Transport Follow-up
+
+Device-order candidate:
+
+- Label: `block128-order0213-localargmax`
+- Runtime delta:
+  `ONEAPI_DEVICE_SELECTOR=level_zero:0,2,1,3`,
+  `ZE_AFFINITY_MASK=0,2,1,3`
+- Summary:
+  `/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-block128-order0213-localargmax-strict-tp4-ctx2048-mbt512-bs128-20260517T070106Z-summary.json`
+- Quality gates passed:
+  raw145 n64 exact, raw145 n256 exact, semantic suite, arithmetic repeat
+  n64/r8.
+- Speed:
+  - Output tok/s: 60.571
+  - Total tok/s: 80.762
+
+Interpretation: quality-safe, but slower than the block-size 128 repeat mean.
+This order does not solve the communication bottleneck.
+
+CCL transport candidate:
+
+- Label: `block128-cclmpi-localargmax`
+- Runtime delta: `CCL_ATL_TRANSPORT=mpi` instead of `ofi`.
+- Summary:
+  `/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-block128-cclmpi-localargmax-strict-tp4-ctx2048-mbt512-bs128-20260517T071641Z-summary.json`
+- Result: reject.
+- Failure: segfault during XCCL communicator initialization, inside
+  `MPIDI_GPU_init_mpl_global` / `ProcessGroupXCCL::initXCCLComm`, before the
+  first quality canary could complete.
+
+Interpretation: keep `CCL_ATL_TRANSPORT=ofi`. MPI transport is not stable on
+this current B70 + XCCL stack.
+
+### Current Next Work
+
+The latest safe performance state is still the promoted local-greedy-argmax
+path plus the optional block-size 128 setting. The next useful work is below:
+
+1. Build a lower-overhead MiniMax-specific decode profile that times attention,
+   MoE, residual allreduces, and token selection without per-token device sync
+   where possible.
+2. Investigate whether the MiniMax attention/RMS allreduce and residual
+   allreduce can be fused or scheduled as fewer CPU-visible framework steps.
+3. Keep pursuing GPU-resident token selection only if it avoids the direct
+   gather/allreduce hangs already seen; the current pair all-gather reducer is
+   only a small part of the per-token time.
+4. Keep 512-token chunking as the stable scheduler value until the IGC/ocloc
+   compile instability above is understood or avoided.
+5. Treat any future result above 60.763 output tok/s as a candidate only after
+   exact n64/n256 canaries, semantic canaries, arithmetic repeat, and at least
+   two p512/n1536 repeats.
