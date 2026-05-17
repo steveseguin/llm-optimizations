@@ -3,8 +3,8 @@ set -euo pipefail
 
 # Strict MiniMax M2.7 candidate gate for the current quality-valid 4x B70 path.
 # A candidate must pass exact token-hash canaries and semantic canaries on the
-# same piecewise graph path as the accepted ~65.75 tok/s baseline before any
-# throughput benchmark is run.
+# same piecewise graph path as the promoted ~61.4 tok/s strict baseline before
+# any throughput benchmark is run.
 
 MODEL="${MODEL:-/mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround}"
 VENV="${VENV:-/home/steve/.venvs/vllm-xpu}"
@@ -206,6 +206,7 @@ run_semantic_suite() {
       --vllm-cache-root "$CACHE_ROOT" \
       --require-prompt-substring 0:PASS \
       --require-prompt-substring 1:42 \
+      --require-prompt-regex '1:^\s*42\s*$' \
       --require-prompt-substring "2:def add_one" \
       --require-prompt-regex "2:return\\s+x\\s*\\+\\s*1" \
       2>&1 | tee "$log"
@@ -250,6 +251,7 @@ run_repeat_arithmetic_suite() {
       --qk-norm-restore-weight-min-tokens "$VLLM_MINIMAX_QK_NORM_RESTORE_WEIGHT_MIN_TOKENS" \
       --vllm-cache-root "$CACHE_ROOT" \
       --require-prompt-substring 0:42 \
+      --require-prompt-regex '0:^\s*42\s*$' \
       2>&1 | tee "$log"
   local statuses=("${PIPESTATUS[@]}")
   set -e
@@ -297,6 +299,7 @@ run_extended_suite() {
       --vllm-cache-root "$CACHE_ROOT" \
       --require-prompt-substring 0:PASS \
       --require-prompt-substring 1:42 \
+      --require-prompt-regex '1:^\s*42\s*$' \
       --require-prompt-substring "2:def add_one" \
       --require-prompt-regex "2:return\\s+x\\s*\\+\\s*1" \
       --require-prompt-substring '3:"status"' \
@@ -363,6 +366,7 @@ write_summary() {
     --arg vllm_xpu_local_argmax_assume_safe "${VLLM_XPU_LOCAL_ARGMAX_ASSUME_SAFE:-}" \
     --arg vllm_xpu_local_argmax_gather_broadcast "${VLLM_XPU_LOCAL_ARGMAX_GATHER_BROADCAST:-}" \
     --arg vllm_xpu_local_argmax_direct_gather "${VLLM_XPU_LOCAL_ARGMAX_DIRECT_GATHER:-}" \
+    --arg vllm_xpu_local_argmax_direct_gather_reuse "${VLLM_XPU_LOCAL_ARGMAX_DIRECT_GATHER_REUSE:-}" \
     --arg vllm_xpu_local_argmax_packed_allreduce "${VLLM_XPU_LOCAL_ARGMAX_PACKED_ALLREDUCE:-}" \
     --arg vllm_xpu_local_argmax_allreduce "${VLLM_XPU_LOCAL_ARGMAX_ALLREDUCE:-}" \
     --arg vllm_bench_temperature "${VLLM_BENCH_TEMPERATURE:-}" \
@@ -418,6 +422,7 @@ write_summary() {
         VLLM_XPU_LOCAL_ARGMAX_ASSUME_SAFE: $vllm_xpu_local_argmax_assume_safe,
         VLLM_XPU_LOCAL_ARGMAX_GATHER_BROADCAST: $vllm_xpu_local_argmax_gather_broadcast,
         VLLM_XPU_LOCAL_ARGMAX_DIRECT_GATHER: $vllm_xpu_local_argmax_direct_gather,
+        VLLM_XPU_LOCAL_ARGMAX_DIRECT_GATHER_REUSE: $vllm_xpu_local_argmax_direct_gather_reuse,
         VLLM_XPU_LOCAL_ARGMAX_PACKED_ALLREDUCE: $vllm_xpu_local_argmax_packed_allreduce,
         VLLM_XPU_LOCAL_ARGMAX_ALLREDUCE: $vllm_xpu_local_argmax_allreduce,
         VLLM_BENCH_TEMPERATURE: $vllm_bench_temperature,
