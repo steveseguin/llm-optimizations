@@ -71,6 +71,9 @@ def module_info(module_name: str) -> dict:
             "reuse_async_output_copy_buffer": (
                 "VLLM_XPU_REUSE_ASYNC_OUTPUT_COPY_BUFFER" in text
             ),
+            "fast_async_output_list": (
+                "VLLM_XPU_FAST_ASYNC_OUTPUT_LIST" in text
+            ),
             "minimax_logits_moe": "MINIMAX_LOGITS" in text,
             "qk_norm_restore_weight": "QK_NORM_RESTORE_WEIGHT" in text,
         },
