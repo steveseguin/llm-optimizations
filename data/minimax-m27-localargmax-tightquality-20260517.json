@@ -1,0 +1,69 @@
+{
+  "id": "minimax-m27-localargmax-tightquality-20260517",
+  "date": "2026-05-17",
+  "model": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+  "hardware": "4x Intel Arc Pro B70 32GB",
+  "engine": "vLLM 0.20.1-local XPU TP4",
+  "quantization": "AutoRound INT4 W4A16",
+  "shape": {
+    "prompt_tokens": 512,
+    "output_tokens": 1536,
+    "context_length": 2048,
+    "batch_size": 1
+  },
+  "result": {
+    "output_tok_s": [
+      61.25068764369882,
+      61.55738179415754
+    ],
+    "total_tok_s": [
+      81.66758352493176,
+      82.07650905887672
+    ],
+    "mean_output_tok_s": 61.40403471892818,
+    "mean_total_tok_s": 81.87204629190424,
+    "prefill_tok_s": null,
+    "prefill_note": "vLLM benchmark JSON reported total tok/s over prompt+output but did not separately expose prefill tok/s for this run."
+  },
+  "quality": {
+    "status": "passed",
+    "raw145_n64_sha256": "267cbf30208d84929ee79284ac695467f7e80597bf8694130e1e1f8b180eb5bd",
+    "raw145_n256_sha256": "58f6e8251c7a0a17e8c441278b5861f7d5da914fa1823ecd10484b296f2d7537",
+    "semantic_suite": "passed",
+    "arithmetic_repeat_runs": 16,
+    "extended_sixpack": "passed",
+    "arithmetic_canary": "Prompt and regex require exactly 42; quoted or approximate variants are rejected."
+  },
+  "runtime": {
+    "label": "minimaxlogits-localargmax-tightquality-extended-bench",
+    "vllm_cache_root": "/mnt/fast-ai/vllm-cache-exp/minimax-strict-minimaxlogits-localargmax-tightquality-extended-20260517",
+    "summary_json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-minimaxlogits-localargmax-tightquality-extended-bench-strict-tp4-ctx2048-mbt512-bs256-20260517T151011Z-summary.json",
+    "quality_dir": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-minimaxlogits-localargmax-tightquality-extended-bench-strict-tp4-ctx2048-mbt512-bs256-20260517T151011Z-quality",
+    "benchmark_jsons": [
+      "/home/steve/bench-results/minimax-m2.7-strict-candidates/vllm-minimax-m27-autoround-tp4-p512n1536-20260517T152524Z.json",
+      "/home/steve/bench-results/minimax-m2.7-strict-candidates/vllm-minimax-m27-autoround-tp4-p512n1536-20260517T152816Z.json"
+    ],
+    "env": {
+      "VLLM_XPU_USE_LLM_SCALER_MOE_MINIMAX_LOGITS": "1",
+      "VLLM_XPU_LOCAL_ARGMAX_DECODE": "1",
+      "VLLM_XPU_LOCAL_ARGMAX_ASSUME_SAFE": "1",
+      "VLLM_BENCH_TEMPERATURE": "0",
+      "VLLM_MINIMAX_QK_NORM_RESTORE_WEIGHT": "1",
+      "VLLM_MINIMAX_QK_NORM_RESTORE_WEIGHT_MIN_TOKENS": "2",
+      "VLLM_MINIMAX_M2_ATTN_DELAY_ALLREDUCE": "1",
+      "VLLM_XPU_USE_LLM_SCALER_MOE": "1",
+      "VLLM_XPU_ENABLE_XPU_GRAPH": "1",
+      "VLLM_XPU_FORCE_GRAPH_WITH_COMM": "1",
+      "VLLM_XPU_GRAPH_NOOP_COMM_CAPTURE": "1",
+      "CCL_ATL_TRANSPORT": "ofi",
+      "CCL_TOPO_P2P_ACCESS": "1"
+    }
+  },
+  "localmaxxing": {
+    "id": "cmp9xpe3w04pdo4013acdikt7",
+    "payload": "data/localmaxxing-minimax-m27-autoround-localargmax-tightquality-p512n1536-20260517.payload.json",
+    "response": "data/localmaxxing-responses/minimax-m27-autoround-localargmax-tightquality-p512n1536-20260517.response.json",
+    "failed_backend_response": "data/localmaxxing-responses/minimax-m27-autoround-localargmax-tightquality-p512n1536-20260517.failed-backend.response.json"
+  },
+  "decision": "Promote as the current strict MiniMax baseline. Keep optimizing only through quality-preserving changes that pass the same gate."
+}
