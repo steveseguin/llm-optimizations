@@ -1,0 +1,112 @@
+{
+  "id": "minimax-m27-xccl-backend-knob-screens-20260517",
+  "date_utc": "2026-05-17",
+  "status": "negative_collective_backend_screens",
+  "model": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+  "hardware": "4x Intel Arc Pro B70 32GB",
+  "engine": "vLLM 0.20.1-local XPU",
+  "quantization": "AutoRound INT4 W4A16",
+  "baseline_for_comparison": {
+    "id": "minimax-m27-localargmax-tightquality-20260517",
+    "localmaxxing_id": "cmp9xpe3w04pdo4013acdikt7",
+    "output_tok_s_mean": 61.40403471892818,
+    "total_tok_s_mean": 81.87204629190424,
+    "shape": "p512/n1536/batch1/context2048/TP4"
+  },
+  "rank_skew_profile": {
+    "shape": "p512/n512/batch1/context2048/TP4",
+    "output_tok_s": 60.39556489733323,
+    "total_tok_s": 120.79112979466646,
+    "elapsed_s": 8.47744368101121,
+    "timing_skip_first": 64,
+    "pair_all_gather_avg_ms_by_rank": {
+      "rank0": 7.986459,
+      "rank1": 7.89839,
+      "rank2": 7.950471,
+      "rank3": 8.01603
+    },
+    "interpretation": "All ranks saw roughly the same 7.9-8.0 ms pair all-gather bucket, so the promoted path is not bottlenecked by a single late rank reaching the local-argmax exchange.",
+    "artifacts": {
+      "log": "/home/steve/bench-results/minimax-m2.7-localargmax-rankskew-profile/vllm-minimax-m27-autoround-tp4-p512n512-20260517T163923Z.log",
+      "json": "/home/steve/bench-results/minimax-m2.7-localargmax-rankskew-profile/vllm-minimax-m27-autoround-tp4-p512n512-20260517T163923Z.json"
+    }
+  },
+  "direct_gather_reuse_profile": {
+    "shape": "p512/n512/batch1/context2048/TP4",
+    "env": {
+      "VLLM_XPU_LOCAL_ARGMAX_DIRECT_GATHER_REUSE": "1"
+    },
+    "output_tok_s": 59.664324668520145,
+    "total_tok_s": 119.32864933704029,
+    "elapsed_s": 8.581342416000552,
+    "timing_skip_first": 64,
+    "direct_gather_reuse_avg_ms_by_rank": {
+      "rank0": 7.68068,
+      "rank1": 8.162359,
+      "rank2": 7.753192,
+      "rank3": 7.821414
+    },
+    "interpretation": "The direct all_gather_into_tensor/reused-output variant still spends about 7.7-8.2 ms in the gather bucket and is slower than the promoted baseline.",
+    "artifacts": {
+      "log": "/home/steve/bench-results/minimax-m2.7-localargmax-rankskew-profile/vllm-minimax-m27-autoround-tp4-p512n512-20260517T164230Z.log",
+      "json": "/home/steve/bench-results/minimax-m2.7-localargmax-rankskew-profile/vllm-minimax-m27-autoround-tp4-p512n512-20260517T164230Z.json"
+    }
+  },
+  "list_all_gather_screen": {
+    "env": {
+      "VLLM_XPU_LIST_ALL_GATHER": "1"
+    },
+    "quality_screen": {
+      "gate": "raw145-n64-exact",
+      "passed": true,
+      "combined_token_sha256": "267cbf30208d84929ee79284ac695467f7e80597bf8694130e1e1f8b180eb5bd",
+      "elapsed_s": 10.868425763997948,
+      "output_tok_s_estimate": 5.888617302056964
+    },
+    "throughput_screen": {
+      "shape": "p512/n256/batch1/context2048/TP4",
+      "output_tok_s": 51.961537917738006,
+      "total_tok_s": 155.884613753214,
+      "elapsed_s": 4.926720999006648,
+      "pair_all_gather_avg_ms_by_rank": {
+        "rank0": 8.006318,
+        "rank1": 7.835294,
+        "rank2": 7.834089,
+        "rank3": 8.034733
+      }
+    },
+    "decision": "Do not promote. The exact-token screen passed, but the gather bucket was unchanged and the short throughput screen did not beat the baseline.",
+    "artifacts": {
+      "quality_json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/list-allgather-screen/raw145-n64-list-allgather-20260517T164627Z.json",
+      "quality_log": "/home/steve/bench-results/minimax-m2.7-strict-candidates/list-allgather-screen/raw145-n64-list-allgather-20260517T164627Z.log",
+      "benchmark_json": "/home/steve/bench-results/minimax-m2.7-localargmax-list-allgather-profile/vllm-minimax-m27-autoround-tp4-p512n256-20260517T165226Z.json",
+      "benchmark_log": "/home/steve/bench-results/minimax-m2.7-localargmax-list-allgather-profile/vllm-minimax-m27-autoround-tp4-p512n256-20260517T165226Z.log"
+    }
+  },
+  "fabric_vertex_connection_check_0_screen": {
+    "env": {
+      "CCL_TOPO_FABRIC_VERTEX_CONNECTION_CHECK": "0"
+    },
+    "quality_screen": {
+      "gate": "raw145-n64-exact",
+      "passed": true,
+      "combined_token_sha256": "267cbf30208d84929ee79284ac695467f7e80597bf8694130e1e1f8b180eb5bd",
+      "elapsed_s": 26.75375668599736,
+      "output_tok_s_estimate": 2.3921874131978234
+    },
+    "decision": "Do not benchmark further. The exact-token screen passed, but decode was far slower than the promoted path.",
+    "artifacts": {
+      "quality_json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/ccl-fabriccheck0-screen/raw145-n64-ccl-fabriccheck0-20260517T165610Z.json",
+      "quality_log": "/home/steve/bench-results/minimax-m2.7-strict-candidates/ccl-fabriccheck0-screen/raw145-n64-ccl-fabriccheck0-20260517T165610Z.log"
+    }
+  },
+  "localmaxxing": {
+    "submitted": false,
+    "reason": "These were negative/backend-screen results and did not beat the promoted strict baseline."
+  },
+  "next_steps": [
+    "Stop spending time on reshaping the same all_gather_into_tensor call; vLLM context still shows about 8 ms per token.",
+    "Investigate GPU-resident token handoff or a custom Level Zero/XPU pair-reduction collective that compares float32 value plus int32 token directly.",
+    "Consider exact speculative decoding only if acceptance can be measured honestly on non-repetitive prompts and quality remains verifier-equivalent."
+  ]
+}
