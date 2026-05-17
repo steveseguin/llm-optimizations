@@ -1,0 +1,30 @@
+diff --git a/vllm/model_executor/layers/logits_processor.py b/vllm/model_executor/layers/logits_processor.py
+--- a/vllm/model_executor/layers/logits_processor.py
++++ b/vllm/model_executor/layers/logits_processor.py
+@@
+-        with timed_region("logits.local_argmax_pair_all_gather"):
+-            gathered = tensor_model_parallel_all_gather(local_pair, dim=-1)
+-        trace_tensor("logits_processor.local_argmax_gathered", gathered)
++        with timed_region("logits.local_argmax_pair_all_gather"):
++            gathered = tensor_model_parallel_all_gather(local_pair, dim=-1)
++        trace_tensor("logits_processor.local_argmax_gathered", gathered)
++        if (
++            os.environ.get("VLLM_XPU_LOCAL_ARGMAX_XPU_REDUCE", "0") == "1"
++            and gathered.device.type == "xpu"
++        ):
++            with timed_region("logits.local_argmax_xpu_reduce"):
++                reducer = getattr(self, "_xpu_local_argmax_reduce_flat_pairs", None)
++                if reducer is None:
++                    import minimax_pair_argmax_xpu
++
++                    reducer = minimax_pair_argmax_xpu.reduce_flat_pairs
++                    self._xpu_local_argmax_reduce_flat_pairs = reducer
++                top_tokens = reducer(gathered.contiguous(), tp_size)
++            trace_tensor(
++                "logits_processor.local_argmax_xpu_reduce_top_tokens",
++                top_tokens,
++            )
++            return top_tokens
+         # [batch, tp_size, 2] where [:, :, 0]=values, [:, :, 1]=indices
+         with timed_region("logits.local_argmax_reduce"):
+             gathered = gathered.view(hidden_states.shape[0], tp_size, 2)
