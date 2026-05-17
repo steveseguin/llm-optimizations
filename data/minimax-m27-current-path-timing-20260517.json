@@ -1,0 +1,145 @@
+{
+  "date": "2026-05-17",
+  "model": "/mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround",
+  "hardware": "4x Intel Arc Pro B70 32GB",
+  "engine": "vLLM 0.20.1-local XPU",
+  "purpose": "Rank-0 synchronized decode timing probe for the current strict quality-preserving MiniMax M2.7 AutoRound INT4 path.",
+  "current_promoted_baseline": {
+    "output_tok_s": 61.404035,
+    "total_tok_s": 81.872046,
+    "prompt_tokens": 512,
+    "output_tokens": 1536,
+    "context_length": 2048,
+    "batch_size": 1,
+    "localmaxxing_id": "cmp9xpe3w04pdo4013acdikt7"
+  },
+  "graph_mode_probe": {
+    "artifact_dir": "/home/steve/bench-results/minimax-m2.7-strict-candidates/current-path-timing-rank0-sync-p512n256-20260517",
+    "prompt_tokens": 512,
+    "output_tokens": 256,
+    "xpu_graph": true,
+    "elapsed_s": 5.0725092550273985,
+    "total_tok_s": 151.40435657930638,
+    "visible_timing_note": "Compiled graph hides most model internals; visible timing is mainly the logits/output tail.",
+    "rank0_timing_ms": {
+      "logits.local_argmax_pair_all_gather": {
+        "count": 224,
+        "total": 61.808217,
+        "avg": 0.27593,
+        "max": 0.3949
+      },
+      "logits.local_argmax_reduce": {
+        "count": 224,
+        "total": 31.022328,
+        "avg": 0.138493,
+        "max": 0.15
+      },
+      "logits.local_argmax_pair_stack": {
+        "count": 224,
+        "total": 25.697681,
+        "avg": 0.114722,
+        "max": 0.128
+      },
+      "logits.local_argmax_local_max": {
+        "count": 224,
+        "total": 18.265319,
+        "avg": 0.081542,
+        "max": 0.12577
+      },
+      "gpu_model_runner.async_output_tolist": {
+        "count": 224,
+        "total": 8.7472,
+        "avg": 0.03905,
+        "max": 0.05076
+      }
+    }
+  },
+  "eager_mode_probe": {
+    "artifact_dir": "/home/steve/bench-results/minimax-m2.7-strict-candidates/current-path-eager-timing-rank0-sync-p512n64-20260517",
+    "prompt_tokens": 512,
+    "output_tokens": 64,
+    "xpu_graph": false,
+    "enforce_eager": true,
+    "elapsed_s": 8.919843407988083,
+    "total_tok_s": 64.57512465792489,
+    "rank0_timing_ms": {
+      "minimax.moe.experts_total": {
+        "count": 4084,
+        "total": 2155.400053,
+        "avg": 0.527767,
+        "max": 700.526492
+      },
+      "minimax.attn.qk_norm": {
+        "count": 4084,
+        "total": 1764.466065,
+        "avg": 0.432044,
+        "max": 8.366967
+      },
+      "minimax.attn.kv_attention": {
+        "count": 4084,
+        "total": 1165.120877,
+        "avg": 0.285289,
+        "max": 28.321964
+      },
+      "minimax.attn.delayed_residual_allreduce": {
+        "count": 4084,
+        "total": 795.119443,
+        "avg": 0.194691,
+        "max": 3.313803
+      },
+      "all_reduce:(1, 3072):torch.float16": {
+        "count": 7992,
+        "total": 757.61768,
+        "avg": 0.094797,
+        "max": 0.607301
+      },
+      "minimax.moe.router_linear": {
+        "count": 4084,
+        "total": 527.052912,
+        "avg": 0.129053,
+        "max": 11.193049
+      },
+      "all_reduce:minimax_qk_var:(1, 2):torch.float32": {
+        "count": 3960,
+        "total": 392.242831,
+        "avg": 0.099051,
+        "max": 0.580811
+      },
+      "minimax.attn.qkv": {
+        "count": 4084,
+        "total": 336.939882,
+        "avg": 0.082502,
+        "max": 9.112178
+      },
+      "minimax.attn.o_proj": {
+        "count": 4084,
+        "total": 330.325129,
+        "avg": 0.080883,
+        "max": 0.285421
+      },
+      "minimax.attn.rope": {
+        "count": 4084,
+        "total": 239.768356,
+        "avg": 0.058709,
+        "max": 0.31624
+      },
+      "logits.local_argmax_pair_all_gather": {
+        "count": 56,
+        "total": 22.364261,
+        "avg": 0.399362,
+        "max": 3.992384
+      },
+      "gpu_model_runner.async_output_tolist": {
+        "count": 56,
+        "total": 2.708794,
+        "avg": 0.048371,
+        "max": 0.06477
+      }
+    }
+  },
+  "conclusion": [
+    "The recent CPU callback/output-list candidates were correctly rejected: visible output conversion is only about 0.04-0.05 ms/token on rank 0.",
+    "The next meaningful work should focus on MoE expert dispatch/kernel behavior, Q/K RMS variance allreduce and RMS application, KV attention, or residual allreduce scheduling/fusion.",
+    "Diagnostics only; no LocalMaxxing submission."
+  ]
+}
