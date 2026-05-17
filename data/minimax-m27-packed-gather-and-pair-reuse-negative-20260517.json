@@ -1,0 +1,109 @@
+{
+  "id": "minimax-m27-packed-gather-and-pair-reuse-negative-20260517",
+  "date_utc": "2026-05-17",
+  "status": "quality_safe_candidates_rejected_for_speed",
+  "model": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+  "hardware": "4x Intel Arc Pro B70 32GB",
+  "engine": "vLLM 0.20.1-local XPU",
+  "quantization": "AutoRound INT4 W4A16",
+  "shape": {
+    "prompt_tokens": 512,
+    "output_tokens": 1536,
+    "context_length": 2048,
+    "batch_size": 1,
+    "tensor_parallel": 4,
+    "block_size": 256,
+    "max_num_batched_tokens": 512,
+    "max_num_seqs": 1
+  },
+  "baseline_for_comparison": {
+    "id": "minimax-m27-localargmax-tightquality-20260517",
+    "localmaxxing_id": "cmp9xpe3w04pdo4013acdikt7",
+    "output_tok_s_mean": 61.40403471892818,
+    "total_tok_s_mean": 81.87204629190424,
+    "quality": "strict current gate passed: raw145 n64/n256 exact hashes, semantic suite, arithmetic repeat, extended sixpack"
+  },
+  "candidates": [
+    {
+      "name": "packed int64 all_gather local argmax",
+      "runtime_flag": "VLLM_XPU_LOCAL_ARGMAX_PACKED_GATHER=1",
+      "status": "rejected_no_improvement",
+      "quality": {
+        "full_strict_gate_passed": true,
+        "quality_artifacts": [
+          "raw145-n64-exact",
+          "raw145-n256-exact",
+          "semantic-suite-n64-r2",
+          "arithmetic-repeat-n64-r8",
+          "extended-sixpack-n64-r2"
+        ]
+      },
+      "throughput": {
+        "output_tok_s_repeats": [
+          58.146236812385325,
+          57.19428957576861
+        ],
+        "total_tok_s_repeats": [
+          77.5283157498471,
+          76.25905276769147
+        ],
+        "output_tok_s_mean": 57.670263194076966,
+        "total_tok_s_mean": 76.89368425876928
+      },
+      "nodebug_rerun": {
+        "status": "unstable_or_stalled",
+        "completed_output_tok_s": 26.695537350376714,
+        "completed_total_tok_s": 35.59404980050229,
+        "second_repeat": "stalled in shared-memory broadcast and was killed by SHM_STALL_MAX_WARNINGS=4"
+      },
+      "artifacts": {
+        "summary_json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/packed-gather-v1/minimax-packed-gather-v1-strict-tp4-ctx2048-mbt512-bs256-20260517T174005Z-summary.json",
+        "benchmark_jsons": [
+          "/home/steve/bench-results/minimax-m2.7-strict-candidates/packed-gather-v1/vllm-minimax-m27-autoround-tp4-p512n1536-20260517T175227Z.json",
+          "/home/steve/bench-results/minimax-m2.7-strict-candidates/packed-gather-v1/vllm-minimax-m27-autoround-tp4-p512n1536-20260517T175523Z.json",
+          "/home/steve/bench-results/minimax-m2.7-strict-candidates/packed-gather-v1-nodebug/vllm-minimax-m27-autoround-tp4-p512n1536-20260517T175845Z.json"
+        ]
+      }
+    },
+    {
+      "name": "reused float32 pair all_gather local argmax",
+      "runtime_flag": "VLLM_XPU_LOCAL_ARGMAX_PAIR_REUSE=1",
+      "status": "rejected_after_first_benchmark",
+      "quality": {
+        "raw145_n64_exact_passed": true,
+        "expected_combined_token_sha256": "267cbf30208d84929ee79284ac695467f7e80597bf8694130e1e1f8b180eb5bd",
+        "full_strict_gate_run": false,
+        "reason_full_gate_skipped": "first p512/n1536 benchmark was far slower than baseline"
+      },
+      "throughput": {
+        "output_tok_s": 45.498382254547984,
+        "total_tok_s": 60.664509672730645,
+        "elapsed_time_s": 33.759442069975194
+      },
+      "artifacts": {
+        "quality_json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/pair-reuse-screen/raw145-n64-pair-reuse-20260517T181226Z.json",
+        "quality_log": "/home/steve/bench-results/minimax-m2.7-strict-candidates/pair-reuse-screen/raw145-n64-pair-reuse-20260517T181226Z.log",
+        "benchmark_json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/pair-reuse-v1-bench/vllm-minimax-m27-autoround-tp4-p512n1536-20260517T181909Z.json",
+        "benchmark_log": "/home/steve/bench-results/minimax-m2.7-strict-candidates/pair-reuse-v1-bench/vllm-minimax-m27-autoround-tp4-p512n1536-20260517T181909Z.log",
+        "aborted_second_repeat_log": "/home/steve/bench-results/minimax-m2.7-strict-candidates/pair-reuse-v1-bench/vllm-minimax-m27-autoround-tp4-p512n1536-20260517T182504Z.log"
+      }
+    }
+  ],
+  "environment": {
+    "VLLM_XPU_USE_LLM_SCALER_MOE": "1",
+    "VLLM_XPU_LOCAL_ARGMAX_DECODE": "1",
+    "VLLM_XPU_LOCAL_ARGMAX_ASSUME_SAFE": "1",
+    "VLLM_XPU_ENABLE_XPU_GRAPH": "1",
+    "VLLM_XPU_FORCE_GRAPH_WITH_COMM": "1",
+    "VLLM_XPU_GRAPH_NOOP_COMM_CAPTURE": "1",
+    "VLLM_MINIMAX_M2_ATTN_DELAY_ALLREDUCE": "1",
+    "VLLM_MINIMAX_QK_NORM_RESTORE_WEIGHT": "1",
+    "VLLM_MINIMAX_QK_NORM_RESTORE_WEIGHT_MIN_TOKENS": "2",
+    "CCL_TOPO_P2P_ACCESS": "1"
+  },
+  "localmaxxing": {
+    "submitted": false,
+    "reason": "Both candidates were valid learnings but neither beat the current promoted strict result."
+  },
+  "decision": "Do not promote packed-gather or pair-reuse. Keep the existing strict 61.404 tok/s local-argmax baseline as current best."
+}
