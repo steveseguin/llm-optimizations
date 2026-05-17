@@ -1,0 +1,39 @@
+{
+  "hfId": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+  "modelRevision": "main",
+  "hardware": {
+    "hwClass": "DISCRETE_GPU",
+    "gpuName": "Intel Arc Pro B70 32GB",
+    "gpuCount": 4,
+    "vramGb": 32,
+    "cpu": "AMD EPYC 9015 8-Core Processor",
+    "ramGb": 16,
+    "os": "Ubuntu 24.04.4 LTS, kernel 6.17.0-23-generic"
+  },
+  "engineName": "vllm",
+  "engineVersion": "0.20.1-local",
+  "quantization": "AutoRound INT4 W4A16",
+  "promptTokens": 512,
+  "outputTokens": 1536,
+  "contextLength": 2048,
+  "batchSize": 1,
+  "tokSOut": 66.75714322464349,
+  "tokSTotal": 89.00952429952466,
+  "notes": "Strict quality-gated 4x B70 TP4 MiniMax M2.7 AutoRound no-clone XPU communicator run. Two benchmark repeats after raw145 n64/n256 exact token-hash gates, semantic repeat gate, and 8-run arithmetic repeat gate. Output tok/s repeats: 66.69972889428962, 66.81455755499735. Total tok/s repeats: 88.93297185905283, 89.08607673999647. vLLM throughput JSON reports total tok/s over 512 prompt + 1536 output tokens; it does not separately report TTFT or prefill-only speed. Active runtime guard verified VLLM_XPU_COMPILE_ALLREDUCE_NO_CLONE marker in xpu_communicator.py sha256 9d35eb45afad1906d635f67480b15c254cbc3296ef10a8e06f977143272f43a7 before model load. Local-argmax logits flags were intentionally unset for this faster result.",
+  "engineFlags": {
+    "commandSnippet": "FI_TCP_IFACE=wlxe865d47e3a48 CCL_KVS_IFACE=wlxe865d47e3a48 CCL_TOPO_P2P_ACCESS=1 USE_LLM_SCALER_MOE=1 VLLM_XPU_USE_LLM_SCALER_MOE=1 VLLM_XPU_ENABLE_XPU_GRAPH=1 VLLM_XPU_FORCE_GRAPH_WITH_COMM=1 VLLM_XPU_GRAPH_NOOP_COMM_CAPTURE=1 VLLM_XPU_COMPILE_ALLREDUCE_NO_CLONE=1 VLLM_MINIMAX_M2_ATTN_DELAY_ALLREDUCE=1 VLLM_MINIMAX_QK_NORM_RESTORE_WEIGHT=1 VLLM_MINIMAX_QK_NORM_RESTORE_WEIGHT_MIN_TOKENS=2 VLLM_BENCH_TEMPERATURE=0 vllm bench throughput --backend vllm --model /mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround --tokenizer /mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround --trust-remote-code --dtype float16 --tensor-parallel-size 4 --distributed-executor-backend mp --max-model-len 2048 --max-num-batched-tokens 512 --max-num-seqs 1 --dataset-name random --random-input-len 512 --random-output-len 1536 --random-range-ratio 0 --num-prompts 1 --disable-log-stats --async-engine --block-size 256 --no-enable-prefix-caching --attention-backend TRITON_ATTN --compilation-config '{\"use_inductor_graph_partition\":true,\"compile_sizes\":[1],\"cudagraph_mode\":\"PIECEWISE\"}'",
+    "tensorParallel": 4,
+    "gpuLayers": 999,
+    "contextLength": 2048,
+    "attentionBackend": "TRITON_ATTN",
+    "chunkedPrefill": true,
+    "prefillChunkSize": 512,
+    "prefixCaching": false,
+    "contBatching": false,
+    "temperature": 0,
+    "maxRunningSeqs": 1,
+    "specDecoding": false,
+    "mtpEnabled": false,
+    "extraFlags": "Quality gates before benchmark: raw145 exact token SHA256 n64=267cbf30208d84929ee79284ac695467f7e80597bf8694130e1e1f8b180eb5bd, n256=58f6e8251c7a0a17e8c441278b5861f7d5da914fa1823ecd10484b296f2d7537; semantic suite PASS/42/add_one r2; arithmetic 42 r8. Runtime guard required VLLM_XPU_COMPILE_ALLREDUCE_NO_CLONE marker in xpu_communicator.py. Local-argmax logits env flags unset."
+  }
+}
