@@ -68,6 +68,9 @@ def module_info(module_name: str) -> dict:
             "local_argmax_pair_all_gather_label": (
                 "logits.local_argmax_pair_all_gather" in text
             ),
+            "reuse_async_output_copy_buffer": (
+                "VLLM_XPU_REUSE_ASYNC_OUTPUT_COPY_BUFFER" in text
+            ),
             "minimax_logits_moe": "MINIMAX_LOGITS" in text,
             "qk_norm_restore_weight": "QK_NORM_RESTORE_WEIGHT" in text,
         },
