@@ -1,0 +1,174 @@
+{
+  "title": "MiniMax M2.7 AutoRound 4x B70 max_num_batched_tokens boundary",
+  "date": "2026-05-18",
+  "status": "boundary_mapped_no_new_promoted_result",
+  "model": {
+    "hf_id": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+    "local_path": "/mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround",
+    "quantization": "AutoRound INT4 W4A16"
+  },
+  "hardware": {
+    "gpu": "Intel Arc Pro B70 32GB",
+    "gpu_count": 4,
+    "aggregate_vram_gb": 128
+  },
+  "engine": {
+    "name": "vLLM",
+    "version": "0.20.1-local",
+    "device": "xpu",
+    "tensor_parallel_size": 4,
+    "dtype": "float16",
+    "attention_backend": "XPU FlashAttention v2",
+    "graph_mode": "PIECEWISE",
+    "block_size": 256,
+    "async_engine": true
+  },
+  "shape": {
+    "prompt_tokens": 512,
+    "output_tokens": 1536,
+    "context_length": 2048,
+    "batch_size": 1,
+    "num_prompts": 1
+  },
+  "environment": {
+    "VLLM_XPU_ENABLE_XPU_GRAPH": "1",
+    "VLLM_XPU_FORCE_GRAPH_WITH_COMM": "1",
+    "VLLM_XPU_GRAPH_NOOP_COMM_CAPTURE": "1",
+    "VLLM_XPU_USE_LLM_SCALER_MOE": "1",
+    "VLLM_XPU_USE_LLM_SCALER_MOE_WS": "1",
+    "VLLM_MINIMAX_M2_ATTN_DELAY_ALLREDUCE": "1",
+    "VLLM_MINIMAX_QK_NORM_RESTORE_WEIGHT": "1",
+    "VLLM_MINIMAX_QK_NORM_RESTORE_WEIGHT_MIN_TOKENS": "2",
+    "CCL_TOPO_P2P_ACCESS": "1",
+    "ONEAPI_DEVICE_SELECTOR": "level_zero:0,1,2,3",
+    "ZE_AFFINITY_MASK": "0,1,2,3"
+  },
+  "compilation_config": {
+    "use_inductor_graph_partition": true,
+    "compile_sizes": [
+      1
+    ],
+    "cudagraph_mode": "PIECEWISE"
+  },
+  "promoted_baseline": {
+    "max_num_batched_tokens": 512,
+    "mean_output_toks_per_second": 80.6027546871925,
+    "mean_total_toks_per_second": 107.47033958292334,
+    "output_toks_per_second": [
+      79.95164209041153,
+      81.25386728397348
+    ],
+    "total_toks_per_second": [
+      106.60218945388203,
+      108.33848971196464
+    ],
+    "quality": "strict_passed",
+    "localmaxxing_id": "cmpasdq5v007nmn019elaut3s",
+    "artifact": "/home/steve/llm-optimizations-publish/data/minimax-m27-moe-ws-flash-piecewise-strict-win-20260518.json"
+  },
+  "candidates": [
+    {
+      "max_num_batched_tokens": 768,
+      "status": "quality_passed",
+      "mean_output_toks_per_second": 80.87600519283717,
+      "mean_total_toks_per_second": 107.83467359044957,
+      "output_toks_per_second": [
+        80.55396040175799,
+        81.19804998391635
+      ],
+      "total_toks_per_second": [
+        107.40528053567732,
+        108.2640666452218
+      ],
+      "quality_gates": [
+        "raw145-n64-exact",
+        "raw145-n256-exact",
+        "semantic-suite-n64-r2",
+        "arithmetic-repeat-n64-r16",
+        "extended-sixpack-n64-r2"
+      ],
+      "summary_json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-moe-ws-flash-piecewise-mbt768-strict-20260518-strict-tp4-ctx2048-mbt768-bs256-20260518T060634Z-summary.json",
+      "decision": "valid_but_not_materially_better_than_mbt512"
+    },
+    {
+      "max_num_batched_tokens": 832,
+      "status": "quality_passed",
+      "mean_output_toks_per_second": 77.79583271698006,
+      "mean_total_toks_per_second": 103.72777695597341,
+      "output_toks_per_second": [
+        78.05199923643688,
+        77.53966619752323
+      ],
+      "total_toks_per_second": [
+        104.06933231524917,
+        103.38622159669764
+      ],
+      "quality_gates": [
+        "raw145-n64-exact",
+        "raw145-n256-exact",
+        "semantic-suite-n64-r2",
+        "arithmetic-repeat-n64-r16",
+        "extended-sixpack-n64-r2"
+      ],
+      "summary_json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-moe-ws-flash-piecewise-mbt832-strict-20260518-strict-tp4-ctx2048-mbt832-bs256-20260518T063952Z-summary.json",
+      "decision": "valid_but_slower_than_mbt512"
+    },
+    {
+      "max_num_batched_tokens": 896,
+      "status": "quality_failed_semantic_suite",
+      "passed_before_failure": [
+        "raw145-n64-exact",
+        "raw145-n256-exact"
+      ],
+      "failure_reasons": [
+        "nondeterministic lstrip_text",
+        "degenerate or corrupt generated output",
+        "prompt-scoped required substring missing",
+        "prompt-scoped required regex missing or invalid"
+      ],
+      "corruption": {
+        "nul_token_count": 256,
+        "control_char_output": true,
+        "degenerate_output": true
+      },
+      "summary_json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-moe-ws-flash-piecewise-mbt896-strict-20260518-strict-tp4-ctx2048-mbt896-bs256-20260518T062839Z-summary.json",
+      "failed_quality_json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-moe-ws-flash-piecewise-mbt896-strict-20260518-strict-tp4-ctx2048-mbt896-bs256-20260518T062839Z-quality/semantic-suite-n64-r2.json",
+      "decision": "unsafe_do_not_benchmark"
+    },
+    {
+      "max_num_batched_tokens": 1024,
+      "status": "quality_failed_raw145_n64",
+      "failure_reasons": [
+        "combined token hash mismatch",
+        "degenerate or corrupt generated output"
+      ],
+      "corruption": {
+        "distinct_generated_token_count": 1,
+        "first_distinct_generated_tokens": [
+          0
+        ],
+        "nul_token_count": 64,
+        "control_char_output": true,
+        "degenerate_output": true
+      },
+      "summary_json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-moe-ws-flash-piecewise-mbt1024-strict-20260518-strict-tp4-ctx2048-mbt1024-bs256-20260518T055959Z-summary.json",
+      "failed_quality_json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-moe-ws-flash-piecewise-mbt1024-strict-20260518-strict-tp4-ctx2048-mbt1024-bs256-20260518T055959Z-quality/raw145-n64-exact.json",
+      "decision": "unsafe_do_not_benchmark"
+    }
+  ],
+  "decision": {
+    "promoted_max_num_batched_tokens": 512,
+    "largest_quality_passed_max_num_batched_tokens": 832,
+    "largest_quality_passed_and_not_slower_max_num_batched_tokens": 768,
+    "first_observed_unsafe_max_num_batched_tokens": 896,
+    "localmaxxing_submitted": false,
+    "reason_no_submission": "No candidate produced a material quality-safe improvement over the accepted MBT512 result."
+  },
+  "notes": [
+    "MBT768 was +0.34% output tok/s versus MBT512, which is not enough to treat as a meaningful public win.",
+    "MBT832 passed full quality but was slower than MBT512.",
+    "MBT896 is the important safety boundary: exact single-prompt canaries passed, then the semantic repeat suite found NUL/control-token corruption.",
+    "MBT1024 failed immediately with NUL/control-token corruption.",
+    "Intermittent ocloc/IGC floating point exceptions during Triton reduction compilation appeared at MBT768/832 but did not alone predict failure."
+  ]
+}
