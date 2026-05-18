@@ -68,6 +68,7 @@ Date: 2026-05-18
    - Reason: micro-reties around simple flags, tiles, and sampler conversion have not beaten the logits-WS baseline. The measured cost still points to local lm-head projection plus repeated per-layer collectives.
    - Method: avoid token-selection shortcuts unless they are exact under the strict gate. Prefer diagnostics or narrow patches that reduce kernel launches/copies around final logits, MoE output, or residual allreduce without changing routing, quantization, or sampling semantics.
    - Gate: raw145 n64 and n256 exact first, then semantic, arithmetic-repeat, extended sixpack, and at least two p512/n1536 benchmark repeats before promotion.
+   - Update: retesting `MAX_BATCHED_TOKENS=768` on top of the newer clone-safe custom-allreduce recipe failed the extended sixpack with nondeterministic greedy output after passing the earlier gates. Do not pursue MBT reties unchanged; go back to exact collective-boundary/epilogue work.
 
 10. Completed: MiniMax WS top-k-only reuse.
    - Reason: test a narrower graph-lifetime hypothesis than the earlier full internal scratch reuse failure by reusing only top-k tensors inside the MiniMax WS op.
