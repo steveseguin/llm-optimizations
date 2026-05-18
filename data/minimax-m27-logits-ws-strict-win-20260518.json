@@ -1,0 +1,70 @@
+{
+  "label": "minimax-logits-ws-flash-piecewise-strict-20260518",
+  "date": "2026-05-18",
+  "model": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+  "hardware": "4x Intel Arc Pro B70 32GB",
+  "engine": "vLLM 0.20.1-local XPU TP4",
+  "quantization": "AutoRound INT4 W4A16",
+  "recipe": {
+    "dtype": "float16",
+    "tensor_parallel_size": 4,
+    "context_length": 2048,
+    "prompt_tokens": 512,
+    "output_tokens": 1536,
+    "batch_size": 1,
+    "max_num_batched_tokens": 512,
+    "block_size": 256,
+    "attention_backend": "XPU FlashAttention v2",
+    "xpu_graph": "PIECEWISE",
+    "prefix_caching": false,
+    "async_engine": true,
+    "temperature": 0,
+    "speculative_decoding": false,
+    "power_limit_changed": false
+  },
+  "env": {
+    "VLLM_XPU_USE_LLM_SCALER_MOE": "1",
+    "VLLM_XPU_USE_LLM_SCALER_MOE_WS": "1",
+    "VLLM_XPU_USE_LLM_SCALER_MOE_MINIMAX_LOGITS_WS": "1",
+    "VLLM_XPU_ENABLE_XPU_GRAPH": "1",
+    "VLLM_XPU_FORCE_GRAPH_WITH_COMM": "1",
+    "VLLM_XPU_GRAPH_NOOP_COMM_CAPTURE": "1",
+    "VLLM_MINIMAX_M2_ATTN_DELAY_ALLREDUCE": "1",
+    "VLLM_MINIMAX_QK_NORM_RESTORE_WEIGHT": "1",
+    "VLLM_MINIMAX_QK_NORM_RESTORE_WEIGHT_MIN_TOKENS": "2",
+    "CCL_TOPO_P2P_ACCESS": "1",
+    "ONEAPI_DEVICE_SELECTOR": "level_zero:0,1,2,3",
+    "ZE_AFFINITY_MASK": "0,1,2,3"
+  },
+  "quality": {
+    "passed": true,
+    "raw145_n64_combined_token_sha256": "267cbf30208d84929ee79284ac695467f7e80597bf8694130e1e1f8b180eb5bd",
+    "raw145_n256_combined_token_sha256": "58f6e8251c7a0a17e8c441278b5861f7d5da914fa1823ecd10484b296f2d7537",
+    "semantic_suite": "passed",
+    "arithmetic_repeat": "16/16 deterministic exact 42",
+    "extended_sixpack": "passed"
+  },
+  "benchmarks": [
+    {
+      "json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/vllm-minimax-m27-autoround-tp4-p512n1536-20260518T082531Z.json",
+      "output_toks_per_second": 82.4268056327071,
+      "total_toks_per_second": 109.90240751027612,
+      "elapsed_time_seconds": 18.634714619955048
+    },
+    {
+      "json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/vllm-minimax-m27-autoround-tp4-p512n1536-20260518T082819Z.json",
+      "output_toks_per_second": 81.08972880155147,
+      "total_toks_per_second": 108.11963840206863,
+      "elapsed_time_seconds": 18.94197973900009
+    }
+  ],
+  "mean_output_toks_per_second": 81.75826721712929,
+  "mean_total_toks_per_second": 109.01102295617238,
+  "previous_promoted_mean_output_toks_per_second": 80.6027546871925,
+  "improvement_percent": 1.433589,
+  "localmaxxing_id": "cmpay7th600bbmn01v6csyaro",
+  "localmaxxing_response": "/home/steve/llm-optimizations-publish/data/localmaxxing-responses/minimax-m27-autoround-logits-ws-strict-p512n1536-20260518.response.json",
+  "summary_json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-minimax-logits-ws-flash-piecewise-strict-20260518-strict-tp4-ctx2048-mbt512-bs256-20260518T080946Z-summary.json",
+  "quality_dir": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-minimax-logits-ws-flash-piecewise-strict-20260518-strict-tp4-ctx2048-mbt512-bs256-20260518T080946Z-quality",
+  "decision": "Promote as current strict baseline; small but repeatable quality-preserving improvement."
+}
