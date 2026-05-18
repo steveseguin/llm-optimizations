@@ -1,0 +1,91 @@
+{
+  "label": "minimax-logits-ws-no-attn-delay-small-win-20260518",
+  "date": "2026-05-18",
+  "model": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+  "hardware": "4x Intel Arc Pro B70 32GB",
+  "engine": "vLLM 0.20.1-local XPU TP4",
+  "quantization": "AutoRound INT4 W4A16",
+  "recipe": {
+    "dtype": "float16",
+    "tensor_parallel_size": 4,
+    "context_length": 2048,
+    "prompt_tokens": 512,
+    "output_tokens": 1536,
+    "batch_size": 1,
+    "max_num_batched_tokens": 512,
+    "block_size": 256,
+    "attention_backend": "XPU FlashAttention v2",
+    "xpu_graph": "PIECEWISE",
+    "prefix_caching": false,
+    "async_engine": true,
+    "temperature": 0,
+    "speculative_decoding": false,
+    "power_limit_changed": false
+  },
+  "env": {
+    "VLLM_XPU_USE_LLM_SCALER_MOE": "1",
+    "VLLM_XPU_USE_LLM_SCALER_MOE_WS": "1",
+    "VLLM_XPU_USE_LLM_SCALER_MOE_MINIMAX_LOGITS_WS": "1",
+    "VLLM_MINIMAX_M2_ATTN_DELAY_ALLREDUCE": "0",
+    "VLLM_XPU_ENABLE_XPU_GRAPH": "1",
+    "VLLM_XPU_FORCE_GRAPH_WITH_COMM": "1",
+    "VLLM_XPU_GRAPH_NOOP_COMM_CAPTURE": "1",
+    "VLLM_MINIMAX_QK_NORM_RESTORE_WEIGHT": "1",
+    "VLLM_MINIMAX_QK_NORM_RESTORE_WEIGHT_MIN_TOKENS": "2",
+    "CCL_TOPO_P2P_ACCESS": "1",
+    "ONEAPI_DEVICE_SELECTOR": "level_zero:0,1,2,3",
+    "ZE_AFFINITY_MASK": "0,1,2,3"
+  },
+  "quality": {
+    "passed": true,
+    "raw145_n64_combined_token_sha256": "267cbf30208d84929ee79284ac695467f7e80597bf8694130e1e1f8b180eb5bd",
+    "raw145_n256_combined_token_sha256": "58f6e8251c7a0a17e8c441278b5861f7d5da914fa1823ecd10484b296f2d7537",
+    "semantic_suite_combined_token_sha256": "adacbf144264486ea7d378ebb6a4c0ba23951b72c4cf86251a762b07ebef5805",
+    "arithmetic_repeat_combined_token_sha256": "578ec378bf31cb16fb49ac5c0043270fd00a0f7898e18ac498a41ffe775d7994",
+    "extended_sixpack_combined_token_sha256": "1e3560554f57b2b56cec8f49f28bc8ba12e9e0ced26bdc99a976f1433c99caa7"
+  },
+  "benchmarks": [
+    {
+      "json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/vllm-minimax-m27-autoround-tp4-p512n1536-20260518T173919Z.json",
+      "output_toks_per_second": 82.85219681784992,
+      "total_toks_per_second": 110.46959575713322,
+      "elapsed_time_seconds": 18.539037695969455
+    },
+    {
+      "json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/vllm-minimax-m27-autoround-tp4-p512n1536-20260518T174208Z.json",
+      "output_toks_per_second": 82.68145460037935,
+      "total_toks_per_second": 110.24193946717247,
+      "elapsed_time_seconds": 18.57732193300035
+    },
+    {
+      "json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/vllm-minimax-m27-autoround-tp4-p512n1536-20260518T175053Z.json",
+      "output_toks_per_second": 82.40052284133643,
+      "total_toks_per_second": 109.86736378844856,
+      "elapsed_time_seconds": 18.64065842103446
+    },
+    {
+      "json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/vllm-minimax-m27-autoround-tp4-p512n1536-20260518T175341Z.json",
+      "output_toks_per_second": 81.68289676822405,
+      "total_toks_per_second": 108.91052902429874,
+      "elapsed_time_seconds": 18.80442615004722
+    }
+  ],
+  "mean_output_toks_per_second": 82.40426775694743,
+  "mean_total_toks_per_second": 109.87235700926325,
+  "min_output_toks_per_second": 81.68289676822405,
+  "max_output_toks_per_second": 82.85219681784992,
+  "previous_promoted_logits_ws_output_toks_per_second": 81.75826721712929,
+  "improvement_percent_vs_previous_promoted_logits_ws": 0.7901348228216878,
+  "improvement_percent_vs_moe_ws_flash_piecewise": 2.2350514901709513,
+  "fresh_cache_confirmation": {
+    "status": "aborted_by_startup_stall_guard",
+    "log": "/home/steve/bench-results/minimax-m2.7-strict-candidates/vllm-minimax-m27-autoround-tp4-p512n1536-20260518T174534Z.log",
+    "counted_as_performance_result": false,
+    "reason": "Fresh isolated cache root was compiling; SHM_STALL guard triggered after 3 startup warnings and no benchmark JSON was produced."
+  },
+  "summary_json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-logits-ws-no-attn-delay-screen-20260518-strict-tp4-ctx2048-mbt512-bs256-20260518T172328Z-summary.json",
+  "quality_dir": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-logits-ws-no-attn-delay-screen-20260518-strict-tp4-ctx2048-mbt512-bs256-20260518T172328Z-quality",
+  "localmaxxing_id": "cmpbifcx3013bmn01747cxix8",
+  "localmaxxing_response": "/home/steve/llm-optimizations-publish/data/localmaxxing-responses/minimax-m27-autoround-logits-ws-no-attn-delay-p512n1536-20260518.response.json",
+  "decision": "Promote as current strict MiniMax baseline; small but repeatable quality-preserving improvement."
+}
