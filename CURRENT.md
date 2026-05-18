@@ -12,6 +12,7 @@ Current strict quality-passed speed result:
 - Recipe: FP16 activations, AutoRound INT4 W4A16, default XPU FlashAttention v2, XPU PIECEWISE graph, exact MiniMax router-logits path feeding llm-scaler INT4 MoE work-sharing decode with `VLLM_XPU_USE_LLM_SCALER_MOE_WS=1` and `VLLM_XPU_USE_LLM_SCALER_MOE_MINIMAX_LOGITS_WS=1`
 - Shape: p512/n1536, ctx2048, batch 1
 - Result: `81.758267` output tok/s, `109.011023` total tok/s, mean of two strict-gated repeats
+- Confirmation repeat: `81.197954` output tok/s, `108.263938` total tok/s; three-run mean is `81.571496` output tok/s
 - Quality: raw145 exact n64/n256 hashes, semantic suite, 16-repeat arithmetic, and extended sixpack all passed before benchmarking
 - LocalMaxxing: `cmpay7th600bbmn01v6csyaro`
 
