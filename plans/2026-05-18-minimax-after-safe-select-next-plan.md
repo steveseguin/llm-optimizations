@@ -4,7 +4,9 @@ Date: 2026-05-18
 
 ## Position
 
-The promoted MiniMax M2.7 AutoRound result remains `81.758267` output tok/s and `109.011023` total tok/s on 4x B70, with strict quality gates passed. The latest safe hidden-state selection candidate passed quality but slowed to `77.314354` output tok/s, so it is rejected.
+The promoted MiniMax M2.7 AutoRound result remains `81.758267` output tok/s and `109.011023` total tok/s on 4x B70, with strict quality gates passed. The safe hidden-state selection candidate passed quality under the fair FlashAttention backend and produced `81.914167` output tok/s / `109.218890` total tok/s, a `+0.19%` output delta that is inside run variance, so it is recorded as neutral rather than promoted.
+
+Erratum: the earlier `77.314354` output tok/s safe-selector result used the strict runner's older `TRITON_ATTN` default. It remains quality-valid diagnostic data, but it is not a fair comparison to the promoted FlashAttention baseline.
 
 ## Constraints
 
@@ -37,4 +39,5 @@ The promoted MiniMax M2.7 AutoRound result remains `81.758267` output tok/s and 
 5. Reproducibility hygiene:
    - Record each candidate in notes/data/patches.
    - Keep strict runner environment summaries complete.
+   - Keep strict runner backend defaults aligned with promoted recipes so candidate comparisons are fair.
    - Publish useful results through the GitHub connector and LocalMaxxing only when warranted.
