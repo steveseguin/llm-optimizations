@@ -1,0 +1,35 @@
+diff --git a/vllm/v1/worker/gpu_model_runner.py b/vllm/v1/worker/gpu_model_runner.py
+--- a/vllm/v1/worker/gpu_model_runner.py
++++ b/vllm/v1/worker/gpu_model_runner.py
+@@ -4419,6 +4419,14 @@ class GPUModelRunner:
+                 with timed_region("gpu_model_runner.select_sample_hidden"):
+                     sample_hidden_states = _select_sample_hidden_states(
+                         hidden_states, logits_indices
+                     )
++                if (
++                    os.environ.get("VLLM_XPU_CLONE_SAMPLE_HIDDEN", "0") == "1"
++                    and sample_hidden_states.device.type == "xpu"
++                ):
++                    with timed_region("gpu_model_runner.clone_sample_hidden"):
++                        sample_hidden_states = (
++                            sample_hidden_states.contiguous().clone()
++                        )
+                 trace_tensor(
+                     "gpu_model_runner.sample_hidden_states", sample_hidden_states
+                 )
+@@ -4459,6 +4467,14 @@ class GPUModelRunner:
+                 trace_tensor("gpu_model_runner.logits_indices", logits_indices)
+                 sample_hidden_states = _select_sample_hidden_states(
+                     hidden_states, logits_indices
+                 )
++                if (
++                    os.environ.get("VLLM_XPU_CLONE_SAMPLE_HIDDEN", "0") == "1"
++                    and sample_hidden_states.device.type == "xpu"
++                ):
++                    with timed_region("gpu_model_runner.clone_sample_hidden"):
++                        sample_hidden_states = (
++                            sample_hidden_states.contiguous().clone()
++                        )
+                 if not get_pp_group().is_last_rank:
+                     all_gather_tensors = {
+                         "residual": not is_residual_scattered_for_sp(
