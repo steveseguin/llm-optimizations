@@ -195,6 +195,14 @@ Recent immediate MoE residual-allreduce follow-up:
 - Decision: do not promote and do not submit to LocalMaxxing. The runtime patch was reverted; coarse model-level residual/allreduce relocation is quality-safe but not a useful speed path.
 - Artifacts: `notes/2026-05-18-minimax-moe-immediate-residual-neutral.md`, `data/minimax-m27-moe-immediate-residual-neutral-20260518.json`, `patches/minimax-moe-immediate-residual-neutral-20260518.md`
 
+Recent CCL topology override follow-up:
+
+- `CCL_TOPO_FABRIC_VERTEX_CONNECTION_CHECK=0` was tested to bypass oneCCL fabric vertex connection checking after logs reported PCIe topology between the four B70s.
+- It passed raw145 n64/n256 exact hashes, semantic suite, 16-repeat arithmetic, and extended sixpack with the same promoted hashes.
+- Result: `81.736187` output tok/s and `108.981582` total tok/s mean, below the promoted `82.404268` / `109.872357` no-attention-delay baseline.
+- Decision: do not promote and do not submit to LocalMaxxing. Leave this CCL env unset for the promoted four-B70 MiniMax path.
+- Artifacts: `notes/2026-05-18-minimax-ccl-fabric-vertex-off-negative.md`, `data/minimax-m27-ccl-fabric-vertex-off-negative-20260518.json`
+
 Recent logits-WS MoE-delay retest:
 
 - `VLLM_MINIMAX_MOE_DELAY_ALLREDUCE=1` was retested on top of the current exact logits-to-work-sharing MiniMax baseline under the fair default XPU FlashAttention v2 backend.
