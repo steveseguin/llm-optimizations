@@ -161,6 +161,16 @@ Recent logits-WS no-clone retie on the current no-attention-delay baseline:
 - Decision: do not promote and do not submit to LocalMaxxing. This confirms the no-clone retie is quality-safe under the current recipe, but it does not beat the promoted setting.
 - Artifacts: `notes/2026-05-18-minimax-no-clone-current-baseline-neutral.md`, `data/minimax-m27-no-clone-current-baseline-neutral-20260518.json`
 
+Recent compile allreduce custom-op screen:
+
+- `VLLM_XPU_COMPILE_ALLREDUCE_CUSTOM_OP=1` was tested on top of the current no-attention-delay logits-WS baseline.
+- It failed the first raw145 n64 exact hash check before benchmarking.
+- Expected combined token hash: `267cbf30208d84929ee79284ac695467f7e80597bf8694130e1e1f8b180eb5bd`
+- Candidate combined token hash: `fddec0c19f560999e0ab5c4507d694d18e71584e7d4d74342dcf24c45e567678`
+- PyTorch warned that `vllm::all_reduce` output may alias an input, which is consistent with this path not being quality-safe under the current XPU graph recipe.
+- Decision: do not promote and do not submit to LocalMaxxing. Keep the strict-runner env capture patch for traceability, but avoid this flag until the custom op is made alias-safe and revalidated.
+- Artifacts: `notes/2026-05-18-minimax-compile-allreduce-custom-op-quality-fail.md`, `data/minimax-m27-compile-allreduce-custom-op-quality-fail-20260518.json`, `patches/minimax-strict-harness-custom-allreduce-env-capture-20260518.patch`
+
 Recent XPU compiler-pass screens:
 
 - `fuse_allreduce_rms` failed before raw output because the pass path asserts CUDA availability: `Torch not compiled with CUDA enabled`.
@@ -185,7 +195,7 @@ Recent cached MoE-op lookup follow-up:
 - It passed raw145 n64/n256 exact hashes, semantic suite, 16-repeat arithmetic, and extended sixpack with the same promoted hashes.
 - Result: `82.006549` output tok/s and `109.342066` total tok/s mean, below the promoted `82.404268` / `109.872357` no-attention-delay baseline.
 - Decision: do not promote and do not submit to LocalMaxxing. The patch was reverted from active runtime; Python import/callable lookup is not the current decode bottleneck under graph replay.
-- Artifacts: `notes/2026-05-18-minimax-cached-moe-op-neutral.md`, `data/minimax-m27-cached-moe-op-neutral-20260518.json`, `patches/minimax-cached-moe-op-neutral-20260518.md`
+- Artifacts: `notes/2026-05-18-minimax-cached-moe-op-neutral.md`, `data/minimax-m27-cached-moe-op-neutral-20260518.json`, `patches/minimax-cached-moe-op-neutral.md`
 
 Recent immediate MoE residual-allreduce follow-up:
 
