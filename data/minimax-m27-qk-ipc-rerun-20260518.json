@@ -1,0 +1,52 @@
+{
+  "date": "2026-05-18",
+  "status": "rejected",
+  "model_context": "MiniMax M2.7 AutoRound INT4 W4A16 TP4",
+  "hardware": {
+    "gpu_name": "Intel Arc Pro B70 32GB",
+    "gpu_count": 4,
+    "vram_gb_per_gpu": 32
+  },
+  "experiment": {
+    "name": "minimax_qk_rms_xpu_ipc",
+    "path": "/home/steve/llm-optimizations-publish/experiments/minimax_qk_rms_xpu_ipc",
+    "script": "test_ipc_qk_var.py",
+    "command_summary": "torchrun --standalone --nproc-per-node=4 test_ipc_qk_var.py with MINIMAX_QK_IPC_BENCH=1 and single-kernel IPC mode"
+  },
+  "env": {
+    "MINIMAX_QK_IPC_BENCH": "1",
+    "MINIMAX_QK_IPC_VALIDATE": "0",
+    "MINIMAX_QK_IPC_BARRIER": "0",
+    "MINIMAX_QK_IPC_SINGLE_KERNEL": "1",
+    "MINIMAX_QK_IPC_COUNTER": "1",
+    "MINIMAX_QK_IPC_SEQ": "0",
+    "MINIMAX_QK_IPC_ITERS": "20",
+    "MINIMAX_QK_IPC_WARMUP": "5",
+    "MINIMAX_QK_IPC_TOKENS": "1",
+    "MINIMAX_QK_IPC_SLOTS": "64",
+    "MINIMAX_QK_IPC_TIMEOUT_ITERS": "100000",
+    "ONEAPI_DEVICE_SELECTOR": "level_zero:0,1,2,3",
+    "ZE_AFFINITY_MASK": "0,1,2,3",
+    "CCL_TOPO_P2P_ACCESS": "1"
+  },
+  "result": {
+    "validation_sample_qk_var": [
+      26.5,
+      265.0
+    ],
+    "tokens": 1,
+    "iters": 20,
+    "warmup": 5,
+    "barrier": false,
+    "elapsed_s": 8.154141,
+    "ms_per_iter": 407.70707
+  },
+  "artifacts": {
+    "log": "/home/steve/bench-results/minimax-m2.7-strict-candidates/qk-ipc-microbench-20260518T030255Z.log"
+  },
+  "decision": "Reject direct IPC Q/K RMS variance collective. Too slow for per-token decode path; continue with graph/XCCL fusion work instead.",
+  "localmaxxing": {
+    "submitted": false,
+    "reason": "Microbenchmark negative result, not an inference benchmark run."
+  }
+}
