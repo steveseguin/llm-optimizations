@@ -31,6 +31,13 @@ Recent MBT boundary follow-up:
 - Decision: keep MBT512 as the promoted public setting. No LocalMaxxing submission was made for the boundary sweep because no candidate gave a material quality-safe improvement.
 - Artifacts: `notes/2026-05-18-minimax-mbt-boundary.md`, `data/minimax-m27-mbt-boundary-20260518.json`
 
+Recent MoE-delay follow-up:
+
+- `VLLM_MINIMAX_MOE_DELAY_ALLREDUCE=1` with the same MBT512 work-sharing FlashAttention/PIECEWISE recipe passed the full strict quality gate.
+- Result: `79.481453` output tok/s and `105.975271` total tok/s mean, slower than the promoted baseline.
+- Decision: do not promote and do not submit to LocalMaxxing. Keep effort on decode-critical collective and epilogue work.
+- Artifacts: `notes/2026-05-18-minimax-moe-delay-negative.md`, `data/minimax-m27-moe-delay-negative-20260518.json`
+
 ## Qwen3.6 27B
 
 The quality-preserving Qwen targets remain separate from MiniMax AutoRound:
