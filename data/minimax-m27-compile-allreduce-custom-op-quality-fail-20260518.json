@@ -1,0 +1,30 @@
+{
+  "date": "2026-05-18",
+  "label": "minimax-compile-allreduce-custom-op-ar-20260518",
+  "model": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+  "hardware": "4x Intel Arc Pro B70 32GB",
+  "engine": "vLLM 0.20.1-local XPU TP4",
+  "baseline": {
+    "out_tok_s": 82.40426775694743,
+    "total_tok_s": 109.87235700926325,
+    "quality": "strict quality passed"
+  },
+  "candidate_env_delta": {
+    "VLLM_XPU_COMPILE_ALLREDUCE_CUSTOM_OP": "1"
+  },
+  "status": "rejected",
+  "failure_stage": "raw145-n64-exact",
+  "failure_reason": "combined token hash mismatch",
+  "expected_combined_token_sha256": "267cbf30208d84929ee79284ac695467f7e80597bf8694130e1e1f8b180eb5bd",
+  "actual_combined_token_sha256": "fddec0c19f560999e0ab5c4507d694d18e71584e7d4d74342dcf24c45e567678",
+  "deterministic_across_raw_run": true,
+  "degenerate_output": false,
+  "benchmark_run": false,
+  "localmaxxing_submitted": false,
+  "warning": "PyTorch warned that vllm::all_reduce output may alias an input; this custom op path is not quality safe in the current XPU graph recipe.",
+  "artifacts": {
+    "summary_json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-minimax-compile-allreduce-custom-op-ar-20260518-strict-tp4-ctx2048-mbt512-bs256-20260518T214429Z-summary.json",
+    "raw145_n64_json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-minimax-compile-allreduce-custom-op-ar-20260518-strict-tp4-ctx2048-mbt512-bs256-20260518T214429Z-quality/raw145-n64-exact.json",
+    "raw145_n64_log": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-minimax-compile-allreduce-custom-op-ar-20260518-strict-tp4-ctx2048-mbt512-bs256-20260518T214429Z-quality/raw145-n64-exact.log"
+  }
+}
