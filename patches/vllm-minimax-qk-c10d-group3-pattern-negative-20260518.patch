@@ -1,0 +1,55 @@
+diff --git a/vllm/compilation/passes/fusion/minimax_qk_norm_fusion.py b/vllm/compilation/passes/fusion/minimax_qk_norm_fusion.py
+index 000000000..000000000 100644
+--- a/vllm/compilation/passes/fusion/minimax_qk_norm_fusion.py
++++ b/vllm/compilation/passes/fusion/minimax_qk_norm_fusion.py
+@@ -249,6 +249,22 @@ class MiniMaxQKNormPattern:
+         tp_rank = self.tp_rank
+         dtype = self.dtype
+         group_name = self.group_name
++        use_xpu_c10d_pattern = (
++            current_platform.is_xpu()
++            and os.environ.get("VLLM_MINIMAX_QK_NORM_XPU_HELPER_FUSION", "0") == "1"
++        )
++        xpu_c10d_group_name = os.environ.get(
++            "VLLM_MINIMAX_QK_NORM_C10D_GROUP_NAME", "3"
++        )
++
++        def all_reduce_pattern(qk_var: torch.Tensor) -> torch.Tensor:
++            if use_xpu_c10d_pattern:
++                all_reduce = torch.ops._c10d_functional.all_reduce(
++                    qk_var, "sum", xpu_c10d_group_name
++                )
++                return torch.ops._c10d_functional.wait_tensor(all_reduce)
++            return tensor_model_parallel_all_reduce(qk_var)
+ 
+         def pattern(
+             qkv: torch.Tensor,
+@@ -263,7 +279,7 @@ class MiniMaxQKNormPattern:
+             q_var = q_fp32.pow(2).mean(dim=-1, keepdim=True)
+             k_var = k_fp32.pow(2).mean(dim=-1, keepdim=True)
+             qk_var = torch.cat([q_var, k_var], dim=-1)
+-            qk_var = tensor_model_parallel_all_reduce(qk_var) / tp_world
++            qk_var = all_reduce_pattern(qk_var) / tp_world
+             q_var, k_var = qk_var.chunk(2, dim=-1)
+             q_out = (q_fp32 * torch.rsqrt(q_var + eps) * q_weight).to(dtype)
+             k_out = (k_fp32 * torch.rsqrt(k_var + eps) * k_weight).to(dtype)
+@@ -311,7 +327,7 @@ class MiniMaxQKNormPattern:
+             q_var = q_fp32.pow(2).mean(dim=-1, keepdim=True)
+             k_var = k_fp32.pow(2).mean(dim=-1, keepdim=True)
+             qk_var = torch.cat([q_var, k_var], dim=-1)
+-            qk_var = tensor_model_parallel_all_reduce(qk_var) / tp_world
++            qk_var = all_reduce_pattern(qk_var) / tp_world
+             q_var, k_var = qk_var.chunk(2, dim=-1)
+             q_out = (q_fp32 * torch.rsqrt(q_var + eps) * q_weight).to(dtype)
+             k_out = (k_fp32 * torch.rsqrt(k_var + eps) * k_weight).to(dtype)
+@@ -429,6 +445,10 @@ class MiniMaxQKNormPass(VllmPatternMatcherPass):
+             return
+         self.matched_count = self.patterns.apply(graph)
+         logger.debug("MiniMaxQKNormPass replaced %s patterns", self.matched_count)
++        if os.environ.get("VLLM_MINIMAX_QK_NORM_PASS_LOG", "0") == "1":
++            logger.warning(
++                "MiniMaxQKNormPass replaced %s patterns", self.matched_count
++            )
+ 
+     def uuid(self) -> str:
+         return VllmInductorPass.hash_source(self, MiniMaxQKNormPattern)
