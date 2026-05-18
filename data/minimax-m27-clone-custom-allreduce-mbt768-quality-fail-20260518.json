@@ -1,0 +1,77 @@
+{
+  "title": "MiniMax M2.7 AutoRound clone-safe custom allreduce MBT768 quality failure",
+  "date": "2026-05-18",
+  "status": "quality_failed_extended_suite",
+  "model": {
+    "hf_id": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+    "local_path": "/mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround",
+    "quantization": "AutoRound INT4 W4A16"
+  },
+  "hardware": {
+    "gpu": "Intel Arc Pro B70 32GB",
+    "gpu_count": 4,
+    "aggregate_vram_gb": 128
+  },
+  "engine": {
+    "name": "vLLM",
+    "version": "0.20.1-local",
+    "device": "xpu",
+    "tensor_parallel_size": 4,
+    "dtype": "float16",
+    "attention_backend": "XPU FlashAttention v2",
+    "graph_mode": "PIECEWISE",
+    "block_size": 256,
+    "max_num_batched_tokens": 768
+  },
+  "baseline": {
+    "name": "clone-safe custom allreduce promoted result",
+    "max_num_batched_tokens": 512,
+    "mean_output_toks_per_second": 87.27912933688414,
+    "mean_total_toks_per_second": 116.37217244917883,
+    "localmaxxing_id": "cmpbsqm4l001qpc0199azisgz"
+  },
+  "environment": {
+    "MAX_BATCHED_TOKENS": "768",
+    "VLLM_XPU_COMPILE_ALLREDUCE_CUSTOM_OP": "1",
+    "VLLM_XPU_CUSTOM_ALLREDUCE_CLONE_INPUT": "1",
+    "VLLM_XPU_USE_LLM_SCALER_MOE": "1",
+    "VLLM_XPU_USE_LLM_SCALER_MOE_WS": "1",
+    "VLLM_XPU_USE_LLM_SCALER_MOE_MINIMAX_LOGITS_WS": "1",
+    "VLLM_MINIMAX_M2_ATTN_DELAY_ALLREDUCE": "0",
+    "VLLM_MINIMAX_QK_NORM_RESTORE_WEIGHT": "1",
+    "VLLM_MINIMAX_QK_NORM_RESTORE_WEIGHT_MIN_TOKENS": "2",
+    "VLLM_XPU_ENABLE_XPU_GRAPH": "1",
+    "VLLM_XPU_FORCE_GRAPH_WITH_COMM": "1",
+    "VLLM_XPU_GRAPH_NOOP_COMM_CAPTURE": "1",
+    "CCL_TOPO_P2P_ACCESS": "1"
+  },
+  "quality": {
+    "raw145_n64_exact": "passed",
+    "raw145_n256_exact": "passed",
+    "semantic_suite_n64_r2": "passed",
+    "arithmetic_repeat_n64_r16": "passed",
+    "extended_sixpack_n64_r2": "failed",
+    "failure_reasons": [
+      "nondeterministic token"
+    ],
+    "nondeterministic_prompt_index": 4,
+    "prompt_4_token_hashes": [
+      "a768eeb66e15fe912fc035532db3a123ae75830fd20765abf2166603f43d3954",
+      "aa86a2578614dd7105f75c56c665c9bd776679d53371df8351be6f9984e93f5e"
+    ]
+  },
+  "artifacts": {
+    "summary_json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-minimax-compile-allreduce-custom-op-clone-mbt768-ar-20260518-strict-tp4-ctx2048-mbt768-bs256-20260518T230121Z-summary.json",
+    "failed_quality_json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-minimax-compile-allreduce-custom-op-clone-mbt768-ar-20260518-strict-tp4-ctx2048-mbt768-bs256-20260518T230121Z-quality/extended-sixpack-n64-r2.json"
+  },
+  "compiler_notes": [
+    "Cold compile emitted Triton/ocloc/IGC failures for triton_red_fused__to_copy_mm_t_10.",
+    "Execution continued, but extended-sixpack nondeterminism makes this graph boundary unsafe under the clone-safe custom-allreduce recipe."
+  ],
+  "decision": {
+    "promote": false,
+    "benchmark": false,
+    "localmaxxing_submitted": false,
+    "reason": "Quality failed before benchmark; keep promoted MBT512 for clone-safe custom allreduce."
+  }
+}
