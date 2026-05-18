@@ -1,0 +1,159 @@
+{
+  "date": "2026-05-18",
+  "model": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+  "hardware": {
+    "gpu": "Intel Arc Pro B70 32GB",
+    "gpu_count": 4
+  },
+  "engine": {
+    "name": "vLLM",
+    "version": "0.20.1-local",
+    "device": "xpu",
+    "tensor_parallel": 4
+  },
+  "baseline": {
+    "name": "promoted logits-to-work-sharing no-attention-delay recipe",
+    "output_toks_per_second": 82.40426775694743,
+    "total_toks_per_second": 109.87235700926325,
+    "shape": {
+      "prompt_tokens": 512,
+      "output_tokens": 1536,
+      "context_length": 2048,
+      "max_num_batched_tokens": 512,
+      "block_size": 256,
+      "batch_size": 1
+    }
+  },
+  "screens": [
+    {
+      "name": "minimax_qk_norm_pass_xpu_helper",
+      "status": "quality_passed_performance_rejected",
+      "env": {
+        "COMPILATION_CONFIG_JSON": "{\"use_inductor_graph_partition\":true,\"compile_sizes\":[1],\"cudagraph_mode\":\"PIECEWISE\",\"pass_config\":{\"fuse_minimax_qk_norm\":true}}",
+        "VLLM_MINIMAX_QK_NORM_XPU_HELPER_FUSION": "1",
+        "VLLM_XPU_USE_LLM_SCALER_MOE": "1",
+        "VLLM_XPU_USE_LLM_SCALER_MOE_WS": "1",
+        "VLLM_XPU_USE_LLM_SCALER_MOE_MINIMAX_LOGITS_WS": "1",
+        "VLLM_MINIMAX_M2_ATTN_DELAY_ALLREDUCE": "0",
+        "VLLM_MINIMAX_QK_NORM_RESTORE_WEIGHT": "1",
+        "VLLM_MINIMAX_QK_NORM_RESTORE_WEIGHT_MIN_TOKENS": "2",
+        "VLLM_XPU_ENABLE_XPU_GRAPH": "1",
+        "VLLM_XPU_FORCE_GRAPH_WITH_COMM": "1",
+        "VLLM_XPU_GRAPH_NOOP_COMM_CAPTURE": "1"
+      },
+      "quality": {
+        "raw145_n64_exact": {
+          "passed": true,
+          "combined_token_sha256": "267cbf30208d84929ee79284ac695467f7e80597bf8694130e1e1f8b180eb5bd"
+        },
+        "raw145_n256_exact": {
+          "passed": true,
+          "combined_token_sha256": "58f6e8251c7a0a17e8c441278b5861f7d5da914fa1823ecd10484b296f2d7537"
+        },
+        "semantic_suite_n64_r2": {
+          "passed": true,
+          "combined_token_sha256": "adacbf144264486ea7d378ebb6a4c0ba23951b72c4cf86251a762b07ebef5805"
+        },
+        "arithmetic_repeat_n64_r16": {
+          "passed": true,
+          "combined_token_sha256": "578ec378bf31cb16fb49ac5c0043270fd00a0f7898e18ac498a41ffe775d7994"
+        },
+        "extended_sixpack_n64_r2": {
+          "passed": true,
+          "combined_token_sha256": "1e3560554f57b2b56cec8f49f28bc8ba12e9e0ced26bdc99a976f1433c99caa7"
+        }
+      },
+      "benchmark": {
+        "output_toks_per_second": [
+          78.86524870002611,
+          79.3789277920448
+        ],
+        "total_toks_per_second": [
+          105.15366493336815,
+          105.83857038939307
+        ],
+        "mean_output_toks_per_second": 79.12208824603546,
+        "mean_total_toks_per_second": 105.49611766138061,
+        "delta_output_percent_vs_baseline": -3.982
+      },
+      "artifacts": {
+        "summary": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-minimax-qk-pass-helper-ar-20260518-strict-tp4-ctx2048-mbt512-bs256-20260518T191730Z-summary.json",
+        "benchmarks": [
+          "/home/steve/bench-results/minimax-m2.7-strict-candidates/vllm-minimax-m27-autoround-tp4-p512n1536-20260518T193306Z.json",
+          "/home/steve/bench-results/minimax-m2.7-strict-candidates/vllm-minimax-m27-autoround-tp4-p512n1536-20260518T193558Z.json"
+        ]
+      }
+    },
+    {
+      "name": "fuse_allreduce_rms",
+      "status": "failed_before_raw_output",
+      "env": {
+        "COMPILATION_CONFIG_JSON": "{\"use_inductor_graph_partition\":true,\"compile_sizes\":[1],\"cudagraph_mode\":\"PIECEWISE\",\"pass_config\":{\"fuse_allreduce_rms\":true}}",
+        "VLLM_XPU_EXPERIMENTAL_FUSE_ALLREDUCE_RMS": "1"
+      },
+      "failure": {
+        "type": "cuda_assumption",
+        "message": "pydantic_core ValidationError: Assertion failed, Torch not compiled with CUDA enabled"
+      },
+      "artifacts": {
+        "summary": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-fuse-allreduce-rms-ar-20260518-strict-tp4-ctx2048-mbt512-bs256-20260518T190108Z-summary.json",
+        "log": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-fuse-allreduce-rms-ar-20260518-strict-tp4-ctx2048-mbt512-bs256-20260518T190108Z-quality/raw145-n64-exact.log"
+      }
+    },
+    {
+      "name": "fuse_gemm_comms_default",
+      "status": "disabled_by_vllm_heuristic",
+      "env": {
+        "COMPILATION_CONFIG_JSON": "{\"use_inductor_graph_partition\":true,\"compile_sizes\":[1],\"cudagraph_mode\":\"PIECEWISE\",\"pass_config\":{\"fuse_gemm_comms\":true}}",
+        "VLLM_XPU_EXPERIMENTAL_FUSE_GEMM_COMMS": "1"
+      },
+      "message": "Model hidden_size too small for the SP threshold heuristic, disabling. Resulting pass_config had enable_sp=false and fuse_gemm_comms=false.",
+      "artifacts": {
+        "log": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-fuse-gemm-comms-ar-20260518-strict-tp4-ctx2048-mbt512-bs256-20260518T190217Z-quality/raw145-n64-exact.log"
+      }
+    },
+    {
+      "name": "fuse_gemm_comms_forced_sp1",
+      "status": "failed_during_compile",
+      "env": {
+        "COMPILATION_CONFIG_JSON": "{\"use_inductor_graph_partition\":true,\"compile_sizes\":[1],\"cudagraph_mode\":\"PIECEWISE\",\"pass_config\":{\"fuse_gemm_comms\":true,\"sp_min_token_num\":1}}",
+        "VLLM_XPU_EXPERIMENTAL_FUSE_GEMM_COMMS": "1"
+      },
+      "failure": {
+        "type": "missing_xpu_import_or_cuda_gated_pass",
+        "message": "NameError: name 'AsyncTPPass' is not defined"
+      },
+      "artifacts": {
+        "summary": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-fuse-gemm-comms-sp1-screen-20260518-strict-tp4-ctx2048-mbt512-bs256-20260518T190621Z-summary.json",
+        "log": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-fuse-gemm-comms-sp1-screen-20260518-strict-tp4-ctx2048-mbt512-bs256-20260518T190621Z-quality/raw145-n64-exact.log"
+      }
+    },
+    {
+      "name": "enable_sequence_parallel_sp1",
+      "status": "failed_engine_start",
+      "env": {
+        "COMPILATION_CONFIG_JSON": "{\"use_inductor_graph_partition\":true,\"compile_sizes\":[1],\"cudagraph_mode\":\"PIECEWISE\",\"pass_config\":{\"enable_sp\":true,\"sp_min_token_num\":1}}",
+        "VLLM_XPU_EXPERIMENTAL_ENABLE_SP": "1"
+      },
+      "failure": {
+        "type": "single_session_graph_shape_conflict",
+        "message": "Batch sizes [1, 2] removed because they are not multiple of tp_size 4; cudagraph_capture_sizes=[], max_cudagraph_capture_size=0; AssertionError: Maximum cudagraph size should be greater than or equal to 1 when using cuda graph."
+      },
+      "artifacts": {
+        "runtime": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-enable-sp-sp1-screen-20260518-strict-tp4-ctx2048-mbt512-bs256-20260518T190923Z-runtime.json",
+        "log": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-enable-sp-sp1-screen-20260518-strict-tp4-ctx2048-mbt512-bs256-20260518T190923Z-quality/raw145-n64-exact.log"
+      }
+    }
+  ],
+  "decision": {
+    "promote": false,
+    "submit_to_localmaxxing": false,
+    "reason": "No compiler-pass candidate beat the promoted strict quality-passed MiniMax result. Q/K pass preserved quality but was slower; the generic fusion passes hit CUDA-only or graph-shape blockers on XPU."
+  },
+  "next": [
+    "Keep the promoted exact router-logits work-sharing path.",
+    "Prioritize XPU-native MoE/projection epilogue and collective-boundary work over generic vLLM compiler toggles.",
+    "Do not retest static scratch reuse unless graph-safe buffer lifetime ownership is implemented.",
+    "Treat SP/gemm-comms as future multi-sequence throughput work unless XPU pass support is repaired."
+  ]
+}
