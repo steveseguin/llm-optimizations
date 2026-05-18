@@ -1,0 +1,98 @@
+{
+  "label": "logits-ws-qk-rms-helper-flashdefault",
+  "date": "2026-05-18",
+  "timestamp_utc": "20260518T153811Z",
+  "status": "quality_passed_not_promoted",
+  "model": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+  "local_model_path": "/mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround",
+  "hardware": {
+    "gpu": "Intel Arc Pro B70 32GB",
+    "gpu_count": 4
+  },
+  "engine": {
+    "name": "vllm",
+    "version": "0.20.1-local",
+    "backend": "xpu",
+    "tensor_parallel_size": 4,
+    "dtype": "float16",
+    "quantization": "AutoRound INT4 W4A16",
+    "attention_backend": "default XPU FlashAttention v2",
+    "xpu_graph": "PIECEWISE"
+  },
+  "shape": {
+    "prompt_tokens": 512,
+    "output_tokens": 1536,
+    "context_length": 2048,
+    "batch_size": 1,
+    "max_num_batched_tokens": 512,
+    "block_size": 256
+  },
+  "baseline": {
+    "label": "promoted-logits-ws",
+    "mean_output_toks_per_second": 81.758267,
+    "mean_total_toks_per_second": 109.011023
+  },
+  "result": {
+    "mean_output_toks_per_second": 81.44192760864851,
+    "mean_total_toks_per_second": 108.58923681153135,
+    "output_toks_per_second": [
+      80.28983338117284,
+      82.5940218361242
+    ],
+    "total_toks_per_second": [
+      107.05311117489713,
+      110.12536244816559
+    ],
+    "delta_output_percent_vs_promoted": -0.386914
+  },
+  "candidate_env": {
+    "VLLM_XPU_USE_LLM_SCALER_MOE_WS": "1",
+    "VLLM_XPU_USE_LLM_SCALER_MOE_MINIMAX_LOGITS_WS": "1",
+    "VLLM_MINIMAX_QK_RMS_XPU_HELPER": "1",
+    "VLLM_MINIMAX_M2_ATTN_DELAY_ALLREDUCE": "1",
+    "VLLM_MINIMAX_QK_NORM_RESTORE_WEIGHT": "1",
+    "VLLM_MINIMAX_QK_NORM_RESTORE_WEIGHT_MIN_TOKENS": "2",
+    "VLLM_XPU_ENABLE_XPU_GRAPH": "1",
+    "VLLM_XPU_FORCE_GRAPH_WITH_COMM": "1",
+    "VLLM_XPU_GRAPH_NOOP_COMM_CAPTURE": "1",
+    "CCL_TOPO_P2P_ACCESS": "1"
+  },
+  "quality": {
+    "raw145_n64_exact": {
+      "passed": true,
+      "combined_token_sha256": "267cbf30208d84929ee79284ac695467f7e80597bf8694130e1e1f8b180eb5bd"
+    },
+    "raw145_n256_exact": {
+      "passed": true,
+      "combined_token_sha256": "58f6e8251c7a0a17e8c441278b5861f7d5da914fa1823ecd10484b296f2d7537"
+    },
+    "semantic_suite_n64_r2": {
+      "passed": true
+    },
+    "arithmetic_repeat_n64_r16": {
+      "passed": true,
+      "deterministic": true,
+      "expected_answer": "42"
+    },
+    "extended_sixpack_n64_r2": {
+      "passed": true
+    }
+  },
+  "decision": {
+    "promote": false,
+    "submit_localmaxxing": false,
+    "reason": "Quality-safe, but slightly slower than the promoted logits-WS baseline. The helper replaces local Q/K RMS math but does not remove the decode-critical Q/K variance collective boundary."
+  },
+  "artifacts": {
+    "full_summary_json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-logits-ws-qk-rms-helper-flashdefault-strict-tp4-ctx2048-mbt512-bs256-20260518T153811Z-summary.json",
+    "quality_dir": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-logits-ws-qk-rms-helper-flashdefault-strict-tp4-ctx2048-mbt512-bs256-20260518T153811Z-quality",
+    "benchmark_jsons": [
+      "/home/steve/bench-results/minimax-m2.7-strict-candidates/vllm-minimax-m27-autoround-tp4-p512n1536-20260518T155357Z.json",
+      "/home/steve/bench-results/minimax-m2.7-strict-candidates/vllm-minimax-m27-autoround-tp4-p512n1536-20260518T155647Z.json"
+    ],
+    "benchmark_logs": [
+      "/home/steve/bench-results/minimax-m2.7-strict-candidates/vllm-minimax-m27-autoround-tp4-p512n1536-20260518T155357Z.log",
+      "/home/steve/bench-results/minimax-m2.7-strict-candidates/vllm-minimax-m27-autoround-tp4-p512n1536-20260518T155647Z.log"
+    ]
+  }
+}
