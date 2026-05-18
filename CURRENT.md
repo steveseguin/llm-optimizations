@@ -83,6 +83,15 @@ Recent WS internal scratch-reuse rejection:
 - Decision: do not enable static internal scratch reuse under XPU graph capture/replay. Future allocation-overhead work needs graph-safe lifetime management.
 - Artifacts: `notes/2026-05-18-minimax-ws-internal-reuse-reject.md`, `data/minimax-m27-ws-internal-reuse-reject-20260518.json`
 
+Recent MoE trace and tile-sweep follow-up:
+
+- Enforced-eager `LLM_SCALER_MOE_TRACE_KERNELS=1` completed and showed the promoted path using the expected `moe ws up routed cutlass int4` and `moe ws down cutlass int4` kernels. Trace output is diagnostic-only because it inserts waits and multi-worker stderr interleaves.
+- `VLLM_XPU_MOE_WS_UP_NTILE=4` passed the full strict quality gate but was slower at `79.236469` output tok/s and `105.648625` total tok/s.
+- `VLLM_XPU_MOE_WS_UP_NTILE=8` stalled after graph compile; no result JSON.
+- `VLLM_XPU_MOE_WS_DOWN_HTILE=8` failed exact raw-hash equivalence, producing `21404821eb70a2ee3de9e82c039b5cbb5c9eef884c5019579f442c6a272a9c5a` instead of the promoted `267cbf30208d84929ee79284ac695467f7e80597bf8694130e1e1f8b180eb5bd`.
+- Decision: do not promote and do not submit to LocalMaxxing. Simple WS tile reties are not the next useful path.
+- Artifacts: `notes/2026-05-18-minimax-moe-trace-and-tile-negative.md`, `data/minimax-m27-moe-trace-and-tile-negative-20260518.json`
+
 ## Qwen3.6 27B
 
 The quality-preserving Qwen targets remain separate from MiniMax AutoRound:
