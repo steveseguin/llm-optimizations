@@ -43,6 +43,7 @@ Recent quality-safe neutral or negative work:
 - Greedy sampler fp32 skip: quality passed but tied/slowed at `81.549421` output tok/s. Artifacts: `notes/2026-05-18-minimax-greedy-skip-logits-fp32-negative.md`, `data/minimax-m27-greedy-skip-logits-fp32-negative-20260518.json`, `patches/minimax-greedy-skip-logits-fp32-negative-20260518.md`.
 - WS top-k reuse: failed raw145 n64 exact immediately with NUL/control-token corruption; reverted and default canary passed. Artifacts: `notes/2026-05-18-minimax-ws-topk-reuse-reject.md`, `data/minimax-m27-ws-topk-reuse-reject-20260518.json`, `patches/minimax-ws-topk-reuse-rejected-20260518.md`.
 - Safe hidden-state selection: quality passed under the fair default XPU FlashAttention v2 backend at `81.914167` output tok/s / `109.218890` total tok/s, only `+0.19%` over promoted and inside run variance. Decision: neutral/tie, not promoted and not submitted to LocalMaxxing. Erratum: the earlier `77.314354` output tok/s safe-selector run used the strict runner's older `TRITON_ATTN` default, so it is quality-valid diagnostic data but not a fair comparison against the promoted FlashAttention baseline. Artifacts: `notes/2026-05-18-minimax-safe-sample-hidden-select-negative.md`, `data/minimax-m27-safe-sample-hidden-select-negative-20260518.json`, `patches/minimax-safe-sample-hidden-select-negative-20260518.md`.
+- Logits chunked gather: `VLLM_XPU_LOGITS_CHUNKED_GATHER=32768` passed raw145 n64/n256 exact and the semantic suite, but failed the 16-repeat arithmetic gate with token-level nondeterminism. Decision: reject without benchmarking. Artifacts: `notes/2026-05-18-minimax-logits-chunked-gather-reject.md`, `data/minimax-m27-logits-chunked-gather-reject-20260518.json`.
 
 ## Qwen3.6 27B
 
@@ -57,5 +58,6 @@ The quality-preserving Qwen targets remain separate from MiniMax AutoRound:
 - Keep the MiniMax logits-to-work-sharing FlashAttention/PIECEWISE recipe as the strict baseline.
 - Target final logits/lm-head cost, hidden-state collective boundaries, MoE/projection epilogue fusion, and prefill efficiency.
 - Do not promote logits/router/argmax shortcuts unless they pass the same strict quality gate.
+- Avoid logits chunked-gather variants unless there is a new deterministic implementation; `VLLM_XPU_LOGITS_CHUNKED_GATHER=32768` failed repeatability.
 - Keep strict runner backend defaults aligned with promoted recipes so candidate comparisons are fair.
 - Keep speculative decode optional and quality-gated; no current promoted MiniMax result uses speculation.
