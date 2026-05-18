@@ -1,0 +1,53 @@
+{
+  "date": "2026-05-18",
+  "model": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+  "hardware": "4x Intel Arc Pro B70 32GB",
+  "engine": "vLLM 0.20.1-local XPU TP4",
+  "purpose": "Decode-boundary timing after the logits-to-work-sharing strict win.",
+  "active_runtime_restored_hashes": {
+    "minimax_m2.py": "e1408e4c95a662f43aca5712d30298bf75073626ffb10fcdce621c175888779f",
+    "logits_processor.py": "ccfe30c1469630aed3040de63970470db6110325850a552a0287764032bbc733"
+  },
+  "compiled_sync_timing_p512n384": {
+    "log": "/home/steve/bench-results/minimax-m2.7-diagnostics/vllm-minimax-m27-autoround-tp4-p512n384-20260518T092055Z.log",
+    "json": "/home/steve/bench-results/minimax-m2.7-diagnostics/vllm-minimax-m27-autoround-tp4-p512n384-20260518T092055Z.json",
+    "note": "Diagnostic only; VLLM_XPU_DECODE_TIMING_SYNC=1 distorts throughput.",
+    "timing_rank0": {
+      "minimax.final_logits_avg_ms": 0.866055,
+      "logits.local_argmax_lm_head_avg_ms": 0.600119,
+      "logits.gather_logits_avg_ms": 0.135818,
+      "gpu_model_runner.async_output_tolist_avg_ms": 0.041435
+    }
+  },
+  "eager_sync_timing_p512n48": {
+    "log": "/home/steve/bench-results/minimax-m2.7-diagnostics/vllm-minimax-m27-autoround-tp4-p512n48-20260518T093102Z.log",
+    "json": "/home/steve/bench-results/minimax-m2.7-diagnostics/vllm-minimax-m27-autoround-tp4-p512n48-20260518T093102Z.json",
+    "note": "Diagnostic only; --enforce-eager and synchronized timing expose labels but are not speed-valid.",
+    "timing_rank0": {
+      "all_reduce:minimax_qk_var:(1, 2):torch.float32_avg_ms": 0.096927,
+      "all_reduce:minimax.attn.delayed_residual_allreduce:(1, 3072):torch.float16_avg_ms": 0.095092,
+      "all_reduce:minimax.moe.experts_allreduce:(1, 3072):torch.float16_avg_ms": 0.092581,
+      "minimax.final_logits_avg_ms": 0.842722,
+      "logits.local_argmax_lm_head_avg_ms": 0.585511,
+      "logits.gather_logits_avg_ms": 0.134978
+    }
+  },
+  "instrumentation_negative": {
+    "ungated_model_forward_labels_output_tps": 63.55981345044449,
+    "gated_model_forward_labels_output_tps": 62.13963725731114,
+    "conclusion": "Do not keep timing wrappers inside compiled MiniMax model forward. They perturb the graph even when intended as diagnostics."
+  },
+  "post_revert_speed_sanity": {
+    "log": "/home/steve/bench-results/minimax-m2.7-diagnostics/vllm-minimax-m27-autoround-tp4-p512n1536-20260518T100224Z.log",
+    "json": "/home/steve/bench-results/minimax-m2.7-diagnostics/vllm-minimax-m27-autoround-tp4-p512n1536-20260518T100224Z.json",
+    "output_tokens_per_second": 82.45476496500011,
+    "total_tokens_per_second": 109.93968662000016,
+    "elapsed_time": 18.6283958319691
+  },
+  "decision": "No LocalMaxxing submission. These are diagnostics, not promoted benchmark results.",
+  "next_targets": [
+    "Full-logits lm-head/postprocess path if exact token selection can be preserved.",
+    "Hidden-size collective reduction only if strict quality gates pass.",
+    "MoE expert output epilogue or scheduling, because MoE remains the largest eager per-layer region."
+  ]
+}
