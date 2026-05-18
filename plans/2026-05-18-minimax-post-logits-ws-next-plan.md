@@ -52,3 +52,9 @@ Date: 2026-05-18
 7. Next diagnostic: MoE kernel trace on the promoted path.
    - Reason: the scratch-reuse failure shows allocation shortcuts can corrupt graph replay. Before changing more code, collect per-kernel wait timings with `LLM_SCALER_MOE_TRACE_KERNELS=1` on a short current-best run to decide whether top-k, up, down, or final logits is the next best exact target.
    - Constraint: trace mode is diagnostic only because it inserts waits and changes throughput.
+   - Update: the first trace attempt was invalid because vLLM still compiled graph ranges; an enforced-eager trace completed and passed a short canary. Clean entries showed the expected WS up/down kernels, but multi-worker stderr interleaving makes aggregates approximate.
+   - Follow-up tile sweep:
+     - `VLLM_XPU_MOE_WS_UP_NTILE=4` passed full strict quality but slowed to `79.236469` output tok/s and `105.648625` total tok/s.
+     - `VLLM_XPU_MOE_WS_UP_NTILE=8` stalled after graph compile.
+     - `VLLM_XPU_MOE_WS_DOWN_HTILE=8` changed the exact raw token hash and was rejected without benchmark.
+   - Decision: stop simple tile reties. Next work should target graph-safe MoE epilogue/work-sharing structure, final logits/lm-head cost, or cleaner non-invasive timing.
