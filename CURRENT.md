@@ -67,6 +67,14 @@ Recent decode-boundary timing:
 - Model-forward timing wrappers were not neutral in compiled graph and were reverted. Active `minimax_m2.py` and `logits_processor.py` hashes match the promoted runtime again.
 - Artifacts: `notes/2026-05-18-minimax-decode-boundary-timing.md`, `data/minimax-m27-decode-boundary-timing-20260518.json`
 
+Recent candidate-router repair follow-up:
+
+- Top-16 candidate-router repair failed the first raw145 n64 exact token-hash gate, so it was rejected without benchmarking.
+- Top-32 candidate-router repair passed the full strict quality gate, including raw145 n64/n256 exact hashes, semantic suite, 16-repeat arithmetic, and extended sixpack.
+- Result: `80.008471` output tok/s and `106.677962` total tok/s mean, slower than the promoted `81.758267` / `109.011023` logits-WS baseline.
+- Decision: do not promote and do not submit to LocalMaxxing. The candidate-repair path is quality-preserving at top32 but not faster than the exact router-logits WS path.
+- Artifacts: `notes/2026-05-18-minimax-candidate-router-top32-negative.md`, `data/minimax-m27-candidate-router-top32-negative-20260518.json`
+
 ## Qwen3.6 27B
 
 The quality-preserving Qwen targets remain separate from MiniMax AutoRound:
