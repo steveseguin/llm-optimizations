@@ -1,0 +1,79 @@
+{
+  "label": "minimax-logits-ws-no-attn-delay-qk-helper-inplace-ar-20260518",
+  "date": "2026-05-18",
+  "model": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+  "hardware": "4x Intel Arc Pro B70 32GB",
+  "engine": "vLLM 0.20.1-local XPU TP4",
+  "quantization": "AutoRound INT4 W4A16",
+  "recipe": {
+    "dtype": "float16",
+    "tensor_parallel_size": 4,
+    "context_length": 2048,
+    "prompt_tokens": 512,
+    "output_tokens": 1536,
+    "batch_size": 1,
+    "max_num_batched_tokens": 512,
+    "block_size": 256,
+    "attention_backend": "XPU FlashAttention v2",
+    "xpu_graph": "PIECEWISE",
+    "prefix_caching": false,
+    "async_engine": true,
+    "temperature": 0,
+    "speculative_decoding": false,
+    "power_limit_changed": false
+  },
+  "env": {
+    "VLLM_XPU_USE_LLM_SCALER_MOE": "1",
+    "VLLM_XPU_USE_LLM_SCALER_MOE_WS": "1",
+    "VLLM_XPU_USE_LLM_SCALER_MOE_MINIMAX_LOGITS_WS": "1",
+    "VLLM_MINIMAX_M2_ATTN_DELAY_ALLREDUCE": "0",
+    "VLLM_MINIMAX_QK_RMS_XPU_HELPER": "1",
+    "VLLM_MINIMAX_QK_RMS_XPU_HELPER_INPLACE_ALLREDUCE": "1",
+    "VLLM_XPU_ENABLE_XPU_GRAPH": "1",
+    "VLLM_XPU_FORCE_GRAPH_WITH_COMM": "1",
+    "VLLM_XPU_GRAPH_NOOP_COMM_CAPTURE": "1",
+    "VLLM_MINIMAX_QK_NORM_RESTORE_WEIGHT": "1",
+    "VLLM_MINIMAX_QK_NORM_RESTORE_WEIGHT_MIN_TOKENS": "2",
+    "CCL_TOPO_P2P_ACCESS": "1",
+    "ONEAPI_DEVICE_SELECTOR": "level_zero:0,1,2,3",
+    "ZE_AFFINITY_MASK": "0,1,2,3"
+  },
+  "runtime_hashes": {
+    "site_packages_minimax_m2_sha256": "ad63b95486d8ab9e49f6ba6b19da772b3982dc7f47b46b10263268f42d12980d",
+    "src_minimax_m2_sha256": "878fd5411c101ceb07b047cc75067fca9a14cf4989cd774d4b7825537b3eabae",
+    "strict_runner_sha256": "6e505011dbd4aef407731a9051ac28a73e59ef69eda26732b6e7c5e31a83dc21"
+  },
+  "quality": {
+    "passed": true,
+    "raw145_n64_combined_token_sha256": "267cbf30208d84929ee79284ac695467f7e80597bf8694130e1e1f8b180eb5bd",
+    "raw145_n256_combined_token_sha256": "58f6e8251c7a0a17e8c441278b5861f7d5da914fa1823ecd10484b296f2d7537",
+    "semantic_suite_combined_token_sha256": "adacbf144264486ea7d378ebb6a4c0ba23951b72c4cf86251a762b07ebef5805",
+    "arithmetic_repeat_combined_token_sha256": "578ec378bf31cb16fb49ac5c0043270fd00a0f7898e18ac498a41ffe775d7994",
+    "extended_sixpack_combined_token_sha256": "1e3560554f57b2b56cec8f49f28bc8ba12e9e0ced26bdc99a976f1433c99caa7"
+  },
+  "benchmarks": [
+    {
+      "json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/vllm-minimax-m27-autoround-tp4-p512n1536-20260518T182325Z.json",
+      "output_toks_per_second": 81.12466505053112,
+      "total_toks_per_second": 108.16622006737482,
+      "elapsed_time_seconds": 18.933822395978495
+    },
+    {
+      "json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/vllm-minimax-m27-autoround-tp4-p512n1536-20260518T182614Z.json",
+      "output_toks_per_second": 82.75375647657313,
+      "total_toks_per_second": 110.33834196876417,
+      "elapsed_time_seconds": 18.56109094497515
+    }
+  ],
+  "mean_output_toks_per_second": 81.93921076355213,
+  "mean_total_toks_per_second": 109.2522810180695,
+  "current_promoted_output_toks_per_second": 82.40426775694743,
+  "delta_percent_vs_current_promoted": -0.5643603250829194,
+  "localmaxxing": {
+    "submitted": false,
+    "reason": "Quality-safe but slower than current promoted result."
+  },
+  "summary_json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-logits-ws-no-attn-delay-qk-helper-inplace-ar-20260518-strict-tp4-ctx2048-mbt512-bs256-20260518T180746Z-summary.json",
+  "quality_dir": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-logits-ws-no-attn-delay-qk-helper-inplace-ar-20260518-strict-tp4-ctx2048-mbt512-bs256-20260518T180746Z-quality",
+  "decision": "Reject for performance; quality preserved."
+}
