@@ -1,0 +1,127 @@
+{
+  "title": "MiniMax M2.7 AutoRound MoE work-sharing FlashAttention PIECEWISE strict win",
+  "date": "2026-05-18",
+  "status": "promoted_strict_quality_pass",
+  "model": {
+    "hf_id": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+    "base_model": "MiniMaxAI/MiniMax-M2.7",
+    "local_path": "/mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround",
+    "quantization": "AutoRound INT4 W4A16 / INC"
+  },
+  "hardware": {
+    "gpu": "Intel Arc Pro B70 32GB",
+    "gpu_count": 4,
+    "vram_gb_per_gpu": 32,
+    "cpu": "AMD EPYC 9015 8-Core Processor",
+    "ram_gb": 16,
+    "os": "Ubuntu 24.04.4 LTS",
+    "kernel": "6.17.0-23-generic"
+  },
+  "engine": {
+    "name": "vllm",
+    "version": "0.20.1-local",
+    "backend": "XPU / Level Zero",
+    "tensor_parallel": 4,
+    "dtype": "float16",
+    "attention_backend": "default XPU FlashAttention v2",
+    "xpu_graph": true,
+    "cudagraph_mode": "PIECEWISE",
+    "async_engine": true
+  },
+  "shape": {
+    "prompt_tokens": 512,
+    "output_tokens": 1536,
+    "context_length": 2048,
+    "batch_size": 1,
+    "max_num_batched_tokens": 512,
+    "max_num_seqs": 1,
+    "block_size": 256,
+    "prefix_caching": false,
+    "temperature": 0
+  },
+  "environment": {
+    "VLLM_XPU_ENABLE_XPU_GRAPH": "1",
+    "VLLM_XPU_FORCE_GRAPH_WITH_COMM": "1",
+    "VLLM_XPU_GRAPH_NOOP_COMM_CAPTURE": "1",
+    "VLLM_XPU_USE_LLM_SCALER_MOE": "1",
+    "VLLM_XPU_USE_LLM_SCALER_MOE_WS": "1",
+    "VLLM_MINIMAX_M2_ATTN_DELAY_ALLREDUCE": "1",
+    "VLLM_MINIMAX_QK_NORM_RESTORE_WEIGHT": "1",
+    "VLLM_MINIMAX_QK_NORM_RESTORE_WEIGHT_MIN_TOKENS": "2",
+    "CCL_TOPO_P2P_ACCESS": "1",
+    "ONEAPI_DEVICE_SELECTOR": "level_zero:0,1,2,3",
+    "ZE_AFFINITY_MASK": "0,1,2,3"
+  },
+  "quality": {
+    "policy": "Strict gate before speed benchmark",
+    "passed": true,
+    "raw145_n64_combined_token_sha256": "267cbf30208d84929ee79284ac695467f7e80597bf8694130e1e1f8b180eb5bd",
+    "raw145_n256_combined_token_sha256": "58f6e8251c7a0a17e8c441278b5861f7d5da914fa1823ecd10484b296f2d7537",
+    "semantic_suite": "PASS",
+    "arithmetic_repeat": "PASS, exact 42 over 16 greedy repeats",
+    "extended_sixpack": "PASS",
+    "no_quality_sacrifices": [
+      "no model weight change",
+      "no quantization change",
+      "no router precision reduction",
+      "no expert routing change",
+      "no KV dtype change",
+      "no sampler change",
+      "no speculative decoding",
+      "no expert dropping",
+      "no power-limit change"
+    ]
+  },
+  "benchmark": {
+    "benchmark_jsons": [
+      "/home/steve/bench-results/minimax-m2.7-strict-candidates/vllm-minimax-m27-autoround-tp4-p512n1536-20260518T054336Z.json",
+      "/home/steve/bench-results/minimax-m2.7-strict-candidates/vllm-minimax-m27-autoround-tp4-p512n1536-20260518T054627Z.json"
+    ],
+    "benchmark_logs": [
+      "/home/steve/bench-results/minimax-m2.7-strict-candidates/vllm-minimax-m27-autoround-tp4-p512n1536-20260518T054336Z.log",
+      "/home/steve/bench-results/minimax-m2.7-strict-candidates/vllm-minimax-m27-autoround-tp4-p512n1536-20260518T054627Z.log"
+    ],
+    "repeats": [
+      {
+        "elapsed_s": 19.211612918006722,
+        "output_toks_per_second": 79.95164209041153,
+        "total_toks_per_second": 106.60218945388203
+      },
+      {
+        "elapsed_s": 18.90371561801294,
+        "output_toks_per_second": 81.25386728397348,
+        "total_toks_per_second": 108.33848971196464
+      }
+    ],
+    "mean_output_toks_per_second": 80.6027546871925,
+    "mean_total_toks_per_second": 107.47033958292334,
+    "output_toks_per_second_sample_stddev": 0.920812,
+    "output_toks_per_second_min_max_spread_percent_of_mean": 1.615609
+  },
+  "baseline_comparison": {
+    "promoted_flash_piecewise_strict_baseline_output_toks_per_second": 70.00635289969598,
+    "delta_percent_vs_promoted_baseline": 15.136343,
+    "baseline_note": "2026-05-18 MiniMax FlashAttention PIECEWISE strict revalidation"
+  },
+  "aot": {
+    "hash": "03f6a28c070656d44eab4c581bc8dc5295ed123e7c0150c7f596ea24012406b0",
+    "note": "AOT hash matches the promoted baseline because the work-sharing choice is inside the custom MoE op path, not an Inductor graph-pattern change."
+  },
+  "implementation": {
+    "vllm_gate": "/home/steve/.venvs/vllm-xpu/lib/python3.12/site-packages/vllm/model_executor/layers/quantization/moe_wna16.py",
+    "llm_scaler_python_wrapper": "/home/steve/src/llm-scaler/vllm/custom-esimd-kernels-vllm/python/custom_esimd_kernels_vllm/ops.py",
+    "llm_scaler_sycl_kernel": "/home/steve/src/llm-scaler/vllm/custom-esimd-kernels-vllm/csrc/moe_batch/moe_int4.sycl",
+    "kernel_symbol": "moe_forward_tiny_cutlass_nmajor_int4_u4_ws"
+  },
+  "localmaxxing": {
+    "submitted": true,
+    "id": "cmpasdq5v007nmn019elaut3s",
+    "payload_path": "data/localmaxxing-minimax-m27-autoround-moe-ws-flash-piecewise-strict-p512n1536-20260518.payload.json",
+    "response_path": "data/localmaxxing-responses/minimax-m27-autoround-moe-ws-flash-piecewise-strict-p512n1536-20260518.response.json",
+    "submitted_metric_policy": "mean of two strict-gated repeats"
+  },
+  "artifact_paths": {
+    "strict_summary": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-moe-ws-flash-piecewise-strict-20260518-strict-tp4-ctx2048-mbt512-bs256-20260518T052722Z-summary.json",
+    "strict_quality_directory": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-moe-ws-flash-piecewise-strict-20260518-strict-tp4-ctx2048-mbt512-bs256-20260518T052722Z-quality"
+  }
+}
