@@ -1,0 +1,56 @@
+{
+  "date": "2026-05-18",
+  "model": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+  "hardware": "4x Intel Arc Pro B70 32GB",
+  "engine": "vLLM 0.20.1-local XPU TP4",
+  "candidate": "VLLM_XPU_GREEDY_SKIP_LOGITS_FP32=1",
+  "status": "quality_passed_but_not_promoted",
+  "decision": "reject_no_localmaxxing",
+  "baseline": {
+    "output_toks_per_second": 81.758267,
+    "total_toks_per_second": 109.011023,
+    "notes": "Promoted exact MiniMax router-logits to llm-scaler INT4 MoE WS decode path."
+  },
+  "result": {
+    "prompt_tokens": 512,
+    "output_tokens": 1536,
+    "context_length": 2048,
+    "batch_size": 1,
+    "tensor_parallel": 4,
+    "max_num_batched_tokens": 512,
+    "block_size": 256,
+    "output_toks_per_second": [
+      81.23739932931902,
+      81.8614430734222
+    ],
+    "total_toks_per_second": [
+      108.31653243909201,
+      109.14859076456291
+    ],
+    "mean_output_toks_per_second": 81.5494212013706,
+    "mean_total_toks_per_second": 108.73256160182746
+  },
+  "quality": {
+    "raw145_n64_exact": true,
+    "raw145_n64_token_sha256": "267cbf30208d84929ee79284ac695467f7e80597bf8694130e1e1f8b180eb5bd",
+    "raw145_n256_exact": true,
+    "raw145_n256_token_sha256": "58f6e8251c7a0a17e8c441278b5861f7d5da914fa1823ecd10484b296f2d7537",
+    "semantic_suite_n64_r2": true,
+    "arithmetic_repeat_n64_r16": true,
+    "extended_sixpack_n64_r2": true
+  },
+  "artifacts": {
+    "summary_json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-minimax-greedy-skip-logits-fp32-strict-20260518-strict-tp4-ctx2048-mbt512-bs256-20260518T124155Z-summary.json",
+    "benchmark_jsons": [
+      "/home/steve/bench-results/minimax-m2.7-strict-candidates/vllm-minimax-m27-autoround-tp4-p512n1536-20260518T125748Z.json",
+      "/home/steve/bench-results/minimax-m2.7-strict-candidates/vllm-minimax-m27-autoround-tp4-p512n1536-20260518T130037Z.json"
+    ]
+  },
+  "runtime_hashes_during_test": {
+    "sampler_py": "4205e43316ecd5727af874802c7ca9ca33e7e5f008cdfb130ce97d33f4e32b18",
+    "logits_processor_py": "ccfe30c1469630aed3040de63970470db6110325850a552a0287764032bbc733",
+    "minimax_m2_py": "e1408e4c95a662f43aca5712d30298bf75073626ffb10fcdce621c175888779f",
+    "moe_int4_sycl": "8d7da6669eecd1d0d0a36cdfca8e07b13620ab0c4d7c20f6dc3967f1b78b3ea5",
+    "vllm_extension": "1ad068a5f8e8b83168a2efb999a486872cccab594f06361ee01ad82df5d2c1ca"
+  }
+}
