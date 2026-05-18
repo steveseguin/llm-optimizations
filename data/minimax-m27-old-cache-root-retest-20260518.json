@@ -1,0 +1,48 @@
+{
+  "label": "old-d0fed-flash-piecewise-strict-retest",
+  "timestamp_utc": "2026-05-18T02:07:01Z",
+  "status": "quality_passed",
+  "model": "/mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround",
+  "hardware": "4x Intel Arc Pro B70 32GB",
+  "engine": "vLLM/XPU local",
+  "quantization": "INT4 AutoRound W4A16",
+  "tensor_parallel_size": 4,
+  "prompt_tokens": 512,
+  "output_tokens": 1536,
+  "context_length": 2048,
+  "batch_size": 1,
+  "cache_root": "/mnt/fast-ai/vllm-cache-exp/minimax-xpugraph-attndelay-block256-mbt512-noprefix-20260513T171301Z",
+  "loaded_aot_hash": "03f6a28c070656d44eab4c581bc8dc5295ed123e7c0150c7f596ea24012406b0",
+  "expected_old_aot_hash_prefix": "d0fed",
+  "quality_gates": {
+    "raw145_n64_exact_sha256": "267cbf30208d84929ee79284ac695467f7e80597bf8694130e1e1f8b180eb5bd",
+    "raw145_n256_exact_sha256": "58f6e8251c7a0a17e8c441278b5861f7d5da914fa1823ecd10484b296f2d7537",
+    "semantic_suite_n64_r2": "passed",
+    "arithmetic_repeat_n64_r16": "passed",
+    "extended_sixpack_n64_r2": "passed"
+  },
+  "benchmarks": [
+    {
+      "elapsed_time_s": 21.888159979018383,
+      "total_tokens_per_second": 93.56656758554296,
+      "output_tokens_per_second": 70.17492568915722,
+      "major_page_faults": 1002769,
+      "filesystem_inputs": 248822136,
+      "json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/vllm-minimax-m27-autoround-tp4-p512n1536-20260518T021913Z.json",
+      "log": "/home/steve/bench-results/minimax-m2.7-strict-candidates/vllm-minimax-m27-autoround-tp4-p512n1536-20260518T021913Z.log"
+    },
+    {
+      "elapsed_time_s": 21.99967396003194,
+      "total_tokens_per_second": 93.09228871849274,
+      "output_tokens_per_second": 69.81921653886955,
+      "major_page_faults": 1015635,
+      "filesystem_inputs": 248746624,
+      "json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/vllm-minimax-m27-autoround-tp4-p512n1536-20260518T022205Z.json",
+      "log": "/home/steve/bench-results/minimax-m2.7-strict-candidates/vllm-minimax-m27-autoround-tp4-p512n1536-20260518T022205Z.log"
+    }
+  ],
+  "mean_output_tokens_per_second": 69.99707111401338,
+  "mean_total_tokens_per_second": 93.32942815201784,
+  "summary_json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-old-d0fed-flash-piecewise-strict-retest-strict-tp4-ctx2048-mbt512-bs256-20260518T020701Z-summary.json",
+  "conclusion": "Old cache root did not recover the earlier 73.306 tok/s high. Runtime loaded current AOT hash 03f6a28c..., so this is not a true old-d0fed AOT replay."
+}
