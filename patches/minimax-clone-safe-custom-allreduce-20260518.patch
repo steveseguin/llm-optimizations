@@ -1,0 +1,21 @@
+diff --git a/vllm/distributed/parallel_state.py b/vllm/distributed/parallel_state.py
+index 58c49c09d..3c1981cd2 100644
+--- a/vllm/distributed/parallel_state.py
++++ b/vllm/distributed/parallel_state.py
+@@ -25,6 +25,7 @@ If you only need to use the distributed environment without model/pipeline
+ 
+ import contextlib
+ import gc
++import os
+ import pickle
+ import weakref
+ from collections import namedtuple
+@@ -132,6 +133,8 @@ def all_reduce(tensor: torch.Tensor, group_name: str) -> torch.Tensor:
+     group = _groups[group_name]()
+     if group is None:
+         raise ValueError(f"Group {group_name} is destroyed.")
++    if os.environ.get("VLLM_XPU_CUSTOM_ALLREDUCE_CLONE_INPUT", "0") == "1":
++        tensor = tensor.clone()
+     return group._all_reduce_out_place(tensor)
+ 
+ 
