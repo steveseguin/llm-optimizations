@@ -100,6 +100,14 @@ Recent greedy sampler fp32-skip follow-up:
 - Decision: do not promote and do not submit to LocalMaxxing. The sampler fp32 conversion is not the current bottleneck; the active runtime sampler was restored to the promoted behavior.
 - Artifacts: `notes/2026-05-18-minimax-greedy-skip-logits-fp32-negative.md`, `data/minimax-m27-greedy-skip-logits-fp32-negative-20260518.json`, `patches/minimax-greedy-skip-logits-fp32-negative-20260518.md`
 
+Recent WS top-k reuse rejection:
+
+- `VLLM_XPU_MINIMAX_WS_REUSE_TOPK_ONLY=1` attempted a narrower graph scratch reuse than the earlier internal-reuse failure by reusing only MiniMax WS top-k tensors.
+- It failed raw145 n64 exact immediately with NUL/control-token corruption: observed hash `242152df6909e5e25433f43875de5e51c210d146a22279611852b695bcf7d978` instead of `267cbf30208d84929ee79284ac695467f7e80597bf8694130e1e1f8b180eb5bd`.
+- The patch was reverted and a default raw145 n64 canary passed with the expected hash and no NUL/control output.
+- Decision: do not use static thread-local top-k reuse under XPU graph replay. Future allocation work needs graph-owned buffers or explicit graph lifetime management.
+- Artifacts: `notes/2026-05-18-minimax-ws-topk-reuse-reject.md`, `data/minimax-m27-ws-topk-reuse-reject-20260518.json`, `patches/minimax-ws-topk-reuse-rejected-20260518.md`
+
 ## Qwen3.6 27B
 
 The quality-preserving Qwen targets remain separate from MiniMax AutoRound:
