@@ -1,0 +1,135 @@
+{
+  "date": "2026-05-18",
+  "status": "quality_passed_speed_regressed_not_promoted",
+  "model_hf_id": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+  "submitted_hf_id": "MiniMaxAI/MiniMax-M2.7",
+  "model_path": "/mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround",
+  "hardware": {
+    "gpu_name": "Intel Arc Pro B70 32GB",
+    "gpu_count": 4,
+    "vram_gb_per_gpu": 32,
+    "cpu": "AMD EPYC 9015 8-Core Processor",
+    "ram_gb": 15,
+    "swap_gb": 64,
+    "os": "Ubuntu 24.04.4 LTS",
+    "kernel": "6.17.0-23-generic"
+  },
+  "engine": {
+    "name": "vllm",
+    "version": "0.20.1-local",
+    "backend": "xpu",
+    "tensor_parallel_size": 4,
+    "dtype": "float16",
+    "quantization": "INT4 AutoRound W4A16 / INC",
+    "attention_backend": "flash_attn"
+  },
+  "benchmark_shape": {
+    "prompt_tokens": 512,
+    "output_tokens": 1536,
+    "context_length": 2048,
+    "batch_size": 1,
+    "max_num_batched_tokens": 512,
+    "block_size": 256,
+    "temperature": 0
+  },
+  "env": {
+    "VLLM_XPU_ENABLE_XPU_GRAPH": "1",
+    "VLLM_XPU_FORCE_GRAPH_WITH_COMM": "1",
+    "VLLM_XPU_GRAPH_NOOP_COMM_CAPTURE": "1",
+    "VLLM_XPU_USE_LLM_SCALER_MOE": "1",
+    "VLLM_MINIMAX_M2_ATTN_DELAY_ALLREDUCE": "1",
+    "VLLM_MINIMAX_QK_NORM_RESTORE_WEIGHT": "1",
+    "VLLM_MINIMAX_QK_NORM_RESTORE_WEIGHT_MIN_TOKENS": "2",
+    "VLLM_MINIMAX_QK_NORM_XPU_HELPER_FUSION": "1",
+    "VLLM_MINIMAX_QK_NORM_C10D_GROUP_NAME": "3",
+    "VLLM_MINIMAX_QK_NORM_PASS_LOG": "1",
+    "CCL_TOPO_P2P_ACCESS": "1",
+    "ONEAPI_DEVICE_SELECTOR": "level_zero:0,1,2,3",
+    "ZE_AFFINITY_MASK": "0,1,2,3"
+  },
+  "extra_args": "--async-engine --block-size 256 --no-enable-prefix-caching --compilation-config {\"use_inductor_graph_partition\":true,\"compile_sizes\":[1],\"cudagraph_mode\":\"PIECEWISE\",\"pass_config\":{\"fuse_minimax_qk_norm\":true}}",
+  "quality": {
+    "status": "passed_known_good_aot_cache",
+    "raw145_n64_combined_token_sha256": "267cbf30208d84929ee79284ac695467f7e80597bf8694130e1e1f8b180eb5bd",
+    "raw145_n256_combined_token_sha256": "58f6e8251c7a0a17e8c441278b5861f7d5da914fa1823ecd10484b296f2d7537",
+    "semantic_suite": "passed",
+    "arithmetic_repeat_n64_r16": "passed",
+    "extended_sixpack_n64_r2": "passed",
+    "summary_json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-qk-c10d-group3-aot-goodcache-strict-quality-20260518T045103Z-strict-tp4-ctx2048-mbt512-bs256-20260518T045103Z-summary.json",
+    "quality_artifact_dir": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-qk-c10d-group3-aot-goodcache-strict-quality-20260518T045103Z-strict-tp4-ctx2048-mbt512-bs256-20260518T045103Z-quality"
+  },
+  "fresh_cache_reliability_issue": {
+    "status": "failed_raw145_n256_after_raw145_n64_pass",
+    "failed_summary_json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-qk-c10d-group3-strict-quality-20260518T041513Z-strict-tp4-ctx2048-mbt512-bs256-20260518T041513Z-summary.json",
+    "failed_quality_json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-qk-c10d-group3-strict-quality-20260518T041513Z-strict-tp4-ctx2048-mbt512-bs256-20260518T041513Z-quality/raw145-n256-exact.json",
+    "expected_token_sha256": "58f6e8251c7a0a17e8c441278b5861f7d5da914fa1823ecd10484b296f2d7537",
+    "failed_token_sha256": "f61a47cbfb6881618f1df1f730173e00c9582073808af531724568215ca84fe8",
+    "observed_prefix": "Answer with four concise bullets about PCIe multi GPU inference. alpha beta gamma...",
+    "interpretation": "AOT artifacts differed under the same graph hash; fresh-cache Q/K fusion must be treated as unreliable until understood."
+  },
+  "benchmark": {
+    "valid_repeats": [
+      {
+        "elapsed_time": 22.530215359001886,
+        "total_num_tokens": 2048,
+        "tokens_per_second": 90.90015196777634,
+        "output_toks_per_second": 68.17511397583226,
+        "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260518T050352Z.json",
+        "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260518T050352Z.log"
+      },
+      {
+        "elapsed_time": 22.504502455005422,
+        "total_num_tokens": 2048,
+        "tokens_per_second": 91.0040114903534,
+        "output_toks_per_second": 68.25300861776506,
+        "json": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260518T050634Z.json",
+        "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260518T050634Z.log"
+      }
+    ],
+    "mean_output_toks_per_second": 68.21406129679866,
+    "mean_total_toks_per_second": 90.95208172906487,
+    "min_output_toks_per_second": 68.17511397583226,
+    "max_output_toks_per_second": 68.25300861776506,
+    "third_repeat": {
+      "status": "stalled_after_aot_load_and_terminated_by_guard",
+      "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/vllm-minimax-m27-autoround-tp4-p512n1536-20260518T050921Z.log",
+      "stall_warning_count": 3
+    },
+    "summary_log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/qk-c10d-group3-aot-goodcache-bench-20260518T050352Z.summary.log"
+  },
+  "aot": {
+    "hash": "7f1422b4de9682e60e5291b8434407b8f49e38907b85537ba584087183bfb1bf",
+    "cache_root": "/mnt/fast-ai/vllm-cache-exp/minimax-qk-c10d-group3-n256-freshonly-20260518T042509Z",
+    "known_good_rank_model_sha256": {
+      "rank_0": "4daacd2db21b48cdaa55278ad5cacbc1c7413cf1db1bd9cb2c3dcb74270b9d3c",
+      "rank_1": "5e7fac18193ee4882e01ecfb689839975c847310e65525aeec8c0cff11dc512b",
+      "rank_2": "fe7a255bc0abe68bfbaf49951e9e6971ab3efeb749d0350b5b0cb3f93d36643b",
+      "rank_3": "ecd1156e3ac8379e19decac05424dbbb7884cdc8fde371c13cde959ff517f07e"
+    },
+    "failed_fresh_rank_model_sha256": {
+      "rank_0": "b1121fd8be7fef67b730b797db62fa7e4e5ebcbeeaf8776f29c8bf211fce38f8",
+      "rank_1": "15d8e07369e76a6c097e6a420c655547c745a32d68258df559ec44bc23cf6edf",
+      "rank_2": "cb2b40e3a227ad4f76365bb4eea37be64b0c545c2631be9889326939de814b7c",
+      "rank_3": "ae868c91cbb75f2585598648de19c9d055ff6b22554d7b2f19cafa2e6b09b395"
+    },
+    "collective_summary": {
+      "actual_allreduce_call_lines": 1000,
+      "actual_wait_tensor_call_lines": 1000,
+      "categories": {
+        "embedding_hidden": 8,
+        "qk_rms_variance": 0,
+        "attention_o_proj_hidden": 496,
+        "moe_hidden": 496
+      }
+    }
+  },
+  "comparison": {
+    "promoted_flash_piecewise_strict_baseline_mean_output_toks_per_second": 70.00635289969598,
+    "delta_vs_promoted_baseline_pct": -2.560184
+  },
+  "decision": "Do not promote or submit to LocalMaxxing. Keep as a negative result: quality can pass and Q/K collectives are removed, but speed regresses and one repeat stalls.",
+  "localmaxxing": {
+    "submitted": false,
+    "reason": "Negative speed result versus current strict baseline and repeatability issue."
+  }
+}
