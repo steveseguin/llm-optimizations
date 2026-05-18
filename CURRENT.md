@@ -75,6 +75,14 @@ Recent candidate-router repair follow-up:
 - Decision: do not promote and do not submit to LocalMaxxing. The candidate-repair path is quality-preserving at top32 but not faster than the exact router-logits WS path.
 - Artifacts: `notes/2026-05-18-minimax-candidate-router-top32-negative.md`, `data/minimax-m27-candidate-router-top32-negative-20260518.json`
 
+Recent WS internal scratch-reuse rejection:
+
+- `VLLM_XPU_MINIMAX_WS_REUSE_INTERNAL=1` attempted to reuse internal top-k and intermediate tensors inside the exact MiniMax logits-WS C++ op.
+- It failed the first raw145 n64 exact canary with NUL/control-token corruption, so it was rejected without benchmarking.
+- A default-path raw145 n64 canary with the rebuilt extension and the reuse env unset passed the expected token hash, confirming the promoted runtime remains intact.
+- Decision: do not enable static internal scratch reuse under XPU graph capture/replay. Future allocation-overhead work needs graph-safe lifetime management.
+- Artifacts: `notes/2026-05-18-minimax-ws-internal-reuse-reject.md`, `data/minimax-m27-ws-internal-reuse-reject-20260518.json`
+
 ## Qwen3.6 27B
 
 The quality-preserving Qwen targets remain separate from MiniMax AutoRound:
