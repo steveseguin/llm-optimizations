@@ -1,0 +1,74 @@
+{
+  "date": "2026-05-18",
+  "model": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+  "hardware": "4x Intel Arc Pro B70 32GB",
+  "engine": "vLLM 0.20.1-local XPU TP4",
+  "label": "minimax-logits-ws-noclone-clonefinal-strict-20260518",
+  "status": "quality_passed_not_promoted",
+  "baseline": {
+    "label": "minimax-logits-ws-flash-piecewise-strict-20260518",
+    "mean_output_toks_per_second": 81.75826721712929,
+    "mean_total_toks_per_second": 109.01102295617238,
+    "localmaxxing_id": "cmpay7th600bbmn01v6csyaro"
+  },
+  "candidate": {
+    "mean_output_toks_per_second": 81.0211243328641,
+    "mean_total_toks_per_second": 108.02816577715214,
+    "output_delta_vs_baseline_percent": -0.9016101090865831,
+    "total_delta_vs_baseline_percent": -0.9016101090865913,
+    "benchmarks": [
+      {
+        "path": "/home/steve/bench-results/minimax-m2.7-strict-candidates/vllm-minimax-m27-autoround-tp4-p512n1536-20260518T090855Z.json",
+        "elapsed_time": 19.195825931965373,
+        "output_tokens_per_second": 80.01739573196556,
+        "total_tokens_per_second": 106.68986097595409
+      },
+      {
+        "path": "/home/steve/bench-results/minimax-m2.7-strict-candidates/vllm-minimax-m27-autoround-tp4-p512n1536-20260518T091152Z.json",
+        "elapsed_time": 18.726031746016815,
+        "output_tokens_per_second": 82.02485293376266,
+        "total_tokens_per_second": 109.3664705783502
+      }
+    ]
+  },
+  "quality": {
+    "raw145_n64_hash": "267cbf30208d84929ee79284ac695467f7e80597bf8694130e1e1f8b180eb5bd",
+    "raw145_n256_hash": "58f6e8251c7a0a17e8c441278b5861f7d5da914fa1823ecd10484b296f2d7537",
+    "semantic_suite": "pass",
+    "arithmetic_repeat": "16/16 deterministic exact 42",
+    "extended_sixpack": "pass"
+  },
+  "env": {
+    "VLLM_XPU_USE_LLM_SCALER_MOE_WS": "1",
+    "VLLM_XPU_USE_LLM_SCALER_MOE_MINIMAX_LOGITS_WS": "1",
+    "VLLM_XPU_COMPILE_ALLREDUCE_NO_CLONE": "1",
+    "VLLM_MINIMAX_M2_CLONE_FINAL_HIDDEN": "1",
+    "VLLM_XPU_ENABLE_XPU_GRAPH": "1",
+    "VLLM_XPU_FORCE_GRAPH_WITH_COMM": "1",
+    "VLLM_XPU_GRAPH_NOOP_COMM_CAPTURE": "1",
+    "CCL_TOPO_P2P_ACCESS": "1"
+  },
+  "runtime": {
+    "dtype": "float16",
+    "tensor_parallel_size": 4,
+    "context_length": 2048,
+    "prompt_tokens": 512,
+    "output_tokens": 1536,
+    "max_num_batched_tokens": 512,
+    "max_num_seqs": 1,
+    "block_size": 256,
+    "attention_backend": "default XPU FlashAttention v2",
+    "compilation_config": {
+      "use_inductor_graph_partition": true,
+      "compile_sizes": [
+        1
+      ],
+      "cudagraph_mode": "PIECEWISE"
+    }
+  },
+  "artifacts": {
+    "summary": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-minimax-logits-ws-noclone-clonefinal-strict-20260518-strict-tp4-ctx2048-mbt512-bs256-20260518T085310Z-summary.json",
+    "quality_dir": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-minimax-logits-ws-noclone-clonefinal-strict-20260518-strict-tp4-ctx2048-mbt512-bs256-20260518T085310Z-quality"
+  },
+  "decision": "Do not promote and do not submit to LocalMaxxing. The branch is quality-preserving but slower than the promoted logits-to-work-sharing baseline."
+}
