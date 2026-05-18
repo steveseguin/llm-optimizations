@@ -60,6 +60,15 @@
   ],
   "mean_output_toks_per_second": 81.75826721712929,
   "mean_total_toks_per_second": 109.01102295617238,
+  "post_submission_confirmation": {
+    "json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/vllm-minimax-m27-autoround-tp4-p512n1536-20260518T084331Z.json",
+    "output_toks_per_second": 81.19795367992532,
+    "total_toks_per_second": 108.26393823990043,
+    "elapsed_time_seconds": 18.916732877958566,
+    "three_run_mean_output_toks_per_second": 81.5714960380613,
+    "three_run_mean_total_toks_per_second": 108.76199471741507,
+    "decision": "Confirms result remains above prior 80.602755 baseline; LocalMaxxing payload remains the original two-run strict submission."
+  },
   "previous_promoted_mean_output_toks_per_second": 80.6027546871925,
   "improvement_percent": 1.433589,
   "localmaxxing_id": "cmpay7th600bbmn01v6csyaro",
