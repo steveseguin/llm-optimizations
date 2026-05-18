@@ -44,6 +44,11 @@ Date: 2026-05-18
    - Reason: repeated flag reties and router shortcuts have not beaten the exact logits-WS baseline; the decode timing points back to per-layer MoE/output collectives and epilogue work.
    - Method: inspect the llm-scaler INT4 MoE work-sharing kernel and Python wrapper, look for avoidable allocations/synchronization, output scaling/accumulation opportunities, and host-side dispatch overhead. Preserve exact top-k routing and expert weights.
    - Gate: smoke-test extension import and wrapper path, then run raw145 n64 before any benchmark. Promote only after the full strict gate and at least two benchmark repeats.
+   - Update: static thread-local reuse of internal top-k and intermediate buffers was tested behind `VLLM_XPU_MINIMAX_WS_REUSE_INTERNAL=1`. It failed raw145 n64 with NUL/control-token corruption. Do not pursue static scratch reuse under XPU graph capture/replay without graph-safe lifetime handling.
 
 6. Characterize prefill separately after decode remains stable.
    - Reason: LocalMaxxing followers asked for prefill numbers, but prefill tuning must not regress decode or quality.
+
+7. Next diagnostic: MoE kernel trace on the promoted path.
+   - Reason: the scratch-reuse failure shows allocation shortcuts can corrupt graph replay. Before changing more code, collect per-kernel wait timings with `LLM_SCALER_MOE_TRACE_KERNELS=1` on a short current-best run to decide whether top-k, up, down, or final logits is the next best exact target.
+   - Constraint: trace mode is diagnostic only because it inserts waits and changes throughput.
