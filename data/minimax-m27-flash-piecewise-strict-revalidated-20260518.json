@@ -1,0 +1,131 @@
+{
+  "date": "2026-05-18",
+  "status": "promoted_strict_revalidated",
+  "model_hf_id": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+  "submitted_hf_id": "MiniMaxAI/MiniMax-M2.7",
+  "model_path": "/mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround",
+  "hardware": {
+    "gpu_name": "Intel Arc Pro B70 32GB",
+    "gpu_count": 4,
+    "vram_gb_per_gpu": 32,
+    "cpu": "AMD EPYC 9015 8-Core Processor",
+    "ram_gb": 15,
+    "swap_gb": 64,
+    "os": "Ubuntu 24.04.4 LTS",
+    "kernel": "6.17.0-23-generic"
+  },
+  "engine": {
+    "name": "vllm",
+    "version": "0.20.1-local",
+    "backend": "xpu",
+    "tensor_parallel_size": 4,
+    "dtype": "float16",
+    "quantization": "INT4 AutoRound W4A16 / INC",
+    "attention_backend": "flash_attn"
+  },
+  "benchmark_shape": {
+    "prompt_tokens": 512,
+    "output_tokens": 1536,
+    "context_length": 2048,
+    "batch_size": 1,
+    "max_num_batched_tokens": 512,
+    "block_size": 256,
+    "temperature": 0
+  },
+  "env": {
+    "VLLM_XPU_ENABLE_XPU_GRAPH": "1",
+    "VLLM_XPU_FORCE_GRAPH_WITH_COMM": "1",
+    "VLLM_XPU_GRAPH_NOOP_COMM_CAPTURE": "1",
+    "VLLM_XPU_USE_LLM_SCALER_MOE": "1",
+    "VLLM_MINIMAX_M2_ATTN_DELAY_ALLREDUCE": "1",
+    "VLLM_MINIMAX_QK_NORM_RESTORE_WEIGHT": "1",
+    "VLLM_MINIMAX_QK_NORM_RESTORE_WEIGHT_MIN_TOKENS": "2",
+    "CCL_TOPO_P2P_ACCESS": "1",
+    "ONEAPI_DEVICE_SELECTOR": "level_zero:0,1,2,3",
+    "ZE_AFFINITY_MASK": "0,1,2,3",
+    "VLLM_XPU_COMPILE_ALLREDUCE_NO_CLONE": "",
+    "VLLM_XPU_CLONE_SAMPLE_HIDDEN": "",
+    "VLLM_MINIMAX_M2_CLONE_FINAL_HIDDEN": "",
+    "VLLM_XPU_LOCAL_ARGMAX_DECODE": ""
+  },
+  "extra_args": "--async-engine --block-size 256 --no-enable-prefix-caching --compilation-config {\"use_inductor_graph_partition\":true,\"compile_sizes\":[1],\"cudagraph_mode\":\"PIECEWISE\"}",
+  "quality": {
+    "status": "passed",
+    "raw145_n64_combined_token_sha256": "267cbf30208d84929ee79284ac695467f7e80597bf8694130e1e1f8b180eb5bd",
+    "raw145_n256_combined_token_sha256": "58f6e8251c7a0a17e8c441278b5861f7d5da914fa1823ecd10484b296f2d7537",
+    "semantic_suite": "passed",
+    "arithmetic_repeat_n64_r16": "passed",
+    "extended_sixpack_n64_r2": "passed",
+    "summary_json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-old-flash-piecewise-cache-revalidate-strict-tp4-ctx2048-mbt512-bs256-20260518T002801Z-summary.json",
+    "quality_artifact_dir": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-old-flash-piecewise-cache-revalidate-strict-tp4-ctx2048-mbt512-bs256-20260518T002801Z-quality"
+  },
+  "strict_quality_gated_benchmark": {
+    "elapsed_time": 21.95529837301001,
+    "total_num_tokens": 2048,
+    "tokens_per_second": 93.2804448933219,
+    "output_toks_per_second": 69.96033366999141,
+    "json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/vllm-minimax-m27-autoround-tp4-p512n1536-20260518T004325Z.json",
+    "log": "/home/steve/bench-results/minimax-m2.7-strict-candidates/vllm-minimax-m27-autoround-tp4-p512n1536-20260518T004325Z.log"
+  },
+  "repeatability_check": {
+    "runs": [
+      {
+        "elapsed_time": 22.025849699042737,
+        "total_num_tokens": 2048,
+        "tokens_per_second": 92.98165691601028,
+        "output_toks_per_second": 69.7362426870077
+      },
+      {
+        "elapsed_time": 21.961096554994583,
+        "total_num_tokens": 2048,
+        "tokens_per_second": 93.2558169338874,
+        "output_toks_per_second": 69.94186270041554
+      },
+      {
+        "elapsed_time": 21.836496773001272,
+        "total_num_tokens": 2048,
+        "tokens_per_second": 93.7879377488863,
+        "output_toks_per_second": 70.34095331166473
+      }
+    ],
+    "mean_output_toks_per_second": 70.00635289969598,
+    "mean_total_toks_per_second": 93.34180386626133,
+    "min_output_toks_per_second": 69.7362426870077,
+    "max_output_toks_per_second": 70.34095331166473,
+    "sample_stddev_output_toks_per_second": 0.30747028189,
+    "relative_min_max_spread_pct": 0.863794,
+    "summary_json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/old-flash-piecewise-repeatability-20260518/summary.bench-only.json",
+    "bench_json_files": "/home/steve/bench-results/minimax-m2.7-strict-candidates/old-flash-piecewise-repeatability-20260518/bench-json-files.txt"
+  },
+  "aot": {
+    "hash": "03f6a28c070656d44eab4c581bc8dc5295ed123e7c0150c7f596ea24012406b0",
+    "cache_root": "/mnt/fast-ai/vllm-cache-exp/minimax-xpugraph-attndelay-block256-mbt512-noprefix-20260513T171301Z",
+    "collective_summary": {
+      "actual_allreduce_call_lines": 1496,
+      "actual_wait_tensor_call_lines": 1496,
+      "categories": {
+        "embedding_hidden": 8,
+        "qk_rms_variance": 496,
+        "attention_o_proj_hidden": 496,
+        "moe_hidden": 496
+      }
+    },
+    "classification_json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/old-flash-piecewise-repeatability-20260518/aot-collectives-03f6a28c.json"
+  },
+  "comparison": {
+    "previous_sample_hidden_clone_repeat_mean_output_toks_per_second": 66.70572667164275,
+    "uplift_vs_sample_hidden_clone_pct": 4.948045,
+    "old_may13_single_run_high_output_toks_per_second": 73.30631164343902,
+    "delta_vs_old_may13_high_pct": -4.501599
+  },
+  "decision": "Promote as current honest strict-quality MiniMax M2.7 AutoRound TP4 baseline. It is faster than the TRITON sample-hidden-clone path and strict-quality valid, but below the old 73.3 single-run high.",
+  "localmaxxing": {
+    "submitted": true,
+    "id": "cmpahyaas002gmn01lk0625he",
+    "status": "APPROVED",
+    "created_at": "2026-05-18T00:59:43.396Z",
+    "payload": "/home/steve/llm-optimizations-publish/data/localmaxxing-minimax-m27-autoround-flash-piecewise-strict-revalidated-p512n1536-20260518.payload.json",
+    "response": "/home/steve/llm-optimizations-publish/data/localmaxxing-responses/minimax-m27-autoround-flash-piecewise-strict-revalidated-p512n1536-20260518.response.json",
+    "api_note": "Successful POST omitted the optional backend field because LocalMaxxing does not currently accept xpu/level-zero as backend enum values."
+  }
+}
