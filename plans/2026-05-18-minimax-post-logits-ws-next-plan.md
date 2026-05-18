@@ -35,5 +35,15 @@ Date: 2026-05-18
    - hidden-state allreduce plus residual/add/norm boundary only if strict quality gates pass;
    - MoE/projection epilogue boundary, because MoE remains the largest eager per-layer region.
 
-4. Characterize prefill separately after decode remains stable.
+4. Completed: candidate-router repair branch.
+   - Reason: test whether a smaller exact-router repair set can preserve routing quality while reducing overhead versus the exact MiniMax router-logits WS path.
+   - Outcome: top16 failed the first raw145 n64 exact token-hash gate. Top32 passed the full strict gate but benchmarked at `80.008471` output tok/s and `106.677962` total tok/s, slower than the promoted `81.758267` / `109.011023` logits-WS baseline.
+   - Decision: do not promote and do not submit to LocalMaxxing. Do not spend more time on smaller candidate repair sets unless a new implementation removes overhead without changing exact token selection.
+
+5. Next active branch: MoE/projection epilogue scheduling.
+   - Reason: repeated flag reties and router shortcuts have not beaten the exact logits-WS baseline; the decode timing points back to per-layer MoE/output collectives and epilogue work.
+   - Method: inspect the llm-scaler INT4 MoE work-sharing kernel and Python wrapper, look for avoidable allocations/synchronization, output scaling/accumulation opportunities, and host-side dispatch overhead. Preserve exact top-k routing and expert weights.
+   - Gate: smoke-test extension import and wrapper path, then run raw145 n64 before any benchmark. Promote only after the full strict gate and at least two benchmark repeats.
+
+6. Characterize prefill separately after decode remains stable.
    - Reason: LocalMaxxing followers asked for prefill numbers, but prefill tuning must not regress decode or quality.
