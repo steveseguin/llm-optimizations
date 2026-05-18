@@ -1,0 +1,63 @@
+{
+  "date": "2026-05-18",
+  "model": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+  "hardware": "4x Intel Arc Pro B70 32GB",
+  "baseline": {
+    "output_toks_per_second": 81.758267,
+    "total_toks_per_second": 109.011023,
+    "localmaxxing_id": "cmpay7th600bbmn01v6csyaro"
+  },
+  "build": {
+    "source_sha256": "7064e92719c598a12d0727bc71a9d134dac166f0a9b77ea6f04c06bf50039c3e",
+    "extension_sha256": "5d6e85788590adc769a25b0c2606266fec68b92856a0384f1756a73ea261483c",
+    "log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/build-moe-int4-u4-oneapi2025-20260518T112129Z.log"
+  },
+  "trace": {
+    "initial_graph_like_eager_attempt": {
+      "status": "stalled_after_compile",
+      "log": "/home/steve/bench-results/minimax-m2.7-strict-candidates/moe-kernel-trace-current-best-eager-n4-20260518T110801Z.log"
+    },
+    "enforce_eager_attempt": {
+      "status": "passed_short_canary",
+      "json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/moe-kernel-trace-current-best-enforce-eager-n4-20260518T111622Z.json",
+      "log": "/home/steve/bench-results/minimax-m2.7-strict-candidates/moe-kernel-trace-current-best-enforce-eager-n4-20260518T111622Z.log",
+      "combined_token_sha256": "2ecb10ff683aae9260eaee665272a325269e916ed4ab73cc22dafe42bd0ae82f"
+    }
+  },
+  "tile_sweep": {
+    "default_after_patch": {
+      "status": "raw145_n64_exact_passed",
+      "combined_token_sha256": "267cbf30208d84929ee79284ac695467f7e80597bf8694130e1e1f8b180eb5bd",
+      "json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/default-after-ws-tile-knobs-raw145-n64-20260518T112330Z.json"
+    },
+    "up_ntile_4": {
+      "status": "quality_passed_but_slower",
+      "mean_output_toks_per_second": 79.2364690751989,
+      "mean_total_toks_per_second": 105.64862543359853,
+      "output_toks_per_second": [
+        79.41372223963985,
+        79.05921591075793
+      ],
+      "total_toks_per_second": [
+        105.88496298618648,
+        105.41228788101057
+      ],
+      "summary_json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-minimax-ws-up-ntile4-strict-20260518-strict-tp4-ctx2048-mbt512-bs256-20260518T114044Z-summary.json"
+    },
+    "up_ntile_8": {
+      "status": "stalled_after_compile",
+      "log": "/home/steve/bench-results/minimax-m2.7-strict-candidates/ws-up-ntile8-raw145-n64-20260518T113156Z.log"
+    },
+    "down_htile_8": {
+      "status": "raw145_n64_exact_hash_mismatch",
+      "observed_combined_token_sha256": "21404821eb70a2ee3de9e82c039b5cbb5c9eef884c5019579f442c6a272a9c5a",
+      "expected_combined_token_sha256": "267cbf30208d84929ee79284ac695467f7e80597bf8694130e1e1f8b180eb5bd",
+      "json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/ws-down-htile8-raw145-n64-20260518T115947Z.json"
+    }
+  },
+  "decision": {
+    "promote": false,
+    "submit_to_localmaxxing": false,
+    "reason": "No tile variant beat the promoted strict result while preserving exact quality."
+  }
+}
