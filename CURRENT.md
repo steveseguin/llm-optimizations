@@ -31,6 +31,13 @@ Previous promoted MiniMax baselines:
 - Delayed-attention logits-WS baseline: `81.758267` output tok/s, `109.011023` total tok/s, LocalMaxxing `cmpay7th600bbmn01v6csyaro`.
 - Earlier MoE-WS FlashAttention/PIECEWISE baseline: `80.602755` output tok/s, `107.470340` total tok/s, LocalMaxxing `cmpasdq5v007nmn019elaut3s`.
 
+Recent rejection:
+
+- `MAX_BATCHED_TOKENS=768` was retested on top of the current clone-safe custom-allreduce recipe.
+- It passed raw145 n64/n256 exact hashes, semantic suite, and 16-repeat arithmetic, but failed the extended sixpack with nondeterministic greedy token output on the sort/list prompt.
+- No benchmark or LocalMaxxing submission was made; keep `MAX_BATCHED_TOKENS=512` for the promoted clone-safe custom-allreduce path.
+- Artifacts: `notes/2026-05-18-minimax-clone-custom-allreduce-mbt768-quality-fail.md`, `data/minimax-m27-clone-custom-allreduce-mbt768-quality-fail-20260518.json`
+
 Detailed historical candidate screens remain in `notes/` and `data/`. The local lab copy of `CURRENT.md` preserves the longer running chronology.
 
 ## Qwen3.6 27B
