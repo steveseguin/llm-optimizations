@@ -1,0 +1,80 @@
+{
+  "date": "2026-05-18",
+  "model": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+  "hardware": "4x Intel Arc Pro B70 32GB",
+  "engine": "vLLM 0.20.1-local XPU TP4",
+  "baseline": {
+    "label": "minimax-logits-ws-flash-piecewise-strict-20260518",
+    "mean_output_toks_per_second": 81.75826721712929,
+    "mean_total_toks_per_second": 109.01102295617238,
+    "localmaxxing_id": "cmpay7th600bbmn01v6csyaro"
+  },
+  "top16_candidate": {
+    "label": "minimax-candidate-router-top16-ws-strict-20260518",
+    "status": "quality_failed_raw145_n64",
+    "expected_raw145_n64_combined_token_sha256": "267cbf30208d84929ee79284ac695467f7e80597bf8694130e1e1f8b180eb5bd",
+    "observed_raw145_n64_combined_token_sha256": "a8f3570b8ed4480c708a958eaac3621dd2b473c39415723e1a87c0ce40d73a49",
+    "summary": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-minimax-candidate-router-top16-ws-strict-20260518-strict-tp4-ctx2048-mbt512-bs256-20260518T101243Z-summary.json"
+  },
+  "top32_candidate": {
+    "label": "minimax-candidate-router-top32-ws-strict-20260518",
+    "status": "quality_passed_not_promoted",
+    "mean_output_toks_per_second": 80.00847143736122,
+    "mean_total_toks_per_second": 106.67796191648162,
+    "output_delta_vs_baseline_percent": -2.1402046703135024,
+    "total_delta_vs_baseline_percent": -2.1402046703135015,
+    "benchmarks": [
+      {
+        "path": "/home/steve/bench-results/minimax-m2.7-strict-candidates/vllm-minimax-m27-autoround-tp4-p512n1536-20260518T103412Z.json",
+        "elapsed_time": 19.015293186006602,
+        "output_tokens_per_second": 80.77708741984299,
+        "total_tokens_per_second": 107.70278322645731
+      },
+      {
+        "path": "/home/steve/bench-results/minimax-m2.7-strict-candidates/vllm-minimax-m27-autoround-tp4-p512n1536-20260518T103704Z.json",
+        "elapsed_time": 19.384184779017232,
+        "output_tokens_per_second": 79.23985545487946,
+        "total_tokens_per_second": 105.65314060650594
+      }
+    ],
+    "summary": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-minimax-candidate-router-top32-ws-strict-20260518-strict-tp4-ctx2048-mbt512-bs256-20260518T101840Z-summary.json"
+  },
+  "quality": {
+    "top16": "failed raw145 n64 exact token hash",
+    "top32_raw145_n64_hash": "267cbf30208d84929ee79284ac695467f7e80597bf8694130e1e1f8b180eb5bd",
+    "top32_raw145_n256_hash": "58f6e8251c7a0a17e8c441278b5861f7d5da914fa1823ecd10484b296f2d7537",
+    "top32_semantic_suite": "pass",
+    "top32_arithmetic_repeat": "16/16 deterministic exact 42",
+    "top32_extended_sixpack": "pass"
+  },
+  "env": {
+    "VLLM_XPU_USE_LLM_SCALER_MOE_WS": "1",
+    "VLLM_XPU_USE_LLM_SCALER_MOE_MINIMAX_LOGITS_WS": "unset",
+    "VLLM_MINIMAX_M2_CANDIDATE_ROUTER_TOPM": "32",
+    "VLLM_MINIMAX_M2_CANDIDATE_ROUTER_MAX_TOKENS": "4",
+    "VLLM_MINIMAX_M2_CANDIDATE_ROUTER_XPU_REPAIR": "1",
+    "VLLM_XPU_ENABLE_XPU_GRAPH": "1",
+    "VLLM_XPU_FORCE_GRAPH_WITH_COMM": "1",
+    "VLLM_XPU_GRAPH_NOOP_COMM_CAPTURE": "1",
+    "CCL_TOPO_P2P_ACCESS": "1"
+  },
+  "runtime": {
+    "dtype": "float16",
+    "tensor_parallel_size": 4,
+    "context_length": 2048,
+    "prompt_tokens": 512,
+    "output_tokens": 1536,
+    "max_num_batched_tokens": 512,
+    "max_num_seqs": 1,
+    "block_size": 256,
+    "attention_backend": "default XPU FlashAttention v2",
+    "compilation_config": {
+      "use_inductor_graph_partition": true,
+      "compile_sizes": [
+        1
+      ],
+      "cudagraph_mode": "PIECEWISE"
+    }
+  },
+  "decision": "Do not promote and do not submit to LocalMaxxing. Top16 is not quality-safe; top32 is quality-safe but slower than the promoted exact MiniMax router-logits WS path."
+}
