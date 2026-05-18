@@ -1,34 +1,6 @@
-diff --git a/scripts/run-minimax-strict-quality-gated-candidate.sh b/scripts/run-minimax-strict-quality-gated-candidate.sh
-index f420d9c..92034b2 100755
 --- a/scripts/run-minimax-strict-quality-gated-candidate.sh
 +++ b/scripts/run-minimax-strict-quality-gated-candidate.sh
-@@ -3,8 +3,8 @@ set -euo pipefail
- 
- # Strict MiniMax M2.7 candidate gate for the current quality-valid 4x B70 path.
- # A candidate must pass exact token-hash canaries and semantic canaries on the
--# same piecewise graph path as the accepted ~65.75 tok/s baseline before any
--# throughput benchmark is run.
-+# same piecewise graph path as the promoted ~61.4 tok/s strict baseline before
-+# any throughput benchmark is run.
- 
- MODEL="${MODEL:-/mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround}"
- VENV="${VENV:-/home/steve/.venvs/vllm-xpu}"
-@@ -24,12 +24,14 @@ QUALITY_TIMEOUT="${QUALITY_TIMEOUT:-30m}"
- BENCH_TIMEOUT="${BENCH_TIMEOUT:-25m}"
- RUN_TIMEOUT_KILL_AFTER="${RUN_TIMEOUT_KILL_AFTER:-30s}"
- SHM_STALL_MAX_WARNINGS="${SHM_STALL_MAX_WARNINGS:-3}"
-+QUALITY_STARTUP_GUARD_SECONDS="${QUALITY_STARTUP_GUARD_SECONDS:-300}"
- QUALITY_ASYNC_SCHEDULING="${QUALITY_ASYNC_SCHEDULING:-default}"
- BENCH_ASYNC_SCHEDULING="${BENCH_ASYNC_SCHEDULING:-default}"
- BENCH_ASYNC_ENGINE="${BENCH_ASYNC_ENGINE:-1}"
- RUN_EXTENDED_QUALITY="${RUN_EXTENDED_QUALITY:-0}"
- RUN_REPEAT_ARITHMETIC_QUALITY="${RUN_REPEAT_ARITHMETIC_QUALITY:-1}"
- REPEAT_ARITHMETIC_RUNS="${REPEAT_ARITHMETIC_RUNS:-8}"
-+ATTENTION_BACKEND="${ATTENTION_BACKEND:-TRITON_ATTN}"
- if [ -z "${COMPILATION_CONFIG_JSON:-}" ]; then
-   COMPILATION_CONFIG_JSON='{"use_inductor_graph_partition":true,"compile_sizes":[1],"cudagraph_mode":"PIECEWISE"}'
- fi
-@@ -37,6 +39,7 @@ if ! jq -e 'type == "object"' >/dev/null <<<"$COMPILATION_CONFIG_JSON"; then
+@@ -39,6 +39,7 @@
    echo "Invalid COMPILATION_CONFIG_JSON; expected a JSON object" >&2
    exit 2
  fi
@@ -36,307 +8,53 @@ index f420d9c..92034b2 100755
  CACHE_ROOT="${VLLM_CACHE_ROOT:-/mnt/fast-ai/vllm-cache-exp/minimax-strict-${LABEL}}"
  RAW145_PROMPT="${RAW145_PROMPT:-/home/steve/llm-optimizations-publish/prompts/minimax-raw145-tokenhash-canary.txt}"
  RAW145_N64_HASH="${RAW145_N64_HASH:-267cbf30208d84929ee79284ac695467f7e80597bf8694130e1e1f8b180eb5bd}"
-@@ -47,6 +50,7 @@ ts="$(date -u +%Y%m%dT%H%M%SZ)"
- stem="minimax-${LABEL}-strict-tp${TP}-ctx${MAX_MODEL_LEN}-mbt${MAX_BATCHED_TOKENS}-bs${BLOCK_SIZE}-${ts}"
- summary_json="$OUTDIR/${stem}-summary.json"
- quality_dir="$OUTDIR/${stem}-quality"
-+runtime_json="$OUTDIR/${stem}-runtime.json"
- mkdir -p "$quality_dir"
- 
- if ip link show wlxe865d47e3a48 >/dev/null 2>&1; then
-@@ -69,6 +73,14 @@ export VLLM_CACHE_ROOT="$CACHE_ROOT"
- 
- source "$VENV/bin/activate"
- 
-+runtime_status=0
-+python /home/steve/llm-optimizations-publish/scripts/inspect-vllm-runtime.py \
-+  --output "$runtime_json" || runtime_status="$?"
-+if [ "$runtime_status" -ne 0 ]; then
-+  cat "$runtime_json" >&2
-+  exit "$runtime_status"
-+fi
-+
- quality_jsons=()
- quality_logs=()
- quality_names=()
-@@ -81,6 +93,56 @@ json_array() {
-   fi
- }
- 
-+attention_backend_args=()
-+bench_attention_backend_args=()
-+case "$ATTENTION_BACKEND" in
-+  ""|default|DEFAULT|auto|AUTO)
-+    ;;
-+  *)
-+    attention_backend_args=(--attention-backend "$ATTENTION_BACKEND")
-+    bench_attention_backend_args=(--attention-backend "$ATTENTION_BACKEND")
-+    ;;
-+esac
-+
-+start_quality_startup_guard() {
-+  local name="$1"
-+  local log="$2"
-+  local json="$3"
-+  quality_startup_guard_pid=""
-+  if [ "$QUALITY_STARTUP_GUARD_SECONDS" -le 0 ]; then
-+    return 0
-+  fi
-+  (
-+    local start now elapsed
-+    start="$(date +%s)"
-+    while true; do
-+      if grep -Eq 'Starting to load model|Loading weights took|Model loading took|Graph capturing finished' "$log" 2>/dev/null; then
-+        exit 0
-+      fi
-+      now="$(date +%s)"
-+      elapsed=$((now - start))
-+      if [ "$elapsed" -ge "$QUALITY_STARTUP_GUARD_SECONDS" ]; then
-+        {
-+          printf 'quality_startup_guard=triggered name=%s elapsed_seconds=%s limit_seconds=%s at=%s\n' \
-+            "$name" "$elapsed" "$QUALITY_STARTUP_GUARD_SECONDS" "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-+          printf 'quality_startup_guard_reason=no model-load milestone before guard limit\n'
-+          printf 'quality_startup_guard_tail_begin\n'
-+          tail -80 "$log" 2>/dev/null || true
-+          printf 'quality_startup_guard_tail_end\n'
-+        } >> "$log"
-+        pkill -TERM -f "run-vllm-minimax-quality-check.py.*--out ${json}" 2>/dev/null || true
-+        pkill -TERM -P "$$" 2>/dev/null || true
-+        sleep 10
-+        pkill -KILL -f "run-vllm-minimax-quality-check.py.*--out ${json}" 2>/dev/null || true
-+        pkill -KILL -P "$$" 2>/dev/null || true
-+        exit 0
-+      fi
-+      sleep 10
-+    done
-+  ) &
-+  quality_startup_guard_pid="$!"
-+}
-+
- run_quality_check() {
-   local name="$1"
-   shift
-@@ -90,6 +152,9 @@ run_quality_check() {
-   quality_logs+=("$log")
-   quality_names+=("$name")
-   printf 'quality_check=%s\njson=%s\nlog=%s\n' "$name" "$json" "$log"
-+  start_quality_startup_guard "$name" "$log" "$json"
-+  local guard_pid="$quality_startup_guard_pid"
-+  set +e
-   timeout --foreground --signal=TERM --kill-after="$RUN_TIMEOUT_KILL_AFTER" "$QUALITY_TIMEOUT" \
-     python /home/steve/llm-optimizations-publish/scripts/run-vllm-minimax-quality-check.py \
-       --mode graph \
-@@ -103,13 +168,20 @@ run_quality_check() {
+@@ -167,6 +168,7 @@
        --max-num-batched-tokens "$MAX_BATCHED_TOKENS" \
        --max-num-seqs "$MAX_NUM_SEQS" \
        --block-size "$BLOCK_SIZE" \
--      --attention-backend TRITON_ATTN \
 +      --compilation-config-json "$COMPILATION_CONFIG_JSON" \
-+      "${attention_backend_args[@]}" \
+       "${attention_backend_args[@]}" \
        --async-scheduling "$QUALITY_ASYNC_SCHEDULING" \
        --determinism-mode lstrip_text \
-       --qk-norm-restore-weight \
-       --qk-norm-restore-weight-min-tokens "$VLLM_MINIMAX_QK_NORM_RESTORE_WEIGHT_MIN_TOKENS" \
-       --vllm-cache-root "$CACHE_ROOT" \
-       "$@" 2>&1 | tee "$log"
-+  local statuses=("${PIPESTATUS[@]}")
-+  set -e
-+  if [ -n "$guard_pid" ]; then
-+    kill "$guard_pid" 2>/dev/null || true
-+  fi
-+  return "${statuses[0]}"
- }
- 
- run_semantic_suite() {
-@@ -120,6 +192,9 @@ run_semantic_suite() {
-   quality_logs+=("$log")
-   quality_names+=("$name")
-   printf 'quality_check=%s\njson=%s\nlog=%s\n' "$name" "$json" "$log"
-+  start_quality_startup_guard "$name" "$log" "$json"
-+  local guard_pid="$quality_startup_guard_pid"
-+  set +e
-   timeout --foreground --signal=TERM --kill-after="$RUN_TIMEOUT_KILL_AFTER" "$QUALITY_TIMEOUT" \
-     python /home/steve/llm-optimizations-publish/scripts/run-vllm-minimax-quality-check.py \
-       --mode graph \
-@@ -137,7 +212,8 @@ run_semantic_suite() {
+@@ -210,6 +212,7 @@
        --max-num-batched-tokens "$MAX_BATCHED_TOKENS" \
        --max-num-seqs "$MAX_NUM_SEQS" \
        --block-size "$BLOCK_SIZE" \
--      --attention-backend TRITON_ATTN \
 +      --compilation-config-json "$COMPILATION_CONFIG_JSON" \
-+      "${attention_backend_args[@]}" \
+       "${attention_backend_args[@]}" \
        --async-scheduling "$QUALITY_ASYNC_SCHEDULING" \
        --determinism-mode lstrip_text \
-       --qk-norm-restore-weight \
-@@ -145,9 +221,16 @@ run_semantic_suite() {
-       --vllm-cache-root "$CACHE_ROOT" \
-       --require-prompt-substring 0:PASS \
-       --require-prompt-substring 1:42 \
-+      --require-prompt-regex '1:^\s*42\s*$' \
-       --require-prompt-substring "2:def add_one" \
-       --require-prompt-regex "2:return\\s+x\\s*\\+\\s*1" \
-       2>&1 | tee "$log"
-+  local statuses=("${PIPESTATUS[@]}")
-+  set -e
-+  if [ -n "$guard_pid" ]; then
-+    kill "$guard_pid" 2>/dev/null || true
-+  fi
-+  return "${statuses[0]}"
- }
- 
- run_repeat_arithmetic_suite() {
-@@ -158,6 +241,9 @@ run_repeat_arithmetic_suite() {
-   quality_logs+=("$log")
-   quality_names+=("$name")
-   printf 'quality_check=%s\njson=%s\nlog=%s\n' "$name" "$json" "$log"
-+  start_quality_startup_guard "$name" "$log" "$json"
-+  local guard_pid="$quality_startup_guard_pid"
-+  set +e
-   timeout --foreground --signal=TERM --kill-after="$RUN_TIMEOUT_KILL_AFTER" "$QUALITY_TIMEOUT" \
-     python /home/steve/llm-optimizations-publish/scripts/run-vllm-minimax-quality-check.py \
-       --mode graph \
-@@ -173,14 +259,22 @@ run_repeat_arithmetic_suite() {
+@@ -256,6 +259,7 @@
        --max-num-batched-tokens "$MAX_BATCHED_TOKENS" \
        --max-num-seqs "$MAX_NUM_SEQS" \
        --block-size "$BLOCK_SIZE" \
--      --attention-backend TRITON_ATTN \
 +      --compilation-config-json "$COMPILATION_CONFIG_JSON" \
-+      "${attention_backend_args[@]}" \
+       "${attention_backend_args[@]}" \
        --async-scheduling "$QUALITY_ASYNC_SCHEDULING" \
        --determinism-mode lstrip_text \
-       --qk-norm-restore-weight \
-       --qk-norm-restore-weight-min-tokens "$VLLM_MINIMAX_QK_NORM_RESTORE_WEIGHT_MIN_TOKENS" \
-       --vllm-cache-root "$CACHE_ROOT" \
-       --require-prompt-substring 0:42 \
-+      --require-prompt-regex '0:^\s*42\s*$' \
-       2>&1 | tee "$log"
-+  local statuses=("${PIPESTATUS[@]}")
-+  set -e
-+  if [ -n "$guard_pid" ]; then
-+    kill "$guard_pid" 2>/dev/null || true
-+  fi
-+  return "${statuses[0]}"
- }
- 
- run_extended_suite() {
-@@ -191,6 +285,9 @@ run_extended_suite() {
-   quality_logs+=("$log")
-   quality_names+=("$name")
-   printf 'quality_check=%s\njson=%s\nlog=%s\n' "$name" "$json" "$log"
-+  start_quality_startup_guard "$name" "$log" "$json"
-+  local guard_pid="$quality_startup_guard_pid"
-+  set +e
-   timeout --foreground --signal=TERM --kill-after="$RUN_TIMEOUT_KILL_AFTER" "$QUALITY_TIMEOUT" \
-     python /home/steve/llm-optimizations-publish/scripts/run-vllm-minimax-quality-check.py \
-       --mode graph \
-@@ -211,13 +308,15 @@ run_extended_suite() {
+@@ -304,6 +308,7 @@
        --max-num-batched-tokens "$MAX_BATCHED_TOKENS" \
        --max-num-seqs "$MAX_NUM_SEQS" \
        --block-size "$BLOCK_SIZE" \
--      --attention-backend TRITON_ATTN \
 +      --compilation-config-json "$COMPILATION_CONFIG_JSON" \
-+      "${attention_backend_args[@]}" \
+       "${attention_backend_args[@]}" \
        --async-scheduling "$QUALITY_ASYNC_SCHEDULING" \
        --qk-norm-restore-weight \
-       --qk-norm-restore-weight-min-tokens "$VLLM_MINIMAX_QK_NORM_RESTORE_WEIGHT_MIN_TOKENS" \
-       --vllm-cache-root "$CACHE_ROOT" \
-       --require-prompt-substring 0:PASS \
-       --require-prompt-substring 1:42 \
-+      --require-prompt-regex '1:^\s*42\s*$' \
-       --require-prompt-substring "2:def add_one" \
-       --require-prompt-regex "2:return\\s+x\\s*\\+\\s*1" \
-       --require-prompt-substring '3:"status"' \
-@@ -232,6 +331,12 @@ run_extended_suite() {
-       --require-prompt-substring '4:gamma' \
-       --require-prompt-substring '5:SELECT id, name FROM users WHERE active = 1 ORDER BY id ASC' \
-       2>&1 | tee "$log"
-+  local statuses=("${PIPESTATUS[@]}")
-+  set -e
-+  if [ -n "$guard_pid" ]; then
-+    kill "$guard_pid" 2>/dev/null || true
-+  fi
-+  return "${statuses[0]}"
- }
- 
- write_summary() {
-@@ -249,6 +354,7 @@ write_summary() {
-     --argjson max_batched_tokens "$MAX_BATCHED_TOKENS" \
-     --argjson max_num_seqs "$MAX_NUM_SEQS" \
-     --argjson block_size "$BLOCK_SIZE" \
-+    --arg attention_backend "$ATTENTION_BACKEND" \
-     --argjson input_len "$INPUT_LEN" \
-     --argjson output_len "$OUTPUT_LEN" \
-     --argjson bench_repeats "$BENCH_REPEATS" \
-@@ -262,6 +368,7 @@ write_summary() {
-     --argjson quality_jsons "$(json_array "${quality_jsons[@]}")" \
-     --argjson quality_logs "$(json_array "${quality_logs[@]}")" \
-     --argjson bench_jsons "$(json_array "${bench_jsons[@]}")" \
-+    --slurpfile runtime_diag "$runtime_json" \
-     --arg vllm_minimax_moe_delay_allreduce "${VLLM_MINIMAX_MOE_DELAY_ALLREDUCE:-}" \
-     --arg vllm_minimax_dist_residual_allreduce "${VLLM_MINIMAX_M2_DIST_RESIDUAL_ALLREDUCE:-}" \
-     --arg vllm_xpu_use_llm_scaler_moe_minimax_logits "${VLLM_XPU_USE_LLM_SCALER_MOE_MINIMAX_LOGITS:-}" \
-@@ -275,9 +382,14 @@ write_summary() {
-     --arg vllm_xpu_compile_out_of_place_allreduce "${VLLM_XPU_COMPILE_OUT_OF_PLACE_ALLREDUCE:-}" \
-     --arg vllm_xpu_local_argmax_decode "${VLLM_XPU_LOCAL_ARGMAX_DECODE:-}" \
-     --arg vllm_xpu_local_argmax_assume_safe "${VLLM_XPU_LOCAL_ARGMAX_ASSUME_SAFE:-}" \
-+    --arg vllm_xpu_local_argmax_gather_broadcast "${VLLM_XPU_LOCAL_ARGMAX_GATHER_BROADCAST:-}" \
-     --arg vllm_xpu_local_argmax_direct_gather "${VLLM_XPU_LOCAL_ARGMAX_DIRECT_GATHER:-}" \
-+    --arg vllm_xpu_local_argmax_direct_gather_reuse "${VLLM_XPU_LOCAL_ARGMAX_DIRECT_GATHER_REUSE:-}" \
-+    --arg vllm_xpu_local_argmax_pair_reuse "${VLLM_XPU_LOCAL_ARGMAX_PAIR_REUSE:-}" \
-+    --arg vllm_xpu_local_argmax_packed_gather "${VLLM_XPU_LOCAL_ARGMAX_PACKED_GATHER:-}" \
-     --arg vllm_xpu_local_argmax_packed_allreduce "${VLLM_XPU_LOCAL_ARGMAX_PACKED_ALLREDUCE:-}" \
-     --arg vllm_xpu_local_argmax_allreduce "${VLLM_XPU_LOCAL_ARGMAX_ALLREDUCE:-}" \
-+    --arg vllm_xpu_local_argmax_xpu_reduce "${VLLM_XPU_LOCAL_ARGMAX_XPU_REDUCE:-}" \
-     --arg vllm_bench_temperature "${VLLM_BENCH_TEMPERATURE:-}" \
-     --arg ccl_topo_fabric_vertex_connection_check "${CCL_TOPO_FABRIC_VERTEX_CONNECTION_CHECK:-}" \
-     --arg ccl_topo_p2p_access "${CCL_TOPO_P2P_ACCESS:-}" \
-@@ -294,11 +406,13 @@ write_summary() {
-         max_num_batched_tokens: $max_batched_tokens,
-         max_num_seqs: $max_num_seqs,
-         block_size: $block_size,
-+        attention_backend: $attention_backend,
-         quality_async_scheduling: $quality_async_scheduling,
-         bench_async_scheduling: $bench_async_scheduling,
-         bench_async_engine: ($bench_async_engine == 1),
-         vllm_cache_root: $cache_root
-       },
-+      runtime_vllm: $runtime_diag[0],
-       quality_policy: {
-         raw145_n64_expected_combined_token_sha256: $raw145_n64_hash,
-         raw145_n256_expected_combined_token_sha256: $raw145_n256_hash,
-@@ -328,9 +442,14 @@ write_summary() {
-         VLLM_XPU_COMPILE_OUT_OF_PLACE_ALLREDUCE: $vllm_xpu_compile_out_of_place_allreduce,
-         VLLM_XPU_LOCAL_ARGMAX_DECODE: $vllm_xpu_local_argmax_decode,
-         VLLM_XPU_LOCAL_ARGMAX_ASSUME_SAFE: $vllm_xpu_local_argmax_assume_safe,
-+        VLLM_XPU_LOCAL_ARGMAX_GATHER_BROADCAST: $vllm_xpu_local_argmax_gather_broadcast,
-         VLLM_XPU_LOCAL_ARGMAX_DIRECT_GATHER: $vllm_xpu_local_argmax_direct_gather,
-+        VLLM_XPU_LOCAL_ARGMAX_DIRECT_GATHER_REUSE: $vllm_xpu_local_argmax_direct_gather_reuse,
-+        VLLM_XPU_LOCAL_ARGMAX_PAIR_REUSE: $vllm_xpu_local_argmax_pair_reuse,
-+        VLLM_XPU_LOCAL_ARGMAX_PACKED_GATHER: $vllm_xpu_local_argmax_packed_gather,
-         VLLM_XPU_LOCAL_ARGMAX_PACKED_ALLREDUCE: $vllm_xpu_local_argmax_packed_allreduce,
-         VLLM_XPU_LOCAL_ARGMAX_ALLREDUCE: $vllm_xpu_local_argmax_allreduce,
-+        VLLM_XPU_LOCAL_ARGMAX_XPU_REDUCE: $vllm_xpu_local_argmax_xpu_reduce,
-         VLLM_BENCH_TEMPERATURE: $vllm_bench_temperature,
-         VLLM_XPU_ENABLE_XPU_GRAPH: env.VLLM_XPU_ENABLE_XPU_GRAPH,
-         VLLM_XPU_FORCE_GRAPH_WITH_COMM: env.VLLM_XPU_FORCE_GRAPH_WITH_COMM,
-@@ -422,7 +541,7 @@ if [ "$BENCH_REPEATS" -gt 0 ]; then
+@@ -536,7 +541,7 @@
        RUN_TIMEOUT="$BENCH_TIMEOUT" \
        RUN_TIMEOUT_KILL_AFTER="$RUN_TIMEOUT_KILL_AFTER" \
        SHM_STALL_MAX_WARNINGS="$SHM_STALL_MAX_WARNINGS" \
--      EXTRA_ARGS="${bench_async_flags[*]} --block-size $BLOCK_SIZE --no-enable-prefix-caching --attention-backend TRITON_ATTN --compilation-config {\"use_inductor_graph_partition\":true,\"compile_sizes\":[1],\"cudagraph_mode\":\"PIECEWISE\"}" \
+-      EXTRA_ARGS="${bench_async_flags[*]} --block-size $BLOCK_SIZE --no-enable-prefix-caching ${bench_attention_backend_args[*]} --compilation-config {\"use_inductor_graph_partition\":true,\"compile_sizes\":[1],\"cudagraph_mode\":\"PIECEWISE\"}" \
 +      EXTRA_ARGS="${bench_async_flags[*]} --block-size $BLOCK_SIZE --no-enable-prefix-caching ${bench_attention_backend_args[*]} --compilation-config $COMPILATION_CONFIG_JSON" \
        /home/steve/llm-optimizations-publish/scripts/bench-vllm-minimax-autoround-xpu.sh
      )"
      printf '%s\n' "$run_out"
-diff --git a/scripts/run-vllm-minimax-quality-check.py b/scripts/run-vllm-minimax-quality-check.py
-index 847ea20..d325dc3 100755
 --- a/scripts/run-vllm-minimax-quality-check.py
 +++ b/scripts/run-vllm-minimax-quality-check.py
-@@ -138,6 +138,14 @@ def parse_args() -> argparse.Namespace:
-             "'none,+rms_norm'. Leave unset for vLLM defaults."
+@@ -139,6 +139,14 @@
          ),
      )
-+    parser.add_argument(
+     parser.add_argument(
 +        "--compilation-config-json",
 +        default=None,
 +        help=(
@@ -344,42 +62,11 @@ index 847ea20..d325dc3 100755
 +            "individual compilation override flags are applied."
 +        ),
 +    )
-     parser.add_argument(
++    parser.add_argument(
          "--rms-norm-priority",
          default=None,
-@@ -171,6 +179,15 @@ def parse_args() -> argparse.Namespace:
-         action="store_true",
-         help="Disable vLLM custom all-reduce. Default mirrors benchmark scripts.",
-     )
-+    parser.add_argument(
-+        "--speculative-config",
-+        default=None,
-+        help=(
-+            "JSON object passed through to vLLM speculative_config. Use behind "
-+            "exact-token gates because speculative metadata disables the "
-+            "current XPU local-argmax shortcut."
-+        ),
-+    )
-     parser.add_argument(
-         "--enable-expert-parallel",
-         action="store_true",
-@@ -274,6 +291,15 @@ def parse_args() -> argparse.Namespace:
-         default="default",
-         help="Override vLLM async scheduling for determinism/isolation tests.",
-     )
-+    parser.add_argument(
-+        "--stream-interval",
-+        type=int,
-+        default=None,
-+        help=(
-+            "Optional vLLM scheduler stream interval. Larger values reduce "
-+            "host output frequency without changing."
-+        ),
-+    )
-     parser.add_argument(
-         "--enable-prefix-caching",
-         dest="enable_prefix_caching",
-@@ -867,6 +893,18 @@ def main() -> None:
+         help=(
+@@ -885,6 +893,18 @@
      compilation_config = {
          "compile_sizes": [1],
      }
@@ -398,37 +85,3 @@ index 847ea20..d325dc3 100755
      if args.compilation_mode != "default":
          mode_map = {
              "none": 0,
-@@ -923,8 +961,21 @@ def main() -> None:
-         llm_kwargs["gpu_memory_utilization"] = args.gpu_memory_utilization
-     if args.async_scheduling != "default":
-         llm_kwargs["async_scheduling"] = args.async_scheduling == "on"
-+    if args.stream_interval is not None:
-+        llm_kwargs["stream_interval"] = args.stream_interval
-     if args.enable_expert_parallel:
-         llm_kwargs["enable_expert_parallel"] = True
-+    speculative_config = None
-+    speculative_config_record = None
-+    if args.speculative_config:
-+        try:
-+            speculative_config = json.loads(args.speculative_config)
-+        except json.JSONDecodeError as exc:
-+            raise SystemExit(f"invalid --speculative-config JSON: {exc}") from exc
-+        if not isinstance(speculative_config, dict):
-+            raise SystemExit("--speculative-config must decode to a JSON object")
-+        speculative_config_record = json.loads(json.dumps(speculative_config))
-+        llm_kwargs["speculative_config"] = json.loads(json.dumps(speculative_config))
- 
-     llm = LLM(
-         model=args.model,
-@@ -1161,9 +1212,11 @@ def main() -> None:
-             "cudagraph_mode": args.cudagraph_mode,
-             "attention_backend": args.attention_backend,
-             "async_scheduling": args.async_scheduling,
-+            "stream_interval": args.stream_interval,
-             "cudagraph_num_warmups": args.cudagraph_num_warmups,
-             "compile_ranges_endpoints": args.compile_ranges_endpoints,
-             "compilation_custom_ops": args.compilation_custom_ops,
-+            "speculative_config": speculative_config_record,
-         },
-         "prompt_diagnostics": prompt_diagnostics,
-         "compilation_config": compilation_config,
