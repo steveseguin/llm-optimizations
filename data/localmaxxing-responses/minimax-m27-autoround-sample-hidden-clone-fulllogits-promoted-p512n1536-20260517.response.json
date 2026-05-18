@@ -1,0 +1,40 @@
+{
+  "http_status": 201,
+  "id": "cmpag0uvt004io101t6rm25o1",
+  "status": "APPROVED",
+  "createdAt": "2026-05-18T00:05:44.153Z",
+  "hfId": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+  "engineName": "vllm",
+  "engineVersion": "0.20.1-local",
+  "quantization": "INT4 AutoRound W4A16",
+  "hardware": {
+    "hwClass": "DISCRETE_GPU",
+    "gpuName": "Intel Arc Pro B70 32GB",
+    "gpuCount": 4,
+    "vramGb": 32,
+    "cpu": "AMD EPYC 9015",
+    "ramGb": 16,
+    "os": "Ubuntu 24.04.4 LTS, kernel 6.17.0-22-generic"
+  },
+  "metrics": {
+    "promptTokens": 512,
+    "outputTokens": 1536,
+    "contextLength": 2048,
+    "batchSize": 1,
+    "tokSOut": 66.60932103987211,
+    "tokSTotal": 88.81242805316282,
+    "peakVramGb": 29.3
+  },
+  "engineFlags": {
+    "tensorParallel": 4,
+    "prefixCaching": false,
+    "attentionBackend": "TRITON_ATTN",
+    "chunkedPrefill": true,
+    "prefillChunkSize": 512,
+    "concurrency": 1,
+    "temperature": 0,
+    "specDecoding": false,
+    "mtpEnabled": false,
+    "extraFlags": "VLLM_XPU_COMPILE_ALLREDUCE_NO_CLONE=1; VLLM_XPU_CLONE_SAMPLE_HIDDEN=1; VLLM_MINIMAX_M2_CLONE_FINAL_HIDDEN=0; VLLM_XPU_ENABLE_XPU_GRAPH=1; VLLM_XPU_FORCE_GRAPH_WITH_COMM=1; VLLM_XPU_GRAPH_NOOP_COMM_CAPTURE=1; VLLM_XPU_USE_LLM_SCALER_MOE=1; VLLM_MINIMAX_M2_ATTN_DELAY_ALLREDUCE=1; VLLM_MINIMAX_QK_NORM_RESTORE_WEIGHT=1; VLLM_MINIMAX_QK_NORM_RESTORE_WEIGHT_MIN_TOKENS=2; CCL_TOPO_P2P_ACCESS=1; local-argmax disabled"
+  }
+}
