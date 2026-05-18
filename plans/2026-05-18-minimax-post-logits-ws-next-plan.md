@@ -58,3 +58,13 @@ Date: 2026-05-18
      - `VLLM_XPU_MOE_WS_UP_NTILE=8` stalled after graph compile.
      - `VLLM_XPU_MOE_WS_DOWN_HTILE=8` changed the exact raw token hash and was rejected without benchmark.
    - Decision: stop simple tile reties. Next work should target graph-safe MoE epilogue/work-sharing structure, final logits/lm-head cost, or cleaner non-invasive timing.
+
+8. Completed: guarded greedy sampler fp32-skip.
+   - Reason: the final logits timing showed about `0.86 ms/token`; a narrow sampler guard could skip `logits.to(torch.float32)` when greedy sampling has no logprobs, penalties, masks, or processors.
+   - Outcome: full strict quality passed, but mean speed was `81.549421` output tok/s and `108.732562` total tok/s, slightly below the promoted `81.758267` / `109.011023` baseline.
+   - Decision: reject and restore the active sampler to the promoted behavior. The sampler fp32 conversion is not the useful next bottleneck.
+
+9. Next active branch: final lm-head/final-token selection or collective boundary work.
+   - Reason: micro-reties around simple flags, tiles, and sampler conversion have not beaten the logits-WS baseline. The measured cost still points to local lm-head projection plus repeated per-layer collectives.
+   - Method: avoid token-selection shortcuts unless they are exact under the strict gate. Prefer diagnostics or narrow patches that reduce kernel launches/copies around final logits, MoE output, or residual allreduce without changing routing, quantization, or sampling semantics.
+   - Gate: raw145 n64 and n256 exact first, then semantic, arithmetic-repeat, extended sixpack, and at least two p512/n1536 benchmark repeats before promotion.
