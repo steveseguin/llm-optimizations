@@ -60,6 +60,13 @@ Recent logits-WS no-clone/final-hidden-clone follow-up:
 - Decision: not promoted and not submitted to LocalMaxxing. This makes further flag reties less interesting than measured timing around residual allreduce and final logits boundaries.
 - Artifacts: `notes/2026-05-18-minimax-logits-ws-noclone-clonefinal-negative.md`, `data/minimax-m27-logits-ws-noclone-clonefinal-negative-20260518.json`
 
+Recent decode-boundary timing:
+
+- Synchronized diagnostics found final logits at about `0.86 ms/token`, with local lm-head projection larger than TP logits gathering.
+- Eager per-layer labels identified three similar steady decode collectives: Q/K variance allreduce, attention delayed residual allreduce, and MoE expert output allreduce.
+- Model-forward timing wrappers were not neutral in compiled graph and were reverted. Active `minimax_m2.py` and `logits_processor.py` hashes match the promoted runtime again.
+- Artifacts: `notes/2026-05-18-minimax-decode-boundary-timing.md`, `data/minimax-m27-decode-boundary-timing-20260518.json`
+
 ## Qwen3.6 27B
 
 The quality-preserving Qwen targets remain separate from MiniMax AutoRound:
@@ -71,6 +78,6 @@ The quality-preserving Qwen targets remain separate from MiniMax AutoRound:
 ## Next Optimization Targets
 
 - Keep the MiniMax logits-to-work-sharing FlashAttention/PIECEWISE recipe as the new strict baseline.
-- Target hidden-state collective boundaries, MoE/projection epilogue fusion, and prefill efficiency.
+- Target final logits/lm-head cost, hidden-state collective boundaries, MoE/projection epilogue fusion, and prefill efficiency.
 - Do not promote logits/router/argmax shortcuts unless they pass the same strict quality gate.
 - Keep speculative decode optional and quality-gated; no current promoted MiniMax result uses speculation.
