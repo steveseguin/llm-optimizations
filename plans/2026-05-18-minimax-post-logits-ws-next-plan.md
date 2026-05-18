@@ -25,13 +25,15 @@ Date: 2026-05-18
    - Outcome: strict quality passed, but mean speed was `81.021124` output tok/s and `108.028166` total tok/s, below the promoted `81.758267` baseline.
    - Decision: do not promote and do not submit to LocalMaxxing.
 
-2. Add better decode timing labels around residual allreduces and final logits boundaries.
+2. Completed: add better decode timing labels around residual allreduces and final logits boundaries.
    - Reason: the current timing helper labels Q/K variance allreduces and postprocess, but residual allreduces are not labeled precisely enough.
+   - Outcome: diagnostic labels identified three similar steady decode collectives in eager mode: Q/K variance allreduce, attention delayed residual allreduce, and MoE expert output allreduce. Compiled post-forward timing showed final logits at about `0.86 ms/token`, mostly lm-head projection rather than TP gather.
+   - Safety finding: model-forward timing wrappers were not neutral in compiled graph and were reverted from the active runtime. Active file hashes now match the promoted baseline again.
 
 3. Use the timing results to choose a narrow fusion branch:
-   - hidden-state allreduce plus residual/add/norm boundary,
-   - MoE/projection epilogue boundary,
-   - or final logits/postprocess boundary.
+   - full-logits lm-head/postprocess boundary if exact token selection can be preserved;
+   - hidden-state allreduce plus residual/add/norm boundary only if strict quality gates pass;
+   - MoE/projection epilogue boundary, because MoE remains the largest eager per-layer region.
 
 4. Characterize prefill separately after decode remains stable.
    - Reason: LocalMaxxing followers asked for prefill numbers, but prefill tuning must not regress decode or quality.
