@@ -1,0 +1,68 @@
+{
+  "date": "2026-05-18",
+  "model": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+  "hardware": "4x Intel Arc Pro B70 32GB",
+  "engine": "vLLM 0.20.1-local XPU TP4",
+  "baseline": {
+    "label": "minimax-logits-ws-flash-piecewise-strict-20260518",
+    "mean_output_toks_per_second": 81.75826721712929,
+    "mean_total_toks_per_second": 109.01102295617238,
+    "localmaxxing_id": "cmpay7th600bbmn01v6csyaro"
+  },
+  "candidate": {
+    "label": "minimax-ws-reuse-internal-strict-20260518",
+    "status": "quality_failed_raw145_n64",
+    "env": {
+      "VLLM_XPU_USE_LLM_SCALER_MOE": "1",
+      "VLLM_XPU_USE_LLM_SCALER_MOE_WS": "1",
+      "VLLM_XPU_USE_LLM_SCALER_MOE_MINIMAX_LOGITS_WS": "1",
+      "VLLM_XPU_MINIMAX_WS_REUSE_INTERNAL": "1",
+      "VLLM_XPU_ENABLE_XPU_GRAPH": "1",
+      "VLLM_XPU_FORCE_GRAPH_WITH_COMM": "1",
+      "VLLM_XPU_GRAPH_NOOP_COMM_CAPTURE": "1"
+    },
+    "quality": {
+      "expected_raw145_n64_combined_token_sha256": "267cbf30208d84929ee79284ac695467f7e80597bf8694130e1e1f8b180eb5bd",
+      "observed_raw145_n64_combined_token_sha256": "242152df6909e5e25433f43875de5e51c210d146a22279611852b695bcf7d978",
+      "passed": false,
+      "distinct_generated_token_count": 2,
+      "printable_nonspace_text_chars": 5,
+      "control_nonspace_text_chars": 63,
+      "nul_token_count": 63,
+      "control_char_output": true,
+      "degenerate_output": true
+    },
+    "benchmark": {
+      "ran": false,
+      "reason": "failed first exact quality canary"
+    }
+  },
+  "default_path_safety_check": {
+    "env": {
+      "VLLM_XPU_MINIMAX_WS_REUSE_INTERNAL": "unset",
+      "VLLM_XPU_USE_LLM_SCALER_MOE": "1",
+      "VLLM_XPU_USE_LLM_SCALER_MOE_WS": "1",
+      "VLLM_XPU_USE_LLM_SCALER_MOE_MINIMAX_LOGITS_WS": "1"
+    },
+    "passed": true,
+    "observed_raw145_n64_combined_token_sha256": "267cbf30208d84929ee79284ac695467f7e80597bf8694130e1e1f8b180eb5bd",
+    "distinct_generated_token_count": 28,
+    "printable_nonspace_text_chars": 240,
+    "control_nonspace_text_chars": 0,
+    "nul_token_count": 0,
+    "control_char_output": false,
+    "degenerate_output": false,
+    "json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/default-after-ws-reuse-reject-raw145-n64-20260518T105752Z.json"
+  },
+  "artifacts": {
+    "summary": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-minimax-ws-reuse-internal-strict-20260518-strict-tp4-ctx2048-mbt512-bs256-20260518T105145Z-summary.json",
+    "failed_raw145_n64": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-minimax-ws-reuse-internal-strict-20260518-strict-tp4-ctx2048-mbt512-bs256-20260518T105145Z-quality/raw145-n64-exact.json",
+    "default_path_raw145_n64": "/home/steve/bench-results/minimax-m2.7-strict-candidates/default-after-ws-reuse-reject-raw145-n64-20260518T105752Z.json",
+    "build_log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/build-moe-int4-u4-oneapi2025-20260518T104831Z.log"
+  },
+  "hashes": {
+    "moe_int4_ops_so_sha256": "64fcbda3d8e27f73a4643764d4be6d4ab17c16a436ab0dd165e8535395d06774",
+    "moe_int4_sycl_sha256": "93e5a3940403efe4eb8ad44df6ef8550fcd97c1dbc48d7f85d46314661a5f8b0"
+  },
+  "decision": "Reject. Do not enable VLLM_XPU_MINIMAX_WS_REUSE_INTERNAL=1. The failure suggests static internal scratch reuse is unsafe under XPU graph capture/replay."
+}
