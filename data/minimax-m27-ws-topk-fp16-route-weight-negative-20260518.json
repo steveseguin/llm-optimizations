@@ -1,0 +1,109 @@
+{
+  "date": "2026-05-18",
+  "model": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+  "hardware": {
+    "gpu": "Intel Arc Pro B70 32GB",
+    "gpu_count": 4
+  },
+  "engine": {
+    "name": "vLLM",
+    "version": "0.20.1-local",
+    "device": "xpu",
+    "tensor_parallel": 4
+  },
+  "baseline": {
+    "name": "promoted logits-to-work-sharing no-attention-delay recipe",
+    "output_toks_per_second": 82.40426775694743,
+    "total_toks_per_second": 109.87235700926325,
+    "shape": {
+      "prompt_tokens": 512,
+      "output_tokens": 1536,
+      "context_length": 2048,
+      "max_num_batched_tokens": 512,
+      "block_size": 256,
+      "batch_size": 1
+    }
+  },
+  "candidate": {
+    "name": "minimax_ws_topk_fp16_route_weight",
+    "status": "quality_passed_performance_rejected",
+    "description": "Store exact MiniMax normalized top-k route weights as FP16 instead of FP32 before the llm-scaler INT4 work-sharing MoE down kernel. Expert selection and score normalization are otherwise unchanged.",
+    "env": {
+      "VLLM_XPU_MINIMAX_WS_TOPK_WEIGHT_FP16": "1",
+      "VLLM_XPU_USE_LLM_SCALER_MOE": "1",
+      "VLLM_XPU_USE_LLM_SCALER_MOE_WS": "1",
+      "VLLM_XPU_USE_LLM_SCALER_MOE_MINIMAX_LOGITS_WS": "1",
+      "VLLM_MINIMAX_M2_ATTN_DELAY_ALLREDUCE": "0",
+      "VLLM_MINIMAX_QK_NORM_RESTORE_WEIGHT": "1",
+      "VLLM_MINIMAX_QK_NORM_RESTORE_WEIGHT_MIN_TOKENS": "2",
+      "VLLM_XPU_ENABLE_XPU_GRAPH": "1",
+      "VLLM_XPU_FORCE_GRAPH_WITH_COMM": "1",
+      "VLLM_XPU_GRAPH_NOOP_COMM_CAPTURE": "1"
+    },
+    "quality": {
+      "raw145_n64_exact": {
+        "passed": true,
+        "combined_token_sha256": "267cbf30208d84929ee79284ac695467f7e80597bf8694130e1e1f8b180eb5bd",
+        "combined_text_sha256": "4f72ba3cd480774951b53d131d188c21f24e113e69ce011580567d7d9baf3a07"
+      },
+      "raw145_n256_exact": {
+        "passed": true,
+        "combined_token_sha256": "58f6e8251c7a0a17e8c441278b5861f7d5da914fa1823ecd10484b296f2d7537",
+        "combined_text_sha256": "516fa1176dfcb3222308acd6af190dc8bba09e755698e7f2f94666b513d08e5b"
+      },
+      "semantic_suite_n64_r2": {
+        "passed": true,
+        "combined_token_sha256": "adacbf144264486ea7d378ebb6a4c0ba23951b72c4cf86251a762b07ebef5805",
+        "combined_text_sha256": "c80deed9ca35b0306f6e1bc2295f45e69d0533306816407f0bb1d5a57cbcb706"
+      },
+      "arithmetic_repeat_n64_r16": {
+        "passed": true,
+        "combined_token_sha256": "578ec378bf31cb16fb49ac5c0043270fd00a0f7898e18ac498a41ffe775d7994",
+        "combined_text_sha256": "92a570febc396a015f63c73dcf8ce0ecf302fb4e2fa49d329abb8d0bdaf75137"
+      },
+      "extended_sixpack_n64_r2": {
+        "passed": true,
+        "combined_token_sha256": "1e3560554f57b2b56cec8f49f28bc8ba12e9e0ced26bdc99a976f1433c99caa7",
+        "combined_text_sha256": "89f3d753fab6848015e7e4a513eec71699e4e8da374598adb836818c0d399797"
+      }
+    },
+    "benchmark": {
+      "prompt_tokens": 512,
+      "output_tokens": 1536,
+      "context_length": 2048,
+      "batch_size": 1,
+      "max_num_batched_tokens": 512,
+      "block_size": 256,
+      "output_toks_per_second": [
+        80.51169692035504,
+        82.32358848146743
+      ],
+      "total_toks_per_second": [
+        107.34892922714005,
+        109.76478464195657
+      ],
+      "mean_output_toks_per_second": 81.41764270091123,
+      "mean_total_toks_per_second": 108.5568569345483,
+      "delta_output_percent_vs_baseline": -1.197,
+      "delta_total_percent_vs_baseline": -1.197
+    }
+  },
+  "decision": {
+    "promote": false,
+    "submit_to_localmaxxing": false,
+    "reason": "Strict quality passed exactly, but performance was below the promoted baseline. This is a valid negative result, not a quality regression."
+  },
+  "artifacts": {
+    "summary": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-minimax-ws-topk-fp16-ar-20260518-strict-tp4-ctx2048-mbt512-bs256-20260518T194905Z-summary.json",
+    "benchmarks": [
+      "/home/steve/bench-results/minimax-m2.7-strict-candidates/vllm-minimax-m27-autoround-tp4-p512n1536-20260518T200505Z.json",
+      "/home/steve/bench-results/minimax-m2.7-strict-candidates/vllm-minimax-m27-autoround-tp4-p512n1536-20260518T200755Z.json"
+    ],
+    "build_log": "/home/steve/bench-results/minimax-m2.7-autoround-vllm/build-moe-int4-u4-oneapi2025-20260518T194720Z.log"
+  },
+  "next": [
+    "Do not promote FP16 route weights for the current MiniMax WS path.",
+    "Keep exact FP32 route weights in the promoted runtime.",
+    "Focus next on collective boundary fusion, MoE/projection epilogues, graph scheduling, and prefill efficiency."
+  ]
+}
