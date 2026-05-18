@@ -48,7 +48,7 @@ Recent MoE-delay follow-up:
 
 Recent no-clone/final-hidden-clone follow-up:
 
-- `VLLM_XPU_COMPILE_ALLREDUCE_NO_CLONE=1` plus `VLLM_MINIMAX_M2_CLONE_FINAL_HIDDEN=1` with the same MBT512 work-sharing FlashAttention/PIIECEWISE recipe passed the full strict quality gate.
+- `VLLM_XPU_COMPILE_ALLREDUCE_NO_CLONE=1` plus `VLLM_MINIMAX_M2_CLONE_FINAL_HIDDEN=1` with the same MBT512 work-sharing FlashAttention/PIECEWISE recipe passed the full strict quality gate.
 - Result: `80.791520` output tok/s and `107.722027` total tok/s mean.
 - Decision: validated tie, not a material new win. Do not submit to LocalMaxxing because the `+0.23%` output delta over the promoted `80.602755` result is within run variance.
 - Artifacts: `notes/2026-05-18-minimax-no-clone-clonefinal-retie.md`, `data/minimax-m27-no-clone-clonefinal-retie-20260518.json`
