@@ -1,0 +1,19 @@
+diff --git a/vllm/compilation/passes/fusion/sequence_parallelism.py b/vllm/compilation/passes/fusion/sequence_parallelism.py
+--- a/vllm/compilation/passes/fusion/sequence_parallelism.py
++++ b/vllm/compilation/passes/fusion/sequence_parallelism.py
+@@ -117,6 +117,14 @@ class _SequenceParallelPatternHelper:
+             and os.environ.get("VLLM_XPU_COMPILE_ALLREDUCE_CUSTOM_OP", "0") == "1"
+         )
+ 
+     def _all_reduce(self, x: torch.Tensor) -> torch.Tensor:
++        from vllm.platforms import current_platform
++
++        if current_platform.is_xpu():
++            x = x.clone()
++            torch.ops._c10d_functional.all_reduce_(
++                x, "sum", self.tp_group.unique_name
++            )
++            return torch.ops._c10d_functional.wait_tensor(x)
+         if self.use_xpu_custom_allreduce_pattern:
+             return torch.ops.vllm.all_reduce(x, group_name=self.tp_group.unique_name)
+         return tensor_model_parallel_all_reduce(x)
