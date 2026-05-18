@@ -1,0 +1,96 @@
+{
+  "date": "2026-05-18",
+  "label": "logits-ws-safe-hidden-repeat4-20260518",
+  "model": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+  "hardware": {
+    "gpu": "Intel Arc Pro B70",
+    "gpu_count": 4,
+    "vram_gb_each": 32
+  },
+  "engine": {
+    "name": "vLLM",
+    "version": "0.20.1-local",
+    "backend": "xpu",
+    "tensor_parallel": 4
+  },
+  "recipe": {
+    "dtype": "float16",
+    "quantization": "AutoRound INT4 W4A16",
+    "attention_backend": "default XPU FlashAttention v2",
+    "xpu_graph": "PIECEWISE",
+    "moe_path": "exact MiniMax router logits feeding llm-scaler INT4 MoE work-sharing decode",
+    "environment": {
+      "VLLM_XPU_USE_LLM_SCALER_MOE": "1",
+      "VLLM_XPU_USE_LLM_SCALER_MOE_WS": "1",
+      "VLLM_XPU_USE_LLM_SCALER_MOE_MINIMAX_LOGITS_WS": "1",
+      "VLLM_XPU_SAFE_SAMPLE_HIDDEN_SELECT": "1",
+      "VLLM_XPU_ENABLE_XPU_GRAPH": "1",
+      "VLLM_XPU_FORCE_GRAPH_WITH_COMM": "1",
+      "VLLM_XPU_GRAPH_NOOP_COMM_CAPTURE": "1"
+    }
+  },
+  "benchmark_shape": {
+    "prompt_tokens": 512,
+    "output_tokens": 1536,
+    "context_length": 2048,
+    "batch_size": 1,
+    "max_num_batched_tokens": 512,
+    "block_size": 256
+  },
+  "quality": {
+    "status": "passed",
+    "raw145_n64_combined_token_sha256": "267cbf30208d84929ee79284ac695467f7e80597bf8694130e1e1f8b180eb5bd",
+    "raw145_n256_combined_token_sha256": "58f6e8251c7a0a17e8c441278b5861f7d5da914fa1823ecd10484b296f2d7537",
+    "arithmetic_repeat_combined_token_sha256": "578ec378bf31cb16fb49ac5c0043270fd00a0f7898e18ac498a41ffe775d7994",
+    "extended_sixpack_combined_token_sha256": "1e3560554f57b2b56cec8f49f28bc8ba12e9e0ced26bdc99a976f1433c99caa7",
+    "semantic_suite": "passed, deterministic across two greedy repeats",
+    "arithmetic_repeat": "passed 16 repeated greedy calls",
+    "extended_sixpack": "passed, deterministic across two greedy repeats",
+    "control_nonspace_text_chars": 0,
+    "nul_token_count": 0
+  },
+  "performance": {
+    "output_toks_per_second": [
+      81.46567075523626,
+      80.30671389731543,
+      81.43441984470338,
+      82.31116522577643
+    ],
+    "total_toks_per_second": [
+      108.620894340315,
+      107.07561852975391,
+      108.57922645960451,
+      109.74822030103525
+    ],
+    "mean_output_toks_per_second": 81.37949243075788,
+    "mean_total_toks_per_second": 108.50598990767718,
+    "promoted_baseline_output_toks_per_second": 81.758267,
+    "promoted_baseline_total_toks_per_second": 109.011023,
+    "output_delta_percent_vs_promoted": -0.4632854388966147
+  },
+  "decision": {
+    "promoted": false,
+    "localmaxxing_submitted": false,
+    "classification": "quality_safe_no_speed_gain",
+    "reason": "The four-repeat mean is below the current promoted logits-WS baseline, so the earlier +0.19% two-repeat result is treated as normal run variance."
+  },
+  "artifacts": {
+    "summary_json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-logits-ws-safe-hidden-repeat4-20260518-strict-tp4-ctx2048-mbt512-bs256-20260518T164551Z-summary.json",
+    "quality_dir": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-logits-ws-safe-hidden-repeat4-20260518-strict-tp4-ctx2048-mbt512-bs256-20260518T164551Z-quality",
+    "benchmark_jsons": [
+      "/home/steve/bench-results/minimax-m2.7-strict-candidates/vllm-minimax-m27-autoround-tp4-p512n1536-20260518T170139Z.json",
+      "/home/steve/bench-results/minimax-m2.7-strict-candidates/vllm-minimax-m27-autoround-tp4-p512n1536-20260518T170430Z.json",
+      "/home/steve/bench-results/minimax-m2.7-strict-candidates/vllm-minimax-m27-autoround-tp4-p512n1536-20260518T170719Z.json",
+      "/home/steve/bench-results/minimax-m2.7-strict-candidates/vllm-minimax-m27-autoround-tp4-p512n1536-20260518T171016Z.json"
+    ]
+  },
+  "source_hashes": {
+    "strict_runner": "0f74c7df64f1ecf9ab3b3a2daf1d28084f0ae6397333b67b215d7b01dfe8d3ca",
+    "gpu_model_runner": "d900ae2c37df0c70df42bb33b350dd4831f0399ccc7222f7b7e2f951efe9308f",
+    "minimax_m2": "e1408e4c95a662f43aca5712d30298bf75073626ffb10fcdce621c175888779f",
+    "logits_processor": "ccfe30c1469630aed3040de63970470db6110325850a552a0287764032bbc733",
+    "sampler": "b8c03e99ea099f710440a1390e1495772a563477a5eafaf3f6d75af194024f76",
+    "moe_wna16": "d14f2523f9bf68a56add8d9dcaad862d58ad641168b32ac00a9b47f25e4c1df2",
+    "llm_scaler_moe_int4_source": "8d7da6669eecd1d0d0a36cdfca8e07b13620ab0c4d7c20f6dc3967f1b78b3ea5"
+  }
+}
