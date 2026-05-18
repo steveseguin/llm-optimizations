@@ -92,6 +92,14 @@ Recent MoE trace and tile-sweep follow-up:
 - Decision: do not promote and do not submit to LocalMaxxing. Simple WS tile reties are not the next useful path.
 - Artifacts: `notes/2026-05-18-minimax-moe-trace-and-tile-negative.md`, `data/minimax-m27-moe-trace-and-tile-negative-20260518.json`
 
+Recent greedy sampler fp32-skip follow-up:
+
+- `VLLM_XPU_GREEDY_SKIP_LOGITS_FP32=1` skipped the sampler-side XPU logits-to-fp32 conversion for guarded greedy/no-logprobs/no-processor requests.
+- It passed raw145 n64/n256 exact hashes, semantic suite, 16-repeat arithmetic, and extended sixpack.
+- Result: `81.549421` output tok/s and `108.732562` total tok/s mean, slightly below the promoted `81.758267` / `109.011023` logits-WS baseline.
+- Decision: do not promote and do not submit to LocalMaxxing. The sampler fp32 conversion is not the current bottleneck; the active runtime sampler was restored to the promoted behavior.
+- Artifacts: `notes/2026-05-18-minimax-greedy-skip-logits-fp32-negative.md`, `data/minimax-m27-greedy-skip-logits-fp32-negative-20260518.json`, `patches/minimax-greedy-skip-logits-fp32-negative-20260518.md`
+
 ## Qwen3.6 27B
 
 The quality-preserving Qwen targets remain separate from MiniMax AutoRound:
