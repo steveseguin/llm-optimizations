@@ -9,22 +9,33 @@ Current strict quality-passed speed result:
 - Model: `Lasimeri/MiniMax-M2.7-int4-AutoRound`
 - Hardware: 4x Intel Arc Pro B70 32GB
 - Engine: vLLM `0.20.1-local`, XPU TP4
-- Recipe: FP16 activations, AutoRound INT4 W4A16, default XPU FlashAttention v2, XPU PIECEWISE graph, exact MiniMax router-logits path feeding llm-scaler INT4 MoE work-sharing decode with `VLLM_XPU_USE_LLM_SCALER_MOE_WS=1` and `VLLM_XPU_USE_LLM_SCALER_MOE_MINIMAX_LOGITS_WS=1`
+- Recipe: FP16 activations, AutoRound INT4 W4A16, default XPU FlashAttention v2, XPU PIECEWISE graph, exact MiniMax router-logits path feeding llm-scaler INT4 MoE work-sharing decode with `VLLM_XPU_USE_LLM_SCALER_MOE_WS=1`, `VLLM_XPU_USE_LLM_SCALER_MOE_MINIMAX_LOGITS_WS=1`, and `VLLM_MINIMAX_M2_ATTN_DELAY_ALLREDUCE=0`
 - Shape: p512/n1536, ctx2048, batch 1
-- Result: `81.758267` output tok/s, `109.011023` total tok/s, mean of two strict-gated repeats
-- Confirmation repeat: `81.197954` output tok/s, `108.263938` total tok/s; three-run mean is `81.571496` output tok/s
+- Result: `82.404268` output tok/s, `109.872357` total tok/s, mean of four clean long repeats
 - Quality: raw145 exact n64/n256 hashes, semantic suite, 16-repeat arithmetic, and extended sixpack all passed before benchmarking
-- LocalMaxxing: `cmpay7th600bbmn01v6csyaro`
+- Delta: `+0.79%` output tok/s over the previous strict logits-WS promoted result and `+2.24%` over the earlier MoE-WS FlashAttention/PIECEWISE baseline
+- LocalMaxxing: `cmpbifcx3013bmn01747cxix8`
 
 Primary artifacts:
 
+- `notes/2026-05-18-minimax-logits-ws-no-attn-delay-small-win.md`
+- `data/minimax-m27-logits-ws-no-attn-delay-small-win-20260518.json`
+- `data/localmaxxing-minimax-m27-autoround-logits-ws-no-attn-delay-p512n1536-20260518.payload.json`
+- `data/localmaxxing-responses/minimax-m27-autoround-logits-ws-no-attn-delay-p512n1536-20260518.response.json`
 - `notes/2026-05-18-minimax-logits-ws-strict-win.md`
 - `data/minimax-m27-logits-ws-strict-win-20260518.json`
 - `data/localmaxxing-minimax-m27-autoround-logits-ws-strict-p512n1536-20260518.payload.json`
 - `data/localmaxxing-responses/minimax-m27-autoround-logits-ws-strict-p512n1536-20260518.response.json`
 - `patches/minimax-logits-ws-path-20260518.md`
 
-Previous promoted baseline:
+Previous promoted logits-WS baseline:
+
+- Same exact router-logits-to-work-sharing path with delayed attention allreduce enabled: `81.758267` output tok/s and `109.011023` total tok/s, mean of two strict-gated repeats.
+- Confirmation repeat: `81.197954` output tok/s, `108.263938` total tok/s; three-run mean was `81.571496` output tok/s.
+- LocalMaxxing: `cmpay7th600bbmn01v6csyaro`
+- Artifacts: `notes/2026-05-18-minimax-logits-ws-strict-win.md`, `data/minimax-m27-logits-ws-strict-win-20260518.json`
+
+Previous MoE-WS baseline:
 
 - `VLLM_XPU_USE_LLM_SCALER_MOE_WS=1` without logits-to-WS routing: `80.602755` output tok/s and `107.470340` total tok/s.
 - LocalMaxxing: `cmpasdq5v007nmn019elaut3s`
@@ -58,7 +69,7 @@ The quality-preserving Qwen targets remain separate from MiniMax AutoRound:
 
 ## Next Optimization Targets
 
-- Keep the MiniMax logits-to-work-sharing FlashAttention/PIECEWISE recipe as the strict baseline.
+- Keep the MiniMax logits-to-work-sharing FlashAttention/PIECEWISE recipe with attention delay disabled as the strict baseline.
 - Target final logits/lm-head cost, hidden-state collective boundaries, MoE/projection epilogue fusion, and prefill efficiency.
 - Do not promote logits/router/argmax shortcuts unless they pass the same strict quality gate.
 - Avoid logits chunked-gather variants unless there is a new deterministic implementation; `VLLM_XPU_LOGITS_CHUNKED_GATHER=32768` failed repeatability.
