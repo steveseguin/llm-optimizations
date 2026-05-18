@@ -1,0 +1,13 @@
+diff --git a/scripts/run-minimax-strict-quality-gated-candidate.sh b/scripts/run-minimax-strict-quality-gated-candidate.sh
+--- a/scripts/run-minimax-strict-quality-gated-candidate.sh
++++ b/scripts/run-minimax-strict-quality-gated-candidate.sh
+@@
+     --arg vllm_minimax_qk_rms_xpu_helper_inplace_allreduce "${VLLM_MINIMAX_QK_RMS_XPU_HELPER_INPLACE_ALLREDUCE:-}" \
+     --arg vllm_xpu_compile_allreduce_custom_op "${VLLM_XPU_COMPILE_ALLREDUCE_CUSTOM_OP:-}" \
++    --arg vllm_xpu_custom_allreduce_clone_input "${VLLM_XPU_CUSTOM_ALLREDUCE_CLONE_INPUT:-}" \
+     --arg vllm_xpu_compile_allreduce_no_clone "${VLLM_XPU_COMPILE_ALLREDUCE_NO_CLONE:-}" \
+@@
+         VLLM_MINIMAX_QK_RMS_XPU_HELPER_INPLACE_ALLREDUCE: $vllm_minimax_qk_rms_xpu_helper_inplace_allreduce,
+         VLLM_XPU_COMPILE_ALLREDUCE_CUSTOM_OP: $vllm_xpu_compile_allreduce_custom_op,
++        VLLM_XPU_CUSTOM_ALLREDUCE_CLONE_INPUT: $vllm_xpu_custom_allreduce_clone_input,
+         VLLM_XPU_COMPILE_ALLREDUCE_NO_CLONE: $vllm_xpu_compile_allreduce_no_clone,
