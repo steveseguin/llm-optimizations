@@ -1,0 +1,80 @@
+{
+  "label": "moe-ws-no-clone-clonefinal-flash-piecewise-strict-20260518",
+  "date": "2026-05-18",
+  "model": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+  "model_path": "/mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround",
+  "hardware": {
+    "gpu_name": "Intel Arc Pro B70 32GB",
+    "gpu_count": 4,
+    "vram_gb_per_gpu": 32
+  },
+  "engine": {
+    "name": "vllm",
+    "version": "0.20.1-local",
+    "backend": "xpu",
+    "tensor_parallel_size": 4,
+    "dtype": "float16",
+    "quantization": "INT4 AutoRound W4A16",
+    "attention_backend": "default XPU FlashAttention v2",
+    "graph_mode": "PIECEWISE",
+    "max_model_len": 2048,
+    "max_num_batched_tokens": 512,
+    "block_size": 256,
+    "max_num_seqs": 1
+  },
+  "candidate_flags": {
+    "VLLM_XPU_USE_LLM_SCALER_MOE": "1",
+    "VLLM_XPU_USE_LLM_SCALER_MOE_WS": "1",
+    "VLLM_XPU_ENABLE_XPU_GRAPH": "1",
+    "VLLM_XPU_FORCE_GRAPH_WITH_COMM": "1",
+    "VLLM_XPU_GRAPH_NOOP_COMM_CAPTURE": "1",
+    "VLLM_MINIMAX_M2_ATTN_DELAY_ALLREDUCE": "1",
+    "VLLM_MINIMAX_QK_NORM_RESTORE_WEIGHT": "1",
+    "VLLM_MINIMAX_QK_NORM_RESTORE_WEIGHT_MIN_TOKENS": "2",
+    "VLLM_XPU_COMPILE_ALLREDUCE_NO_CLONE": "1",
+    "VLLM_MINIMAX_M2_CLONE_FINAL_HIDDEN": "1",
+    "CCL_TOPO_P2P_ACCESS": "1"
+  },
+  "benchmark": {
+    "prompt_tokens": 512,
+    "output_tokens": 1536,
+    "context_length": 2048,
+    "batch_size": 1,
+    "runs": [
+      {
+        "output_toks_per_second": 80.2191321842468,
+        "total_toks_per_second": 106.95884291232908,
+        "elapsed_time_s": 19.147551939007826,
+        "json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/vllm-minimax-m27-autoround-tp4-p512n1536-20260518T075219Z.json"
+      },
+      {
+        "output_toks_per_second": 81.36390757278825,
+        "total_toks_per_second": 108.48521009705101,
+        "elapsed_time_s": 18.878149364027195,
+        "json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/vllm-minimax-m27-autoround-tp4-p512n1536-20260518T075513Z.json"
+      }
+    ],
+    "mean_output_toks_per_second": 80.79151987851753,
+    "mean_total_toks_per_second": 107.72202650469004,
+    "previous_promoted_mean_output_toks_per_second": 80.6027546871925,
+    "relative_output_delta_vs_promoted": 0.002342542545639843
+  },
+  "quality": {
+    "status": "passed",
+    "raw145_n64_expected_combined_token_sha256": "267cbf30208d84929ee79284ac695467f7e80597bf8694130e1e1f8b180eb5bd",
+    "raw145_n256_expected_combined_token_sha256": "58f6e8251c7a0a17e8c441278b5861f7d5da914fa1823ecd10484b296f2d7537",
+    "semantic_suite": "passed",
+    "arithmetic_repeat_runs": 16,
+    "arithmetic_repeat": "passed",
+    "extended_sixpack": "passed"
+  },
+  "decision": {
+    "promote": false,
+    "submit_to_localmaxxing": false,
+    "reason": "Quality passed and speed retied the promoted baseline, but +0.23% output tok/s is not a material repeatable improvement."
+  },
+  "artifacts": {
+    "summary_json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-moe-ws-no-clone-clonefinal-flash-piecewise-strict-20260518-strict-tp4-ctx2048-mbt512-bs256-20260518T073625Z-summary.json",
+    "quality_dir": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-moe-ws-no-clone-clonefinal-flash-piecewise-strict-20260518-strict-tp4-ctx2048-mbt512-bs256-20260518T073625Z-quality"
+  }
+}
