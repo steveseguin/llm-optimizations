@@ -1,0 +1,56 @@
+diff --git a/vllm/model_executor/models/minimax_m2.py b/vllm/model_executor/models/minimax_m2.py
+--- a/vllm/model_executor/models/minimax_m2.py
++++ b/vllm/model_executor/models/minimax_m2.py
+@@
+ import torch
++import torch.distributed as dist
+ from torch import nn
+@@
+ from vllm.distributed import (
+     get_pp_group,
+     get_tensor_model_parallel_rank,
+     get_tensor_model_parallel_world_size,
++    get_tp_group,
+ )
+@@
+ _MINIMAX_QK_RMS_XPU_HELPER = (
+     os.environ.get("VLLM_MINIMAX_QK_RMS_XPU_HELPER", "0") == "1"
+ )
++_MINIMAX_QK_RMS_XPU_HELPER_INPLACE_ALLREDUCE = (
++    os.environ.get("VLLM_MINIMAX_QK_RMS_XPU_HELPER_INPLACE_ALLREDUCE", "0")
++    == "1"
++)
+ _MINIMAX_QK_RMS_XPU_HELPER_MAX_TOKENS = int(
+     os.environ.get("VLLM_MINIMAX_QK_RMS_XPU_HELPER_MAX_TOKENS", "4")
+ )
+@@
+                 qk_var = torch.ops.minimax_qk_rms_xpu.var_alloc(
+                     qkv, self.q_size, self.kv_size
+                 )
+                 if self.q_norm.tp_world > 1:
+-                    qk_var = (
+-                        tensor_model_parallel_all_reduce(qk_var)
+-                        / self.q_norm.tp_world
+-                    )
++                    if _MINIMAX_QK_RMS_XPU_HELPER_INPLACE_ALLREDUCE:
++                        dist.all_reduce(qk_var, group=get_tp_group().device_group)
++                        qk_var.div_(self.q_norm.tp_world)
++                    else:
++                        qk_var = (
++                            tensor_model_parallel_all_reduce(qk_var)
++                            / self.q_norm.tp_world
++                        )
+
+diff --git a/scripts/run-minimax-strict-quality-gated-candidate.sh b/scripts/run-minimax-strict-quality-gated-candidate.sh
+--- a/scripts/run-minimax-strict-quality-gated-candidate.sh
++++ b/scripts/run-minimax-strict-quality-gated-candidate.sh
+@@
+     --arg vllm_minimax_m2_fp16_router "${VLLM_MINIMAX_M2_FP16_ROUTER:-}" \
+     --arg vllm_minimax_qk_rms_xpu_helper "${VLLM_MINIMAX_QK_RMS_XPU_HELPER:-}" \
++    --arg vllm_minimax_qk_rms_xpu_helper_inplace_allreduce "${VLLM_MINIMAX_QK_RMS_XPU_HELPER_INPLACE_ALLREDUCE:-}" \
+     --arg vllm_xpu_compile_allreduce_no_clone "${VLLM_XPU_COMPILE_ALLREDUCE_NO_CLONE:-}" \
+@@
+         VLLM_MINIMAX_M2_FP16_ROUTER: $vllm_minimax_m2_fp16_router,
+         VLLM_MINIMAX_QK_RMS_XPU_HELPER: $vllm_minimax_qk_rms_xpu_helper,
++        VLLM_MINIMAX_QK_RMS_XPU_HELPER_INPLACE_ALLREDUCE: $vllm_minimax_qk_rms_xpu_helper_inplace_allreduce,
+         VLLM_XPU_COMPILE_ALLREDUCE_NO_CLONE: $vllm_xpu_compile_allreduce_no_clone,
