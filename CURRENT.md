@@ -23,6 +23,7 @@ Primary artifacts:
 - `data/localmaxxing-minimax-m27-autoround-clone-safe-custom-allreduce-p512n1536-20260518.payload.json`
 - `data/localmaxxing-responses/minimax-m27-autoround-clone-safe-custom-allreduce-p512n1536-20260518.response.json`
 - `patches/minimax-clone-safe-custom-allreduce-20260518.patch`
+- `patches/minimax-strict-harness-custom-allreduce-clone-env-capture-20260518.patch`
 
 Previous promoted MiniMax baselines:
 
