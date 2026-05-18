@@ -74,7 +74,8 @@ SHM_STALL_MAX_WARNINGS=6 \
   - `/home/steve/bench-results/minimax-m2.7-strict-candidates/vllm-minimax-m27-autoround-tp4-p512n1536-20260518T223818Z.json`
   - `/home/steve/bench-results/minimax-m2.7-strict-candidates/vllm-minimax-m27-autoround-tp4-p512n1536-20260518T224110Z.json`
   - `/home/steve/bench-results/minimax-m2.7-strict-candidates/vllm-minimax-m27-autoround-tp4-p512n1536-20260518T224402Z.json`
-- Patch: `patches/minimax-clone-safe-custom-allreduce-20260518.patch`
+- Runtime patch: `patches/minimax-clone-safe-custom-allreduce-20260518.patch`
+- Strict-runner traceability patch: `patches/minimax-strict-harness-custom-allreduce-clone-env-capture-20260518.patch`
 
 ## Decision
 
