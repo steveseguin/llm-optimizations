@@ -1,0 +1,96 @@
+{
+  "date": "2026-05-18",
+  "model": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+  "hardware": {
+    "gpu": "Intel Arc Pro B70 32GB",
+    "gpu_count": 4
+  },
+  "engine": {
+    "name": "vLLM",
+    "version": "0.20.1-local",
+    "device": "xpu",
+    "tensor_parallel": 4
+  },
+  "baseline": {
+    "name": "promoted logits-to-work-sharing no-attention-delay recipe",
+    "output_toks_per_second": 82.40426775694743,
+    "total_toks_per_second": 109.87235700926325,
+    "shape": {
+      "prompt_tokens": 512,
+      "output_tokens": 1536,
+      "context_length": 2048,
+      "max_num_batched_tokens": 512,
+      "block_size": 256,
+      "batch_size": 1
+    }
+  },
+  "candidate": {
+    "name": "cached_llm_scaler_moe_op_callable",
+    "status": "quality_passed_performance_neutral_negative",
+    "description": "Cache imported llm-scaler custom-op function objects on MoeWNA16Method instead of doing dynamic imports at each call boundary. No tensor or kernel math changed.",
+    "quality": {
+      "raw145_n64_exact": {
+        "passed": true,
+        "combined_token_sha256": "267cbf30208d84929ee79284ac695467f7e80597bf8694130e1e1f8b180eb5bd",
+        "combined_text_sha256": "4f72ba3cd480774951b53d131d188c21f24e113e69ce011580567d7d9baf3a07"
+      },
+      "raw145_n256_exact": {
+        "passed": true,
+        "combined_token_sha256": "58f6e8251c7a0a17e8c441278b5861f7d5da914fa1823ecd10484b296f2d7537",
+        "combined_text_sha256": "516fa1176dfcb3222308acd6af190dc8bba09e755698e7f2f94666b513d08e5b"
+      },
+      "semantic_suite_n64_r2": {
+        "passed": true,
+        "combined_token_sha256": "adacbf144264486ea7d378ebb6a4c0ba23951b72c4cf86251a762b07ebef5805",
+        "combined_text_sha256": "c80deed9ca35b0306f6e1bc2295f45e69d0533306816407f0bb1d5a57cbcb706"
+      },
+      "arithmetic_repeat_n64_r16": {
+        "passed": true,
+        "combined_token_sha256": "578ec378bf31cb16fb49ac5c0043270fd00a0f7898e18ac498a41ffe775d7994",
+        "combined_text_sha256": "92a570febc396a015f63c73dcf8ce0ecf302fb4e2fa49d329abb8d0bdaf75137"
+      },
+      "extended_sixpack_n64_r2": {
+        "passed": true,
+        "combined_token_sha256": "1e3560554f57b2b56cec8f49f28bc8ba12e9e0ced26bdc99a976f1433c99caa7",
+        "combined_text_sha256": "89f3d753fab6848015e7e4a513eec71699e4e8da374598adb836818c0d399797"
+      }
+    },
+    "benchmark": {
+      "prompt_tokens": 512,
+      "output_tokens": 1536,
+      "context_length": 2048,
+      "batch_size": 1,
+      "max_num_batched_tokens": 512,
+      "block_size": 256,
+      "output_toks_per_second": [
+        82.07060275556375,
+        81.94249599041527
+      ],
+      "total_toks_per_second": [
+        109.42747034075167,
+        109.25666132055368
+      ],
+      "mean_output_toks_per_second": 82.00654937298951,
+      "mean_total_toks_per_second": 109.34206583065267,
+      "delta_output_percent_vs_baseline": -0.483,
+      "delta_total_percent_vs_baseline": -0.483
+    }
+  },
+  "decision": {
+    "promote": false,
+    "submit_to_localmaxxing": false,
+    "reverted_from_active_runtime": true,
+    "reason": "Strict quality passed exactly, but performance was below the promoted baseline and inside normal variance."
+  },
+  "artifacts": {
+    "summary": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-minimax-cached-moe-op-ar-20260518-strict-tp4-ctx2048-mbt512-bs256-20260518T201819Z-summary.json",
+    "benchmarks": [
+      "/home/steve/bench-results/minimax-m2.7-strict-candidates/vllm-minimax-m27-autoround-tp4-p512n1536-20260518T203412Z.json",
+      "/home/steve/bench-results/minimax-m2.7-strict-candidates/vllm-minimax-m27-autoround-tp4-p512n1536-20260518T203702Z.json"
+    ]
+  },
+  "next": [
+    "Do not pursue Python import/callable caching as a decode-speed path for the current graph recipe.",
+    "Keep focus on GPU-side collective and epilogue work."
+  ]
+}
