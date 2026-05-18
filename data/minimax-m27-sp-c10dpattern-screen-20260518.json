@@ -1,0 +1,94 @@
+{
+  "date": "2026-05-18",
+  "model": "/mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround",
+  "hardware": "4x Intel Arc Pro B70 32GB",
+  "objective": "Clean sequence-parallelism screen for MiniMax M2.7 AutoRound TP4 using math-preserving collective-boundary changes.",
+  "referenceBaseline": {
+    "description": "Promoted strict MiniMax AutoRound TP4 baseline",
+    "promptTokens": 512,
+    "outputTokens": 1536,
+    "contextLength": 2048,
+    "tokSOut": 70.00635289969598,
+    "tokSTotal": 93.34180386626133,
+    "aotHash": "03f6a28c070656d44eab4c581bc8dc5295ed123e7c0150c7f596ea24012406b0",
+    "localMaxxingId": "cmpahyaas002gmn01lk0625he"
+  },
+  "patch": {
+    "path": "patches/vllm-xpu-sequence-parallel-c10d-pattern-20260518.patch",
+    "description": "Use c10d functional all_reduce_/wait_tensor by TP group name for XPU sequence-parallel pattern registration instead of capturing a torchbind process-group object."
+  },
+  "screens": [
+    {
+      "label": "minimax-sp-clean-qualityscreen",
+      "timestampUtc": "20260518T023533Z",
+      "compilationConfig": {
+        "use_inductor_graph_partition": true,
+        "compile_sizes": [1],
+        "cudagraph_mode": "PIECEWISE",
+        "pass_config": {
+          "enable_sp": true,
+          "sp_min_token_num": 1
+        }
+      },
+      "patchApplied": false,
+      "status": "failed_startup",
+      "failure": "Torch/Inductor pattern registration rejects a captured torchbind process-group object.",
+      "errorExcerpt": "NotImplementedError: While executing %_torchbind_obj0 = get_attr[target=_torchbind_obj0]",
+      "summaryJson": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-minimax-sp-clean-qualityscreen-strict-tp4-ctx2048-mbt512-bs256-20260518T023533Z-summary.json",
+      "log": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-minimax-sp-clean-qualityscreen-strict-tp4-ctx2048-mbt512-bs256-20260518T023533Z-quality/raw145-n64-exact.log"
+    },
+    {
+      "label": "minimax-sp-c10dpattern-cg4-qualityscreen",
+      "timestampUtc": "20260518T024611Z",
+      "compilationConfig": {
+        "use_inductor_graph_partition": true,
+        "compile_sizes": [1],
+        "cudagraph_mode": "PIECEWISE",
+        "cudagraph_capture_sizes": [4],
+        "max_cudagraph_capture_size": 4,
+        "pass_config": {
+          "enable_sp": true,
+          "sp_min_token_num": 1
+        }
+      },
+      "patchApplied": true,
+      "aotHash": "5a8a6fb51a0fe33823b10fccf3bf70dd40edef802a4c737b520a4c015186380b",
+      "status": "failed_startup_after_aot",
+      "failure": "SP requires cudagraph sizes that are multiples of TP4; compile size 1 is padded to 4 and rejected.",
+      "errorExcerpt": "ValueError: compile_sizes contains 1 which would be padded to 4. All compile_sizes must be values that won't be changed by cudagraph padding.",
+      "summaryJson": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-minimax-sp-c10dpattern-cg4-qualityscreen-strict-tp4-ctx2048-mbt512-bs256-20260518T024611Z-summary.json",
+      "log": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-minimax-sp-c10dpattern-cg4-qualityscreen-strict-tp4-ctx2048-mbt512-bs256-20260518T024611Z-quality/raw145-n64-exact.log"
+    },
+    {
+      "label": "minimax-sp-c10dpattern-cg4cs4-qualityscreen",
+      "timestampUtc": "20260518T025122Z",
+      "compilationConfig": {
+        "use_inductor_graph_partition": true,
+        "compile_sizes": [4],
+        "cudagraph_mode": "PIECEWISE",
+        "cudagraph_capture_sizes": [4],
+        "max_cudagraph_capture_size": 4,
+        "pass_config": {
+          "enable_sp": true,
+          "sp_min_token_num": 1
+        }
+      },
+      "patchApplied": true,
+      "status": "failed_compile",
+      "failure": "After using valid TP4 graph sizes, Intel ocloc/IGC crashes on a generated reduction kernel.",
+      "errorExcerpt": "RuntimeError: `ocloc` failed with error code 245; IGC: Internal Compiler Error: Floating point exception",
+      "summaryJson": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-minimax-sp-c10dpattern-cg4cs4-qualityscreen-strict-tp4-ctx2048-mbt512-bs256-20260518T025122Z-summary.json",
+      "log": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-minimax-sp-c10dpattern-cg4cs4-qualityscreen-strict-tp4-ctx2048-mbt512-bs256-20260518T025122Z-quality/raw145-n64-exact.log"
+    }
+  ],
+  "decision": "Do not promote sequence parallelism for MiniMax M2.7 AutoRound on the current B70 software stack. The c10d pattern patch fixes the first registration failure, but the valid TP4 cudagraph route is blocked by an Intel compiler ICE before quality or throughput can be measured.",
+  "localMaxxing": {
+    "submitted": false,
+    "reason": "No quality-valid throughput benchmark was produced."
+  },
+  "nextSteps": [
+    "Archive the c10d pattern patch for future compiler-driver retests.",
+    "Revisit SP only after an Intel compiler update or an Inductor lowering that avoids the crashing reduction kernel.",
+    "Continue with narrower XPU-specific Q/K variance or hidden-state collective fusion work, which should expose less compiler surface than full sequence parallelism."
+  ]
+}
