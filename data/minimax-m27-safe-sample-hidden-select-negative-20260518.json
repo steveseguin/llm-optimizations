@@ -28,7 +28,26 @@
     "arithmetic_repeat": "passed 16 repeated greedy calls",
     "extended_sixpack": "passed, deterministic across two greedy repeats"
   },
-  "result": {
+  "fair_flashattention_result": {
+    "attention_backend": "default XPU FlashAttention v2",
+    "output_toks_per_second": [
+      81.96129048058948,
+      81.86704432643423
+    ],
+    "total_toks_per_second": [
+      109.28172064078598,
+      109.1560591019123
+    ],
+    "mean_output_toks_per_second": 81.91416740351185,
+    "mean_total_toks_per_second": 109.21888987134915,
+    "promoted_baseline_output_toks_per_second": 81.758267,
+    "promoted_baseline_total_toks_per_second": 109.011023,
+    "output_delta_percent_vs_promoted": 0.190684846092317,
+    "decision": "neutral_tie"
+  },
+  "backend_mismatched_diagnostic_result": {
+    "attention_backend": "TRITON_ATTN",
+    "warning": "This run is quality-valid but backend-mismatched against the promoted FlashAttention baseline. Do not compare it directly to the promoted result.",
     "output_toks_per_second": [
       77.37715805983186,
       77.2515496572617
@@ -38,24 +57,27 @@
       103.00206620968227
     ],
     "mean_output_toks_per_second": 77.31435385854678,
-    "mean_total_toks_per_second": 103.08580514472904,
-    "promoted_baseline_output_toks_per_second": 81.758267,
-    "promoted_baseline_total_toks_per_second": 109.011023
+    "mean_total_toks_per_second": 103.08580514472904
   },
   "decision": {
     "promoted": false,
     "localmaxxing_submitted": false,
-    "reason": "Quality-clean but slower than the promoted logits-WS baseline."
+    "reason": "Quality-clean under the fair FlashAttention backend, but the output-token delta is only +0.19%, within normal run variance."
   },
   "artifacts": {
-    "summary_json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-safe-sample-hidden-select-logits-ws-strict-tp4-ctx2048-mbt512-bs256-20260518T133805Z-summary.json",
-    "benchmark_jsons": [
+    "fair_summary_json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-safe-sample-hidden-select-logits-ws-flashdefault-strict-tp4-ctx2048-mbt512-bs256-20260518T140741Z-summary.json",
+    "fair_benchmark_jsons": [
+      "/home/steve/bench-results/minimax-m2.7-strict-candidates/vllm-minimax-m27-autoround-tp4-p512n1536-20260518T142318Z.json",
+      "/home/steve/bench-results/minimax-m2.7-strict-candidates/vllm-minimax-m27-autoround-tp4-p512n1536-20260518T142609Z.json"
+    ],
+    "backend_mismatched_summary_json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-safe-sample-hidden-select-logits-ws-strict-tp4-ctx2048-mbt512-bs256-20260518T133805Z-summary.json",
+    "backend_mismatched_benchmark_jsons": [
       "/home/steve/bench-results/minimax-m2.7-strict-candidates/vllm-minimax-m27-autoround-tp4-p512n1536-20260518T135400Z.json",
       "/home/steve/bench-results/minimax-m2.7-strict-candidates/vllm-minimax-m27-autoround-tp4-p512n1536-20260518T135651Z.json"
     ]
   },
   "source_hashes": {
-    "strict_runner_after_metadata_fix": "76edc96d6dc0fdb870e6ea50d654713c9d199baa60c13ae75e361995213e7118",
+    "strict_runner_after_flashattention_default": "1a576ebcbb6b311f9cc9516b5d99cb2c6c98e78dff377ccf2cbb68ed1474e1a0",
     "gpu_model_runner": "d900ae2c37df0c70df42bb33b350dd4831f0399ccc7222f7b7e2f951efe9308f",
     "logits_processor": "ccfe30c1469630aed3040de63970470db6110325850a552a0287764032bbc733",
     "sampler": "b8c03e99ea099f710440a1390e1495772a563477a5eafaf3f6d75af194024f76",
