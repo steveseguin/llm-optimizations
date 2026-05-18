@@ -1,0 +1,146 @@
+{
+  "date": "2026-05-18",
+  "status": "not_promoted",
+  "model_hf_id": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+  "model_path": "/mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround",
+  "hardware": {
+    "gpu_name": "Intel Arc Pro B70 32GB",
+    "gpu_count": 4,
+    "vram_gb_per_gpu": 32,
+    "os": "Ubuntu 24.04.4 LTS"
+  },
+  "engine": {
+    "name": "vllm",
+    "version": "0.20.1-local",
+    "backend": "xpu",
+    "tensor_parallel_size": 4,
+    "dtype": "float16",
+    "quantization": "INT4 AutoRound W4A16 / INC",
+    "attention_backend": "flash_attn"
+  },
+  "baseline": {
+    "name": "flash-piecewise-strict-revalidated-block256-mbt512",
+    "mean_output_toks_per_second": 70.00635289969598,
+    "mean_total_toks_per_second": 93.34180386626133,
+    "localmaxxing_id": "cmpahyaas002gmn01lk0625he",
+    "data": "/home/steve/llm-optimizations-publish/data/minimax-m27-flash-piecewise-strict-revalidated-20260518.json"
+  },
+  "shared_env": {
+    "VLLM_XPU_ENABLE_XPU_GRAPH": "1",
+    "VLLM_XPU_FORCE_GRAPH_WITH_COMM": "1",
+    "VLLM_XPU_GRAPH_NOOP_COMM_CAPTURE": "1",
+    "VLLM_XPU_USE_LLM_SCALER_MOE": "1",
+    "VLLM_MINIMAX_M2_ATTN_DELAY_ALLREDUCE": "1",
+    "VLLM_MINIMAX_QK_NORM_RESTORE_WEIGHT": "1",
+    "VLLM_MINIMAX_QK_NORM_RESTORE_WEIGHT_MIN_TOKENS": "2",
+    "CCL_TOPO_P2P_ACCESS": "1",
+    "ONEAPI_DEVICE_SELECTOR": "level_zero:0,1,2,3",
+    "ZE_AFFINITY_MASK": "0,1,2,3"
+  },
+  "compile_config": {
+    "use_inductor_graph_partition": true,
+    "compile_sizes": [
+      1
+    ],
+    "cudagraph_mode": "PIECEWISE"
+  },
+  "quality_policy": {
+    "benchmarked_only_after_quality_pass": true,
+    "raw145_n64_expected_combined_token_sha256": "267cbf30208d84929ee79284ac695467f7e80597bf8694130e1e1f8b180eb5bd",
+    "raw145_n256_expected_combined_token_sha256": "58f6e8251c7a0a17e8c441278b5861f7d5da914fa1823ecd10484b296f2d7537",
+    "semantic_suite": "PASS, arithmetic 42, add_one function with return x + 1; two greedy repeats deterministic",
+    "arithmetic_repeat_n64_r16": true,
+    "extended_sixpack_n64_r2": true
+  },
+  "candidates": [
+    {
+      "label": "flash-block128-mbt1024-strict-revalidate",
+      "decision": "rejected_quality_failure",
+      "block_size": 128,
+      "max_num_batched_tokens": 1024,
+      "aot_hash": "27004bb3d576a7e2112e9ac2c9878f13d8b0e9421a3e841d99ca978919f3c959",
+      "quality": {
+        "status": "failed_raw145_n64",
+        "failure_reasons": [
+          "combined token hash mismatch",
+          "degenerate or corrupt generated output"
+        ],
+        "combined_token_sha256": "3dc2cfd048d538e0707c7a833de67bbbd886730aa22a8f15b2a7f9ae01c6b15d",
+        "distinct_generated_token_count": 1,
+        "first_distinct_generated_tokens": [
+          0
+        ],
+        "printable_nonspace_text_chars": 0,
+        "control_nonspace_text_chars": 64,
+        "nul_token_count": 64,
+        "control_char_output": true,
+        "degenerate_output": true
+      },
+      "artifacts": {
+        "summary_json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-flash-block128-mbt1024-strict-revalidate-strict-tp4-ctx2048-mbt1024-bs128-20260518T031055Z-summary.json",
+        "failed_quality_json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-flash-block128-mbt1024-strict-revalidate-strict-tp4-ctx2048-mbt1024-bs128-20260518T031055Z-quality/raw145-n64-exact.json"
+      }
+    },
+    {
+      "label": "flash-block128-mbt512-strict-revalidate",
+      "decision": "quality_safe_but_slower_than_baseline",
+      "block_size": 128,
+      "max_num_batched_tokens": 512,
+      "aot_hash": "96d74654910c9a809fed1fee1d8f2c66e21ba0578d069f4a16037abe3043b421",
+      "quality": {
+        "status": "passed",
+        "checks": [
+          "raw145-n64-exact",
+          "raw145-n256-exact",
+          "semantic-suite-n64-r2",
+          "arithmetic-repeat-n64-r16",
+          "extended-sixpack-n64-r2"
+        ]
+      },
+      "benchmark_shape": {
+        "prompt_tokens": 512,
+        "output_tokens": 1536,
+        "context_length": 2048,
+        "batch_size": 1,
+        "repeats": 3
+      },
+      "benchmarks": [
+        {
+          "elapsed_time": 22.137864003016148,
+          "total_num_tokens": 2048,
+          "tokens_per_second": 92.51118354150937,
+          "output_toks_per_second": 69.38338765613202,
+          "json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/vllm-minimax-m27-autoround-tp4-p512n1536-20260518T033155Z.json",
+          "log": "/home/steve/bench-results/minimax-m2.7-strict-candidates/vllm-minimax-m27-autoround-tp4-p512n1536-20260518T033155Z.log"
+        },
+        {
+          "elapsed_time": 21.933911220985465,
+          "total_num_tokens": 2048,
+          "tokens_per_second": 93.37140008301655,
+          "output_toks_per_second": 70.02855006226241,
+          "json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/vllm-minimax-m27-autoround-tp4-p512n1536-20260518T033445Z.json",
+          "log": "/home/steve/bench-results/minimax-m2.7-strict-candidates/vllm-minimax-m27-autoround-tp4-p512n1536-20260518T033445Z.log"
+        },
+        {
+          "elapsed_time": 22.151069194020238,
+          "total_num_tokens": 2048,
+          "tokens_per_second": 92.4560337048139,
+          "output_toks_per_second": 69.34202527861042,
+          "json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/vllm-minimax-m27-autoround-tp4-p512n1536-20260518T033729Z.json",
+          "log": "/home/steve/bench-results/minimax-m2.7-strict-candidates/vllm-minimax-m27-autoround-tp4-p512n1536-20260518T033729Z.log"
+        }
+      ],
+      "mean_output_toks_per_second": 69.58465433233495,
+      "mean_total_toks_per_second": 92.77953910977995,
+      "delta_vs_baseline_output_pct": -0.602373,
+      "artifacts": {
+        "summary_json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-flash-block128-mbt512-strict-revalidate-strict-tp4-ctx2048-mbt512-bs128-20260518T031639Z-summary.json",
+        "quality_dir": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-flash-block128-mbt512-strict-revalidate-strict-tp4-ctx2048-mbt512-bs128-20260518T031639Z-quality"
+      }
+    }
+  ],
+  "localmaxxing": {
+    "submitted": false,
+    "reason": "No new promoted result. MBT1024 failed quality; MBT512 passed quality but was slower than the existing strict baseline."
+  }
+}
