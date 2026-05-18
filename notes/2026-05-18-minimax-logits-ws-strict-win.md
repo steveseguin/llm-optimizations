@@ -14,6 +14,12 @@ The candidate passed the full strict quality gate and produced a small new best:
 
 The previous promoted LocalMaxxing result was `80.602755` output tok/s and `107.470340` total tok/s. This is `+1.43%` output tok/s. The gain is not large, but it is above the recent retie noise and preserves quality, so it is promoted as the current best.
 
+Post-submission confirmation repeat:
+
+- Run 3: `81.197954` output tok/s, `108.263938` total tok/s
+- Three-run mean: `81.571496` output tok/s, `108.761995` total tok/s
+- Decision unchanged: the third repeat confirms the result is above the prior `80.602755` baseline, but LocalMaxxing remains the original two-run strict submission.
+
 ## Quality
 
 All strict gates passed before benchmarking:
@@ -60,6 +66,7 @@ COMPILATION_CONFIG_JSON='{"use_inductor_graph_partition":true,"compile_sizes":[1
 - Benchmark JSONs:
   - `/home/steve/bench-results/minimax-m2.7-strict-candidates/vllm-minimax-m27-autoround-tp4-p512n1536-20260518T082531Z.json`
   - `/home/steve/bench-results/minimax-m2.7-strict-candidates/vllm-minimax-m27-autoround-tp4-p512n1536-20260518T082819Z.json`
+  - confirmation repeat: `/home/steve/bench-results/minimax-m2.7-strict-candidates/vllm-minimax-m27-autoround-tp4-p512n1536-20260518T084331Z.json`
 
 ## Decision
 
