@@ -1,0 +1,89 @@
+{
+  "date": "2026-05-18",
+  "label": "logits-chunked-gather-32768-logits-ws-flashdefault",
+  "model": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+  "hardware": "4x Intel Arc Pro B70 32GB",
+  "engine": "vLLM 0.20.1-local XPU TP4",
+  "candidate_flags": {
+    "VLLM_XPU_LOGITS_CHUNKED_GATHER": "32768",
+    "VLLM_XPU_USE_LLM_SCALER_MOE_WS": "1",
+    "VLLM_XPU_USE_LLM_SCALER_MOE_MINIMAX_LOGITS_WS": "1",
+    "VLLM_XPU_ENABLE_XPU_GRAPH": "1",
+    "VLLM_XPU_FORCE_GRAPH_WITH_COMM": "1",
+    "VLLM_XPU_GRAPH_NOOP_COMM_CAPTURE": "1"
+  },
+  "benchmark_shape": {
+    "prompt_tokens": 512,
+    "output_tokens": 1536,
+    "context_length": 2048,
+    "batch_size": 1,
+    "max_num_batched_tokens": 512,
+    "block_size": 256
+  },
+  "quality": {
+    "status": "failed",
+    "failed_gate": "arithmetic-repeat-n64-r16",
+    "failure_reasons": [
+      "nondeterministic lstrip_text"
+    ],
+    "raw145_n64": {
+      "passed": true,
+      "combined_token_sha256": "267cbf30208d84929ee79284ac695467f7e80597bf8694130e1e1f8b180eb5bd"
+    },
+    "raw145_n256": {
+      "passed": true,
+      "combined_token_sha256": "58f6e8251c7a0a17e8c441278b5861f7d5da914fa1823ecd10484b296f2d7537"
+    },
+    "semantic_suite": {
+      "passed": true,
+      "combined_token_sha256": "adacbf144264486ea7d378ebb6a4c0ba23951b72c4cf86251a762b07ebef5805"
+    },
+    "arithmetic_repeat": {
+      "passed": false,
+      "combined_token_sha256": "7145a9fe4a4d482ca642e391d9c18c3f0c0b222bdcd027e1d488c30cd3952ada",
+      "deterministic_across_runs": false,
+      "control_nonspace_text_chars": 0,
+      "nul_token_count": 0,
+      "per_prompt_token_hashes": [
+        "def6899500b2364bc97d561fc5f9cc78aa9fbcd5a0eb032eab1f2c6735d2bbec",
+        "def6899500b2364bc97d561fc5f9cc78aa9fbcd5a0eb032eab1f2c6735d2bbec",
+        "def6899500b2364bc97d561fc5f9cc78aa9fbcd5a0eb032eab1f2c6735d2bbec",
+        "9409e53d9c5444f8e179bee4951544a7b36986e5d53a0d90aca0a0479ecdecad",
+        "def6899500b2364bc97d561fc5f9cc78aa9fbcd5a0eb032eab1f2c6735d2bbec",
+        "def6899500b2364bc97d561fc5f9cc78aa9fbcd5a0eb032eab1f2c6735d2bbec",
+        "def6899500b2364bc97d561fc5f9cc78aa9fbcd5a0eb032eab1f2c6735d2bbec",
+        "def6899500b2364bc97d561fc5f9cc78aa9fbcd5a0eb032eab1f2c6735d2bbec",
+        "def6899500b2364bc97d561fc5f9cc78aa9fbcd5a0eb032eab1f2c6735d2bbec",
+        "def6899500b2364bc97d561fc5f9cc78aa9fbcd5a0eb032eab1f2c6735d2bbec",
+        "def6899500b2364bc97d561fc5f9cc78aa9fbcd5a0eb032eab1f2c6735d2bbec",
+        "def6899500b2364bc97d561fc5f9cc78aa9fbcd5a0eb032eab1f2c6735d2bbec",
+        "def6899500b2364bc97d561fc5f9cc78aa9fbcd5a0eb032eab1f2c6735d2bbec",
+        "def6899500b2364bc97d561fc5f9cc78aa9fbcd5a0eb032eab1f2c6735d2bbec",
+        "def6899500b2364bc97d561fc5f9cc78aa9fbcd5a0eb032eab1f2c6735d2bbec",
+        "def6899500b2364bc97d561fc5f9cc78aa9fbcd5a0eb032eab1f2c6735d2bbec"
+      ]
+    }
+  },
+  "result": {
+    "benchmarked": false,
+    "reason": "Rejected before benchmarking due to quality-repeatability failure."
+  },
+  "decision": {
+    "promoted": false,
+    "localmaxxing_submitted": false,
+    "reason": "Chunked logits gather preserved the exact raw canaries but introduced token-level nondeterminism in the repeated arithmetic gate."
+  },
+  "artifacts": {
+    "summary_json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-logits-chunked-gather-32768-logits-ws-flashdefault-strict-tp4-ctx2048-mbt512-bs256-20260518T143607Z-summary.json",
+    "quality_jsons": [
+      "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-logits-chunked-gather-32768-logits-ws-flashdefault-strict-tp4-ctx2048-mbt512-bs256-20260518T143607Z-quality/raw145-n64-exact.json",
+      "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-logits-chunked-gather-32768-logits-ws-flashdefault-strict-tp4-ctx2048-mbt512-bs256-20260518T143607Z-quality/raw145-n256-exact.json",
+      "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-logits-chunked-gather-32768-logits-ws-flashdefault-strict-tp4-ctx2048-mbt512-bs256-20260518T143607Z-quality/semantic-suite-n64-r2.json",
+      "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-logits-chunked-gather-32768-logits-ws-flashdefault-strict-tp4-ctx2048-mbt512-bs256-20260518T143607Z-quality/arithmetic-repeat-n64-r16.json"
+    ]
+  },
+  "source_hashes": {
+    "strict_runner_after_logits_gather_metadata": "0f74c7df64f1ecf9ab3b3a2daf1d28084f0ae6397333b67b215d7b01dfe8d3ca",
+    "logits_processor": "ccfe30c1469630aed3040de63970470db6110325850a552a0287764032bbc733"
+  }
+}
