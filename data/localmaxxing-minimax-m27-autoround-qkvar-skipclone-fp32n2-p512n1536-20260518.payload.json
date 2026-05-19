@@ -1,0 +1,42 @@
+{
+  "hfId": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+  "modelRevision": "main",
+  "hardware": {
+    "hwClass": "DISCRETE_GPU",
+    "gpuName": "Intel Arc Pro B70 32GB",
+    "gpuCount": 4,
+    "vramGb": 32,
+    "cpu": "AMD EPYC 9015 8-Core Processor",
+    "ramGb": 16,
+    "os": "Ubuntu 24.04.4 LTS, kernel 6.17.0-23-generic"
+  },
+  "engineName": "vllm",
+  "engineVersion": "0.20.1-local",
+  "quantization": "AutoRound INT4 W4A16",
+  "promptTokens": 512,
+  "outputTokens": 1536,
+  "contextLength": 2048,
+  "batchSize": 1,
+  "tokSOut": 88.74842422812014,
+  "tokSTotal": 118.33123230416018,
+  "notes": "MiniMax M2.7 AutoRound W4A16 on 4x Intel Arc Pro B70 via vLLM/XPU TP4. Strict quality gate passed before benchmarking: raw145 exact token hashes at n64/n256, semantic suite, 16-run arithmetic repeat, and extended sixpack. This run uses the exact MiniMax router-logits path feeding the llm-scaler ESIMD work-sharing INT4 MoE decode kernel, default XPU FlashAttention v2, PIECEWISE XPU graph, block-size 256, max_num_batched_tokens 512, prefix cache disabled, async engine, greedy temperature 0. New detail versus previous result: VLLM_XPU_CUSTOM_ALLREDUCE_SKIP_CLONE_FP32_MAX_NUMEL=2 skips the custom-allreduce input clone only for tiny FP32 allreduces, targeting Q/K RMS variance scalar collectives while preserving the clone-safe path for larger collectives. Four p512/n1536 repeats: 88.148932, 89.072947, 89.473994, and 88.297823 output tok/s; mean 88.748424 output tok/s and 118.331232 total tok/s. vLLM benchmark JSON reports total tok/s for prompt+decode but does not expose a separate prefill tok/s metric here. No speculative decoding, no expert dropping, no router approximation, no quality-reducing quant change, no power-limit change. Caveat: PyTorch emits a custom-op aliasing warning on the tiny no-clone path; it is quality-clean on this stack but should be replaced by a non-aliasing op output or Q/K variance+RMS fusion.",
+  "engineFlags": {
+    "commandSnippet": "VLLM_XPU_COMPILE_ALLREDUCE_CUSTOM_OP=1 VLLM_XPU_CUSTOM_ALLREDUCE_CLONE_INPUT=1 VLLM_XPU_CUSTOM_ALLREDUCE_SKIP_CLONE_FP32_MAX_NUMEL=2 VLLM_XPU_USE_LLM_SCALER_MOE=1 VLLM_XPU_USE_LLM_SCALER_MOE_WS=1 VLLM_XPU_USE_LLM_SCALER_MOE_MINIMAX_LOGITS_WS=1 VLLM_MINIMAX_M2_ATTN_DELAY_ALLREDUCE=0 VLLM_XPU_ENABLE_XPU_GRAPH=1 VLLM_XPU_FORCE_GRAPH_WITH_COMM=1 VLLM_XPU_GRAPH_NOOP_COMM_CAPTURE=1 VLLM_MINIMAX_QK_NORM_RESTORE_WEIGHT=1 VLLM_MINIMAX_QK_NORM_RESTORE_WEIGHT_MIN_TOKENS=2 CCL_TOPO_P2P_ACCESS=1 ONEAPI_DEVICE_SELECTOR=level_zero:0,1,2,3 ZE_AFFINITY_MASK=0,1,2,3 vllm bench throughput --backend vllm --model /mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround --tokenizer /mnt/fast-ai/llm-models/minimax-m2.7-int4-autoround --trust-remote-code --dtype float16 --tensor-parallel-size 4 --distributed-executor-backend mp --max-model-len 2048 --max-num-batched-tokens 512 --max-num-seqs 1 --dataset-name random --random-input-len 512 --random-output-len 1536 --random-range-ratio 0 --num-prompts 1 --disable-log-stats --async-engine --block-size 256 --no-enable-prefix-caching --compilation-config {\"use_inductor_graph_partition\":true,\"compile_sizes\":[1],\"cudagraph_mode\":\"PIECEWISE\"}",
+    "tensorParallel": 4,
+    "pipelineParallel": 1,
+    "kvCacheDtype": "auto",
+    "prefixCaching": false,
+    "attentionBackend": "flash_attn",
+    "flashAttn": true,
+    "chunkedPrefill": true,
+    "prefillChunkSize": 512,
+    "contBatching": true,
+    "engineQuant": "inc",
+    "maxRunningSeqs": 1,
+    "concurrency": 1,
+    "specDecoding": false,
+    "mtpEnabled": false,
+    "temperature": 0,
+    "extraFlags": "XPU/Level Zero; exact MiniMax router-logits to work-sharing u4 MoE path selected by VLLM_XPU_USE_LLM_SCALER_MOE_MINIMAX_LOGITS_WS=1; delayed attention allreduce disabled; clone-safe compiled allreduce custom-op enabled with tiny FP32 clone elision for numel<=2; default XPU FlashAttention v2; PIECEWISE XPU graph with communicator capture guard; strict quality hashes preserved; no power-limit change"
+  }
+}
