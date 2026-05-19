@@ -1,0 +1,85 @@
+{
+  "label": "minimax-moe-cache-samecache-ab-20260519",
+  "date": "2026-05-19",
+  "model": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+  "hardware": "4x Intel Arc Pro B70 32GB",
+  "engine": "vLLM 0.20.1-local XPU TP4",
+  "cache_root": "/mnt/fast-ai/vllm-cache-exp/minimax-moe-cache-ab-20260519",
+  "benchmark_shape": {
+    "tensor_parallel": 4,
+    "context_length": 2048,
+    "prompt_tokens": 512,
+    "output_tokens": 1536,
+    "max_num_batched_tokens": 512,
+    "max_num_seqs": 1,
+    "block_size": 256,
+    "dtype": "float16"
+  },
+  "shared_env": {
+    "VLLM_MINIMAX_M2_ATTN_DELAY_ALLREDUCE": "0",
+    "VLLM_MINIMAX_QK_RMS_XPU_HELPER": "1",
+    "VLLM_MINIMAX_QK_RMS_XPU_HELPER_MAX_TOKENS": "4",
+    "VLLM_MINIMAX_QK_RMS_DIRECT_INPLACE_SCALE": "1",
+    "VLLM_XPU_COMPILE_ALLREDUCE_CUSTOM_OP": "1",
+    "VLLM_XPU_CUSTOM_ALLREDUCE_CLONE_INPUT": "1",
+    "VLLM_XPU_CUSTOM_ALLREDUCE_SKIP_CLONE_FP32_MAX_NUMEL": "0",
+    "VLLM_XPU_CUSTOM_ALLREDUCE_TINY_FP32_INPLACE_MAX_NUMEL": "2",
+    "VLLM_XPU_CUSTOM_ALLREDUCE_INPLACE_MAX_NUMEL": "0",
+    "VLLM_XPU_COMPILE_OUT_OF_PLACE_ALLREDUCE": "0",
+    "VLLM_XPU_USE_LLM_SCALER_MOE": "1",
+    "VLLM_XPU_USE_LLM_SCALER_MOE_WS": "1",
+    "VLLM_XPU_USE_LLM_SCALER_MOE_MINIMAX_LOGITS_WS": "1"
+  },
+  "cache_on": {
+    "label": "minimax-moe-cache-ab-cacheon-20260519",
+    "env": {
+      "VLLM_XPU_LLM_SCALER_MOE_CACHE_MINIMAX_LOGITS_OP": "1"
+    },
+    "summary_json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-minimax-moe-cache-ab-cacheon-20260519-strict-tp4-ctx2048-mbt512-bs256-20260519T113341Z-summary.json",
+    "quality_gates": [
+      "raw145-n64-exact",
+      "raw145-n256-exact",
+      "semantic-suite-n64-r2",
+      "arithmetic-repeat-n64-r8"
+    ],
+    "mean_output_toks_per_second": 88.40470302002713,
+    "mean_total_toks_per_second": 117.87293736003618,
+    "output_toks_per_second": [
+      88.6123416469214,
+      88.71182949768006,
+      87.98204832438597,
+      88.31259261112109
+    ],
+    "total_toks_per_second": [
+      118.14978886256186,
+      118.28243933024008,
+      117.30939776584798,
+      117.75012348149478
+    ]
+  },
+  "cache_off": {
+    "label": "minimax-moe-cache-ab-cacheoff-20260519",
+    "env": {
+      "VLLM_XPU_LLM_SCALER_MOE_CACHE_MINIMAX_LOGITS_OP": "0"
+    },
+    "summary_json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-minimax-moe-cache-ab-cacheoff-20260519-strict-tp4-ctx2048-mbt512-bs256-20260519T115822Z-summary.json",
+    "quality_gates": [
+      "raw145-n64-exact",
+      "raw145-n256-exact",
+      "semantic-suite-n64-r2",
+      "arithmetic-repeat-n64-r8"
+    ],
+    "mean_output_toks_per_second": 88.05666798129275,
+    "mean_total_toks_per_second": 117.40889064172366,
+    "output_toks_per_second": [
+      88.06446552619066,
+      88.04887043639482
+    ],
+    "total_toks_per_second": [
+      117.41928736825422,
+      117.3984939151931
+    ]
+  },
+  "current_clean_baseline_output_toks_per_second": 88.50195308567419,
+  "decision": "Rejected: cache-on is quality-safe and slightly faster than cache-off in this same-cache screen, but it remains below the current clean promoted 88.501953 tok/s baseline. No LocalMaxxing submission."
+}
