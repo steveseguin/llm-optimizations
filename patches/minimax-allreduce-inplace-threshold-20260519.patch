@@ -1,0 +1,41 @@
+diff --git a/vllm/distributed/parallel_state.py b/vllm/distributed/parallel_state.py
+index tiny-fp32-inplace..generic-inplace-threshold 100644
+--- a/vllm/distributed/parallel_state.py
++++ b/vllm/distributed/parallel_state.py
+@@ -568,6 +568,19 @@ class GroupCoordinator:
+         if self.use_custom_op_call:
++            inplace_max_numel = int(
++                os.environ.get(
++                    "VLLM_XPU_CUSTOM_ALLREDUCE_INPLACE_MAX_NUMEL",
++                    "0",
++                )
++                or "0"
++            )
++            if inplace_max_numel > 0 and input_.numel() <= inplace_max_numel:
++                torch.ops.vllm.all_reduce_inplace(
++                    input_, group_name=self.unique_name
++                )
++                return input_
+             tiny_fp32_inplace_max_numel = int(
+                 os.environ.get(
+                     "VLLM_XPU_CUSTOM_ALLREDUCE_TINY_FP32_INPLACE_MAX_NUMEL",
+diff --git a/scripts/run-minimax-strict-quality-gated-candidate.sh b/scripts/run-minimax-strict-quality-gated-candidate.sh
+index tiny-fp32-inplace..generic-inplace-threshold 100755
+--- a/scripts/run-minimax-strict-quality-gated-candidate.sh
++++ b/scripts/run-minimax-strict-quality-gated-candidate.sh
+@@ -390,6 +390,7 @@ write_summary() {
+     --arg vllm_xpu_custom_allreduce_graph_clone_input "${VLLM_XPU_CUSTOM_ALLREDUCE_GRAPH_CLONE_INPUT:-}" \
+     --arg vllm_xpu_custom_allreduce_skip_clone_fp32_max_numel "${VLLM_XPU_CUSTOM_ALLREDUCE_SKIP_CLONE_FP32_MAX_NUMEL:-}" \
+     --arg vllm_xpu_custom_allreduce_tiny_fp32_inplace_max_numel "${VLLM_XPU_CUSTOM_ALLREDUCE_TINY_FP32_INPLACE_MAX_NUMEL:-}" \
++    --arg vllm_xpu_custom_allreduce_inplace_max_numel "${VLLM_XPU_CUSTOM_ALLREDUCE_INPLACE_MAX_NUMEL:-}" \
+     --arg vllm_xpu_compile_allreduce_no_clone "${VLLM_XPU_COMPILE_ALLREDUCE_NO_CLONE:-}" \
+     --arg vllm_xpu_compile_out_of_place_allreduce "${VLLM_XPU_COMPILE_OUT_OF_PLACE_ALLREDUCE:-}" \
+     --arg vllm_xpu_clone_sample_hidden "${VLLM_XPU_CLONE_SAMPLE_HIDDEN:-}" \
+@@ -468,6 +469,7 @@ write_summary() {
+         VLLM_XPU_CUSTOM_ALLREDUCE_GRAPH_CLONE_INPUT: $vllm_xpu_custom_allreduce_graph_clone_input,
+         VLLM_XPU_CUSTOM_ALLREDUCE_SKIP_CLONE_FP32_MAX_NUMEL: $vllm_xpu_custom_allreduce_skip_clone_fp32_max_numel,
+         VLLM_XPU_CUSTOM_ALLREDUCE_TINY_FP32_INPLACE_MAX_NUMEL: $vllm_xpu_custom_allreduce_tiny_fp32_inplace_max_numel,
++        VLLM_XPU_CUSTOM_ALLREDUCE_INPLACE_MAX_NUMEL: $vllm_xpu_custom_allreduce_inplace_max_numel,
+         VLLM_XPU_COMPILE_ALLREDUCE_NO_CLONE: $vllm_xpu_compile_allreduce_no_clone,
+         VLLM_XPU_COMPILE_OUT_OF_PLACE_ALLREDUCE: $vllm_xpu_compile_out_of_place_allreduce,
+         VLLM_XPU_CLONE_SAMPLE_HIDDEN: $vllm_xpu_clone_sample_hidden,
