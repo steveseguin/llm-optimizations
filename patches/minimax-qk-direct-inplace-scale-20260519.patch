@@ -1,0 +1,45 @@
+diff --git a/vllm/model_executor/models/minimax_m2.py b/vllm/model_executor/models/minimax_m2.py
+--- a/vllm/model_executor/models/minimax_m2.py
++++ b/vllm/model_executor/models/minimax_m2.py
+@@
+ from vllm.distributed import (
+     get_pp_group,
+     get_tensor_model_parallel_rank,
+     get_tensor_model_parallel_world_size,
++    get_tp_group,
+ )
+@@
+ _MINIMAX_QK_RMS_XPU_HELPER_MAX_TOKENS = int(
+     os.environ.get("VLLM_MINIMAX_QK_RMS_XPU_HELPER_MAX_TOKENS", "4")
+ )
++_MINIMAX_QK_RMS_DIRECT_INPLACE_SCALE = (
++    os.environ.get("VLLM_MINIMAX_QK_RMS_DIRECT_INPLACE_SCALE", "0") == "1"
++)
+ _MINIMAX_QK_NORM_EAGER = (
+     os.environ.get("VLLM_MINIMAX_QK_NORM_EAGER", "0") == "1"
+ )
+@@
+                 qk_var = torch.ops.minimax_qk_rms_xpu.var_alloc(
+                     qkv, self.q_size, self.kv_size
+                 )
+                 if self.q_norm.tp_world > 1:
+-                    qk_var = (
+-                        tensor_model_parallel_all_reduce(qk_var)
+-                        / self.q_norm.tp_world
+-                    )
++                    if (
++                        _MINIMAX_QK_RMS_DIRECT_INPLACE_SCALE
++                        and qk_var.dtype == torch.float32
++                        and qk_var.numel() <= 2
++                        and hasattr(torch.ops, "vllm")
++                        and hasattr(torch.ops.vllm, "all_reduce_inplace")
++                    ):
++                        torch.ops.vllm.all_reduce_inplace(
++                            qk_var, group_name=get_tp_group().unique_name
++                        )
++                        qk_var.mul_(1.0 / self.q_norm.tp_world)
++                    else:
++                        qk_var = (
++                            tensor_model_parallel_all_reduce(qk_var)
++                            / self.q_norm.tp_world
++                        )
