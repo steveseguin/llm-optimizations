@@ -21,3 +21,8 @@ _load_extension()
 @torch.library.register_fake("minimax_ar_fused_rms_xpu::ar_fused_add_rms")
 def _fake_ar_fused_add_rms(input, residual, weight, group_name: str, eps: float):
     return torch.empty_like(input), torch.empty_like(input)
+
+
+@torch.library.register_fake("minimax_ar_fused_rms_xpu::ar_rms")
+def _fake_ar_rms(input, weight, group_name: str, eps: float):
+    return torch.empty_like(input), torch.empty_like(input)
