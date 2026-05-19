@@ -1,0 +1,44 @@
+{
+  "date": "2026-05-18",
+  "label": "minimax-graph-clone-custom-allreduce-hang-20260518",
+  "model": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+  "hardware": "4x Intel Arc Pro B70 32GB",
+  "engine": "vLLM 0.20.1-local",
+  "backend": "xpu",
+  "tensor_parallel_size": 4,
+  "context_length": 2048,
+  "max_num_batched_tokens": 512,
+  "block_size": 256,
+  "env": {
+    "VLLM_XPU_COMPILE_ALLREDUCE_CUSTOM_OP": "1",
+    "VLLM_XPU_CUSTOM_ALLREDUCE_CLONE_INPUT": "0",
+    "VLLM_XPU_CUSTOM_ALLREDUCE_GRAPH_CLONE_INPUT": "1",
+    "VLLM_XPU_COMPILE_OUT_OF_PLACE_ALLREDUCE": "0",
+    "VLLM_XPU_USE_LLM_SCALER_MOE": "1",
+    "VLLM_XPU_USE_LLM_SCALER_MOE_WS": "1",
+    "VLLM_XPU_USE_LLM_SCALER_MOE_MINIMAX_LOGITS_WS": "1",
+    "VLLM_MINIMAX_M2_ATTN_DELAY_ALLREDUCE": "0",
+    "VLLM_MINIMAX_QK_NORM_RESTORE_WEIGHT": "1",
+    "VLLM_MINIMAX_QK_NORM_RESTORE_WEIGHT_MIN_TOKENS": "2",
+    "VLLM_XPU_ENABLE_XPU_GRAPH": "1",
+    "VLLM_XPU_FORCE_GRAPH_WITH_COMM": "1",
+    "VLLM_XPU_GRAPH_NOOP_COMM_CAPTURE": "1",
+    "CCL_TOPO_P2P_ACCESS": "1"
+  },
+  "quality": {
+    "status": "not_completed",
+    "first_gate": "raw145_n64",
+    "reason": "post-compile hang before quality JSON was written"
+  },
+  "compile": {
+    "range_1_1_seconds": 76.28,
+    "range_1_512_seconds": 65.31,
+    "torch_compile_total_seconds": 171.40
+  },
+  "performance": null,
+  "decision": "rejected before benchmarking; not submitted to LocalMaxxing",
+  "artifacts": {
+    "smoke_dir": "/home/steve/bench-results/minimax-m2.7-strict-candidates/graph-clone-custom-allreduce-smoke-20260519T000420Z",
+    "smoke_log": "/home/steve/bench-results/minimax-m2.7-strict-candidates/graph-clone-custom-allreduce-smoke-20260519T000420Z/raw145-n64.log"
+  }
+}
