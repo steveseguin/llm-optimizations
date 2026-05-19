@@ -1,6 +1,6 @@
 # Current Promoted Results
 
-Date: 2026-05-18
+Date: 2026-05-19
 
 ## MiniMax M2.7
 
@@ -24,6 +24,18 @@ Primary artifacts:
 - `data/localmaxxing-responses/minimax-m27-autoround-qkvar-skipclone-fp32n2-p512n1536-20260518.response.json`
 - `patches/minimax-qkvar-skipclone-fp32n2-20260518.patch`
 
+Cleaner reliability follow-up:
+
+- `notes/2026-05-19-minimax-qkvar-inplace-fp32n2.md`
+- `data/minimax-m27-qkvar-inplace-fp32n2-20260519.json`
+- `data/localmaxxing-minimax-m27-autoround-qkvar-inplace-fp32n2-p512n1536-20260519.payload.json`
+- `data/localmaxxing-responses/minimax-m27-autoround-qkvar-inplace-fp32n2-p512n1536-20260519.response.json`
+- `data/localmaxxing-responses/minimax-m27-autoround-qkvar-inplace-fp32n2-p512n1536-20260519.http.txt`
+- `patches/minimax-qkvar-inplace-fp32n2-20260519.patch`
+- LocalMaxxing: `cmpc1dxgv0052pc01s1j9i37l`
+- Result: `88.103866` output tok/s, `117.471821` total tok/s, mean of four repeats
+- Decision: cleaner reproduction path because it removes the PyTorch custom-op alias warning; the `88.748424` skip-clone result remains the slightly faster speed headline.
+
 Previous promoted MiniMax baselines:
 
 - Clone-safe custom allreduce without tiny-FP32 clone elision: `87.279129` output tok/s, `116.372172` total tok/s, LocalMaxxing `cmpbsqm4l001qpc0199azisgz`.
@@ -34,7 +46,8 @@ Previous promoted MiniMax baselines:
 Current caveat:
 
 - The tiny-FP32 no-clone path is quality-clean on the current stack, but PyTorch emits a custom-op aliasing warning and says this behavior may become an error in a future release.
-- The cleaner follow-up is a non-aliasing custom-op output for small FP32 allreduces or a fused Q/K variance allreduce plus RMS apply path.
+- The 2026-05-19 alias-correct follow-up uses a mutating no-return custom op for tiny FP32 allreduces. It passed the same strict quality gate, removed the alias warning, and averaged `88.103866` output tok/s / `117.471821` total tok/s across four repeats. It is the cleaner reproduction path.
+- Three of four alias-correct benchmark logs printed `Bad address (src/pipe.cpp:367)` during shutdown after request completion and JSON write. Track this as shutdown noise; it did not affect quality or benchmark JSONs.
 
 Recent rejections and screens:
 
@@ -54,8 +67,9 @@ The quality-preserving Qwen targets remain separate from MiniMax AutoRound:
 
 ## Next Optimization Targets
 
-- Make the tiny-FP32 custom allreduce path alias-correct without reintroducing the Python-side clone cost.
+- Use the alias-correct tiny-FP32 in-place op as the reproduction-safe baseline for future code work, while measuring against the faster skip-clone speed headline.
 - Fuse Q/K variance allreduce with Q/K RMS apply if it preserves the exact restored-weight output hashes.
 - Continue targeting true XPU fused-boundary work: hidden allreduce plus residual/RMSNorm, MoE output plus epilogue, and final lm-head/projection boundaries.
+- Investigate the benchmark shutdown `Bad address (src/pipe.cpp:367)` noise so future public results have cleaner logs.
 - Keep strict quality gates as promotion blockers; do not promote logits/router/argmax shortcuts unless they pass raw exact hashes, semantic checks, arithmetic repeat, and extended sixpack.
 - Keep speculative decode optional and quality-gated; no current promoted MiniMax result uses speculation.
