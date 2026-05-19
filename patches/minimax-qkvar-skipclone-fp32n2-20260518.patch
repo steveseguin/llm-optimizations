@@ -1,0 +1,45 @@
+diff --git a/vllm/distributed/parallel_state.py b/vllm/distributed/parallel_state.py
+--- a/vllm/distributed/parallel_state.py
++++ b/vllm/distributed/parallel_state.py
+@@
+ import contextlib
+ import gc
++import os
+ import pickle
+ import weakref
+@@
+ def all_reduce(tensor: torch.Tensor, group_name: str) -> torch.Tensor:
+     group = _groups[group_name]()
+     if group is None:
+         raise ValueError(f"Group {group_name} is destroyed.")
++    if os.environ.get("VLLM_XPU_CUSTOM_ALLREDUCE_CLONE_INPUT", "0") == "1":
++        skip_fp32_max_numel = int(
++            os.environ.get(
++                "VLLM_XPU_CUSTOM_ALLREDUCE_SKIP_CLONE_FP32_MAX_NUMEL",
++                "0",
++            )
++            or "0"
++        )
++        skip_clone = (
++            skip_fp32_max_numel > 0
++            and tensor.dtype == torch.float32
++            and tensor.numel() <= skip_fp32_max_numel
++        )
++        if not skip_clone:
++            tensor = tensor.clone()
+     return group._all_reduce_out_place(tensor)
+diff --git a/scripts/run-minimax-strict-quality-gated-candidate.sh b/scripts/run-minimax-strict-quality-gated-candidate.sh
+--- a/scripts/run-minimax-strict-quality-gated-candidate.sh
++++ b/scripts/run-minimax-strict-quality-gated-candidate.sh
+@@
+     --arg vllm_xpu_compile_allreduce_custom_op "${VLLM_XPU_COMPILE_ALLREDUCE_CUSTOM_OP:-}" \
+     --arg vllm_xpu_custom_allreduce_clone_input "${VLLM_XPU_CUSTOM_ALLREDUCE_CLONE_INPUT:-}" \
+     --arg vllm_xpu_custom_allreduce_graph_clone_input "${VLLM_XPU_CUSTOM_ALLREDUCE_GRAPH_CLONE_INPUT:-}" \
++    --arg vllm_xpu_custom_allreduce_skip_clone_fp32_max_numel "${VLLM_XPU_CUSTOM_ALLREDUCE_SKIP_CLONE_FP32_MAX_NUMEL:-}" \
+     --arg vllm_xpu_compile_allreduce_no_clone "${VLLM_XPU_COMPILE_ALLREDUCE_NO_CLONE:-}" \
+@@
+         VLLM_XPU_COMPILE_ALLREDUCE_CUSTOM_OP: $vllm_xpu_compile_allreduce_custom_op,
+         VLLM_XPU_CUSTOM_ALLREDUCE_CLONE_INPUT: $vllm_xpu_custom_allreduce_clone_input,
+         VLLM_XPU_CUSTOM_ALLREDUCE_GRAPH_CLONE_INPUT: $vllm_xpu_custom_allreduce_graph_clone_input,
++        VLLM_XPU_CUSTOM_ALLREDUCE_SKIP_CLONE_FP32_MAX_NUMEL: $vllm_xpu_custom_allreduce_skip_clone_fp32_max_numel,
+         VLLM_XPU_COMPILE_ALLREDUCE_NO_CLONE: $vllm_xpu_compile_allreduce_no_clone,
