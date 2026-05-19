@@ -1,0 +1,88 @@
+{
+  "label": "minimax-moe-full-forward-customop-plus-output-ar-20260519",
+  "date": "2026-05-19",
+  "model": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+  "hardware": "4x Intel Arc Pro B70 32GB",
+  "engine": "vLLM 0.20.1-local XPU TP4",
+  "shape": {
+    "prompt_tokens": 512,
+    "output_tokens": 1536,
+    "context_length": 2048,
+    "batch_size": 1,
+    "tensor_parallel": 4,
+    "max_num_batched_tokens": 512,
+    "block_size": 256
+  },
+  "candidate_env": {
+    "VLLM_MINIMAX_MOE_FULL_FORWARD_CUSTOM_OP": "1",
+    "VLLM_MINIMAX_MOE_FULL_FORWARD_CUSTOM_OP_MAX_TOKENS": "4",
+    "VLLM_MINIMAX_MOE_OUTPUT_ALLREDUCE_INSIDE_CUSTOM_OP": "1",
+    "VLLM_MINIMAX_QK_RMS_XPU_HELPER": "1",
+    "VLLM_MINIMAX_QK_RMS_XPU_HELPER_MAX_TOKENS": "4",
+    "VLLM_MINIMAX_QK_RMS_DIRECT_INPLACE_SCALE": "1",
+    "VLLM_MINIMAX_QK_RMS_APPLY_TP_SCALE": "0",
+    "VLLM_XPU_COMPILE_ALLREDUCE_CUSTOM_OP": "1",
+    "VLLM_XPU_CUSTOM_ALLREDUCE_CLONE_INPUT": "1",
+    "VLLM_XPU_CUSTOM_ALLREDUCE_TINY_FP32_INPLACE_MAX_NUMEL": "2",
+    "VLLM_XPU_CUSTOM_ALLREDUCE_INPLACE_MAX_NUMEL": "0",
+    "VLLM_XPU_COMPILE_OUT_OF_PLACE_ALLREDUCE": "0",
+    "VLLM_XPU_USE_LLM_SCALER_MOE": "1",
+    "VLLM_XPU_USE_LLM_SCALER_MOE_WS": "1",
+    "VLLM_XPU_USE_LLM_SCALER_MOE_MINIMAX_LOGITS_WS": "1",
+    "VLLM_MINIMAX_M2_ATTN_DELAY_ALLREDUCE": "0",
+    "VLLM_XPU_ENABLE_XPU_GRAPH": "1",
+    "VLLM_XPU_FORCE_GRAPH_WITH_COMM": "1",
+    "VLLM_XPU_GRAPH_NOOP_COMM_CAPTURE": "1",
+    "CCL_TOPO_P2P_ACCESS": "1"
+  },
+  "quality": {
+    "status": "passed",
+    "raw145_n64_token_sha256": "267cbf30208d84929ee79284ac695467f7e80597bf8694130e1e1f8b180eb5bd",
+    "raw145_n256_token_sha256": "58f6e8251c7a0a17e8c441278b5861f7d5da914fa1823ecd10484b296f2d7537",
+    "arithmetic_repeat_n64_r16_token_sha256": "578ec378bf31cb16fb49ac5c0043270fd00a0f7898e18ac498a41ffe775d7994",
+    "extended_sixpack_n64_r2_token_sha256": "1e3560554f57b2b56cec8f49f28bc8ba12e9e0ced26bdc99a976f1433c99caa7",
+    "semantic_suite_passed": true,
+    "deterministic": true,
+    "quality_reducing_changes": false
+  },
+  "performance": {
+    "output_toks_per_second": [
+      88.92723924469661,
+      89.39667728272477,
+      89.52732050585546,
+      89.40554449051147
+    ],
+    "total_toks_per_second": [
+      118.56965232626214,
+      119.19556971029968,
+      119.36976067447394,
+      119.2073926540153
+    ],
+    "mean_output_toks_per_second": 89.31419538094708,
+    "mean_total_toks_per_second": 119.08559384126276,
+    "previous_promoted_output_toks_per_second": 88.92794492070186,
+    "previous_promoted_total_toks_per_second": 118.5705932276025,
+    "output_delta_toks_per_second": 0.38625046024522177,
+    "output_delta_percent": 0.434340940856663
+  },
+  "artifacts": {
+    "summary_json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-minimax-moe-full-forward-customop-plus-output-ar-20260519-strict-tp4-ctx2048-mbt512-bs256-20260519T151909Z-summary.json",
+    "quality_dir": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-minimax-moe-full-forward-customop-plus-output-ar-20260519-strict-tp4-ctx2048-mbt512-bs256-20260519T151909Z-quality",
+    "benchmark_jsons": [
+      "/home/steve/bench-results/minimax-m2.7-strict-candidates/vllm-minimax-m27-autoround-tp4-p512n1536-20260519T153431Z.json",
+      "/home/steve/bench-results/minimax-m2.7-strict-candidates/vllm-minimax-m27-autoround-tp4-p512n1536-20260519T153719Z.json",
+      "/home/steve/bench-results/minimax-m2.7-strict-candidates/vllm-minimax-m27-autoround-tp4-p512n1536-20260519T154005Z.json",
+      "/home/steve/bench-results/minimax-m2.7-strict-candidates/vllm-minimax-m27-autoround-tp4-p512n1536-20260519T154253Z.json"
+    ],
+    "note": "notes/2026-05-19-minimax-moe-full-forward-customop-plus-output-ar.md",
+    "patch_note": "patches/minimax-moe-full-forward-customop-plus-output-ar-20260519.md",
+    "localmaxxing_payload": "data/localmaxxing-minimax-m27-autoround-moe-full-forward-customop-plus-output-ar-p512n1536-20260519.payload.json",
+    "localmaxxing_response": "data/localmaxxing-responses/minimax-m27-autoround-moe-full-forward-customop-plus-output-ar-p512n1536-20260519.response.json"
+  },
+  "localmaxxing": {
+    "submitted": true,
+    "id": "cmpct6t4m007fnw01yjdtlcs4",
+    "status": "APPROVED"
+  },
+  "decision": "promote"
+}
