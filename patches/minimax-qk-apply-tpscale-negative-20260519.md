@@ -2,7 +2,9 @@
 
 Date: 2026-05-19
 
-Status: rejected after quality-passed speed screen.
+Status: rejected. An older stack passed quality but was slower; a stricter
+retest on the current promoted MoE-output-allreduce custom-op stack failed the
+raw145 n256 exact token hash.
 
 ## Purpose
 
@@ -62,8 +64,21 @@ Speed screen:
 - Mean: `88.359247` output tok/s, `117.812329` total tok/s.
 - Current clean high remains `88.501953` output tok/s.
 
+Strict retest on the current high:
+
+- Candidate stack included `VLLM_MINIMAX_MOE_OUTPUT_ALLREDUCE_INSIDE_CUSTOM_OP=1`.
+- `raw145-n64-exact`: passed.
+- `raw145-n256-exact`: failed.
+- Expected n256 token hash: `58f6e8251c7a0a17e8c441278b5861f7d5da914fa1823ecd10484b296f2d7537`.
+- Observed n256 token hash: `e9e4aba8f7af253645a925ea8278df7a0e9a38154f379db96ea8fd5f13fc1f67`.
+- Summary: `/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-minimax-qk-apply-tpscale-plus-moe-output-ar-20260519-strict-tp4-ctx2048-mbt512-bs256-20260519T145936Z-summary.json`.
+- Benchmark was skipped.
+
 ## Decision
 
-Keep this as a negative/marginal patch record, but do not promote it and do not submit it to LocalMaxxing.
+Keep this as a negative patch record, but do not promote it and do not submit it
+to LocalMaxxing.
 
-The result indicates the separate tiny TP scale multiply is not worth optimizing by itself. A larger Q/K or residual boundary fusion is still the more promising path.
+The result indicates the separate tiny TP scale multiply is not worth optimizing
+by itself, and the current graph/custom-op stack can make the model-level result
+non-exact even when the helper microcheck is bit-exact.
