@@ -1,0 +1,135 @@
+diff --git a/vllm/distributed/parallel_state.py b/vllm/distributed/parallel_state.py
+--- a/vllm/distributed/parallel_state.py
++++ b/vllm/distributed/parallel_state.py
+@@
+ import contextlib
+ import gc
++import os
+ import pickle
+ import weakref
+@@
+ def all_reduce(tensor: torch.Tensor, group_name: str) -> torch.Tensor:
+     group = _groups[group_name]()
+     if group is None:
+         raise ValueError(f"Group {group_name} is destroyed.")
++    if os.environ.get("VLLM_XPU_CUSTOM_ALLREDUCE_CLONE_INPUT", "0") == "1":
++        skip_fp32_max_numel = int(
++            os.environ.get(
++                "VLLM_XPU_CUSTOM_ALLREDUCE_SKIP_CLONE_FP32_MAX_NUMEL",
++                "0",
++            )
++            or "0"
++        )
++        skip_clone = (
++            skip_fp32_max_numel > 0
++            and tensor.dtype == torch.float32
++            and tensor.numel() <= skip_fp32_max_numel
++        )
++        if not skip_clone:
++            tensor = tensor.clone()
+     return group._all_reduce_out_place(tensor)
+@@
+ def all_reduce_fake(tensor: torch.Tensor, group_name: str) -> torch.Tensor:
+     return torch.empty_like(tensor)
+ 
+ 
++def all_reduce_inplace(tensor: torch.Tensor, group_name: str) -> None:
++    assert group_name in _groups, f"Group {group_name} is not found."
++    group = _groups[group_name]()
++    if group is None:
++        raise ValueError(f"Group {group_name} is destroyed.")
++    group._all_reduce_out_place(tensor)
++
++
++def all_reduce_inplace_fake(tensor: torch.Tensor, group_name: str) -> None:
++    return None
++
++
+ def reduce_scatter(
+     tensor: torch.Tensor, dim: int, world_size: int, group_name: str
+ ) -> torch.Tensor:
+@@
+ direct_register_custom_op(
+     op_name="all_reduce",
+     op_func=all_reduce,
+     fake_impl=all_reduce_fake,
+ )
+ 
++direct_register_custom_op(
++    op_name="all_reduce_inplace",
++    op_func=all_reduce_inplace,
++    fake_impl=all_reduce_inplace_fake,
++    mutates_args=["tensor"],
++)
++
+ direct_register_custom_op(
+     op_name="reduce_scatter",
+     op_func=reduce_scatter,
+@@
+         )
+ 
+         if self.device_communicator is not None:
+-            assert isinstance(self.device_communicator, CudaCommunicator)
+-            ca_comm = self.device_communicator.ca_comm
++            if not isinstance(self.device_communicator, CudaCommunicator):
++                if os.environ.get("VLLM_XPU_GRAPH_NOOP_COMM_CAPTURE", "0") != "1":
++                    assert isinstance(self.device_communicator, CudaCommunicator)
++                logger.warning_once(
++                    "Skipping communicator graph-capture context for %s under "
++                    "VLLM_XPU_GRAPH_NOOP_COMM_CAPTURE=1.",
++                    type(self.device_communicator).__name__,
++                )
++                ca_comm = None
++            else:
++                ca_comm = self.device_communicator.ca_comm
+             if ca_comm is not None:
+                 maybe_ca_context = ca_comm.capture()  # type: ignore
+ 
+             from vllm._aiter_ops import rocm_aiter_ops
+ 
+-            if rocm_aiter_ops.is_enabled():
++            if (
++                isinstance(self.device_communicator, CudaCommunicator)
++                and rocm_aiter_ops.is_enabled()
++            ):
+                 aiter_ar = rocm_aiter_ops.get_aiter_allreduce()
+                 if aiter_ar is not None:
+                     maybe_aiter_context = aiter_ar.capture()  # type: ignore
+@@
+             return input_
+ 
+         if self.use_custom_op_call:
++            tiny_fp32_inplace_max_numel = int(
++                os.environ.get(
++                    "VLLM_XPU_CUSTOM_ALLREDUCE_TINY_FP32_INPLACE_MAX_NUMEL",
++                    "0",
++                )
++                or "0"
++            )
++            if (
++                tiny_fp32_inplace_max_numel > 0
++                and input_.dtype == torch.float32
++                and input_.numel() <= tiny_fp32_inplace_max_numel
++            ):
++                torch.ops.vllm.all_reduce_inplace(
++                    input_, group_name=self.unique_name
++                )
++                return input_
+             return torch.ops.vllm.all_reduce(input_, group_name=self.unique_name)
+         else:
+             return self._all_reduce_out_place(input_)
+diff --git a/scripts/run-minimax-strict-quality-gated-candidate.sh b/scripts/run-minimax-strict-quality-gated-candidate.sh
+--- a/scripts/run-minimax-strict-quality-gated-candidate.sh
++++ b/scripts/run-minimax-strict-quality-gated-candidate.sh
+@@
+     --arg vllm_xpu_custom_allreduce_clone_input "${VLLM_XPU_CUSTOM_ALLREDUCE_CLONE_INPUT:-}" \
+     --arg vllm_xpu_custom_allreduce_graph_clone_input "${VLLM_XPU_CUSTOM_ALLREDUCE_GRAPH_CLONE_INPUT:-}" \
+     --arg vllm_xpu_custom_allreduce_skip_clone_fp32_max_numel "${VLLM_XPU_CUSTOM_ALLREDUCE_SKIP_CLONE_FP32_MAX_NUMEL:-}" \
++    --arg vllm_xpu_custom_allreduce_tiny_fp32_inplace_max_numel "${VLLM_XPU_CUSTOM_ALLREDUCE_TINY_FP32_INPLACE_MAX_NUMEL:-}" \
+     --arg vllm_xpu_compile_allreduce_no_clone "${VLLM_XPU_COMPILE_ALLREDUCE_NO_CLONE:-}" \
+@@
+         VLLM_XPU_CUSTOM_ALLREDUCE_CLONE_INPUT: $vllm_xpu_custom_allreduce_clone_input,
+         VLLM_XPU_CUSTOM_ALLREDUCE_GRAPH_CLONE_INPUT: $vllm_xpu_custom_allreduce_graph_clone_input,
+         VLLM_XPU_CUSTOM_ALLREDUCE_SKIP_CLONE_FP32_MAX_NUMEL: $vllm_xpu_custom_allreduce_skip_clone_fp32_max_numel,
++        VLLM_XPU_CUSTOM_ALLREDUCE_TINY_FP32_INPLACE_MAX_NUMEL: $vllm_xpu_custom_allreduce_tiny_fp32_inplace_max_numel,
+         VLLM_XPU_COMPILE_ALLREDUCE_NO_CLONE: $vllm_xpu_compile_allreduce_no_clone,
