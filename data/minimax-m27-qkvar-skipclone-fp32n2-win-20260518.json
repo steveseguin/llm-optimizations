@@ -1,0 +1,61 @@
+{
+  "date": "2026-05-18",
+  "model": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+  "hardware": "4x Intel Arc Pro B70 32GB",
+  "engine": "vLLM 0.20.1-local XPU TP4",
+  "candidate": "shape-gated tiny-FP32 custom-allreduce clone elision",
+  "status": "promoted",
+  "localmaxxing_id": "cmpbz7lyc004rpc019jburzqv",
+  "summary_json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-minimax-qkvar-skipclone-fp32n2-ar-20260518-strict-tp4-ctx2048-mbt512-bs256-20260519T011834Z-summary.json",
+  "shape": {
+    "prompt_tokens": 512,
+    "output_tokens": 1536,
+    "context_length": 2048,
+    "batch_size": 1,
+    "tensor_parallel": 4,
+    "max_num_batched_tokens": 512,
+    "block_size": 256
+  },
+  "performance": {
+    "mean_output_toks_per_second": 88.74842422812014,
+    "mean_total_toks_per_second": 118.33123230416018,
+    "output_toks_per_second": [
+      88.14893199410821,
+      89.0729474954678,
+      89.47399415277515,
+      88.29782327012938
+    ],
+    "total_toks_per_second": [
+      117.53190932547761,
+      118.76392999395706,
+      119.29865887036686,
+      117.73043102683918
+    ],
+    "delta_output_pct_vs_previous_promoted": 1.5259208221054532,
+    "previous_promoted_output_toks_per_second": 87.27912933688414
+  },
+  "quality": {
+    "passed": true,
+    "raw145_n64": "267cbf30208d84929ee79284ac695467f7e80597bf8694130e1e1f8b180eb5bd",
+    "raw145_n256": "58f6e8251c7a0a17e8c441278b5861f7d5da914fa1823ecd10484b296f2d7537",
+    "semantic_suite": "adacbf144264486ea7d378ebb6a4c0ba23951b72c4cf86251a762b07ebef5805",
+    "arithmetic_repeat_n64_r16": "578ec378bf31cb16fb49ac5c0043270fd00a0f7898e18ac498a41ffe775d7994",
+    "extended_sixpack_n64_r2": "1e3560554f57b2b56cec8f49f28bc8ba12e9e0ced26bdc99a976f1433c99caa7"
+  },
+  "env": {
+    "VLLM_XPU_COMPILE_ALLREDUCE_CUSTOM_OP": "1",
+    "VLLM_XPU_CUSTOM_ALLREDUCE_CLONE_INPUT": "1",
+    "VLLM_XPU_CUSTOM_ALLREDUCE_SKIP_CLONE_FP32_MAX_NUMEL": "2",
+    "VLLM_XPU_USE_LLM_SCALER_MOE": "1",
+    "VLLM_XPU_USE_LLM_SCALER_MOE_WS": "1",
+    "VLLM_XPU_USE_LLM_SCALER_MOE_MINIMAX_LOGITS_WS": "1",
+    "VLLM_MINIMAX_M2_ATTN_DELAY_ALLREDUCE": "0",
+    "VLLM_MINIMAX_QK_NORM_RESTORE_WEIGHT": "1",
+    "VLLM_MINIMAX_QK_NORM_RESTORE_WEIGHT_MIN_TOKENS": "2",
+    "VLLM_XPU_ENABLE_XPU_GRAPH": "1",
+    "VLLM_XPU_FORCE_GRAPH_WITH_COMM": "1",
+    "VLLM_XPU_GRAPH_NOOP_COMM_CAPTURE": "1",
+    "CCL_TOPO_P2P_ACCESS": "1"
+  },
+  "notes": "Skips the pre-custom-op clone only for tiny FP32 allreduces with numel <= 2, targeting the Q/K RMS variance scalar collective while keeping larger hidden/residual collectives clone-safe. Full strict quality passed before benchmarking. PyTorch emits an alias warning for the tiny no-clone custom-op path, so this is promoted for the current stack but should be replaced by a non-aliasing custom-op output or fused Q/K variance+RMS path."
+}
