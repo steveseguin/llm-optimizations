@@ -1,0 +1,12 @@
+{
+  "http_code": 201,
+  "id": "cmpbz7lyc004rpc019jburzqv",
+  "status": "APPROVED",
+  "createdAt": "2026-05-19T01:50:38.052Z",
+  "tokSOut": 88.74842422812014,
+  "tokSTotal": 118.3312323041602,
+  "hfId": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+  "engineName": "vllm",
+  "engineVersion": "0.20.1-local",
+  "quantization": "AutoRound INT4 W4A16"
+}
