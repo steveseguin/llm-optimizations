@@ -52,6 +52,7 @@ Current caveat:
 Recent rejections and screens:
 
 - `VLLM_XPU_CUSTOM_ALLREDUCE_INPLACE_MAX_NUMEL=4096` passed raw145 n64/n256 exact hashes, semantic suite, 16-repeat arithmetic, and extended sixpack, but averaged only `86.386284` output tok/s and `115.181713` total tok/s across four repeats. It is `-1.95%` versus the alias-correct tiny-FP32 in-place path and showed repeated `triton_red_fused__to_copy_mm_t_9` / `ocloc` error-code `245` fallback noise. Do not submit to LocalMaxxing or promote. Artifacts: `notes/2026-05-19-minimax-allreduce-inplace-n4096-negative.md`, `data/minimax-m27-allreduce-inplace-n4096-negative-20260519.json`, `patches/minimax-allreduce-inplace-threshold-20260519.patch`.
+- Guarded allreduce shape logging showed decode fp32 Q/K variance at `(1, 2)`/numel `2`, prefill/profile fp32 Q/K variance at `(512, 2)`/numel `1024`, and decode fp16 hidden-state allreduce at `(1, 3072)`/numel `3072`. That explains the `n4096` regression: the broad threshold caught the fp16 decode hidden-state collective. `VLLM_XPU_CUSTOM_ALLREDUCE_INPLACE_MAX_NUMEL=2048` avoided that shape and passed the full strict quality gate, but averaged only `87.105717` output tok/s / `116.140956` total tok/s. Do not submit or promote; keep generic in-place threshold unset or `0`. Artifacts: `notes/2026-05-19-minimax-allreduce-shape-log-and-n2048-negative.md`, `data/minimax-m27-allreduce-shape-log-and-n2048-negative-20260519.json`, `patches/minimax-allreduce-shape-logger-and-n2048-screen-20260519.patch`.
 - `MAX_BATCHED_TOKENS=768` on top of the clone-safe custom-allreduce recipe passed early gates but failed the extended sixpack with nondeterministic greedy output. Keep MBT512.
 - `VLLM_XPU_COMPILE_OUT_OF_PLACE_ALLREDUCE=1` passed full quality but only reached `82.288077` output tok/s, below the promoted custom-op path.
 - `VLLM_XPU_CUSTOM_ALLREDUCE_GRAPH_CLONE_INPUT=1` with internal custom-op clone disabled completed AOT graph compilation but hung before producing the first raw145 n64 quality JSON.
@@ -69,8 +70,9 @@ The quality-preserving Qwen targets remain separate from MiniMax AutoRound:
 ## Next Optimization Targets
 
 - Use the alias-correct tiny-FP32 in-place op as the reproduction-safe baseline for future code work, while measuring against the faster skip-clone speed headline.
-- Instrument allreduce dtype/shape/numel before further threshold work; broad in-place thresholding is quality-safe but slower at `<=4096`.
+- Keep `VLLM_XPU_CUSTOM_ALLREDUCE_INPLACE_MAX_NUMEL=0` for promoted runs; the n2048/n4096 screens show generic in-place thresholds are quality-safe but slower than dtype-specific tiny-FP32 routing.
 - Fuse Q/K variance allreduce with Q/K RMS apply if it preserves the exact restored-weight output hashes.
+- Benchmark raw communication overhead for `(1, 2)`, `(1, 3072)`, `(512, 2)`, and `(512, 3072)` to separate CCL latency from graph/compiler overhead.
 - Continue targeting true XPU fused-boundary work: hidden allreduce plus residual/RMSNorm, MoE output plus epilogue, and final lm-head/projection boundaries.
 - Investigate the benchmark shutdown `Bad address (src/pipe.cpp:367)` noise so future public results have cleaner logs.
 - Keep strict quality gates as promotion blockers; do not promote logits/router/argmax shortcuts unless they pass raw exact hashes, semantic checks, arithmetic repeat, and extended sixpack.
