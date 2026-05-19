@@ -1,0 +1,52 @@
+{
+  "date": "2026-05-19",
+  "hardware": "4x Intel Arc Pro B70 32GB",
+  "benchmark": "b70_xccl_minimax_allreduce_shapes",
+  "backend": "torch.distributed xccl on XPU/Level Zero",
+  "env": {
+    "CCL_TOPO_P2P_ACCESS": "1",
+    "ONEAPI_DEVICE_SELECTOR": "level_zero:0,1,2,3",
+    "ZE_AFFINITY_MASK": "0,1,2,3",
+    "B70_MINIMAX_AR_ITERS_SCALE": "4"
+  },
+  "artifacts": {
+    "script": "/home/steve/llm-optimizations-publish/benchmarks/b70_xccl_minimax_allreduce_shapes.py",
+    "first_run_raw_json": "/home/steve/bench-results/collectives/b70-minimax-allreduce-shapes-20260519T042325Z.json",
+    "first_run_clean_json": "/home/steve/bench-results/collectives/b70-minimax-allreduce-shapes-20260519T042325Z.clean.json",
+    "long_run_raw_json": "/home/steve/bench-results/collectives/b70-minimax-allreduce-shapes-long-20260519T042421Z.json",
+    "long_run_clean_json": "/home/steve/bench-results/collectives/b70-minimax-allreduce-shapes-long-20260519T042421Z.clean.json"
+  },
+  "long_run_mean_ms": {
+    "inplace": {
+      "qk_decode_fp32_shape_1x2": 0.016773858930682763,
+      "qk_prompt42_fp32_shape_42x2": 0.016718613860430196,
+      "qk_profile512_fp32_shape_512x2": 0.014893494000231535,
+      "hidden_decode_fp16_shape_1x3072": 0.014878371250233613,
+      "hidden_prompt42_fp16_shape_42x3072": 0.015231822497298708,
+      "hidden_profile512_fp16_shape_512x3072": 0.1179674087325111
+    },
+    "clone": {
+      "qk_decode_fp32_shape_1x2": 0.020703029130236243,
+      "qk_prompt42_fp32_shape_42x2": 0.020674112921115012,
+      "qk_profile512_fp32_shape_512x2": 0.019471985567361117,
+      "hidden_decode_fp16_shape_1x3072": 0.01935772744958134,
+      "hidden_prompt42_fp16_shape_42x3072": 0.018893110875069397,
+      "hidden_profile512_fp16_shape_512x3072": 0.12041162626701407
+    },
+    "empty_copy": {
+      "qk_decode_fp32_shape_1x2": 0.021563849860685876,
+      "qk_prompt42_fp32_shape_42x2": 0.02168125076976139,
+      "qk_profile512_fp32_shape_512x2": 0.019971169834025203,
+      "hidden_decode_fp16_shape_1x3072": 0.02001413146596557,
+      "hidden_prompt42_fp16_shape_42x3072": 0.020216981876728823,
+      "hidden_profile512_fp16_shape_512x3072": 0.1204848058114294
+    }
+  },
+  "interpretation": [
+    "Raw decode-sized XCCL collectives are about 15-17 us in-place on the four B70s.",
+    "Clone/copy setup adds about 4-5 us for tiny decode tensors.",
+    "The full-model regressions from generic in-place thresholds are larger than the raw collective delta, so framework/compiler/graph boundaries matter.",
+    "Do not use broad numel thresholds; they catch hidden_decode_fp16 shape (1,3072) and push it into a worse compiler path.",
+    "Next speed work should focus on shape-aware Q/K variance fusion, residual/allreduce boundary fusion, and MoE epilogue fusion."
+  ]
+}
