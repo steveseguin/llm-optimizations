@@ -4,61 +4,54 @@ Date: 2026-05-19
 
 ## MiniMax M2.7
 
-Current speed headline:
+Current strict quality-passed speed result:
 
 - Model: `Lasimeri/MiniMax-M2.7-int4-AutoRound`
 - Hardware: 4x Intel Arc Pro B70 32GB
 - Engine: vLLM `0.20.1-local`, XPU TP4
-- Recipe: FP16 activations, AutoRound INT4 W4A16, default XPU FlashAttention v2, XPU PIECEWISE graph, exact MiniMax router-logits path feeding llm-scaler INT4 MoE work-sharing decode, clone-safe compiled allreduce custom-op, and shape-gated clone elision for tiny FP32 Q/K variance allreduces.
+- Recipe: FP16 activations, AutoRound INT4 W4A16, default XPU FlashAttention v2, XPU PIECEWISE graph, exact MiniMax router-logits path feeding llm-scaler INT4 MoE work-sharing decode with `VLLM_XPU_USE_LLM_SCALER_MOE_WS=1`, `VLLM_XPU_USE_LLM_SCALER_MOE_MINIMAX_LOGITS_WS=1`, `VLLM_MINIMAX_M2_ATTN_DELAY_ALLREDUCE=0`, clone-safe compiled allreduce custom-op via `VLLM_XPU_COMPILE_ALLREDUCE_CUSTOM_OP=1` plus `VLLM_XPU_CUSTOM_ALLREDUCE_CLONE_INPUT=1`, direct in-place Q/K variance allreduce+scale via `VLLM_MINIMAX_QK_RMS_DIRECT_INPLACE_SCALE=1`, and final MoE output allreduce moved inside the MoE custom-op boundary via `VLLM_MINIMAX_MOE_OUTPUT_ALLREDUCE_INSIDE_CUSTOM_OP=1`
 - Shape: p512/n1536, ctx2048, batch 1
-- Result: `88.748424` output tok/s, `118.331232` total tok/s, mean of four clean long repeats
+- Result: `88.927945` output tok/s, `118.570593` total tok/s, mean of four clean long repeats
+- Output tok/s repeats: `[88.422654, 89.595083, 88.524703, 89.169339]`
 - Quality: raw145 exact n64/n256 hashes, semantic suite, 16-repeat arithmetic, and extended sixpack all passed before benchmarking
-- LocalMaxxing: `cmpbz7lyc004rpc019jburzqv`
-
-Current clean-path high:
-
-- Same model/hardware/engine shape.
-- Change: `VLLM_MINIMAX_QK_RMS_DIRECT_INPLACE_SCALE=1` calls `vllm.all_reduce_inplace` directly for decode-sized FP32 Q/K variance tensors and then scales `qk_var` in-place at the MiniMax call site.
-- Result: `88.501953` output tok/s, `118.002604` total tok/s, mean of four repeats `[88.739272, 88.302351, 88.821529, 88.144660]`
-- Quality: raw145 exact n64/n256 hashes, semantic suite, 16-repeat arithmetic, and extended sixpack all passed before benchmarking
-- LocalMaxxing: `cmpc8cmqm0060pc016g5l5ukh`
-- Use this as the reproduction-safe baseline when the PyTorch custom-op alias warning in the faster speed headline is unacceptable.
+- Delta: `+0.48%` output tok/s over the previous clean direct Q/K variance high (`88.501953`), `+0.20%` over the previous warning-prone speed headline (`88.748424`), and `+10.33%` over the earlier MoE-WS FlashAttention/PIECEWISE baseline
+- LocalMaxxing: `cmpco63q90052nw01ov1zxvwp`
 
 Primary artifacts:
 
-- `notes/2026-05-18-minimax-qkvar-skipclone-fp32n2-win.md`
-- `data/minimax-m27-qkvar-skipclone-fp32n2-win-20260518.json`
-- `data/localmaxxing-minimax-m27-autoround-qkvar-skipclone-fp32n2-p512n1536-20260518.payload.json`
-- `data/localmaxxing-responses/minimax-m27-autoround-qkvar-skipclone-fp32n2-p512n1536-20260518.response.json`
-- `patches/minimax-qkvar-skipclone-fp32n2-20260518.patch`
-- `notes/2026-05-19-minimax-qk-direct-inplace-scale.md`
-- `data/minimax-m27-qk-direct-inplace-scale-20260519.json`
-- `data/localmaxxing-minimax-m27-autoround-qk-direct-inplace-scale-p512n1536-20260519.payload.json`
-- `data/localmaxxing-responses/minimax-m27-autoround-qk-direct-inplace-scale-p512n1536-20260519.response.json`
-- `patches/minimax-qk-direct-inplace-scale-20260519.patch`
+- Current strict clean high: `notes/2026-05-19-minimax-moe-output-allreduce-inside-customop.md`, `data/minimax-m27-moe-output-allreduce-inside-customop-20260519.json`, `data/localmaxxing-minimax-m27-autoround-moe-output-allreduce-inside-customop-p512n1536-20260519.payload.json`, `data/localmaxxing-responses/minimax-m27-autoround-moe-output-allreduce-inside-customop-p512n1536-20260519.response.json`, `patches/minimax-moe-output-allreduce-inside-customop-20260519.patch`
+- Current clean direct Q/K variance follow-up: `notes/2026-05-19-minimax-qk-direct-inplace-scale.md`, `data/minimax-m27-qk-direct-inplace-scale-20260519.json`, `data/localmaxxing-minimax-m27-autoround-qk-direct-inplace-scale-p512n1536-20260519.payload.json`, `data/localmaxxing-responses/minimax-m27-autoround-qk-direct-inplace-scale-p512n1536-20260519.response.json`, `patches/minimax-qk-direct-inplace-scale-20260519.patch`
+- Cleaner Q/K-helper follow-up: `notes/2026-05-19-minimax-qk-helper-tinyfp32-inplace.md`, `data/minimax-m27-qk-helper-tinyfp32-inplace-20260519.json`, `data/localmaxxing-minimax-m27-autoround-qk-helper-tinyfp32-inplace-p512n1536-20260519.payload.json`, `data/localmaxxing-responses/minimax-m27-autoround-qk-helper-tinyfp32-inplace-p512n1536-20260519.response.json`
+- Cleaner alias-correct tiny-FP32 in-place path: `notes/2026-05-19-minimax-qkvar-inplace-fp32n2.md`, `data/minimax-m27-qkvar-inplace-fp32n2-20260519.json`, `data/localmaxxing-minimax-m27-autoround-qkvar-inplace-fp32n2-p512n1536-20260519.payload.json`, `data/localmaxxing-responses/minimax-m27-autoround-qkvar-inplace-fp32n2-p512n1536-20260519.response.json`, `patches/minimax-qkvar-inplace-fp32n2-20260519.patch`
+- Previous warning-prone speed headline: `notes/2026-05-18-minimax-qkvar-skipclone-fp32n2-win.md`, `data/minimax-m27-qkvar-skipclone-fp32n2-win-20260518.json`, `data/localmaxxing-minimax-m27-autoround-qkvar-skipclone-fp32n2-p512n1536-20260518.payload.json`, `data/localmaxxing-responses/minimax-m27-autoround-qkvar-skipclone-fp32n2-p512n1536-20260518.response.json`, `patches/minimax-qkvar-skipclone-fp32n2-20260518.patch`
+- Previous clone-safe custom-allreduce baseline: `notes/2026-05-18-minimax-clone-safe-custom-allreduce-win.md`, `data/minimax-m27-clone-safe-custom-allreduce-win-20260518.json`, `data/localmaxxing-minimax-m27-autoround-clone-safe-custom-allreduce-p512n1536-20260518.payload.json`, `data/localmaxxing-responses/minimax-m27-autoround-clone-safe-custom-allreduce-p512n1536-20260518.response.json`, `patches/minimax-clone-safe-custom-allreduce-20260518.patch`
+- Previous logits-WS wins: `notes/2026-05-18-minimax-logits-ws-no-attn-delay-small-win.md`, `data/minimax-m27-logits-ws-no-attn-delay-small-win-20260518.json`, `notes/2026-05-18-minimax-logits-ws-strict-win.md`, `data/minimax-m27-logits-ws-strict-win-20260518.json`, `patches/minimax-logits-ws-path-20260518.md`
 
 Previous promoted MiniMax baselines:
 
 - Alias-correct tiny-FP32 in-place op: `88.103866` output tok/s, `117.471821` total tok/s, LocalMaxxing `cmpc1dxgv0052pc01s1j9i37l`.
 - Q/K helper plus alias-correct tiny-FP32 in-place op: `88.313105` output tok/s, `117.750807` total tok/s, LocalMaxxing `cmpc5xmm6005jpc01k84dxd14`.
+- Direct Q/K variance in-place scale: `88.501953` output tok/s, `118.002604` total tok/s, LocalMaxxing `cmpc8cmqm0060pc016g5l5ukh`.
+- Warning-prone tiny-FP32 skip-clone headline: `88.748424` output tok/s, `118.331232` total tok/s, LocalMaxxing `cmpbz7lyc004rpc019jburzqv`.
 - Clone-safe custom allreduce without tiny-FP32 clone elision: `87.279129` output tok/s, `116.372172` total tok/s, LocalMaxxing `cmpbsqm4l001qpc0199azisgz`.
 - No-attention-delay logits-WS baseline without clone-safe compiled allreduce custom-op: `82.404268` output tok/s, `109.872357` total tok/s, LocalMaxxing `cmpbifcx3013bmn01747cxix8`.
 - Delayed-attention logits-WS baseline: `81.758267` output tok/s, `109.011023` total tok/s, LocalMaxxing `cmpay7th600bbmn01v6csyaro`.
 - Earlier MoE-WS FlashAttention/PIECEWISE baseline: `80.602755` output tok/s, `107.470340` total tok/s, LocalMaxxing `cmpasdq5v007nmn019elaut3s`.
 
-Recent rejections and screens:
+Recent quality-safe rejections and screens:
 
-- Source-path `gpu_model_runner.py` repair restored the local `/home/steve/src/vllm` execution path after a source-tree repeat failed `raw145-n256-exact`. The repair restored XPU-aware async copy helpers, removed broad timing wrappers from compiled decode/postprocess paths, and restored the optional sampled-token clone guard. Strict source-path validation then passed raw145 n64/n256 exact hashes, semantic suite, arithmetic repeat, and extended sixpack. Result: `87.976305` output tok/s / `117.301741` total tok/s across two p512/n1536 repeats. This was not submitted to LocalMaxxing because it is below the `88.501953` clean high. Artifacts: `notes/2026-05-19-minimax-source-gpumodelrunner-sync-repeat.md`, `data/minimax-m27-source-gpumodelrunner-sync-repeat-20260519.json`, `patches/minimax-source-gpumodelrunner-sync-repeat-20260519.md`.
-- `VLLM_MINIMAX_AR_FUSED_RMS_XPU=1` with a c10d group-name fix passed one strict screen, but a fresh speed-screen label failed `raw145-n256-exact` before benchmark repeats with a deterministic but different combined token hash. Reject as a repeatability/quality risk. No LocalMaxxing submission. Artifacts: `notes/2026-05-19-minimax-ar-fused-rms-c10d-repeatability-negative.md`, `data/minimax-m27-ar-fused-rms-c10d-repeatability-negative-20260519.json`, `patches/minimax-ar-fused-rms-c10d-repeatability-negative-20260519.md`.
-- `VLLM_MINIMAX_QK_RMS_APPLY_TP_SCALE=1` folded the `1 / tp_world` variance scale into the XPU Q/K RMS apply helper. Quality passed, but result was `88.359247` output tok/s / `117.812329` total tok/s, slower than the clean direct in-place scale baseline. No LocalMaxxing submission.
-- `VLLM_XPU_INC_FAST_2D_APPLY=1` bypassed reshape/view work in `INCXPULinearMethod.apply()` when the W4A16 input was already 2D contiguous. Quality passed raw145 n64/n256, semantic, arithmetic repeat, and extended sixpack, but result was `87.733425` output tok/s / `116.977900` total tok/s across two p512/n1536 repeats. The active source and venv patch were removed after testing. No LocalMaxxing submission. Artifacts: `notes/2026-05-19-minimax-inc-fast-2d-apply-negative.md`, `data/minimax-inc-fast-2d-apply-full-repeat-20260519.json`, `patches/minimax-inc-fast-2d-apply-negative-20260519.md`.
-- `VLLM_MINIMAX_AR_RMS_XPU=1` added an ordered AR+RMS extension op that preserves the delayed rank-0 residual-add/allreduce order. A standalone 4-rank microcheck showed the old helper mismatched the delayed reference (`max_out_diff=0.015625`) while the ordered helper was bit-exact (`ordered_max_out_diff=0.0`). Integrated model screen passed `raw145-n64-exact`, but decoded at only about `10.10` output tok/s and hit the B70 `triton_red_fused__to_copy_mm_t_6` / `ocloc` 245 / IGC floating-point-exception path, so the run was manually stopped during `raw145-n256-exact`. Reject and do not submit to LocalMaxxing. Artifacts: `notes/2026-05-19-minimax-ar-rms-ordered-negative.md`, `data/minimax-m27-ar-rms-ordered-negative-20260519.json`, `patches/minimax-ar-rms-ordered-negative-20260519.md`, `benchmarks/b70_minimax_ar_fused_rms_compare.py`.
+- MoE output-allreduce plus callable-cache stack: `VLLM_XPU_LLM_SCALER_MOE_CACHE_MINIMAX_LOGITS_OP=1` on top of the current strict high passed raw145 n64/n256 exact hashes, semantic suite, 16-repeat arithmetic, and extended sixpack. Result: `88.912296` output tok/s / `118.549728` total tok/s. Decision: reject and do not submit to LocalMaxxing because it is `0.015649` output tok/s below the promoted mean. Artifacts: `notes/2026-05-19-minimax-moe-output-ar-plus-moe-cache-negative.md`, `data/minimax-m27-moe-output-ar-plus-moe-cache-negative-20260519.json`.
+- MiniMax MoE WS skip-redundant-contiguous: `VLLM_XPU_LLM_SCALER_MOE_MINIMAX_SKIP_REDUNDANT_CONTIGUOUS=1` reused already-contiguous hidden-state and router-logit tensors before the llm-scaler MiniMax MoE WS custom op. It passed raw145 n64/n256 exact hashes, semantic suite, 16-repeat arithmetic, and extended sixpack. Result: `88.885135` output tok/s / `118.513514` total tok/s. Decision: reject and do not submit to LocalMaxxing because it is `0.042809` output tok/s below the promoted mean. Artifacts: `notes/2026-05-19-minimax-moe-ws-skip-redundant-contiguous-negative.md`, `data/minimax-m27-moe-ws-skip-redundant-contiguous-negative-20260519.json`, `patches/minimax-moe-ws-skip-redundant-contiguous-negative-20260519.md`.
+- Source-path `gpu_model_runner.py` repair restored the local `/home/steve/src/vllm` execution path after a source-tree repeat failed `raw145-n256-exact`. The repair passed strict source-path validation and measured `87.976305` output tok/s / `117.301741` total tok/s. No LocalMaxxing submission. Artifacts: `notes/2026-05-19-minimax-source-gpumodelrunner-sync-repeat.md`, `data/minimax-m27-source-gpumodelrunner-sync-repeat-20260519.json`, `patches/minimax-source-gpumodelrunner-sync-repeat-20260519.md`.
+- `VLLM_MINIMAX_AR_FUSED_RMS_XPU=1` with a c10d group-name fix passed one strict screen, but a fresh speed-screen label failed `raw145-n256-exact` before benchmark repeats with a deterministic but different combined token hash. Reject as a repeatability/quality risk. No LocalMaxxing submission.
+- `VLLM_MINIMAX_QK_RMS_APPLY_TP_SCALE=1` folded the `1 / tp_world` variance scale into the XPU Q/K RMS apply helper. Quality passed, but result was `88.359247` output tok/s / `117.812329` total tok/s, slower than the clean direct in-place scale baseline.
+- `VLLM_XPU_INC_FAST_2D_APPLY=1` bypassed reshape/view work in `INCXPULinearMethod.apply()` when the W4A16 input was already 2D contiguous. Quality passed, but result was `87.733425` output tok/s / `116.977900` total tok/s. Active source and venv patches were removed.
+- `VLLM_MINIMAX_AR_RMS_XPU=1` added an ordered AR+RMS extension op. A standalone 4-rank microcheck was bit-exact for the ordered helper, but the integrated model ran around `10.10` output tok/s and hit the B70 `triton_red_fused__to_copy_mm_t_6` / `ocloc` 245 / IGC floating-point-exception path. Reject.
 - `VLLM_MINIMAX_QK_RMS_XPU_HELPER_MAX_TOKENS=512` extended the Q/K RMS helper into prompt/profile token ranges. Quality passed, but result was `87.974187` output tok/s / `117.298916` total tok/s. Keep helper max tokens at `4`.
 - Disabled diagnostics cleanup with a static finite-trace flag passed full quality but was slower at `88.119325` output tok/s / `117.492433` total tok/s. Keep the Dynamo-compatible timing context shape unchanged.
-- MiniMax MoE callable-cache patch passed full quality and measured `88.549265` output tok/s / `118.065687` total tok/s, but the `+0.047` tok/s delta over the clean high is inside normal run noise. Do not promote.
-- MiniMax MoE callable-cache same-cache A/B used `/mnt/fast-ai/vllm-cache-exp/minimax-moe-cache-ab-20260519` for cache-on and cache-off. Both passed raw145 n64/n256 exact hashes, semantic suite, and 8-repeat arithmetic. Cache-on measured `88.404703` output tok/s / `117.872937` total tok/s across four repeats; cache-off measured `88.056668` output tok/s / `117.408891` total tok/s across two repeats. Reject and do not submit to LocalMaxxing because cache-on remains below the current clean `88.501953` output tok/s baseline. Artifacts: `notes/2026-05-19-minimax-moe-cache-samecache-negative.md`, `data/minimax-m27-moe-cache-samecache-negative-20260519.json`.
-- `VLLM_XPU_GREEDY_SKIP_LOGITS_FP32=1` was retested on the current clean direct Q/K in-place scale baseline. It passed `raw145-n64-exact`, but failed `raw145-n256-exact` before benchmark repeats. Expected token hash `58f6e8251c7a0a17e8c441278b5861f7d5da914fa1823ecd10484b296f2d7537`; observed `e9e4aba8f7af253645a925ea8278df7a0e9a38154f379db96ea8fd5f13fc1f67`. Reject and do not submit to LocalMaxxing. The active source and venv sampler patches were removed. Artifacts: `notes/2026-05-19-minimax-greedy-skip-fp32-currentbase-quality-fail.md`, `data/minimax-m27-greedy-skip-fp32-currentbase-quality-fail-20260519.json`, `patches/minimax-greedy-skip-fp32-currentbase-quality-fail-20260519.md`.
-- `VLLM_MINIMAX_ATTN_POST_REDUCE_RMS_XPU=1` preserved the normal attention output allreduce order and replaced only the post-reduce residual-add + RMSNorm step with a small SYCL helper. A direct helper microcheck was bit-exact against the intended FP32-add/RMS formula, but the integrated model failed `raw145-n64-exact`: expected `267cbf30208d84929ee79284ac695467f7e80597bf8694130e1e1f8b180eb5bd`, observed `cd6c4f7e39506f6038de1425e1a40c0512200de409c9cfee1f681d5b2be069f7`. The failed graph compiled in `146.33 s` and reported only `9.52 tok/s`; reject and do not submit to LocalMaxxing. Artifacts: `notes/2026-05-19-minimax-attn-post-reduce-rms-xpu-quality-fail.md`, `data/minimax-m27-attn-post-reduce-rms-xpu-quality-fail-20260519.json`, `patches/minimax-attn-post-reduce-rms-xpu-quality-fail-20260519.md`.
+- MiniMax MoE callable-cache patch passed full quality and measured `88.549265` output tok/s / `118.065687` total tok/s, but the delta was inside normal run noise. Same-cache A/B later measured cache-on `88.404703` and cache-off `88.056668`; reject.
+- `VLLM_XPU_GREEDY_SKIP_LOGITS_FP32=1` passed `raw145-n64-exact` but failed `raw145-n256-exact` on the current clean baseline. Reject as not quality-preserving under the current compiled graph/runtime recipe.
+- `VLLM_MINIMAX_ATTN_POST_REDUCE_RMS_XPU=1` was bit-exact in a direct helper microcheck but failed integrated `raw145-n64-exact` and compiled slowly. Reject.
 - Exact-shape XCCL microbench found raw decode-sized allreduces at about `15-17 us`; full-model loss is dominated by framework/compiler/graph boundaries around collectives, not raw CCL latency alone.
 - `VLLM_XPU_CUSTOM_ALLREDUCE_INPLACE_MAX_NUMEL=4096` and `=2048` both passed quality but were slower than dtype-specific tiny-FP32 routing. Keep generic in-place threshold unset or `0`.
 - `MAX_BATCHED_TOKENS=768` on top of the clone-safe custom-allreduce recipe passed early gates but failed the extended sixpack with nondeterministic greedy output. Keep MBT512.
@@ -77,8 +70,8 @@ The quality-preserving Qwen targets remain separate from MiniMax AutoRound:
 
 ## Next Optimization Targets
 
-- Use the clean direct Q/K variance in-place scale path as the reproduction-safe baseline for future code work, while measuring against the faster skip-clone speed headline.
-- Keep `VLLM_XPU_CUSTOM_ALLREDUCE_INPLACE_MAX_NUMEL=0` for promoted runs; generic thresholds are quality-safe but slower than dtype-specific tiny-FP32 routing.
+- Use the MoE output-allreduce-inside-custom-op result as the current strict baseline for future code work.
+- Keep `VLLM_XPU_CUSTOM_ALLREDUCE_INPLACE_MAX_NUMEL=0`; generic thresholds are quality-safe but slower than dtype-specific tiny-FP32 routing.
 - Continue targeting true XPU fused-boundary work: hidden allreduce plus residual/RMSNorm, Q/K variance allreduce plus Q/K RMS apply, MoE output plus epilogue, and final lm-head/projection boundaries.
 - Preserve vLLM's proven allreduce semantics unless a candidate has an exact repeatability proof across fresh graph/cache captures.
 - Keep strict quality gates as promotion blockers; do not promote logits/router/argmax shortcuts unless they pass raw exact hashes, semantic checks, arithmetic repeat, and extended sixpack.
