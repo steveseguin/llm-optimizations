@@ -9,40 +9,38 @@ Current strict quality-passed speed result:
 - Model: `Lasimeri/MiniMax-M2.7-int4-AutoRound`
 - Hardware: 4x Intel Arc Pro B70 32GB
 - Engine: vLLM `0.20.1-local`, XPU TP4
-- Recipe: FP16 activations, AutoRound INT4 W4A16, default XPU FlashAttention v2, XPU PIECEWISE graph, exact MiniMax router-logits path feeding llm-scaler INT4 MoE work-sharing decode with `VLLM_XPU_USE_LLM_SCALER_MOE_WS=1`, `VLLM_XPU_USE_LLM_SCALER_MOE_MINIMAX_LOGITS_WS=1`, `VLLM_MINIMAX_M2_ATTN_DELAY_ALLREDUCE=0`, and clone-safe compiled allreduce custom-op via `VLLM_XPU_COMPILE_ALLREDUCE_CUSTOM_OP=1` plus `VLLM_XPU_CUSTOM_ALLREDUCE_CLONE_INPUT=1`
+- Recipe: FP16 activations, AutoRound INT4 W4A16, default XPU FlashAttention v2, XPU PIECEWISE graph, exact MiniMax router-logits path feeding llm-scaler INT4 MoE work-sharing decode with `VLLM_XPU_USE_LLM_SCALER_MOE_WS=1`, `VLLM_XPU_USE_LLM_SCALER_MOE_MINIMAX_LOGITS_WS=1`, `VLLM_MINIMAX_M2_ATTN_DELAY_ALLREDUCE=0`, clone-safe compiled allreduce custom-op via `VLLM_XPU_COMPILE_ALLREDUCE_CUSTOM_OP=1` plus `VLLM_XPU_CUSTOM_ALLREDUCE_CLONE_INPUT=1`, and shape-gated clone elision for tiny FP32 allreduces via `VLLM_XPU_CUSTOM_ALLREDUCE_SKIP_CLONE_FP32_MAX_NUMEL=2`.
 - Shape: p512/n1536, ctx2048, batch 1
-- Result: `87.279129` output tok/s, `116.372172` total tok/s, mean of four clean long repeats
+- Result: `88.748424` output tok/s, `118.331232` total tok/s, mean of four clean long repeats
 - Quality: raw145 exact n64/n256 hashes, semantic suite, 16-repeat arithmetic, and extended sixpack all passed before benchmarking
-- Delta: `+5.92%` output tok/s over the previous no-attention-delay strict promoted result and `+8.28%` over the earlier MoE-WS FlashAttention/PIECEWISE baseline
-- LocalMaxxing: `cmpbsqm4l001qpc0199azisgz`
+- Delta: `+1.53%` output tok/s over the previous clone-safe custom-allreduce promoted result and `+7.53%` over the previous no-attention-delay strict promoted result
+- LocalMaxxing: `cmpbz7lyc004rpc019jburzqv`
 
 Primary artifacts:
 
-- `notes/2026-05-18-minimax-clone-safe-custom-allreduce-win.md`
-- `data/minimax-m27-clone-safe-custom-allreduce-win-20260518.json`
-- `data/localmaxxing-minimax-m27-autoround-clone-safe-custom-allreduce-p512n1536-20260518.payload.json`
-- `data/localmaxxing-responses/minimax-m27-autoround-clone-safe-custom-allreduce-p512n1536-20260518.response.json`
-- `patches/minimax-clone-safe-custom-allreduce-20260518.patch`
-- `patches/minimax-strict-harness-custom-allreduce-clone-env-capture-20260518.patch`
+- `notes/2026-05-18-minimax-qkvar-skipclone-fp32n2-win.md`
+- `data/minimax-m27-qkvar-skipclone-fp32n2-win-20260518.json`
+- `data/localmaxxing-minimax-m27-autoround-qkvar-skipclone-fp32n2-p512n1536-20260518.payload.json`
+- `data/localmaxxing-responses/minimax-m27-autoround-qkvar-skipclone-fp32n2-p512n1536-20260518.response.json`
+- `patches/minimax-qkvar-skipclone-fp32n2-20260518.patch`
 
 Previous promoted MiniMax baselines:
 
+- Clone-safe custom allreduce without tiny-FP32 clone elision: `87.279129` output tok/s, `116.372172` total tok/s, LocalMaxxing `cmpbsqm4l001qpc0199azisgz`.
 - No-attention-delay logits-WS baseline without clone-safe compiled allreduce custom-op: `82.404268` output tok/s, `109.872357` total tok/s, LocalMaxxing `cmpbifcx3013bmn01747cxix8`.
 - Delayed-attention logits-WS baseline: `81.758267` output tok/s, `109.011023` total tok/s, LocalMaxxing `cmpay7th600bbmn01v6csyaro`.
 - Earlier MoE-WS FlashAttention/PIECEWISE baseline: `80.602755` output tok/s, `107.470340` total tok/s, LocalMaxxing `cmpasdq5v007nmn019elaut3s`.
 
+Current caveat:
+
+- The tiny-FP32 no-clone path is quality-clean on the current stack, but PyTorch emits a custom-op aliasing warning and says this behavior may become an error in a future release.
+- The cleaner follow-up is a non-aliasing custom-op output for small FP32 allreduces or a fused Q/K variance allreduce plus RMS apply path.
+
 Recent rejections and screens:
 
-- `MAX_BATCHED_TOKENS=768` was retested on top of the current clone-safe custom-allreduce recipe.
-- It passed raw145 n64/n256 exact hashes, semantic suite, and 16-repeat arithmetic, but failed the extended sixpack with nondeterministic greedy token output on the sort/list prompt.
-- No benchmark or LocalMaxxing submission was made; keep `MAX_BATCHED_TOKENS=512` for the promoted clone-safe custom-allreduce path.
-- Artifacts: `notes/2026-05-18-minimax-clone-custom-allreduce-mbt768-quality-fail.md`, `data/minimax-m27-clone-custom-allreduce-mbt768-quality-fail-20260518.json`
-
-- `VLLM_XPU_COMPILE_OUT_OF_PLACE_ALLREDUCE=1` was tested as a quality-safe alternative to the clone-safe compiled custom allreduce path.
-- It passed raw145 n64/n256 exact hashes, semantic suite, 16-repeat arithmetic, and extended sixpack with the promoted hashes.
-- Result: `82.288077` output tok/s and `109.717436` total tok/s mean, below the promoted `87.279129` / `116.372172` clone-safe custom allreduce result.
-- No LocalMaxxing submission was made because this is quality-safe but slower than the promoted baseline.
-- Artifacts: `notes/2026-05-18-minimax-functional-outofplace-allreduce-negative.md`, `data/minimax-m27-functional-outofplace-allreduce-negative-20260518.json`
+- `MAX_BATCHED_TOKENS=768` on top of the clone-safe custom-allreduce recipe passed early gates but failed the extended sixpack with nondeterministic greedy output. Keep MBT512.
+- `VLLM_XPU_COMPILE_OUT_OF_PLACE_ALLREDUCE=1` passed full quality but only reached `82.288077` output tok/s, below the promoted custom-op path.
+- `VLLM_XPU_CUSTOM_ALLREDUCE_GRAPH_CLONE_INPUT=1` with internal custom-op clone disabled completed AOT graph compilation but hung before producing the first raw145 n64 quality JSON.
 
 Detailed historical candidate screens remain in `notes/` and `data/`. The local lab copy of `CURRENT.md` preserves the longer running chronology.
 
@@ -56,7 +54,8 @@ The quality-preserving Qwen targets remain separate from MiniMax AutoRound:
 
 ## Next Optimization Targets
 
-- Use the clone-safe custom allreduce MiniMax result as the new strict baseline.
-- Target true XPU fused-boundary work: Q/K RMS variance allreduce plus apply, hidden allreduce plus residual/RMSNorm, and attention output allreduce plus post-attention normalization.
+- Make the tiny-FP32 custom allreduce path alias-correct without reintroducing the Python-side clone cost.
+- Fuse Q/K variance allreduce with Q/K RMS apply if it preserves the exact restored-weight output hashes.
+- Continue targeting true XPU fused-boundary work: hidden allreduce plus residual/RMSNorm, MoE output plus epilogue, and final lm-head/projection boundaries.
 - Keep strict quality gates as promotion blockers; do not promote logits/router/argmax shortcuts unless they pass raw exact hashes, semantic checks, arithmetic repeat, and extended sixpack.
 - Keep speculative decode optional and quality-gated; no current promoted MiniMax result uses speculation.
