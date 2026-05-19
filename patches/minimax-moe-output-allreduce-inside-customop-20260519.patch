@@ -1,0 +1,87 @@
+diff --git a/vllm/model_executor/layers/fused_moe/runner/moe_runner.py b/vllm/model_executor/layers/fused_moe/runner/moe_runner.py
+--- a/vllm/model_executor/layers/fused_moe/runner/moe_runner.py
++++ b/vllm/model_executor/layers/fused_moe/runner/moe_runner.py
+@@
+ def _minimax_moe_final_inplace_allreduce_enabled() -> bool:
+     return os.environ.get("VLLM_MINIMAX_MOE_FINAL_INPLACE_ALLREDUCE", "0") == "1"
+ 
+ 
++def _minimax_moe_output_allreduce_inside_custom_op_enabled() -> bool:
++    return (
++        os.environ.get(
++            "VLLM_MINIMAX_MOE_OUTPUT_ALLREDUCE_INSIDE_CUSTOM_OP", "0"
++        )
++        == "1"
++    )
++
++
+ def get_layer_from_name(layer_name: str) -> torch.nn.Module:
+@@
+     def _maybe_reduce_shared_expert_output(
+         self,
+         shared_output: torch.Tensor | None,
+     ) -> torch.Tensor | None:
+@@
+         ):
+             shared_output = tensor_model_parallel_all_reduce(shared_output)
+         return shared_output
+ 
++    def _allreduce_output_inside_custom_op_active(self) -> bool:
++        return (
++            _minimax_moe_output_allreduce_inside_custom_op_enabled()
++            and self._shared_experts is None
++            and self.routed_output_transform is None
++            and not self.moe_config.is_sequence_parallel
++            and (self.moe_config.tp_size > 1 or self.moe_config.ep_size > 1)
++            and not self._fused_output_is_reduced
++            and not _minimax_moe_delay_allreduce_enabled()
++        )
++
+     def _maybe_reduce_final_output(
+         self,
+         states: torch.Tensor,
+         trunc_size: int,
+@@
+             not self.moe_config.is_sequence_parallel
+             and (self.moe_config.tp_size > 1 or self.moe_config.ep_size > 1)
+             and not self._fused_output_is_reduced
++            and not self._allreduce_output_inside_custom_op_active()
+             and not getattr(self, "_last_quant_output_reduced", False)
+             and not _minimax_moe_delay_allreduce_enabled()
+         ):
+@@
+         Orchestrates shared expert execution (before/after), expert selection
+         via the router, and the actual fused MoE computation. Returns
+         (shared_expert_output, fused_expert_output).
+         """
++        self._last_quant_output_reduced = False
+         self._maybe_apply_shared_experts(
+             shared_experts_input, SharedExpertsOrder.NO_OVERLAP
+         )
+@@
+                 shared_experts_input=shared_experts_input,
+             )
+ 
++        if (
++            self._allreduce_output_inside_custom_op_active()
++            and shared_experts_input is None
++        ):
++            fused_out = tensor_model_parallel_all_reduce(fused_out)
++            self._last_quant_output_reduced = True
++
+         self._maybe_apply_shared_experts(
+             shared_experts_input,
+             SharedExpertsOrder.MULTI_STREAM_OVERLAPPED,
+diff --git a/scripts/run-minimax-strict-quality-gated-candidate.sh b/scripts/run-minimax-strict-quality-gated-candidate.sh
+--- a/scripts/run-minimax-strict-quality-gated-candidate.sh
++++ b/scripts/run-minimax-strict-quality-gated-candidate.sh
+@@
+     --arg vllm_minimax_moe_delay_allreduce "${VLLM_MINIMAX_MOE_DELAY_ALLREDUCE:-}" \
+     --arg vllm_minimax_moe_final_inplace_allreduce "${VLLM_MINIMAX_MOE_FINAL_INPLACE_ALLREDUCE:-}" \
++    --arg vllm_minimax_moe_output_allreduce_inside_custom_op "${VLLM_MINIMAX_MOE_OUTPUT_ALLREDUCE_INSIDE_CUSTOM_OP:-}" \
+     --arg vllm_minimax_moe_immediate_residual_allreduce "${VLLM_MINIMAX_MOE_IMMEDIATE_RESIDUAL_ALLREDUCE:-}" \
+@@
+         VLLM_MINIMAX_MOE_DELAY_ALLREDUCE: $vllm_minimax_moe_delay_allreduce,
+         VLLM_MINIMAX_MOE_FINAL_INPLACE_ALLREDUCE: $vllm_minimax_moe_final_inplace_allreduce,
++        VLLM_MINIMAX_MOE_OUTPUT_ALLREDUCE_INSIDE_CUSTOM_OP: $vllm_minimax_moe_output_allreduce_inside_custom_op,
+         VLLM_MINIMAX_MOE_IMMEDIATE_RESIDUAL_ALLREDUCE: $vllm_minimax_moe_immediate_residual_allreduce,
