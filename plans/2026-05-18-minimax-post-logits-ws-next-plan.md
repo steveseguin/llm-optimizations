@@ -7,9 +7,9 @@ Date: 2026-05-18
 - Model: `Lasimeri/MiniMax-M2.7-int4-AutoRound`
 - Hardware: 4x Intel Arc Pro B70 32GB
 - Engine: vLLM `0.20.1-local`, XPU TP4
-- Current strict result: `81.758267` output tok/s, `109.011023` total tok/s
-- Confirmation repeat: `81.197954` output tok/s, `108.263938` total tok/s
-- LocalMaxxing id: `cmpay7th600bbmn01v6csyaro`
+- Current strict result: `87.279129` output tok/s, `116.372172` total tok/s
+- Current recipe: clone-safe compiled custom allreduce on top of exact MiniMax logits-to-work-sharing llm-scaler INT4 MoE, no delayed attention allreduce, FlashAttention/PIECEWISE graph, MBT512.
+- LocalMaxxing id: `cmpbsqm4l001qpc0199azisgz`
 
 ## Rules
 
@@ -69,6 +69,7 @@ Date: 2026-05-18
    - Method: avoid token-selection shortcuts unless they are exact under the strict gate. Prefer diagnostics or narrow patches that reduce kernel launches/copies around final logits, MoE output, or residual allreduce without changing routing, quantization, or sampling semantics.
    - Gate: raw145 n64 and n256 exact first, then semantic, arithmetic-repeat, extended sixpack, and at least two p512/n1536 benchmark repeats before promotion.
    - Update: retesting `MAX_BATCHED_TOKENS=768` on top of the newer clone-safe custom-allreduce recipe failed the extended sixpack with nondeterministic greedy output after passing the earlier gates. Do not pursue MBT reties unchanged; go back to exact collective-boundary/epilogue work.
+   - Update: the functional out-of-place allreduce path (`VLLM_XPU_COMPILE_OUT_OF_PLACE_ALLREDUCE=1`) passed the full strict quality suite, but only reached `82.288077` output tok/s and `109.717436` total tok/s, below the promoted clone-safe custom allreduce result. Keep it as a quality-safe diagnostic baseline, not a promoted path.
 
 10. Completed: MiniMax WS top-k-only reuse.
    - Reason: test a narrower graph-lifetime hypothesis than the earlier full internal scratch reuse failure by reusing only top-k tensors inside the MiniMax WS op.
