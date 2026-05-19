@@ -1,0 +1,91 @@
+{
+  "label": "minimax-fullforward-max1-20260519",
+  "date": "2026-05-19",
+  "status": "quality_passed_performance_regression",
+  "model": "Lasimeri/MiniMax-M2.7-int4-AutoRound",
+  "hardware": "4x Intel Arc Pro B70 32GB",
+  "engine": "vLLM 0.20.1-local XPU TP4",
+  "shape": {
+    "prompt_tokens": 512,
+    "output_tokens": 1536,
+    "context_length": 2048,
+    "batch_size": 1,
+    "tensor_parallel": 4,
+    "max_num_batched_tokens": 512,
+    "block_size": 256
+  },
+  "candidate_env": {
+    "VLLM_MINIMAX_MOE_FULL_FORWARD_CUSTOM_OP": "1",
+    "VLLM_MINIMAX_MOE_FULL_FORWARD_CUSTOM_OP_MAX_TOKENS": "1",
+    "VLLM_MINIMAX_POST_ATTN_NORM_MOE_CUSTOM_OP": "0",
+    "VLLM_MINIMAX_POST_ATTN_NORM_MOE_CUSTOM_OP_MAX_TOKENS": "4",
+    "VLLM_MINIMAX_MOE_OUTPUT_ALLREDUCE_INSIDE_CUSTOM_OP": "1",
+    "VLLM_MINIMAX_QK_RMS_XPU_HELPER": "1",
+    "VLLM_MINIMAX_QK_RMS_XPU_HELPER_MAX_TOKENS": "4",
+    "VLLM_MINIMAX_QK_RMS_DIRECT_INPLACE_SCALE": "1",
+    "VLLM_MINIMAX_QK_RMS_APPLY_TP_SCALE": "0",
+    "VLLM_XPU_COMPILE_ALLREDUCE_CUSTOM_OP": "1",
+    "VLLM_XPU_CUSTOM_ALLREDUCE_CLONE_INPUT": "1",
+    "VLLM_XPU_CUSTOM_ALLREDUCE_TINY_FP32_INPLACE_MAX_NUMEL": "2",
+    "VLLM_XPU_CUSTOM_ALLREDUCE_INPLACE_MAX_NUMEL": "0",
+    "VLLM_XPU_COMPILE_OUT_OF_PLACE_ALLREDUCE": "0",
+    "VLLM_XPU_USE_LLM_SCALER_MOE": "1",
+    "VLLM_XPU_USE_LLM_SCALER_MOE_WS": "1",
+    "VLLM_XPU_USE_LLM_SCALER_MOE_MINIMAX_LOGITS_WS": "1",
+    "VLLM_XPU_LLM_SCALER_MOE_CACHE_MINIMAX_LOGITS_OP": "0",
+    "VLLM_MINIMAX_M2_ATTN_DELAY_ALLREDUCE": "0",
+    "VLLM_XPU_ENABLE_XPU_GRAPH": "1",
+    "VLLM_XPU_FORCE_GRAPH_WITH_COMM": "1",
+    "VLLM_XPU_GRAPH_NOOP_COMM_CAPTURE": "1",
+    "CCL_TOPO_P2P_ACCESS": "1"
+  },
+  "quality": {
+    "status": "passed",
+    "raw145_n64_token_sha256": "267cbf30208d84929ee79284ac695467f7e80597bf8694130e1e1f8b180eb5bd",
+    "raw145_n256_token_sha256": "58f6e8251c7a0a17e8c441278b5861f7d5da914fa1823ecd10484b296f2d7537",
+    "semantic_suite_token_sha256": "adacbf144264486ea7d378ebb6a4c0ba23951b72c4cf86251a762b07ebef5805",
+    "arithmetic_repeat_n64_r16_token_sha256": "578ec378bf31cb16fb49ac5c0043270fd00a0f7898e18ac498a41ffe775d7994",
+    "extended_sixpack_n64_r2_token_sha256": "1e3560554f57b2b56cec8f49f28bc8ba12e9e0ced26bdc99a976f1433c99caa7",
+    "semantic_suite_passed": true,
+    "deterministic": true,
+    "quality_reducing_changes": false
+  },
+  "performance": {
+    "output_toks_per_second": [
+      88.3174861104427,
+      89.54408153446087,
+      89.33442877052246,
+      88.93157749735276
+    ],
+    "total_toks_per_second": [
+      117.75664814725693,
+      119.39210871261449,
+      119.11257169402995,
+      118.57543666313701
+    ],
+    "mean_output_toks_per_second": 89.0318934781947,
+    "mean_total_toks_per_second": 118.70919130425959,
+    "current_promoted_output_toks_per_second": 89.31419538094708,
+    "current_promoted_total_toks_per_second": 119.08559384126276,
+    "output_delta_toks_per_second": -0.2823019027523799,
+    "output_delta_percent": -0.3160773061306689,
+    "total_delta_toks_per_second": -0.37640253700317317,
+    "total_delta_percent": -0.316077306130669
+  },
+  "artifacts": {
+    "summary_json": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-minimax-fullforward-max1-20260519-strict-tp4-ctx2048-mbt512-bs256-20260519T174710Z-summary.json",
+    "quality_dir": "/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-minimax-fullforward-max1-20260519-strict-tp4-ctx2048-mbt512-bs256-20260519T174710Z-quality",
+    "benchmark_jsons": [
+      "/home/steve/bench-results/minimax-m2.7-strict-candidates/vllm-minimax-m27-autoround-tp4-p512n1536-20260519T180256Z.json",
+      "/home/steve/bench-results/minimax-m2.7-strict-candidates/vllm-minimax-m27-autoround-tp4-p512n1536-20260519T180547Z.json",
+      "/home/steve/bench-results/minimax-m2.7-strict-candidates/vllm-minimax-m27-autoround-tp4-p512n1536-20260519T180836Z.json",
+      "/home/steve/bench-results/minimax-m2.7-strict-candidates/vllm-minimax-m27-autoround-tp4-p512n1536-20260519T181125Z.json"
+    ],
+    "note": "notes/2026-05-19-minimax-moe-full-forward-max1-negative.md"
+  },
+  "localmaxxing": {
+    "submitted": false,
+    "reason": "quality-safe but below the current promoted mean"
+  },
+  "decision": "reject_performance"
+}
