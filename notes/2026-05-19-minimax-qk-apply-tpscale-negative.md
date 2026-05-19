@@ -65,7 +65,28 @@ It is also below the warning-prone speed headline:
 
 Reject for promotion.
 
-The candidate is quality-safe in the screen gate, but the speed result is below the current clean high and the delta is too small to justify a longer full validation run. The separate `qk_var.mul_(1 / tp_world)` is not the bottleneck worth chasing in isolation.
+### 2026-05-19 Strict Retest On Current High
+
+The candidate was retested on top of the current promoted
+`VLLM_MINIMAX_MOE_OUTPUT_ALLREDUCE_INSIDE_CUSTOM_OP=1` stack with the full
+strict gate enabled:
+
+- Label: `minimax-qk-apply-tpscale-plus-moe-output-ar-20260519`
+- Summary: `/home/steve/bench-results/minimax-m2.7-strict-candidates/minimax-minimax-qk-apply-tpscale-plus-moe-output-ar-20260519-strict-tp4-ctx2048-mbt512-bs256-20260519T145936Z-summary.json`
+- `raw145-n64-exact`: passed
+- `raw145-n256-exact`: failed exact token hash
+- Expected n256 hash: `58f6e8251c7a0a17e8c441278b5861f7d5da914fa1823ecd10484b296f2d7537`
+- Observed n256 hash: `e9e4aba8f7af253645a925ea8278df7a0e9a38154f379db96ea8fd5f13fc1f67`
+- Benchmark: skipped
+
+This stricter retest changes the candidate status from "quality-safe but
+slower" to "not quality-safe on the current promoted stack." The old microcheck
+remains useful for validating the helper in isolation, but it is not enough for
+model-level promotion.
+
+The separate `qk_var.mul_(1 / tp_world)` is still not the bottleneck worth
+chasing in isolation, and folding it into the apply helper can perturb the
+model output under the current graph/custom-op stack.
 
 Do not submit this result to LocalMaxxing. It is useful as a negative data point and as evidence that future Q/K work should fuse a larger boundary than only the scalar scale multiply.
 
